@@ -4,5 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+config = { path = "../lib/config/" }
+log = { path = "../lib/log/" }
 riscv-rt = "0.12.2"
 sbi-rt = { version = "0.0.3", features = ["legacy"] }
+
+[build-dependencies]
+config = { path = "../lib/config/" }

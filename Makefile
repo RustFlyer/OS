@@ -39,8 +39,8 @@ $(KERNEL_ASM): $(KERNEL_ELF)
 	@echo "Updated: $(KERNEL_ASM)"
 
 # Phony targets
-PHONY += build_docker
-build_docker:
+PHONY += build2docker
+build2docker:
 	@docker build -t ${DOCKER_NAME} .
 
 PHONY += docker

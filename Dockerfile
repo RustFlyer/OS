@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
-FROM ubuntu:20.04
+FROM ubuntu:22.04
 
-ARG QEMU_VERSION=7.0.0
+ARG QEMU_VERSION=9.0.0
 ARG HOME=/root
 
 # 0. Install general tools
@@ -19,6 +19,10 @@ RUN apt-get update && \
 # - https://wiki.qemu.org/Documentation/Platforms/RISCV
 # - https://risc-v-getting-started-guide.readthedocs.io/en/latest/linux-qemu.html
 
+RUN apt-get update && apt-get install -y xz-utils && \
+    wget https://download.qemu.org/qemu-${QEMU_VERSION}.tar.xz && \
+    tar xvJf qemu-${QEMU_VERSION}.tar.xz
+
 # 1.1. Download source
 WORKDIR ${HOME}
 RUN wget https://download.qemu.org/qemu-${QEMU_VERSION}.tar.xz && \
@@ -31,6 +35,8 @@ RUN apt-get install -y \
     gawk build-essential bison flex texinfo gperf libtool patchutils bc \
     zlib1g-dev libexpat-dev git \
     ninja-build pkg-config libglib2.0-dev libpixman-1-dev libsdl2-dev
+
+RUN apt-get update && apt-get install -y python3-venv python3-pip python3-setuptools
 
 # 1.3. Build and install from source
 WORKDIR ${HOME}/qemu-${QEMU_VERSION}
@@ -55,7 +61,7 @@ RUN qemu-system-riscv64 --version && \
 ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
     PATH=/usr/local/cargo/bin:$PATH \
-    RUST_VERSION=nightly-2024-02-01 \
+    RUST_VERSION=nightly-2025-03-05 \
     PROFILE=default
 RUN set -eux; \
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o rustup-init; \
@@ -74,6 +80,9 @@ RUN rustup target add riscv64gc-unknown-none-elf && \
     rustup component add rust-src && \
     rustup component add llvm-tools && \
     cargo install --locked cargo-binutils
+
+RUN apt-get update && apt-get upgrade -y
+RUN apt-get install -y libc6
 
 # Ready to go
 WORKDIR ${HOME}
