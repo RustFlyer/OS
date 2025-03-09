@@ -2,6 +2,10 @@ ifeq ($(MODE), release)
 	MODE_ARG = --release
 endif
 
+ifeq ($(DEBUG), on)
+	DEBUG_ARG = --cfg ondebug
+endif
+
 PHONY := all
 all: build
 
@@ -11,6 +15,6 @@ env:
 
 PHONY += build
 build: env
-	@cargo build $(MODE_ARG)
+	@RUSTFLAGS="$(DEBUG_ARG)" cargo build $(MODE_ARG) 
 
 .PHONY: $(PHONY)

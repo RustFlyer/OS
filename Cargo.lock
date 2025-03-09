@@ -3,8 +3,25 @@
 version = 4
 
 [[package]]
+name = "cfg-if"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
+
+[[package]]
 name = "config"
 version = "0.1.0"
+
+[[package]]
+name = "crate_interface"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "70272a03a2cef15589bac05d3d15c023752f5f8f2da8be977d983a9d9e6250fb"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "critical-section"
@@ -22,15 +39,29 @@ checksum = "361a90feb7004eca4019fb28352a9465666b24f840f5c3cddf0ff13920590b89"
 name = "kernel"
 version = "0.1.0"
 dependencies = [
+ "cfg-if",
  "config",
+ "crate_interface",
  "log",
+ "logger",
  "riscv-rt",
  "sbi-rt",
+ "simdebug",
 ]
 
 [[package]]
 name = "log"
+version = "0.4.26"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "30bde2b3dc3671ae49d8e2e9f044c7c005836e7a023ee57cffa25ab82764bb9e"
+
+[[package]]
+name = "logger"
 version = "0.1.0"
+dependencies = [
+ "crate_interface",
+ "log",
+]
 
 [[package]]
 name = "proc-macro2"
@@ -95,6 +126,13 @@ name = "sbi-spec"
 version = "0.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6e36312fb5ddc10d08ecdc65187402baba4ac34585cb9d1b78522ae2358d890"
+
+[[package]]
+name = "simdebug"
+version = "0.1.0"
+dependencies = [
+ "cfg-if",
+]
 
 [[package]]
 name = "syn"

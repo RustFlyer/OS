@@ -5,9 +5,17 @@ edition = "2024"
 
 [dependencies]
 config = { path = "../lib/config/" }
-log = { path = "../lib/log/" }
+logger = { path = "../lib/logger/" }
+simdebug = { path = "../lib/simdebug/" }
 riscv-rt = "0.12.2"
 sbi-rt = { version = "0.0.3", features = ["legacy"] }
+log = "0.4"
+crate_interface = "0.1"
+cfg-if = "1.0"
 
 [build-dependencies]
 config = { path = "../lib/config/" }
+logger = { path = "../lib/logger/" }
+simdebug = { path = "../lib/simdebug/" }
+
+ 
