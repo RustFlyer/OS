@@ -5,3 +5,6 @@ pub const RAM_SIZE: usize = 128 * 1024 * 1024;
 pub const KERNEL_OFFSET: usize = 0x20_0000;
 pub const KERNEL_START_PHYS: usize = RAM_START + KERNEL_OFFSET;
 pub const KERNEL_START: usize = VIRT_START + KERNEL_OFFSET;
+
+pub const APP_BASE_ADDRESS: usize = 0x1000_0000;
+pub const APP_SIZE_LIMIT: usize = 1024 * 1024 * 1024;
