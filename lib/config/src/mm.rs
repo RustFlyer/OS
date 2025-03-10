@@ -26,16 +26,20 @@ pub const KERNEL_HEAP_SIZE: usize = 32 * 1024 * 1024;
 pub const ADDRESS_WIDTH: usize = 64;
 /// Page size
 pub const PAGE_SIZE: usize = 4096;
-/// Length of page offset
+/// Width of page offset
 pub const PAGE_OFFSET_WIDTH: usize = 12;
-/// Length of a physical address in Sv39
+/// Width of a physical address in Sv39
 pub const PA_WIDTH_SV39: usize = 56;
-/// Length of a virtual address in Sv39
+/// Width of a virtual address in Sv39
 pub const VA_WIDTH_SV39: usize = 39;
-/// Length of a physical page number in Sv39
+/// Width of a physical page number in Sv39
 pub const PPN_WIDTH_SV39: usize = PA_WIDTH_SV39 - PAGE_OFFSET_WIDTH;
-/// Length of a virtual page number in Sv39
+/// Width of a virtual page number in Sv39
 pub const VPN_WIDTH_SV39: usize = VA_WIDTH_SV39 - PAGE_OFFSET_WIDTH;
 
 pub const APP_BASE_ADDRESS: usize = 0x1000_0000;
 pub const APP_SIZE_LIMIT: usize = 1024 * 1024 * 1024;
+
+unsafe extern "C" {
+    pub fn _ekernel();
+}

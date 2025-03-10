@@ -20,18 +20,27 @@ global_asm!(include_str!("entry.S"));
 #[unsafe(no_mangle)]
 pub fn rust_main() -> ! {
     logger::init();
-    unsafe { mm::heap::init_heap_allocator() };
-    log::info!("Hello, world!");
+    log::info!("test info");
     log::error!("test error");
     log::warn!("test warn");
     log::debug!("test debug");
     log::trace!("test trace");
-    log::info!("when debug2");
     simdebug::when_debug!({
         log::info!("when debug");
-        log::info!("when debug");
-        log::info!("when debug");
     });
+    log::info!(
+        "kernel physical memory: {:#x} - {:#x}",
+        config::mm::KERNEL_START_PHYS,
+        config::mm::_ekernel as usize
+    );
+    log::info!(
+        "kernel virtual memory: {:#x} - {:#x}",
+        config::mm::KERNEL_START,
+        config::mm::_ekernel as usize + config::mm::KERNEL_VM_OFFSET
+    );
+
+    unsafe { mm::heap::init_heap_allocator() };
+
     sbi::shutdown(false);
     loop {}
 }

@@ -142,7 +142,10 @@ dependencies = [
  "bitflags",
  "buddy_system_allocator",
  "config",
+ "id_allocator",
+ "lazy_static",
  "log",
+ "mutex",
 ]
 
 [[package]]

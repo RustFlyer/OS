@@ -1,14 +1,12 @@
 //! Kernel heap allocator
-//! 
+//!
 //! Currently, we use the buddy system allocator for the kernel heap.
 
 use core::alloc::Layout;
 
 use buddy_system_allocator as buddy;
 
-use config::mm::KERNEL_HEAP_SIZE;
-
-extern crate alloc;
+use config::mm::{KERNEL_HEAP_SIZE, KERNEL_VM_OFFSET};
 
 static mut KERNEL_HEAP: [u8; KERNEL_HEAP_SIZE] = [0; KERNEL_HEAP_SIZE];
 
@@ -20,7 +18,7 @@ fn alloc_error_handler(layout: Layout) -> ! {
     panic!("heap allocation error, layout = {:?}", layout)
 }
 
-/// Initialize heap allocator
+/// Initializes heap allocator.
 ///
 /// # Safety
 ///
@@ -30,12 +28,12 @@ pub unsafe fn init_heap_allocator() {
     unsafe {
         // SAFETY: we are the only one using the heap
         #[allow(static_mut_refs)]
-        let start_addr = KERNEL_HEAP.as_ptr() as usize;
+        let start_addr = KERNEL_HEAP.as_ptr() as usize + KERNEL_VM_OFFSET;
 
         HEAP_ALLOCATOR.lock().init(start_addr, KERNEL_HEAP_SIZE);
 
         log::info!(
-            "[kernel] heap initialized: {:#x} - {:#x}",
+            "heap memory: {:#x} - {:#x}",
             start_addr,
             start_addr + KERNEL_HEAP_SIZE
         );

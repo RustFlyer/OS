@@ -5,7 +5,7 @@
 //! between these types.
 
 use config::mm::{
-    PA_WIDTH_SV39, PAGE_SIZE, PPN_WIDTH_SV39, VA_WIDTH_SV39, VPN_WIDTH_SV39,
+    KERNEL_VM_OFFSET, PA_WIDTH_SV39, PAGE_SIZE, PPN_WIDTH_SV39, VA_WIDTH_SV39, VPN_WIDTH_SV39,
 };
 
 /// An address in physical memory defined in Sv39.
@@ -54,6 +54,13 @@ impl PhysAddr {
         let page_num = (self.addr / PAGE_SIZE) & ppn_mask;
         PhysPageNum::new(page_num)
     }
+
+    /// Translates a physical address into a virtual address, if the PA is in the
+    /// kernel space.
+    pub fn to_va_kernel(self) -> VirtAddr {
+        let va = self.addr + KERNEL_VM_OFFSET;
+        VirtAddr::new(va)
+    }
 }
 
 /// An address in virtual memory defined in Sv39.
@@ -98,9 +105,16 @@ impl VirtAddr {
 
     /// Gets the page number where the address resides.
     pub fn page_number(self) -> VirtPageNum {
-        let vpn_mask = (1 << VA_WIDTH_SV39) - 1;
+        let vpn_mask = (1 << VPN_WIDTH_SV39) - 1;
         let page_num = (self.addr / PAGE_SIZE) & vpn_mask;
-        VirtPageNum { page_num }
+        VirtPageNum::new(page_num)
+    }
+
+    /// Translates a virtual address into a physical address, if the VA is in the
+    /// kernel space.
+    pub fn to_pa_kernel(self) -> PhysAddr {
+        let pa = self.addr - KERNEL_VM_OFFSET;
+        PhysAddr::new(pa)
     }
 }
 

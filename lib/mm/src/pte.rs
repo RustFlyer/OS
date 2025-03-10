@@ -30,6 +30,9 @@ bitflags! {
     /// - `A`: Accessed. If set, the page pointed at by the PTE has been
     ///   accessed.
     /// - `D`: Dirty. If set, the page pointed at by the PTE has been written to.
+    ///
+    /// Flag `RSW` is reserved for supervisor software, but we do not use it in
+    /// the current implementation.
     #[derive(Debug, Clone, Copy)]
     pub struct PteFlags: u8 {
         const V = 1 << 0;

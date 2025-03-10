@@ -7,7 +7,10 @@ edition = "2024"
 buddy_system_allocator = "0.11"
 log = "0.4"
 bitflags = "2.9"
-config = { path = "../config/" }
+lazy_static = { version = "1.4", features = ["spin_no_std"] }
+config = { path = "../config" }
+id_allocator = { path = "../id_allocator" }
+mutex = { path = "../mutex" }
 
 [build-dependencies]
-config = { path = "../config/" }
+config = { path = "../config" }
