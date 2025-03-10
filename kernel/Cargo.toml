@@ -18,7 +18,3 @@ lazy_static = { version = "1.4", features = ["spin_no_std"] }
 
 [build-dependencies]
 config = { path = "../lib/config/" }
-logger = { path = "../lib/logger/" }
-simdebug = { path = "../lib/simdebug/" }
-mm = { path = "../lib/mm/" }
- 

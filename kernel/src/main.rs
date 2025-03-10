@@ -9,6 +9,9 @@ mod sbi;
 
 use core::arch::global_asm;
 
+extern crate alloc;
+extern crate mm;
+
 global_asm!(include_str!("entry.S"));
 
 #[unsafe(no_mangle)]
