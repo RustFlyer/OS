@@ -7,8 +7,9 @@ edition = "2024"
 config = { path = "../lib/config/" }
 logger = { path = "../lib/logger/" }
 simdebug = { path = "../lib/simdebug/" }
+id_allocator = { path = "../lib/id_allocator/" }
 mm = { path = "../lib/mm/" }
-
+mutex = { path = "../lib/mutex/" }
 riscv-rt = "0.12.2"
 sbi-rt = { version = "0.0.3", features = ["legacy"] }
 log = "0.4"
@@ -20,5 +21,4 @@ lazy_static = { version = "1.4", features = ["spin_no_std"] }
 config = { path = "../lib/config/" }
 logger = { path = "../lib/logger/" }
 simdebug = { path = "../lib/simdebug/" }
-mm = { path = "../lib/mm/" }
- 
+id_allocator = { path = "../lib/id_allocator/" }
