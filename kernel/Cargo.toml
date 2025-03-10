@@ -16,7 +16,7 @@ log = "0.4"
 crate_interface = "0.1"
 cfg-if = "1.0"
 lazy_static = { version = "1.4", features = ["spin_no_std"] }
-
+    
 [build-dependencies]
 config = { path = "../lib/config/" }
 logger = { path = "../lib/logger/" }

@@ -29,7 +29,7 @@ boot_stack_top:
 boot_pagetable:
     # a root pagetable which contains the next two pte
     # 0x0000_0000_8000_0000 -> 0x0000_0000_8000_0000
-    # 0xffff_fc00_8000_0000 -> 0x0000_0000_8000_0000
+    # 0xffff_ffc0_8000_0000 -> 0x0000_0000_8000_0000
     .zero 8 * 2
     .8byte (0x80000 << 10) | 0xcf # VRWXAD
     .zero 8 * 255
