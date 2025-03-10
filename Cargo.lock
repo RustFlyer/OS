@@ -109,6 +109,7 @@ dependencies = [
 name = "mm"
 version = "0.1.0"
 dependencies = [
+ "bitflags",
  "buddy_system_allocator",
  "config",
  "log",

@@ -1,3 +1,7 @@
+//! Kernel heap allocator
+//! 
+//! Currently, we use the buddy system allocator for the kernel heap.
+
 use core::alloc::Layout;
 
 use buddy_system_allocator as buddy;
