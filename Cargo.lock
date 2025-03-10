@@ -3,6 +3,20 @@
 version = 4
 
 [[package]]
+name = "arch"
+version = "0.1.0"
+dependencies = [
+ "config",
+ "riscv",
+]
+
+[[package]]
+name = "async-task"
+version = "4.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b75356056920673b02621b35afd0f7dda9306d03c79a30f5c56c44cf256e3de"
+
+[[package]]
 name = "autocfg"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -57,6 +71,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "361a90feb7004eca4019fb28352a9465666b24f840f5c3cddf0ff13920590b89"
 
 [[package]]
+name = "executor"
+version = "0.1.0"
+dependencies = [
+ "async-task",
+ "lazy_static",
+ "mutex",
+]
+
+[[package]]
 name = "id_allocator"
 version = "0.1.0"
 
@@ -67,6 +90,7 @@ dependencies = [
  "cfg-if",
  "config",
  "crate_interface",
+ "executor",
  "id_allocator",
  "lazy_static",
  "log",

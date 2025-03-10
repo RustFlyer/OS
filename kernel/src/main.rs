@@ -6,8 +6,10 @@ mod console;
 mod lang_item;
 mod loader;
 mod logging;
+mod processor;
 mod sbi;
 mod task;
+
 use core::arch::global_asm;
 
 extern crate alloc;

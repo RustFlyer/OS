@@ -60,6 +60,10 @@ impl Task {
         self.inner.lock().state = state;
     }
 
+    pub fn get_state(&self) -> TaskState {
+        self.inner.lock().state
+    }
+
     pub fn set_parent(&self, parent: Arc<Task>) {
         self.inner.lock().parent = Some(Arc::downgrade(&parent));
     }
@@ -95,7 +99,23 @@ impl Task {
         self.inner.lock().exit_code = exit_code;
     }
 
-    pub fn exit_code(&self) -> u32 {
+    pub fn set_waker(&self, waker: Waker) {
+        unsafe {
+            *self.inner.lock().waker.get() = Some(waker);
+        }
+    }
+
+    pub fn get_waker(&self) -> Option<&Waker> {
+        unsafe { self.inner.lock().waker.get().as_ref().unwrap().as_ref() }
+    }
+
+    pub fn get_exit_code(&self) -> u32 {
         self.inner.lock().exit_code
+    }
+
+    pub fn exit(&self) {
+        self.inner.lock().state = TaskState::Zombie;
+        self.inner.lock().exit_code = 0;
+        todo!()
     }
 }
