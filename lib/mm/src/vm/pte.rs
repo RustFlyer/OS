@@ -3,10 +3,11 @@
 //! This module provides the `Pte` type, which represents a page table entry,
 //! along with functions for creating and manipulating page table entries.
 
-use crate::address::PhysPageNum;
-
 use bitflags::bitflags;
+
 use config::mm::PPN_WIDTH_SV39;
+
+use crate::address::PhysPageNum;
 
 /// Offset of the physical page number in a page table entry. A physical page
 /// number located at bits 10-53 in a page table entry.

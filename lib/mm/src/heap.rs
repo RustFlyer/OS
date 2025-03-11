@@ -53,6 +53,6 @@ pub fn heap_test() {
     }
     let vec_start = vec.as_ptr() as usize;
     let vec_end = &vec[99] as *const _ as usize;
-    log::info!("heap test: vec in {:#x} - {:#x}", vec_start, vec_end);
+    log::info!("heap test: vec from {:#x} - {:#x}", vec_start, vec_end);
     log::info!("heap test: end");
 }

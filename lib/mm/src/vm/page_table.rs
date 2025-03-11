@@ -10,23 +10,27 @@ use crate::{
     address::{PhysPageNum, VirtPageNum},
     frame::FrameTracker,
     mm_error::AllocError,
-    vm::pte::PageTableEntry,
 };
 
-use super::pte::PteFlags;
+use super::pte::{PageTableEntry, PteFlags};
 
 /// A data structure for manipulating page tables and manage memory mappings.
 ///
 /// This struct represents a page table (with its sub page tables) in the memory.
-/// It not only manages the page table itself, but also tracks the allocated frames
-/// where the page table(s) reside so that the frames can be deallocated automatically
-/// when the `PageTable` is dropped.
+/// It provides methods to manipulate page tables and page table entries in a
+/// convenient way. It also tracks allocated frames for the page table itself
+/// and allocatable frames mapped by the page table.
+///
+/// A page table consists of page tables and mapped physical frames. Both of them
+/// can be separated into two categories: kernel-used and user-used. Kernel-used
+/// tables and frames are shared among all processes, and is not tracked by
+/// this struct. User-used tables are exclusively allocated for each process,
+/// and are tracked by this struct. When a `PageTable` is dropped, all user-used
+/// tables are dropped.
 pub struct PageTable {
     /// Physical page number of the root page table.
     root: PhysPageNum,
-    /// Exclusively allocated frames for the page table.
-    ///
-    /// Globally shared page tables are not included in this list.
+    /// Frames allocated for user-used tables
     frames: Vec<FrameTracker>,
 }
 
@@ -34,9 +38,9 @@ impl PageTable {
     /// Builds an empty page table.
     ///
     /// # Errors
-    /// Returns `AllocError::OutOfMemory` if there are no free frames.
-    pub fn build() -> Result<Self, AllocError> {
-        let root_frame = FrameTracker::new().ok_or_else(|| AllocError::OutOfMemory)?;
+    /// Returns [`AllocError::OutOfMemory`] if there are no free frames.
+    pub fn build_empty() -> Result<Self, AllocError> {
+        let root_frame = FrameTracker::new()?;
         // SAFETY: the frame is newly allocated for the root page table.
         unsafe {
             PageTableMem::new(root_frame.as_ppn()).clear();
@@ -54,15 +58,14 @@ impl PageTable {
 
     /// Adds a `FrameTracker` to the page table so that the frame can be deallocated
     /// when the `PageTable` is dropped. Any page table frame exclusive to the page table
-    /// must be added to the page table.
+    /// must be tracked by calling this method.
     pub fn track_frame(&mut self, frame: FrameTracker) {
         self.frames.push(frame);
     }
 
     /// Returns a mutable reference to a leaf page table entry mapping a given VPN.
     /// This method sets any non-present intermediate entries and creates intermediate
-    /// page tables if necessary.
-    /// The returned entry may be invalid.
+    /// page tables if necessary. Note that the returned entry may be invalid.
     ///
     /// This function only support 4 KiB pages.
     pub fn find_entry_create(&mut self, vpn: VirtPageNum) -> &mut PageTableEntry {
@@ -84,12 +87,15 @@ impl PageTable {
     }
 
     /// Returns a mutable reference to a leaf page table entry mapping a given VPN.
-    /// If any intermediate entry is not present, returns `None`.
-    pub fn find_entry(&self, vpn: VirtPageNum) -> Option<&PageTableEntry> {
+    /// If any intermediate entry is not present, returns `None`. Note that the returned
+    /// entry may be invalid.
+    ///
+    /// This function only support 4 KiB pages.
+    pub fn find_entry(&mut self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
         let mut ppn = self.root;
         for (i, index) in vpn.indices().into_iter().enumerate() {
-            let page_table = unsafe { PageTableMem::new(ppn) };
-            let entry = page_table.get_entry(index);
+            let mut page_table = unsafe { PageTableMem::new(ppn) };
+            let entry = page_table.get_entry_mut(index);
             if i == 2 {
                 return Some(entry);
             }
@@ -101,24 +107,59 @@ impl PageTable {
         unreachable!();
     }
 
-    /// Maps the given VPN to the given PPN with the given flags.
+    /// Maps a page by specifying VPN, PPN, and page table entry flags.
     ///
-    /// # Note
-    /// [`PageTable::set_mapping`] and [`PageTable::unset_mapping`] should be used
-    /// together with operations such as (de)allocating.
-    pub fn set_mapping(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PteFlags) {
+    /// This method does not allocate the frame for the page. It only sets the mapping
+    /// in the page table. The caller should allocate a frame is allocated and set the
+    /// mapping by calling this method. Be careful that calling this method with an
+    /// already mapped `vpn` will overwrite the existing mapping.
+    pub fn map_page(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PteFlags) {
         let entry = self.find_entry_create(vpn);
         *entry = PageTableEntry::new(ppn, flags | PteFlags::V);
     }
 
-    /// Unmaps the given VPN.
+    /// Unmaps a page by specifying the VPN.
     ///
-    /// # Note
-    /// [`PageTable::set_mapping`] and [`PageTable::unset_mapping`] should be used
-    /// together with operations such as (de)allocating.
-    pub fn unset_mapping(&mut self, vpn: VirtPageNum) {
-        let entry = self.find_entry_create(vpn);
-        *entry = PageTableEntry::default();
+    /// This method does not deallocate the frame for the page. It only clears the
+    /// mapping in the page table. The caller should deallocate the frame and clear
+    /// the mapping by calling this method. Calling this method to clear an unmapped
+    /// page is safe.
+    pub fn unmap_page(&mut self, vpn: VirtPageNum) {
+        if let Some(entry) = self.find_entry(vpn) {
+            *entry = PageTableEntry::default();
+        }
+    }
+
+    /// Maps a range of pages by specifying the starting VPN, a slice of PPNs, and
+    /// page table entry flags.
+    ///
+    /// The range is `[start_vpn, start_vpn + ppns.len())`. The range should be valid
+    /// and not overlap with existing mappings.
+    ///
+    /// This methods does not allocate the frames for the pages. It only sets the mappings
+    /// in the page table. The caller should allocate frames and set the mappings by calling
+    /// this method. Be careful that calling this method with an already mapped `vpn` will
+    /// overwrite the existing mapping.
+    pub fn map_range(&mut self, start_vpn: VirtPageNum, ppns: &[PhysPageNum], flags: PteFlags) {
+        for &ppn in ppns {
+            let vpn =
+                VirtPageNum::new(start_vpn.to_usize() + (ppn.to_usize() - ppns[0].to_usize()));
+            self.map_page(vpn, ppn, flags);
+        }
+    }
+
+    /// Unmaps a range of pages by specifying the starting VPN and the number of pages.
+    ///
+    /// The range is `[start_vpn, start_vpn + count)`.
+    ///
+    /// This method does not deallocate the frames for the pages. It only clears the mappings
+    /// in the page table. The caller should deallocate the frames and clear the mappings by
+    /// calling this method. Calling this method to clear any unmapped range is safe.
+    pub fn unmap_range(&mut self, start_vpn: VirtPageNum, count: usize) {
+        for i in 0..count {
+            let vpn = VirtPageNum::new(start_vpn.to_usize() + i);
+            self.unmap_page(vpn);
+        }
     }
 }
 
