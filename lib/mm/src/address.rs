@@ -210,6 +210,17 @@ impl VirtPageNum {
         let ppn = self.to_usize() - (KERNEL_VM_OFFSET >> PAGE_OFFSET_WIDTH);
         PhysPageNum::new(ppn)
     }
+
+    /// Returns 9-bit indices of the VPN.
+    pub fn indices(self) -> [usize; 3] {
+        let index_mask = 0x1ff;
+        let vpn = self.to_usize();
+        let mut indices = [0; 3];
+        indices[0] = (vpn >> 18) & index_mask;
+        indices[1] = (vpn >> 9) & index_mask;
+        indices[2] = vpn & index_mask;
+        indices
+    }
 }
 
 impl From<PhysPageNum> for PhysAddr {

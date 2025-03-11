@@ -40,7 +40,7 @@ impl FrameTracker {
     ///
     /// Returns `Some(FrameTracker)` if a frame is successfully allocated,
     /// or `None` if there are no free frames.
-    fn new() -> Option<Self> {
+    pub fn new() -> Option<Self> {
         FRAME_ALLOCATOR.lock().alloc().map(|frame| FrameTracker {
             ppn: PhysPageNum::new(frame),
         })

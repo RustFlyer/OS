@@ -37,6 +37,11 @@ pub const PPN_WIDTH_SV39: usize = PA_WIDTH_SV39 - PAGE_OFFSET_WIDTH;
 /// Width of a virtual page number in Sv39
 pub const VPN_WIDTH_SV39: usize = VA_WIDTH_SV39 - PAGE_OFFSET_WIDTH;
 
+/// Width of a page table entry in Sv39 (64-bit)
+pub const PTE_WIDTH: usize = 8;
+/// Number of page table entries in a page table
+pub const PTE_PER_TABLE: usize = PAGE_SIZE / PTE_WIDTH;
+
 pub const APP_BASE_ADDRESS: usize = 0x1000_0000;
 pub const APP_SIZE_LIMIT: usize = 1024 * 1024 * 1024;
 
