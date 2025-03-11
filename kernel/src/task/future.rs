@@ -8,18 +8,10 @@ use super::Task;
 use crate::task::task::TaskState;
 use core::task::Waker;
 
-#[derive(Debug, Clone, Copy)]
-pub struct FutureContext {}
-
-impl FutureContext {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
+use pps::ProcessorPrivilegeState;
 pub struct UserFuture<F: Future + Send + 'static> {
     task: Arc<Task>,
-    context: FutureContext,
+    pps: ProcessorPrivilegeState,
     future: F,
 }
 
@@ -27,7 +19,7 @@ impl<F: Future + Send + 'static> UserFuture<F> {
     pub fn new(task: Arc<Task>, future: F) -> Self {
         Self {
             task,
-            context: FutureContext::new(),
+            pps: ProcessorPrivilegeState::new(),
             future,
         }
     }
@@ -38,18 +30,21 @@ impl<F: Future + Send + 'static> Future for UserFuture<F> {
 
     fn poll(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Self::Output> {
         todo!()
+        // just user_switch_in
+        // then poll future
+        // then user_switch_out
     }
 }
 
 pub struct KernelFuture<F: Future + Send + 'static> {
-    context: FutureContext,
+    pps: ProcessorPrivilegeState,
     future: F,
 }
 
 impl<F: Future + Send + 'static> KernelFuture<F> {
     pub fn new(future: F) -> Self {
         Self {
-            context: FutureContext {},
+            pps: ProcessorPrivilegeState::new(),
             future,
         }
     }
@@ -60,13 +55,16 @@ impl<F: Future + Send + 'static> Future for KernelFuture<F> {
 
     fn poll(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Self::Output> {
         todo!()
+        // just kernel_switch_in
+        // then poll future
+        // then kernel_switch_out
     }
 }
 
 pub async fn task_executor_unit(task: Arc<Task>) {
     task.set_waker(take_waker().await);
     loop {
-        todo!();
+        todo!(); // trap_return_
 
         match task.get_state() {
             TaskState::Zombie => break,
@@ -76,7 +74,7 @@ pub async fn task_executor_unit(task: Arc<Task>) {
             _ => {}
         }
 
-        todo!();
+        todo!(); // trap_handle_
 
         match task.get_state() {
             TaskState::Zombie => break,
@@ -86,7 +84,7 @@ pub async fn task_executor_unit(task: Arc<Task>) {
             _ => {}
         }
 
-        todo!();
+        todo!(); // signal_handle_
     }
 
     task.exit();
@@ -106,7 +104,6 @@ pub fn spawn_kernel_task<F: Future<Output = ()> + Send + 'static>(future: F) {
     handle.detach();
 }
 
-/// Take the waker of the current future
 #[inline(always)]
 pub async fn take_waker() -> Waker {
     TakeWakerFuture.await
@@ -121,3 +118,5 @@ impl Future for TakeWakerFuture {
         Poll::Ready(cx.waker().clone())
     }
 }
+
+// time schedule is coming soon....

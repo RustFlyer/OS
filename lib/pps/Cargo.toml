@@ -1,9 +1,8 @@
 [package]
-name = "arch"
+name = "pps"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-config = { path = "../config" }
 riscv = "0.11"
-bit_field = "0.10"
+arch = { path = "../arch" }
