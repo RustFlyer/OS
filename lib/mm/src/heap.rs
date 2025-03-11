@@ -6,7 +6,9 @@ use core::alloc::Layout;
 
 use buddy_system_allocator as buddy;
 
-use config::mm::{KERNEL_HEAP_SIZE, KERNEL_VM_OFFSET};
+use config::mm::KERNEL_HEAP_SIZE;
+
+use crate::address::PhysAddr;
 
 static mut KERNEL_HEAP: [u8; KERNEL_HEAP_SIZE] = [0; KERNEL_HEAP_SIZE];
 
@@ -28,7 +30,9 @@ pub unsafe fn init_heap_allocator() {
     unsafe {
         // SAFETY: we are the only one using the heap
         #[allow(static_mut_refs)]
-        let start_addr = KERNEL_HEAP.as_ptr() as usize + KERNEL_VM_OFFSET;
+        let start_addr = PhysAddr::new(KERNEL_HEAP.as_ptr() as usize)
+            .to_va_kernel()
+            .to_usize();
 
         HEAP_ALLOCATOR.lock().init(start_addr, KERNEL_HEAP_SIZE);
 
@@ -38,4 +42,17 @@ pub unsafe fn init_heap_allocator() {
             start_addr + KERNEL_HEAP_SIZE
         );
     }
+}
+
+pub fn heap_test() {
+    use alloc::vec::Vec;
+    log::info!("heap test: start");
+    let mut vec = Vec::new();
+    for i in 0..100 {
+        vec.push(i);
+    }
+    let vec_start = vec.as_ptr() as usize;
+    let vec_end = &vec[99] as *const _ as usize;
+    log::info!("heap test: vec in {:#x} - {:#x}", vec_start, vec_end);
+    log::info!("heap test: end");
 }

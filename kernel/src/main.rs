@@ -12,6 +12,8 @@ mod task;
 
 use core::arch::global_asm;
 
+use mm::{frame, heap};
+
 extern crate alloc;
 extern crate mm;
 
@@ -40,6 +42,11 @@ pub fn rust_main() -> ! {
     );
 
     unsafe { mm::heap::init_heap_allocator() };
+
+    simdebug::when_debug!({
+        heap::heap_test();
+        frame::frame_alloc_test();
+    });
 
     sbi::shutdown(false);
     loop {}

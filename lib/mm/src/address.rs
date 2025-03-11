@@ -5,7 +5,8 @@
 //! between these types.
 
 use config::mm::{
-    KERNEL_VM_OFFSET, PA_WIDTH_SV39, PAGE_SIZE, PPN_WIDTH_SV39, VA_WIDTH_SV39, VPN_WIDTH_SV39,
+    KERNEL_VM_OFFSET, PA_WIDTH_SV39, PAGE_OFFSET_WIDTH, PAGE_SIZE, PPN_WIDTH_SV39, VA_WIDTH_SV39,
+    VPN_WIDTH_SV39,
 };
 
 /// An address in physical memory defined in Sv39.
@@ -55,8 +56,7 @@ impl PhysAddr {
         PhysPageNum::new(page_num)
     }
 
-    /// Translates a physical address into a virtual address, if the PA is in the
-    /// kernel space.
+    /// Translates a physical address into a virtual address in the kernel space.
     pub fn to_va_kernel(self) -> VirtAddr {
         let va = self.addr + KERNEL_VM_OFFSET;
         VirtAddr::new(va)
@@ -151,6 +151,13 @@ impl PhysPageNum {
         let addr = self.page_num << (64 - PPN_WIDTH_SV39) >> (64 - PA_WIDTH_SV39);
         PhysAddr::new(addr)
     }
+
+    /// Translates a physical page number into a virtual page number in the kernel space.
+    pub fn to_vpn_kernel(self) -> VirtPageNum {
+        let vpn_mask = (1 << VPN_WIDTH_SV39) - 1;
+        let vpn = self.to_usize() + (KERNEL_VM_OFFSET >> PAGE_OFFSET_WIDTH) & vpn_mask;
+        VirtPageNum::new(vpn)
+    }
 }
 
 /// A virtual page number defined in Sv39.
@@ -184,6 +191,24 @@ impl VirtPageNum {
     pub fn address(self) -> VirtAddr {
         let addr = self.page_num << (64 - VPN_WIDTH_SV39) >> (64 - VA_WIDTH_SV39);
         VirtAddr::new(addr)
+    }
+
+    /// Gets a slice pointing to the page.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the page is allocated, and the slice should
+    /// not outlive the page.
+    pub unsafe fn as_slice(self) -> &'static mut [u8; PAGE_SIZE] {
+        let ptr = self.address().to_usize() as *mut [u8; PAGE_SIZE];
+        unsafe { &mut *ptr }
+    }
+
+    /// Translates a virtual page number into a physical page number, if the VPN is in the
+    /// kernel space.
+    pub fn to_ppn_kernel(self) -> PhysPageNum {
+        let ppn = self.to_usize() - (KERNEL_VM_OFFSET >> PAGE_OFFSET_WIDTH);
+        PhysPageNum::new(ppn)
     }
 }
 
