@@ -5,11 +5,11 @@
 
 use alloc::vec::Vec;
 use config::mm::PTE_PER_TABLE;
+use systype::SysResult;
 
 use crate::{
     address::{PhysPageNum, VirtPageNum},
     frame::FrameTracker,
-    mm_error::AllocError,
 };
 
 use super::pte::{PageTableEntry, PteFlags};
@@ -39,7 +39,7 @@ impl PageTable {
     ///
     /// # Errors
     /// Returns [`AllocError::OutOfMemory`] if there are no free frames.
-    pub fn build_empty() -> Result<Self, AllocError> {
+    pub fn build_empty() -> SysResult<Self> {
         let root_frame = FrameTracker::new()?;
         // SAFETY: the frame is newly allocated for the root page table.
         unsafe {

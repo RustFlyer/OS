@@ -146,6 +146,7 @@ dependencies = [
  "lazy_static",
  "log",
  "mutex",
+ "systype",
 ]
 
 [[package]]
@@ -253,6 +254,10 @@ dependencies = [
  "quote",
  "unicode-ident",
 ]
+
+[[package]]
+name = "systype"
+version = "0.1.0"
 
 [[package]]
 name = "unicode-ident"

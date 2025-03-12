@@ -17,6 +17,7 @@
 //! frames in batch, respectively.
 
 use alloc::vec::Vec;
+use systype::{SysError, SysResult};
 use core::mem::ManuallyDrop;
 
 use lazy_static::lazy_static;
@@ -70,14 +71,14 @@ impl FrameTracker {
     ///
     /// Returns `Some(FrameTracker)` if a frame is successfully allocated,
     /// or `None` if there are no free frames.
-    pub fn new() -> Result<Self, AllocError> {
+    pub fn new() -> SysResult<Self> {
         FRAME_ALLOCATOR
             .lock()
             .alloc()
             .map(|frame| FrameTracker {
                 ppn: PhysPageNum::new(frame),
             })
-            .ok_or(AllocError::OutOfMemory)
+            .ok_or(SysError::ENOMEM)
     }
 
     /// Allocates a batch of frames.
