@@ -44,11 +44,12 @@ static mut BOOT_PAGE_TABLE: BootPageTable = {
 #[naked]
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".text.entry")]
-unsafe extern "C" fn _start(hart_id: usize) -> ! {
-    core::arch::naked_asm!(
-        // Enable Sv39 page table
-        // satp = (8 << 60) | ppn
-        "
+unsafe extern "C" fn _start() -> ! {
+    unsafe {
+        naked_asm!(
+            // Enable Sv39 page table
+            // satp = (8 << 60) | ppn
+            "
             la      t0, {page_table_pa}
             srli    t0, t0, 12              // t0 = ppn of page table
             li      t1, 8 << 60
@@ -56,26 +57,28 @@ unsafe extern "C" fn _start(hart_id: usize) -> ! {
             csrw    satp, t0
             sfence.vma
         ",
-        // Kernel address offset between physical and virtual memory
-        "
+            // Kernel address offset between physical and virtual memory
+            "
             li      t0, {kernel_map_offset}
         ",
-        // Set stack pointer to the virtual address of the upper bound of the boot stack
-        "
+            // Set stack pointer to the virtual address of the upper bound of the boot stack
+            "
             li      t1, 1
             slli    t1, t1, 16              // t1 = `KERNEL_STACK_SIZE`
             la      sp, {boot_stack_pa}
             add     sp, sp, t1
             add     sp, sp, t0
         ",
-        // Jump to the virtual address of `rust_main`
-        "
-            la      a0, rust_main
+            // Jump to the virtual address of `rust_main`
+            "
+            la      a0, {rust_main}
             or      a0, a0, t0
             jr      a0
         ",
-        page_table_pa = sym BOOT_PAGE_TABLE,
-        boot_stack_pa = sym BOOT_STACK,
-        kernel_map_offset = const KERNEL_MAP_OFFSET,
-    )
+            page_table_pa = sym BOOT_PAGE_TABLE,
+            boot_stack_pa = sym BOOT_STACK,
+            kernel_map_offset = const KERNEL_MAP_OFFSET,
+            rust_main = sym rust_main,
+        )
+    }
 }

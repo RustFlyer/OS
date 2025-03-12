@@ -12,16 +12,10 @@ mod processor;
 mod sbi;
 mod task;
 
-use core::arch::global_asm;
-
-use mm::{
-    frame, heap,
-    vm::page_table::{self, PageTable},
-};
+use mm::{frame, heap, vm::page_table};
 
 extern crate alloc;
 
-#[unsafe(no_mangle)]
 pub fn rust_main() -> ! {
     /* Initialize logger */
     logger::init();

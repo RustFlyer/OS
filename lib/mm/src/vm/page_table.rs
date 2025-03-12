@@ -176,8 +176,6 @@ impl PageTable {
     /// this method. Be careful that calling this method with an already mapped `vpn` will
     /// overwrite the existing mapping.
     pub fn map_range(&mut self, start_vpn: VirtPageNum, ppns: &[PhysPageNum], flags: PteFlags) {
-        log::debug!("map virtual address");
-
         // Optimization is applied to cut down most unnecessary page table lookups.
         let mut entry = self.find_entry_create(start_vpn);
         *entry = PageTableEntry::new(ppns[0], flags);
@@ -192,8 +190,6 @@ impl PageTable {
             };
             *entry = PageTableEntry::new(ppn, flags);
         }
-
-        log::debug!("map virtual address done");
     }
 
     /// Unmaps a range of leaf pages by specifying the starting VPN and the number of pages.
