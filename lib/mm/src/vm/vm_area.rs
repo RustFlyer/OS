@@ -1,4 +1,4 @@
-//! A module for managing virtual memory areas.
+//! Module for managing virtual memory areas.
 //!
 //! A virtual memory area (VMA) is a contiguous region of virtual memory in an
 //! address space, whose pages have a common set of attributes, such as permissions

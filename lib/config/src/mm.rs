@@ -1,21 +1,31 @@
-//! Memory layout
+//! Module defining constants related to memory management.
 
 /// Start of physical memory
 pub const RAM_START: usize = 0x8000_0000;
 /// Size of physical memory
 pub const RAM_SIZE: usize = 128 * 1024 * 1024;
+/// End of physical memory
+pub const RAM_END: usize = RAM_START + RAM_SIZE;
 
 /// Start of kernel address space
 pub const VIRT_START: usize = 0xffff_ffc0_8000_0000;
 /// Offset of kernel from `RAM_START`
-pub const KERNEL_OFFSET: usize = 0x20_0000;
+pub const KERNEL_RAM_OFFSET: usize = 0x20_0000;
 /// Start of kernel in physical memory
-pub const KERNEL_START_PHYS: usize = RAM_START + KERNEL_OFFSET;
+pub const KERNEL_START_PHYS: usize = RAM_START + KERNEL_RAM_OFFSET;
+/// End of kernel in physical memory
+pub fn kernel_end_phys() -> usize {
+    _ekernel as usize - KERNEL_MAP_OFFSET
+}
 /// Start of kernel in virtual memory
-pub const KERNEL_START: usize = VIRT_START + KERNEL_OFFSET;
+pub const KERNEL_START: usize = VIRT_START + KERNEL_RAM_OFFSET;
+/// End of kernel in virtual memory
+pub fn kernel_end() -> usize {
+    _ekernel as usize
+}
 
 /// Offset of kernel in virtual memory from physical memory
-pub const KERNEL_VM_OFFSET: usize = KERNEL_START - KERNEL_START_PHYS;
+pub const KERNEL_MAP_OFFSET: usize = KERNEL_START - KERNEL_START_PHYS;
 
 /// Size of kernel stack
 pub const KERNEL_STACK_SIZE: usize = 64 * 1024;

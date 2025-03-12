@@ -23,7 +23,7 @@ export DEBUG = off
 # Toolchain Configuration
 # ======================
 QEMU = qemu-system-riscv64
-GDB = riscv64-elf-gdb
+GDB = riscv64-unknown-elf-gdb
 OBJDUMP = rust-objdump --arch-name=riscv64
 OBJCOPY = rust-objcopy --binary-architecture=riscv64
 PAGER ?= less

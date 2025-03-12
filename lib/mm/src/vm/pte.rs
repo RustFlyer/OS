@@ -56,7 +56,7 @@ bitflags! {
 /// number, and the upper 10 bits are reserved for extensions. In our
 /// implementation, the upper 10 bits are always zero.
 #[derive(Debug, Clone, Copy)]
-#[repr(transparent)]
+#[repr(C)]
 pub struct PageTableEntry {
     bits: usize,
 }

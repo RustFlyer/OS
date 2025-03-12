@@ -17,12 +17,12 @@
 //! frames in batch, respectively.
 
 use alloc::vec::Vec;
-use systype::{SysError, SysResult};
 use core::mem::ManuallyDrop;
+use systype::{SysError, SysResult};
 
 use lazy_static::lazy_static;
 
-use config::mm::{_ekernel, PAGE_SIZE, RAM_SIZE, RAM_START};
+use config::mm::{PAGE_SIZE, RAM_END, kernel_end_phys};
 use id_allocator::{IdAllocator, VecIdAllocator};
 use mutex::SpinNoIrqLock;
 
@@ -39,8 +39,8 @@ lazy_static! {
     ///
     /// It is protected by a lock to be used in a multi-threaded environment.
     static ref FRAME_ALLOCATOR: SpinNoIrqLock<FrameAllocator> = {
-        let frames_ppn_start = PhysAddr::new(_ekernel as usize).page_number().to_usize();
-        let frames_ppn_end = PhysAddr::new(RAM_START + RAM_SIZE).page_number().to_usize();
+        let frames_ppn_start = PhysAddr::new(kernel_end_phys()).page_number().to_usize();
+        let frames_ppn_end = PhysAddr::new(RAM_END).page_number().to_usize();
         log::info!(
             "frame allocator: free frame memory from {:#x} - {:#x}",
             frames_ppn_start * PAGE_SIZE,
@@ -191,20 +191,34 @@ pub fn frame_alloc_test() {
     {
         let f1 = FrameTracker::new().expect("frame_alloc_test: failed to allocate frame");
         let f2 = FrameTracker::new().expect("frame_alloc_test: failed to allocate frame");
-        log::info!("frame_alloc_test: frame 1: 0x{:x}", f1.as_ppn().address().to_usize());
-        log::info!("frame_alloc_test: frame 2: 0x{:x}", f2.as_ppn().address().to_usize());
+        log::info!(
+            "frame_alloc_test: frame 1: 0x{:x}",
+            f1.as_ppn().address().to_usize()
+        );
+        log::info!(
+            "frame_alloc_test: frame 2: 0x{:x}",
+            f2.as_ppn().address().to_usize()
+        );
     }
     {
         log::info!("frame_alloc_test: frames 1 and 2 are dropped");
         let f3 = FrameTracker::new().expect("frame_alloc_test: failed to allocate frame");
-        log::info!("frame_alloc_test: frame 3: 0x{:x}", f3.as_ppn().address().to_usize());
+        log::info!(
+            "frame_alloc_test: frame 3: 0x{:x}",
+            f3.as_ppn().address().to_usize()
+        );
         log::info!("frame_alloc_test: frame 3 is dropped");
     }
     {
         log::info!("frame_alloc_test: allocate 5 frames in a batch");
-        let frames = FrameTracker::new_batch(5).expect("frame_alloc_test: failed to allocate frames");
+        let frames =
+            FrameTracker::new_batch(5).expect("frame_alloc_test: failed to allocate frames");
         for (i, f) in frames.iter().enumerate() {
-            log::info!("frame_alloc_test: frame {}: 0x{:x}", i, f.as_ppn().address().to_usize());
+            log::info!(
+                "frame_alloc_test: frame {}: 0x{:x}",
+                i,
+                f.as_ppn().address().to_usize()
+            );
         }
         FrameDropper::drop(frames);
         log::info!("frame_alloc_test: frames are dropped");

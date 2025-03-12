@@ -1,4 +1,4 @@
-//! Kernel heap allocator
+//! Module for kernel heap allocator
 //!
 //! Currently, we use the buddy system allocator for the kernel heap.
 
@@ -30,9 +30,7 @@ pub unsafe fn init_heap_allocator() {
     unsafe {
         // SAFETY: we are the only one using the heap
         #[allow(static_mut_refs)]
-        let start_addr = PhysAddr::new(KERNEL_HEAP.as_ptr() as usize)
-            .to_va_kernel()
-            .to_usize();
+        let start_addr = PhysAddr::new(KERNEL_HEAP.as_ptr() as usize).to_usize();
 
         HEAP_ALLOCATOR.lock().init(start_addr, KERNEL_HEAP_SIZE);
 
