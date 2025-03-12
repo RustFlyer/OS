@@ -1,10 +1,14 @@
+//! Kernel heap allocator
+//!
+//! Currently, we use the buddy system allocator for the kernel heap.
+
 use core::alloc::Layout;
 
 use buddy_system_allocator as buddy;
 
 use config::mm::KERNEL_HEAP_SIZE;
 
-extern crate alloc;
+use crate::address::PhysAddr;
 
 static mut KERNEL_HEAP: [u8; KERNEL_HEAP_SIZE] = [0; KERNEL_HEAP_SIZE];
 
@@ -16,7 +20,7 @@ fn alloc_error_handler(layout: Layout) -> ! {
     panic!("heap allocation error, layout = {:?}", layout)
 }
 
-/// Initialize heap allocator
+/// Initializes heap allocator.
 ///
 /// # Safety
 ///
@@ -26,14 +30,29 @@ pub unsafe fn init_heap_allocator() {
     unsafe {
         // SAFETY: we are the only one using the heap
         #[allow(static_mut_refs)]
-        let start_addr = KERNEL_HEAP.as_ptr() as usize;
+        let start_addr = PhysAddr::new(KERNEL_HEAP.as_ptr() as usize)
+            .to_va_kernel()
+            .to_usize();
 
         HEAP_ALLOCATOR.lock().init(start_addr, KERNEL_HEAP_SIZE);
 
         log::info!(
-            "[kernel] heap initialized: {:#x} - {:#x}",
+            "heap memory: {:#x} - {:#x}",
             start_addr,
             start_addr + KERNEL_HEAP_SIZE
         );
     }
+}
+
+pub fn heap_test() {
+    use alloc::vec::Vec;
+    log::info!("heap test: start");
+    let mut vec = Vec::new();
+    for i in 0..100 {
+        vec.push(i);
+    }
+    let vec_start = vec.as_ptr() as usize;
+    let vec_end = &vec[99] as *const _ as usize;
+    log::info!("heap test: vec from {:#x} - {:#x}", vec_start, vec_end);
+    log::info!("heap test: end");
 }
