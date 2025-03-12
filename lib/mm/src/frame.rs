@@ -190,20 +190,34 @@ pub fn frame_alloc_test() {
     {
         let f1 = FrameTracker::new().expect("frame_alloc_test: failed to allocate frame");
         let f2 = FrameTracker::new().expect("frame_alloc_test: failed to allocate frame");
-        log::info!("frame_alloc_test: frame 1: 0x{:x}", f1.as_ppn().address().to_usize());
-        log::info!("frame_alloc_test: frame 2: 0x{:x}", f2.as_ppn().address().to_usize());
+        log::info!(
+            "frame_alloc_test: frame 1: 0x{:x}",
+            f1.as_ppn().address().to_usize()
+        );
+        log::info!(
+            "frame_alloc_test: frame 2: 0x{:x}",
+            f2.as_ppn().address().to_usize()
+        );
     }
     {
         log::info!("frame_alloc_test: frames 1 and 2 are dropped");
         let f3 = FrameTracker::new().expect("frame_alloc_test: failed to allocate frame");
-        log::info!("frame_alloc_test: frame 3: 0x{:x}", f3.as_ppn().address().to_usize());
+        log::info!(
+            "frame_alloc_test: frame 3: 0x{:x}",
+            f3.as_ppn().address().to_usize()
+        );
         log::info!("frame_alloc_test: frame 3 is dropped");
     }
     {
         log::info!("frame_alloc_test: allocate 10 frames in a batch");
-        let frames = FrameTracker::new_batch(10).expect("frame_alloc_test: failed to allocate frames");
+        let frames =
+            FrameTracker::new_batch(10).expect("frame_alloc_test: failed to allocate frames");
         for (i, f) in frames.iter().enumerate() {
-            log::info!("frame_alloc_test: frame {}: 0x{:x}", i, f.as_ppn().address().to_usize());
+            log::info!(
+                "frame_alloc_test: frame {}: 0x{:x}",
+                i,
+                f.as_ppn().address().to_usize()
+            );
         }
         FrameDropper::drop(frames);
         log::info!("frame_alloc_test: frames are dropped");
