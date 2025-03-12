@@ -12,6 +12,9 @@ mm = { path = "../lib/mm/" }
 mutex = { path = "../lib/mutex/" }
 executor = { path = "../lib/executor/" }
 pps = { path = "../lib/pps/" }
+arch = { path = "../lib/arch/" }
+time = { path = "../lib/time/" }
+timer = { path = "../lib/timer/" }
 
 riscv-rt = "0.12.2"
 sbi-rt = { version = "0.0.3", features = ["legacy"] }

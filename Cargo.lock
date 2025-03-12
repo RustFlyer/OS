@@ -94,6 +94,7 @@ version = "0.1.0"
 name = "kernel"
 version = "0.1.0"
 dependencies = [
+ "arch",
  "cfg-if",
  "config",
  "crate_interface",
@@ -109,6 +110,8 @@ dependencies = [
  "riscv-rt",
  "sbi-rt",
  "simdebug",
+ "time",
+ "timer",
 ]
 
 [[package]]
@@ -269,6 +272,23 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "time"
+version = "0.1.0"
+dependencies = [
+ "arch",
+]
+
+[[package]]
+name = "timer"
+version = "0.1.0"
+dependencies = [
+ "arch",
+ "log",
+ "mutex",
+ "spin",
 ]
 
 [[package]]

@@ -5,6 +5,7 @@ use core::pin::Pin;
 use core::task::{Context, Poll};
 
 use super::Task;
+use crate::processor::hart::current_hart;
 use crate::task::task::TaskState;
 use core::task::Waker;
 
@@ -28,11 +29,13 @@ impl<F: Future + Send + 'static> UserFuture<F> {
 impl<F: Future + Send + 'static> Future for UserFuture<F> {
     type Output = F::Output;
 
-    fn poll(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Self::Output> {
-        todo!()
-        // just user_switch_in
-        // then poll future
-        // then user_switch_out
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut future = unsafe { Pin::get_unchecked_mut(self) };
+        let hart = current_hart();
+        hart.user_switch_in(future.task.clone(), &mut future.pps);
+        let ret = unsafe { Pin::new_unchecked(&mut future.future).poll(cx) };
+        hart.user_switch_out(&mut future.pps);
+        ret
     }
 }
 
@@ -53,11 +56,13 @@ impl<F: Future + Send + 'static> KernelFuture<F> {
 impl<F: Future + Send + 'static> Future for KernelFuture<F> {
     type Output = F::Output;
 
-    fn poll(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Self::Output> {
-        todo!()
-        // just kernel_switch_in
-        // then poll future
-        // then kernel_switch_out
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut future = unsafe { Pin::get_unchecked_mut(self) };
+        let hart = current_hart();
+        hart.kernel_switch_in(&mut future.pps);
+        let ret = unsafe { Pin::new_unchecked(&mut future.future).poll(cx) };
+        hart.kernel_switch_out(&mut future.pps);
+        ret
     }
 }
 
@@ -119,4 +124,33 @@ impl Future for TakeWakerFuture {
     }
 }
 
-// time schedule is coming soon....
+// 挂起当前线程
+struct SuspendFuture {
+    has_suspended: bool,
+}
+
+impl SuspendFuture {
+    const fn new() -> Self {
+        Self {
+            has_suspended: false,
+        }
+    }
+}
+
+impl Future for SuspendFuture {
+    type Output = ();
+
+    fn poll(mut self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Self::Output> {
+        match self.has_suspended {
+            true => Poll::Ready(()),
+            false => {
+                self.has_suspended = true;
+                Poll::Pending
+            }
+        }
+    }
+}
+
+pub async fn suspend_now() {
+    SuspendFuture::new().await
+}

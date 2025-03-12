@@ -22,13 +22,14 @@ global_asm!(include_str!("entry.S"));
 #[unsafe(no_mangle)]
 pub fn rust_main() -> ! {
     logger::init();
-    log::info!("test info");
-    log::error!("test error");
-    log::warn!("test warn");
-    log::debug!("test debug");
-    log::trace!("test trace");
     simdebug::when_debug!({
-        log::info!("when debug");
+        log::info!("--------when debug--------");
+        log::info!("test info");
+        log::error!("test error");
+        log::warn!("test warn");
+        log::debug!("test debug");
+        log::trace!("test trace");
+        log::info!("--------when debug--------");
     });
     log::info!(
         "kernel physical memory: {:#x} - {:#x}",
