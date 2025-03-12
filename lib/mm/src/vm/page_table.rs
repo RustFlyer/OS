@@ -27,6 +27,7 @@ use super::pte::{PageTableEntry, PteFlags};
 /// this struct. User-used tables are exclusively allocated for each process,
 /// and are tracked by this struct. When a `PageTable` is dropped, all user-used
 /// tables are dropped.
+#[derive(Debug)]
 pub struct PageTable {
     /// Physical page number of the root page table.
     root: PhysPageNum,
