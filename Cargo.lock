@@ -6,6 +6,7 @@ version = 4
 name = "arch"
 version = "0.1.0"
 dependencies = [
+ "bit_field",
  "config",
  "riscv",
 ]
@@ -21,6 +22,12 @@ name = "autocfg"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
+
+[[package]]
+name = "bit_field"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc827186963e592360843fb5ba4b973e145841266c1357f7180c43526f2e5b61"
 
 [[package]]
 name = "bitflags"
@@ -87,6 +94,7 @@ version = "0.1.0"
 name = "kernel"
 version = "0.1.0"
 dependencies = [
+ "arch",
  "cfg-if",
  "config",
  "crate_interface",
@@ -97,9 +105,13 @@ dependencies = [
  "logger",
  "mm",
  "mutex",
+ "pps",
+ "riscv",
  "riscv-rt",
  "sbi-rt",
  "simdebug",
+ "time",
+ "timer",
 ]
 
 [[package]]
@@ -155,6 +167,14 @@ version = "0.1.0"
 dependencies = [
  "bitflags",
  "log",
+ "riscv",
+]
+
+[[package]]
+name = "pps"
+version = "0.1.0"
+dependencies = [
+ "arch",
  "riscv",
 ]
 
@@ -258,6 +278,23 @@ dependencies = [
 [[package]]
 name = "systype"
 version = "0.1.0"
+
+[[package]]
+name = "time"
+version = "0.1.0"
+dependencies = [
+ "arch",
+]
+
+[[package]]
+name = "timer"
+version = "0.1.0"
+dependencies = [
+ "arch",
+ "log",
+ "mutex",
+ "spin",
+]
 
 [[package]]
 name = "unicode-ident"

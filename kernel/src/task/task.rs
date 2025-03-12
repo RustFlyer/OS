@@ -5,10 +5,20 @@ use alloc::{
     collections::BTreeMap,
     sync::{Arc, Weak},
 };
-use mutex::SpinLock;
+use mutex::SpinNoIrqLock;
 
-use core::cell::SyncUnsafeCell;
-use core::task::Waker;
+use core::{cell::SyncUnsafeCell, num::IntErrorKind};
+use core::{ops::DerefMut, task::Waker};
+
+use mutex::UPSafeCell;
+use time::TaskTimeStat;
+use timer::{TIMER_MANAGER, Timer};
+
+use arch::riscv64::time::get_time_duration;
+
+use core::time::Duration;
+
+use super::future;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TaskState {
@@ -23,14 +33,15 @@ pub struct Task {
     process: Option<Weak<Task>>,
     is_process: bool,
 
-    inner: SpinLock<TaskInner>,
+    inner: UPSafeCell<TaskInner>,
 }
 
 pub struct TaskInner {
     state: TaskState,
     parent: Option<Weak<Task>>,
     children: BTreeMap<Tid, Weak<Task>>,
-    waker: SyncUnsafeCell<Option<Waker>>,
+    waker: Option<Waker>,
+    timer: TaskTimeStat,
 
     exit_code: u32,
 }
@@ -52,70 +63,137 @@ impl Task {
         self.is_process
     }
 
-    pub fn is_in_state(&self, state: TaskState) -> bool {
-        self.inner.lock().state == state
+    pub fn is_in_state(&mut self, state: TaskState) -> bool {
+        self.inner.exclusive_access().is_in_state(state)
     }
 
-    pub fn set_state(&self, state: TaskState) {
-        self.inner.lock().state = state;
+    pub fn set_state(&mut self, state: TaskState) {
+        self.inner.exclusive_access().set_state(state);
     }
 
-    pub fn get_state(&self) -> TaskState {
-        self.inner.lock().state
+    pub fn get_state(&mut self) -> TaskState {
+        self.inner.exclusive_access().get_state()
     }
 
-    pub fn set_parent(&self, parent: Arc<Task>) {
-        self.inner.lock().parent = Some(Arc::downgrade(&parent));
+    pub fn set_parent(&mut self, parent: Arc<Task>) {
+        self.inner.exclusive_access().parent = Some(Arc::downgrade(&parent));
     }
 
-    pub fn add_child(&self, child: Arc<Task>) {
+    pub fn add_child(&mut self, child: Arc<Task>) {
         self.inner
-            .lock()
+            .exclusive_access()
             .children
             .insert(child.tid(), Arc::downgrade(&child));
     }
 
-    pub fn remove_child(&self, child: Arc<Task>) {
-        self.inner.lock().children.remove(&child.tid());
+    pub fn remove_child(&mut self, child: Arc<Task>) {
+        self.inner.exclusive_access().children.remove(&child.tid());
     }
 
     pub fn new() -> Self {
-        let inner = TaskInner {
-            state: TaskState::Running,
-            parent: None,
-            children: BTreeMap::new(),
-            waker: SyncUnsafeCell::new(None),
-            exit_code: 0,
-        };
+        let inner = TaskInner::new();
         Task {
             tid: tid_alloc(),
             process: None,
             is_process: false,
-            inner: SpinLock::new(inner),
+            inner: unsafe { UPSafeCell::new(inner) },
         }
     }
 
     pub fn set_exit_code(&self, exit_code: u32) {
-        self.inner.lock().exit_code = exit_code;
+        self.inner.exclusive_access().set_exit_code(exit_code);
     }
 
     pub fn set_waker(&self, waker: Waker) {
-        unsafe {
-            *self.inner.lock().waker.get() = Some(waker);
-        }
+        self.inner.exclusive_access().set_waker(waker);
     }
 
-    pub fn get_waker(&self) -> Option<&Waker> {
-        unsafe { self.inner.lock().waker.get().as_ref().unwrap().as_ref() }
+    pub fn get_waker(&self) -> Waker {
+        self.inner.exclusive_access().get_waker().clone()
     }
 
     pub fn get_exit_code(&self) -> u32 {
-        self.inner.lock().exit_code
+        self.inner.exclusive_access().exit_code
     }
 
-    pub fn exit(&self) {
-        self.inner.lock().state = TaskState::Zombie;
-        self.inner.lock().exit_code = 0;
-        todo!()
+    pub fn exit(&mut self) {
+        self.inner.exclusive_access().clear();
+    }
+
+    pub fn clear(&mut self) {
+        self.inner.exclusive_access().clear();
+    }
+
+    pub fn enter_user_mode(&mut self) {
+        self.inner.exclusive_access().enter_user_mode();
+    }
+
+    pub fn enter_kernel_mode(&mut self) {
+        self.inner.exclusive_access().enter_kernel_mode();
+    }
+}
+
+impl TaskInner {
+    pub fn new() -> Self {
+        Self {
+            state: TaskState::Running,
+            parent: None,
+            children: BTreeMap::new(),
+            waker: None,
+            exit_code: 0,
+
+            timer: TaskTimeStat::new(),
+        }
+    }
+
+    pub fn enter_user_mode(&mut self) {
+        self.timer.switch_to_user();
+    }
+
+    pub fn enter_kernel_mode(&mut self) {
+        self.timer.switch_to_kernel();
+    }
+
+    pub fn clear(&mut self) {
+        self.state = TaskState::Zombie;
+        self.exit_code = 0;
+    }
+
+    pub fn set_waker(&mut self, waker: Waker) {
+        self.waker = Some(waker);
+    }
+
+    pub fn get_waker(&self) -> &Waker {
+        self.waker.as_ref().unwrap()
+    }
+
+    pub fn set_state(&mut self, state: TaskState) {
+        self.state = state;
+    }
+
+    pub fn get_state(&self) -> TaskState {
+        self.state
+    }
+
+    pub fn set_exit_code(&mut self, exit_code: u32) {
+        self.exit_code = exit_code;
+    }
+
+    pub fn is_in_state(&self, state: TaskState) -> bool {
+        self.state == state
+    }
+
+    pub async fn suspend_timeout(&self, limit: Duration) -> Duration {
+        let expire = get_time_duration() + limit;
+        let mut timer = Timer::new(expire);
+        timer.set_callback(self.get_waker().clone());
+        TIMER_MANAGER.add_timer(timer);
+        future::suspend_now().await;
+        let now = get_time_duration();
+        if expire > now {
+            expire - now
+        } else {
+            Duration::ZERO
+        }
     }
 }

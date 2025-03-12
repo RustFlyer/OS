@@ -20,19 +20,19 @@ use mm::{
 };
 
 extern crate alloc;
-extern crate mm;
 
 #[unsafe(no_mangle)]
 pub fn rust_main() -> ! {
     /* Initialize logger */
     logger::init();
-    log::trace!("test trace");
-    log::info!("test info");
-    log::debug!("test debug");
-    log::warn!("test warn");
-    log::error!("test error");
     simdebug::when_debug!({
-        log::info!("when debug");
+        log::info!("--------when debug--------");
+        log::info!("test info");
+        log::error!("test error");
+        log::warn!("test warn");
+        log::debug!("test debug");
+        log::trace!("test trace");
+        log::info!("--------when debug--------");
     });
 
     /* Initialize heap allocator and page table */

@@ -11,12 +11,18 @@ id_allocator = { path = "../lib/id_allocator/" }
 mm = { path = "../lib/mm/" }
 mutex = { path = "../lib/mutex/" }
 executor = { path = "../lib/executor/" }
+pps = { path = "../lib/pps/" }
+arch = { path = "../lib/arch/" }
+time = { path = "../lib/time/" }
+timer = { path = "../lib/timer/" }
+
 riscv-rt = "0.12.2"
 sbi-rt = { version = "0.0.3", features = ["legacy"] }
 log = "0.4"
 crate_interface = "0.1"
 cfg-if = "1.0"
 lazy_static = { version = "1.4", features = ["spin_no_std"] }
+riscv = "0.11"
 
 [build-dependencies]
 config = { path = "../lib/config/" }
