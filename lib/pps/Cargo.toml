@@ -1,0 +1,8 @@
+[package]
+name = "pps"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+riscv = "0.11"
+arch = { path = "../arch" }

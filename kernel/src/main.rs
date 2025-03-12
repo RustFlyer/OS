@@ -1,11 +1,14 @@
 #![no_std]
 #![no_main]
+#![feature(sync_unsafe_cell)]
 
 mod console;
 mod lang_item;
 mod loader;
 mod logging;
+mod processor;
 mod sbi;
+mod task;
 
 use core::arch::global_asm;
 
@@ -17,6 +20,7 @@ global_asm!(include_str!("entry.S"));
 #[unsafe(no_mangle)]
 pub fn rust_main() -> ! {
     logger::init();
+    unsafe { mm::heap::init_heap_allocator() };
     log::info!("Hello, world!");
     log::error!("test error");
     log::warn!("test warn");
