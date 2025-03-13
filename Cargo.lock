@@ -72,6 +72,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "790eea4361631c5e7d22598ecd5723ff611904e3344ce8720784c93e3d83d40b"
 
 [[package]]
+name = "driver"
+version = "0.1.0"
+dependencies = [
+ "config",
+]
+
+[[package]]
 name = "embedded-hal"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -94,9 +101,11 @@ version = "0.1.0"
 name = "kernel"
 version = "0.1.0"
 dependencies = [
+ "arch",
  "cfg-if",
  "config",
  "crate_interface",
+ "driver",
  "executor",
  "id_allocator",
  "lazy_static",
@@ -109,6 +118,8 @@ dependencies = [
  "riscv-rt",
  "sbi-rt",
  "simdebug",
+ "time",
+ "timer",
 ]
 
 [[package]]
@@ -155,6 +166,7 @@ dependencies = [
  "lazy_static",
  "log",
  "mutex",
+ "systype",
 ]
 
 [[package]]
@@ -276,6 +288,26 @@ name = "systype"
 version = "0.1.0"
 
 [[package]]
+<<<<<<< HEAD
+=======
+name = "time"
+version = "0.1.0"
+dependencies = [
+ "arch",
+]
+
+[[package]]
+name = "timer"
+version = "0.1.0"
+dependencies = [
+ "arch",
+ "log",
+ "mutex",
+ "spin",
+]
+
+[[package]]
+>>>>>>> 400a9fba92e46ff4666017928f286a9aba81aec8
 name = "unicode-ident"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"

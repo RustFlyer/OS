@@ -11,6 +11,7 @@ lazy_static = { version = "1.4", features = ["spin_no_std"] }
 config = { path = "../config" }
 id_allocator = { path = "../id_allocator" }
 mutex = { path = "../mutex" }
+systype = { path = "../systype" }
 
 [build-dependencies]
 config = { path = "../config" }

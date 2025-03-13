@@ -1,4 +1,4 @@
-//! A module for managing virtual memory areas.
+//! Module for managing virtual memory areas.
 //!
 //! A virtual memory area (VMA) is a contiguous region of virtual memory in an
 //! address space, whose pages have a common set of attributes, such as permissions
@@ -10,20 +10,33 @@
 //! frames are not managed by [`VmArea`] because they do not need allocating and
 //! deallocating. [`VmArea`] only manages the physical pages allocated for user-used
 //! tables and frames.
+//!
+//! We implement modularized page fault handling as follows:
+//! - A [`VmArea`] struct has common fields for all typed of VMAs, as well as unique
+//!   fields for a specific type of VMA represented by a [`TypedArea`] enum.
+//! - A [`VmArea`] struct is registered with a page fault handler function for the VMA's
+//!   specific type when constructed via calling a `new_*` constructor corresponding to
+//!   that type.
+//! - The `fault_handler` method of a specific type of VMA is finally responsible for
+//!   handling the page fault.
+//!
+//! With this design, we avoid using trait objects or an enum for VMA types, while still
+//! maintaining modularization and extensibility.
 
 use alloc::{slice, vec::Vec};
 use config::mm::PAGE_SIZE;
 use core::fmt::Debug;
+use systype::{SysError, SysResult};
 
 use bitflags::bitflags;
 
-use super::pte::PteFlags;
+use super::{page_table::PageTable, pte::PteFlags};
 use crate::{address::VirtAddr, frame::FrameTracker};
 
 bitflags! {
-    /// Mapping permission corresponding to R, W, X, and U bits in a page table entry.
+    /// Memory permission corresponding to R, W, X, and U bits in a page table entry.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    pub struct MapPerm: u8 {
+    pub struct MemPerm: u8 {
         const R = 1 << 0;
         const W = 1 << 1;
         const X = 1 << 2;
@@ -31,26 +44,39 @@ bitflags! {
     }
 }
 
-impl From<MapPerm> for PteFlags {
-    /// Convert `MapPerm` to `PteFlags`.
-    fn from(perm: MapPerm) -> Self {
+impl From<MemPerm> for PteFlags {
+    /// Convert `MemPerm` to `PteFlags`.
+    fn from(perm: MemPerm) -> Self {
         let mut flags = Self::empty();
-        if perm.contains(MapPerm::U) {
+        if perm.contains(MemPerm::U) {
             flags |= PteFlags::U;
         } else {
             flags |= PteFlags::G;
         }
-        if perm.contains(MapPerm::R) {
+        if perm.contains(MemPerm::R) {
             flags |= PteFlags::R;
         }
-        if perm.contains(MapPerm::W) {
+        if perm.contains(MemPerm::W) {
             flags |= PteFlags::W;
         }
-        if perm.contains(MapPerm::X) {
+        if perm.contains(MemPerm::X) {
             flags |= PteFlags::X;
         }
         flags
     }
+}
+
+/// Data passed to a page fault handler.
+///
+/// This struct is used to pass data to a page fault handler registered in a [`VmArea`].
+#[derive(Debug)]
+pub struct PageFaultInfo<'a> {
+    /// Faulting virtual address.
+    pub addr: VirtAddr,
+    /// Page table.
+    pub page_table: &'a mut PageTable,
+    /// How the address was accessed when the fault occurred.
+    pub access: MemPerm,
 }
 
 /// A virtual memory area (VMA).
@@ -60,26 +86,26 @@ impl From<MapPerm> for PteFlags {
 #[derive(Debug)]
 pub struct VmArea {
     /// Starting virtual address.
-    start_va: VirtAddr,
+    pub start_va: VirtAddr,
     /// Ending virtual address (exclusive).
-    end_va: VirtAddr,
+    pub end_va: VirtAddr,
     /// Page table entry flags.
-    flags: PteFlags,
+    pub flags: PteFlags,
     /// Permission.
-    perm: MapPerm,
+    pub perm: MemPerm,
     /// Unique data of a specific type of VMA.
-    map_type: TypedArea,
+    pub map_type: TypedArea,
     /// Page fault handler.
-    handler: Option<fn(&Self, VirtAddr)>,
+    pub handler: Option<fn(&mut Self, PageFaultInfo) -> SysResult<()>>,
 }
 
 impl VmArea {
-    /// Constructs a [`VmArea`] which is a [`TypedArea::MemoryBacked`] VMA.
+    /// Constructs a [`VmArea`] whose specific type is [`TypedArea::MemoryBacked`].
     pub fn new_memory_backed(
         start_va: VirtAddr,
         end_va: VirtAddr,
         flags: PteFlags,
-        perm: MapPerm,
+        perm: MemPerm,
         memory: &'static [u8],
     ) -> Self {
         Self {
@@ -88,36 +114,16 @@ impl VmArea {
             flags,
             perm,
             map_type: TypedArea::MemoryBacked(MemoryBackedArea::new(memory)),
-            handler: Some(Self::memory_backed_fault_handler),
+            handler: Some(MemoryBackedArea::fault_handler),
         }
     }
 
-    /// Returns the starting virtual page number of the VMA.
-    pub fn start_va(&self) -> VirtAddr {
-        self.start_va
-    }
-
-    /// Returns the ending virtual page number of the VMA.
-    pub fn end_va(&self) -> VirtAddr {
-        self.end_va
-    }
-
-    /// Returns the page table entry flags of the VMA.
-    pub fn flags(&self) -> PteFlags {
-        self.flags
-    }
-
-    /// Returns the permission of the VMA.
-    pub fn perm(&self) -> MapPerm {
-        self.perm
-    }
-
-    /// Page fault handler for a [`MemoryBackedArea`].
-    fn memory_backed_fault_handler(&self, fault_addr: VirtAddr) {
-        if let TypedArea::MemoryBacked(memory_backed) = &self.map_type {
-            memory_backed.fault_handler(fault_addr, self.start_va, self.end_va);
+    /// Handles a page fault happened in this VMA.
+    pub fn handle_page_fault(&mut self, info: PageFaultInfo) -> SysResult<()> {
+        if let Some(handler) = self.handler {
+            handler(self, info)
         } else {
-            unreachable!("Page fault handler: not a MemoryBackedArea");
+            panic!("page fault handler: handler not registered");
         }
     }
 }
@@ -160,8 +166,39 @@ impl MemoryBackedArea {
     }
 
     /// Handles a page fault.
-    pub fn fault_handler(&self, fault_addr: VirtAddr, start_va: VirtAddr, end_va: VirtAddr) {
-        let fault_page = fault_addr.page_number();
+    pub fn fault_handler(area: &mut VmArea, info: PageFaultInfo) -> SysResult<()> {
+        // Extract the specific data of the memory-backed VMA.
+        let Self { memory, pages } = match &mut area.map_type {
+            TypedArea::MemoryBacked(memory_backed) => memory_backed,
+            _ => panic!("fault_handler: not a memory-backed area"),
+        };
+
+        let VmArea {
+            start_va,
+            end_va,
+            flags,
+            perm,
+            ..
+        } = *area;
+
+        let PageFaultInfo {
+            addr,
+            page_table,
+            access,
+        } = info;
+
+        // Check permission.
+        if !access.contains(perm) {
+            return Err(SysError::EACCES);
+        }
+
+        // Allocate a frame and map the page.
+        let frame = FrameTracker::new()?;
+        page_table.map_page(addr.page_number(), frame.as_ppn(), flags);
+        pages.push(frame);
+
+        // Copy data from the memory backing store to the allocated frame.
+        let fault_page = addr.page_number();
         let dst_start = {
             let fault_page_start = fault_page.address().to_usize();
             let start_va = start_va.to_usize();
@@ -174,10 +211,9 @@ impl MemoryBackedArea {
         };
         let dst_slice =
             unsafe { slice::from_raw_parts_mut(dst_start as *mut u8, dst_end - dst_start) };
-
-        let src_slice =
-            &self.memory[(dst_start - start_va.to_usize())..(dst_end - start_va.to_usize())];
-
+        let src_slice = &memory[(dst_start - start_va.to_usize())..(dst_end - start_va.to_usize())];
         dst_slice.copy_from_slice(src_slice);
+
+        Ok(())
     }
 }

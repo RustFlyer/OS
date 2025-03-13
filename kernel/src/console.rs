@@ -1,18 +1,23 @@
-use crate::sbi::console_putchar;
+// use crate::sbi::console_putchar;
 use core::fmt::{self, Write};
+
+use mutex::SpinNoIrqLock;
+
+static PRINT_LOCK: SpinNoIrqLock<()> = SpinNoIrqLock::new(());
 
 struct Stdout;
 
 impl Write for Stdout {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         for c in s.as_bytes() {
-            console_putchar(*c as usize);
+            driver::sbi::console_putchar(*c as usize);
         }
         Ok(())
     }
 }
 
 pub fn print(args: fmt::Arguments) {
+    let _guard = PRINT_LOCK.lock();
     Stdout.write_fmt(args).unwrap();
 }
 

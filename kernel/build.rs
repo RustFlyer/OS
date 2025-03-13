@@ -6,7 +6,7 @@ fn main() {
 
     let link_script = fs::read_to_string(PathBuf::from(manifest_dir).join("link.ld")).unwrap();
 
-    let ram_size = config::mm::RAM_SIZE - config::mm::KERNEL_OFFSET;
+    let ram_size = config::mm::RAM_SIZE - config::mm::KERNEL_RAM_OFFSET;
 
     let new = link_script
         .replace("%RAM_START%", &config::mm::KERNEL_START_PHYS.to_string())

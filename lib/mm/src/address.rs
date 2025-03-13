@@ -1,12 +1,11 @@
-//! Address types and utilities for Sv39.
+//! Module for address types for Sv39.
 //!
 //! This module provides types for physical and virtual addresses, as well as
 //! physical and virtual page numbers. It also provides functions for converting
 //! between these types.
 
 use config::mm::{
-    KERNEL_VM_OFFSET, PA_WIDTH_SV39, PAGE_OFFSET_WIDTH, PAGE_SIZE, PPN_WIDTH_SV39, VA_WIDTH_SV39,
-    VPN_WIDTH_SV39,
+    KERNEL_MAP_OFFSET, PA_WIDTH_SV39, PAGE_SIZE, PPN_WIDTH_SV39, VA_WIDTH_SV39, VPN_WIDTH_SV39,
 };
 
 /// An address in physical memory defined in Sv39.
@@ -58,7 +57,7 @@ impl PhysAddr {
 
     /// Translates a physical address into a virtual address in the kernel space.
     pub fn to_va_kernel(self) -> VirtAddr {
-        let va = self.addr + KERNEL_VM_OFFSET;
+        let va = self.addr + KERNEL_MAP_OFFSET;
         VirtAddr::new(va)
     }
 }
@@ -113,7 +112,7 @@ impl VirtAddr {
     /// Translates a virtual address into a physical address, if the VA is in the
     /// kernel space.
     pub fn to_pa_kernel(self) -> PhysAddr {
-        let pa = self.addr - KERNEL_VM_OFFSET;
+        let pa = self.addr - KERNEL_MAP_OFFSET;
         PhysAddr::new(pa)
     }
 }
@@ -154,9 +153,7 @@ impl PhysPageNum {
 
     /// Translates a physical page number into a virtual page number in the kernel space.
     pub fn to_vpn_kernel(self) -> VirtPageNum {
-        let vpn_mask = (1 << VPN_WIDTH_SV39) - 1;
-        let vpn = self.to_usize() + (KERNEL_VM_OFFSET >> PAGE_OFFSET_WIDTH) & vpn_mask;
-        VirtPageNum::new(vpn)
+        self.address().to_va_kernel().page_number()
     }
 }
 
@@ -189,7 +186,8 @@ impl VirtPageNum {
 
     /// Gets the starting address of the page.
     pub fn address(self) -> VirtAddr {
-        let addr = self.page_num << (64 - VPN_WIDTH_SV39) >> (64 - VA_WIDTH_SV39);
+        let addr =
+            ((self.page_num as isize) << (64 - VPN_WIDTH_SV39) >> (64 - VA_WIDTH_SV39)) as usize;
         VirtAddr::new(addr)
     }
 
@@ -207,8 +205,7 @@ impl VirtPageNum {
     /// Translates a virtual page number into a physical page number, if the VPN is in the
     /// kernel space.
     pub fn to_ppn_kernel(self) -> PhysPageNum {
-        let ppn = self.to_usize() - (KERNEL_VM_OFFSET >> PAGE_OFFSET_WIDTH);
-        PhysPageNum::new(ppn)
+        self.address().to_pa_kernel().page_number()
     }
 
     /// Returns 9-bit indices of the VPN.

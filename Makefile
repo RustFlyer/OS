@@ -11,6 +11,7 @@ DOCKER_NAME = my-os
 PACKAGE_NAME = kernel
 BOOTLOADER = default
 TARGET = riscv64gc-unknown-none-elf
+SMP = 4
 # Target board (QEMU emulator)
 # Build mode (debug/release)
 # Logging level (trace/debug/info/warn/error/off)
@@ -23,7 +24,7 @@ export DEBUG = off
 # Toolchain Configuration
 # ======================
 QEMU = qemu-system-riscv64
-GDB = riscv64-elf-gdb
+GDB = riscv64-unknown-elf-gdb
 OBJDUMP = rust-objdump --arch-name=riscv64
 OBJCOPY = rust-objcopy --binary-architecture=riscv64
 PAGER ?= less
@@ -35,7 +36,8 @@ DISASM_ARGS = -d
 QEMU_ARGS = -machine virt \
 			 -nographic \
 			 -bios $(BOOTLOADER) \
-			 -kernel $(KERNEL_ELF)
+			 -kernel $(KERNEL_ELF) \
+			 -smp $(SMP)
 	
 
 # ======================
