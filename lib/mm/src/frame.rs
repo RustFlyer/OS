@@ -58,7 +58,7 @@ lazy_static! {
 /// # Note
 /// Constructing and dropping a `FrameTrackerGuard` will acquire and release the frame
 /// allocator lock, respectively. Therefore, it is recommended to use
-/// [`FrameTracker::new_batch`] to allocate multiple frames at once,
+/// [`FrameTracker::build_batch`] to allocate multiple frames in batch,
 /// and to use [`FrameDropper`] to deallocate frames in batch.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FrameTracker {
@@ -69,8 +69,8 @@ pub struct FrameTracker {
 impl FrameTracker {
     /// Allocates a frame.
     ///
-    /// Returns `Some(FrameTracker)` if a frame is successfully allocated,
-    /// or `None` if there are no free frames.
+    /// Returns a `FrameTracker` if the frame is successfully allocated, or an `ENOMEM` error
+    /// if there are no free frames.
     pub fn new() -> SysResult<Self> {
         FRAME_ALLOCATOR
             .lock()
@@ -84,15 +84,15 @@ impl FrameTracker {
     /// Allocates a batch of frames.
     ///
     /// Returns a vector of `FrameTracker` if all frames are successfully allocated,
-    /// or an error if there are no free frames. If the allocation fails, no frames
-    /// are allocated.
+    /// or an `ENOMEM` error if there are no free frames. In the case of an error,
+    /// no frames are allocated.
     ///
     /// This function acquires the frame allocator lock only once, so it is more efficient
     /// than calling [`FrameTracker::new`] multiple times.
     ///
     /// # Errors
     /// Returns [`AllocError::OutOfMemory`] if there are no free frames.
-    pub fn new_batch(count: usize) -> Result<Vec<Self>, AllocError> {
+    pub fn build_batch(count: usize) -> Result<Vec<Self>, AllocError> {
         let mut allocator_locked = FRAME_ALLOCATOR.lock();
         let mut frames = Vec::new();
         for _ in 0..count {
@@ -212,7 +212,7 @@ pub fn frame_alloc_test() {
     {
         log::info!("frame_alloc_test: allocate 5 frames in a batch");
         let frames =
-            FrameTracker::new_batch(5).expect("frame_alloc_test: failed to allocate frames");
+            FrameTracker::build_batch(5).expect("frame_alloc_test: failed to allocate frames");
         for (i, f) in frames.iter().enumerate() {
             log::info!(
                 "frame_alloc_test: frame {}: 0x{:x}",
@@ -223,7 +223,7 @@ pub fn frame_alloc_test() {
         FrameDropper::drop(frames);
         log::info!("frame_alloc_test: frames are dropped");
         log::info!("frame_alloc_test: allocate 5 frames in a batch");
-        let frames = FrameTracker::new_batch(5).expect("failed to allocate frames");
+        let frames = FrameTracker::build_batch(5).expect("failed to allocate frames");
         for (i, f) in frames.iter().enumerate() {
             log::info!("frame {}: 0x{:x}", i, f.as_ppn().address().to_usize());
         }

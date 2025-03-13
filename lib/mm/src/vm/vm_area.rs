@@ -72,7 +72,7 @@ impl From<MemPerm> for PteFlags {
 #[derive(Debug)]
 pub struct PageFaultInfo<'a> {
     /// Faulting virtual address.
-    pub addr: VirtAddr,
+    pub fault_addr: VirtAddr,
     /// Page table.
     pub page_table: &'a mut PageTable,
     /// How the address was accessed when the fault occurred.
@@ -167,22 +167,25 @@ impl MemoryBackedArea {
 
     /// Handles a page fault.
     pub fn fault_handler(area: &mut VmArea, info: PageFaultInfo) -> SysResult<()> {
-        // Extract the specific data of the memory-backed VMA.
-        let Self { memory, pages } = match &mut area.map_type {
+        // Extract data needed for fault handling.
+        let &mut Self {
+            memory,
+            ref mut pages,
+        } = match &mut area.map_type {
             TypedArea::MemoryBacked(memory_backed) => memory_backed,
             _ => panic!("fault_handler: not a memory-backed area"),
         };
 
-        let VmArea {
+        let &mut VmArea {
             start_va,
             end_va,
             flags,
             perm,
             ..
-        } = *area;
+        } = area;
 
         let PageFaultInfo {
-            addr,
+            fault_addr,
             page_table,
             access,
         } = info;
@@ -194,11 +197,11 @@ impl MemoryBackedArea {
 
         // Allocate a frame and map the page.
         let frame = FrameTracker::new()?;
-        page_table.map_page(addr.page_number(), frame.as_ppn(), flags);
+        page_table.map_page(fault_addr.page_number(), frame.as_ppn(), flags);
         pages.push(frame);
 
         // Copy data from the memory backing store to the allocated frame.
-        let fault_page = addr.page_number();
+        let fault_page = fault_addr.page_number();
         let dst_start = {
             let fault_page_start = fault_page.address().to_usize();
             let start_va = start_va.to_usize();
@@ -209,10 +212,13 @@ impl MemoryBackedArea {
             let end_va = end_va.to_usize();
             usize::min(fault_page_end, end_va)
         };
+        // SAFETY: the range is within the newly allocated page.
         let dst_slice =
             unsafe { slice::from_raw_parts_mut(dst_start as *mut u8, dst_end - dst_start) };
         let src_slice = &memory[(dst_start - start_va.to_usize())..(dst_end - start_va.to_usize())];
         dst_slice.copy_from_slice(src_slice);
+
+        riscv::asm::sfence_vma(page_table.root().to_usize(), fault_addr.to_usize());
 
         Ok(())
     }
