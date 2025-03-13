@@ -34,6 +34,8 @@ bitflags! {
     ///
     /// Flag `RSW` is reserved for supervisor software, but we do not use it in
     /// the current implementation.
+    ///
+    /// Do not set any unknown bits.
     #[derive(Debug, Clone, Copy)]
     pub struct PteFlags: u8 {
         const V = 1 << 0;
