@@ -70,6 +70,8 @@ pub fn rust_main(hart_id: usize) -> ! {
             log::info!("start harts");
             boot::start_harts(hart_id);
         });
+
+        simdebug::backtrace_test();
     } else {
         log::info!("hart {} is waiting", hart_id);
     }

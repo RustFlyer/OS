@@ -52,6 +52,8 @@ pub struct TaskInner {
     state: TaskState,
     parent: Option<Weak<Task>>,
     children: BTreeMap<Tid, Weak<Task>>,
+
+    /// 任务的唤醒器
     waker: Option<Waker>,
     timer: TaskTimeStat,
 
@@ -167,10 +169,12 @@ impl TaskInner {
         }
     }
 
+    /// 当前任务切换到用户模式
     pub fn enter_user_mode(&mut self) {
         self.timer.switch_to_user();
     }
 
+    /// 当前任务切换到内核模式
     pub fn enter_kernel_mode(&mut self) {
         self.timer.switch_to_kernel();
     }
@@ -204,6 +208,7 @@ impl TaskInner {
         self.state == state
     }
 
+    // 挂起当前任务，等待时间到达或被唤醒
     pub async fn suspend_timeout(&self, limit: Duration) -> Duration {
         let expire = get_time_duration() + limit;
         let mut timer = Timer::new(expire);

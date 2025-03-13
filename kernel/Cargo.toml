@@ -27,6 +27,4 @@ riscv = "0.11"
 
 [build-dependencies]
 config = { path = "../lib/config/" }
-logger = { path = "../lib/logger/" }
-simdebug = { path = "../lib/simdebug/" }
-id_allocator = { path = "../lib/id_allocator/" }
+
