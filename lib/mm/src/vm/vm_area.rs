@@ -31,36 +31,42 @@ use systype::{SysError, SysResult};
 use bitflags::bitflags;
 
 use super::{page_table::PageTable, pte::PteFlags};
-use crate::{address::VirtAddr, frame::FrameTracker};
+use crate::{
+    address::{PhysPageNum, VirtAddr},
+    frame::FrameTracker,
+};
 
 bitflags! {
     /// Memory permission corresponding to R, W, X, and U bits in a page table entry.
+    ///
+    /// The bits of `MemPerm` are identical to the bits of `PteFlags` to make conversion
+    /// between them easier.
+    ///
+    /// Do not set any unknown bits.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct MemPerm: u8 {
-        const R = 1 << 0;
-        const W = 1 << 1;
-        const X = 1 << 2;
-        const U = 1 << 3;
+        const R = 1 << 1;
+        const W = 1 << 2;
+        const X = 1 << 3;
+        const U = 1 << 4;
     }
 }
 
-impl From<MemPerm> for PteFlags {
-    /// Convert `MemPerm` to `PteFlags`.
+impl MemPerm {
+    /// Create a new `MemPerm` from a set of `PteFlags`.
+    pub fn from(flags: PteFlags) -> Self {
+        Self::from_bits_truncate(flags.bits())
+    }
+}
+
+impl PteFlags {
+    /// Create a new `PteFlags` from a set of `MemPerm`.
+    ///
+    /// When `MemPerm` does not contain `U`, `G` is set in the returned `PteFlags`.
     fn from(perm: MemPerm) -> Self {
-        let mut flags = Self::empty();
-        if perm.contains(MemPerm::U) {
-            flags |= PteFlags::U;
-        } else {
-            flags |= PteFlags::G;
-        }
-        if perm.contains(MemPerm::R) {
-            flags |= PteFlags::R;
-        }
-        if perm.contains(MemPerm::W) {
-            flags |= PteFlags::W;
-        }
-        if perm.contains(MemPerm::X) {
-            flags |= PteFlags::X;
+        let mut flags = Self::from_bits_retain(perm.bits());
+        if !perm.contains(MemPerm::U) {
+            flags |= Self::G;
         }
         flags
     }
@@ -100,6 +106,18 @@ pub struct VmArea {
 }
 
 impl VmArea {
+    /// Constructs a [`VmArea`] whose specific type is [`TypedArea::Kernel`].
+    pub fn new_kernel(start_va: VirtAddr, end_va: VirtAddr, flags: PteFlags) -> Self {
+        Self {
+            start_va,
+            end_va,
+            flags,
+            perm: MemPerm::from(flags),
+            map_type: TypedArea::Kernel(KernelArea::new()),
+            handler: None,
+        }
+    }
+
     /// Constructs a [`VmArea`] whose specific type is [`TypedArea::MemoryBacked`].
     pub fn new_memory_backed(
         start_va: VirtAddr,
@@ -131,6 +149,8 @@ impl VmArea {
 /// Unique data of a specific type of VMA. This enum is used in [`VmArea`].
 #[derive(Debug)]
 pub enum TypedArea {
+    /// A helper VMA representing one in the kernel space.
+    Kernel(KernelArea),
     /// A memory-backed VMA.
     MemoryBacked(MemoryBackedArea),
     /// A file-backed VMA.
@@ -142,6 +162,47 @@ pub enum TypedArea {
     /// An anonymous VMA is not backed by any file or memory. It is used for stack
     /// and heap.
     Anonymous,
+}
+
+/// A helper VMA representing one in the kernel space.
+///
+/// This struct is used to map an area in the kernel space to the kernel page table.
+/// It is of no use after the kernel page table is set up.
+///
+/// A kernel area must be aligned to the size of a page.
+#[derive(Debug)]
+pub struct KernelArea;
+
+impl KernelArea {
+    /// Creates a new kernel area.
+    fn new() -> Self {
+        Self
+    }
+
+    /// Maps the kernel area to the kernel page table.
+    pub fn map(area: &VmArea, page_table: &mut PageTable) {
+        match area.map_type {
+            TypedArea::Kernel(_) => {}
+            _ => panic!("KernelArea::map: not a kernel area"),
+        }
+
+        let &VmArea {
+            start_va,
+            end_va,
+            flags,
+            ..
+        } = area;
+
+        let start_vpn = start_va.page_number();
+        let end_vpn = end_va.page_number();
+        let start_ppn = start_vpn.to_ppn_kernel().to_usize();
+        let end_ppn = end_vpn.to_ppn_kernel().to_usize();
+        let ppns = (start_ppn..end_ppn)
+            .map(PhysPageNum::new)
+            .collect::<Vec<_>>();
+
+        page_table.map_range(start_vpn, &ppns, flags);
+    }
 }
 
 /// A memory-backed VMA.
@@ -158,7 +219,7 @@ pub struct MemoryBackedArea {
 
 impl MemoryBackedArea {
     /// Creates a new memory-backed VMA.
-    pub fn new(memory: &'static [u8]) -> Self {
+    fn new(memory: &'static [u8]) -> Self {
         Self {
             memory,
             pages: Vec::new(),

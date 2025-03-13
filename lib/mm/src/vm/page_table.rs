@@ -8,12 +8,16 @@ use core::arch::asm;
 
 use lazy_static::lazy_static;
 
-use config::mm::{KERNEL_START, KERNEL_START_PHYS, PTE_PER_TABLE, kernel_end_phys};
+use config::mm::{
+    KERNEL_START, KERNEL_START_PHYS, PTE_PER_TABLE, bss_end, bss_start, data_end, data_start,
+    kernel_end_phys, rodata_end, rodata_start, text_end,
+};
 use systype::SysResult;
 
 use crate::{
     address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum},
     frame::FrameTracker,
+    vm::vm_area::{KernelArea, VmArea},
 };
 
 use super::pte::{PageTableEntry, PteFlags};
@@ -41,15 +45,15 @@ pub struct PageTable {
 
 lazy_static! {
     /// The kernel page table.
-    pub static ref KERNEL_PAGE_TABLE: PageTable = PageTable::new_kernel();
+    pub static ref KERNEL_PAGE_TABLE: PageTable = PageTable::build_kernel_page_table();
 }
 
 impl PageTable {
-    /// Builds an empty page table.
+    /// Builds a new `PageTable` with an empty root page table.
     ///
     /// # Errors
-    /// Returns [`AllocError::OutOfMemory`] if there are no free frames.
-    pub fn build_empty() -> SysResult<Self> {
+    /// Returns an [`ENOMEM`] error if memory allocation for the root page table fails.
+    pub fn build() -> SysResult<Self> {
         let root_frame = FrameTracker::new()?;
         // SAFETY: the frame is newly allocated for the root page table.
         unsafe {
@@ -67,15 +71,17 @@ impl PageTable {
     /// The mapping is linear, i.e., VPN = PPN + KERNEL_MAP_OFFSET.
     ///
     /// # Panics
-    /// Panics if the kernel page table cannot be constructed.
-    fn new_kernel() -> Self {
+    /// Panics if the kernel page table cannot be constructed due to lack of free
+    /// frames, which should not happen in practice.
+    #[deprecated]
+    fn build_kernel() -> Self {
         let kernel_ppn_start = PhysAddr::new(KERNEL_START_PHYS).page_number().to_usize();
         let kernel_ppn_end = PhysAddr::new(kernel_end_phys()).page_number().to_usize();
         let kernel_vpn_start = VirtAddr::new(KERNEL_START).page_number();
 
-        let mut page_table = Self::build_empty().expect("out of memory");
+        let mut page_table = Self::build().expect("out of memory");
         let kernel_frames: Vec<PhysPageNum> = (kernel_ppn_start..kernel_ppn_end)
-            .map(|ppn| PhysPageNum::new(ppn))
+            .map(PhysPageNum::new)
             .collect();
         page_table.map_range(
             kernel_vpn_start,
@@ -83,6 +89,54 @@ impl PageTable {
             // TODO: make the permission more accurate
             PteFlags::V | PteFlags::R | PteFlags::W | PteFlags::X,
         );
+        page_table
+    }
+
+    /// Constructs the kernel page table.
+    ///
+    /// The kernel page table is a page table that maps the entire kernel space.
+    /// The mapping is linear, i.e., VPN = PPN + KERNEL_MAP_OFFSET.
+    ///
+    /// # Panics
+    /// Panics if the kernel page table cannot be constructed due to lack of free
+    /// frames, which should not happen in practice.
+    fn build_kernel_page_table() -> Self {
+        let mut page_table = Self::build().expect("out of memory");
+
+        log::debug!("--- kernel memory layout ---");
+        // Bug: linker returns an error when using _etext: relocation R_RISCV_PCREL_HI20 out of range
+        // Use the constant `KERNEL_START` as a workaround.
+        // log::debug!(".text {:#x} - {:#x}", text_start(), text_end());
+        log::debug!(".text {:#x} - {:#x}", KERNEL_START, text_end());
+        log::debug!(".rodata {:#x} - {:#x}", rodata_start(), rodata_end());
+        log::debug!(".data {:#x} - {:#x}", data_start(), data_end());
+        log::debug!(".bss {:#x} - {:#x}", bss_start(), bss_end());
+
+        // let text_start_va = VirtAddr::new(text_start());
+        let text_start_va = VirtAddr::new(KERNEL_START);
+        let text_end_va = VirtAddr::new(text_end());
+        let text_flags = PteFlags::V | PteFlags::R | PteFlags::X;
+        let text_vma = VmArea::new_kernel(text_start_va, text_end_va, text_flags);
+        KernelArea::map(&text_vma, &mut page_table);
+
+        let rodata_start_va = VirtAddr::new(rodata_start());
+        let rodata_end_va = VirtAddr::new(rodata_end());
+        let rodata_flags = PteFlags::V | PteFlags::R;
+        let rodata_vma = VmArea::new_kernel(rodata_start_va, rodata_end_va, rodata_flags);
+        KernelArea::map(&rodata_vma, &mut page_table);
+
+        let data_start_va = VirtAddr::new(data_start());
+        let data_end_va = VirtAddr::new(data_end());
+        let data_flags = PteFlags::V | PteFlags::R | PteFlags::W;
+        let data_vma = VmArea::new_kernel(data_start_va, data_end_va, data_flags);
+        KernelArea::map(&data_vma, &mut page_table);
+
+        let bss_start_va = VirtAddr::new(bss_start());
+        let bss_end_va = VirtAddr::new(bss_end());
+        let bss_flags = PteFlags::V | PteFlags::R | PteFlags::W;
+        let bss_vma = VmArea::new_kernel(bss_start_va, bss_end_va, bss_flags);
+        KernelArea::map(&bss_vma, &mut page_table);
+
         page_table
     }
 
@@ -105,10 +159,10 @@ impl PageTable {
     /// This function only support 4 KiB pages.
     pub fn find_entry_create(&mut self, vpn: VirtPageNum) -> &mut PageTableEntry {
         let mut ppn = self.root;
-        for (i, index) in vpn.indices().into_iter().enumerate() {
+        for (i, index) in vpn.indices().into_iter().enumerate().rev() {
             let mut page_table = unsafe { PageTableMem::new(ppn) };
             let entry = page_table.get_entry_mut(index);
-            if i == 2 {
+            if i == 0 {
                 return entry;
             }
             if !entry.is_valid() {
@@ -128,10 +182,10 @@ impl PageTable {
     /// This function only support 4 KiB pages.
     pub fn find_entry(&mut self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
         let mut ppn = self.root;
-        for (i, index) in vpn.indices().into_iter().enumerate() {
+        for (i, index) in vpn.indices().into_iter().enumerate().rev() {
             let mut page_table = unsafe { PageTableMem::new(ppn) };
             let entry = page_table.get_entry_mut(index);
-            if i == 2 {
+            if i == 0 {
                 return Some(entry);
             }
             if !entry.is_valid() {
@@ -206,9 +260,34 @@ impl PageTable {
             self.unmap_page(vpn);
         }
     }
+
+    /// Maps the kernel part of the address space into this page table.
+    ///
+    /// This method is used to map the kernel space into a new page table for a user process.
+    /// This method does not allocate any frame or make this page table own any frame.
+    pub fn map_kernel(&mut self) {
+        let kernel_vpn_start = VirtAddr::new(KERNEL_START).page_number();
+        let kernel_vpn_end = VirtAddr::new(kernel_end_phys()).page_number();
+        // Range of the top-level PTEs that map the kernel space.
+        let index_start = kernel_vpn_start.indices()[2];
+        let index_end = kernel_vpn_end.indices()[2];
+
+        let mut page_table = unsafe { PageTableMem::new(self.root) };
+        let kernel_page_table = unsafe { PageTableMem::new(KERNEL_PAGE_TABLE.root) };
+        let src = &kernel_page_table.as_slice()[index_start..=index_end];
+        let dst = &mut page_table.as_slice_mut()[index_start..=index_end];
+        dst.copy_from_slice(src);
+    }
 }
 
 /// A helper struct for manipulating a page table in memory temporarily.
+///
+/// # Discussion
+/// To achieve thread-safe access to a page table, we need to ensure that only one
+/// thread can get a mutable reference to the page table at a time. Consider using
+/// a lock to protect the page table. We will change the implementation of this struct
+/// in the future.
+#[derive(Debug)]
 struct PageTableMem {
     /// Reference to the page table in memory.
     ppn: PhysPageNum,

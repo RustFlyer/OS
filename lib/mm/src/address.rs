@@ -32,7 +32,7 @@ impl PhysAddr {
         let tmp = addr as isize >> PA_WIDTH_SV39;
         debug_assert!(
             tmp == 0 || tmp == -1,
-            "invalid physical address: 0x{:x}",
+            "invalid physical address: {:#x}",
             addr
         );
         PhysAddr { addr }
@@ -86,7 +86,7 @@ impl VirtAddr {
         let tmp = addr as isize >> VA_WIDTH_SV39;
         debug_assert!(
             tmp == 0 || tmp == -1,
-            "invalid virtual address: 0x{:x}",
+            "invalid virtual address: {:#x}",
             addr
         );
         VirtAddr { addr }
@@ -136,7 +136,7 @@ impl PhysPageNum {
     /// are not zero.
     pub fn new(page_num: usize) -> Self {
         let tmp = page_num >> (64 - PPN_WIDTH_SV39);
-        debug_assert!(tmp == 0, "invalid physical page number: 0x{:x}", page_num);
+        debug_assert!(tmp == 0, "invalid physical page number: {:#x}", page_num);
         PhysPageNum { page_num }
     }
 
@@ -175,7 +175,7 @@ impl VirtPageNum {
     /// are not zero.
     pub fn new(page_num: usize) -> Self {
         let tmp = page_num >> (64 - VPN_WIDTH_SV39);
-        debug_assert!(tmp == 0, "invalid virtual page number: 0x{:x}", page_num);
+        debug_assert!(tmp == 0, "invalid virtual page number: {:#x}", page_num);
         VirtPageNum { page_num }
     }
 
@@ -209,14 +209,30 @@ impl VirtPageNum {
     }
 
     /// Returns 9-bit indices of the VPN.
+    ///
+    /// `indices[2]` is the index of the root page table.
+    /// `indices[1]` is the index of the second-level page table.
+    /// `indices[0]` is the index of the leaf page table.
     pub fn indices(self) -> [usize; 3] {
         let index_mask = 0x1ff;
         let vpn = self.to_usize();
         let mut indices = [0; 3];
-        indices[0] = (vpn >> 18) & index_mask;
+        indices[0] = vpn & index_mask;
         indices[1] = (vpn >> 9) & index_mask;
-        indices[2] = vpn & index_mask;
+        indices[2] = (vpn >> 18) & index_mask;
         indices
+    }
+}
+
+impl From<PhysAddr> for usize {
+    fn from(pa: PhysAddr) -> usize {
+        pa.to_usize()
+    }
+}
+
+impl From<VirtAddr> for usize {
+    fn from(va: VirtAddr) -> usize {
+        va.to_usize()
     }
 }
 
@@ -226,8 +242,20 @@ impl From<PhysPageNum> for PhysAddr {
     }
 }
 
+impl From<PhysPageNum> for usize {
+    fn from(ppn: PhysPageNum) -> usize {
+        ppn.to_usize()
+    }
+}
+
 impl From<VirtPageNum> for VirtAddr {
     fn from(vpn: VirtPageNum) -> VirtAddr {
         vpn.address()
+    }
+}
+
+impl From<VirtPageNum> for usize {
+    fn from(vpn: VirtPageNum) -> usize {
+        vpn.to_usize()
     }
 }

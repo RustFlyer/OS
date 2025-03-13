@@ -6,6 +6,9 @@ ifeq ($(DEBUG), on)
 	DEBUG_ARG = --cfg ondebug
 endif
 
+RUSTFLAGS := -Ccode-model=large
+RUSTFLAGS := $(RUSTFLAGS) $(DEBUG_ARG)
+
 PHONY := all
 all: build
 
@@ -15,6 +18,6 @@ env:
 
 PHONY += build
 build: env
-	@RUSTFLAGS="$(DEBUG_ARG)" cargo build $(MODE_ARG) 
+	RUSTFLAGS="$(RUSTFLAGS)" cargo build $(MODE_ARG) 
 
 .PHONY: $(PHONY)

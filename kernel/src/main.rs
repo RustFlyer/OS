@@ -49,8 +49,8 @@ pub fn rust_main() -> ! {
 
     log::info!(
         "kernel virtual memory: {:#x} - {:#x}",
-        config::mm::KERNEL_START,
-        config::mm::kernel_end() as usize
+        config::mm::kernel_start(),
+        config::mm::kernel_end()
     );
 
     /* Simple tests */

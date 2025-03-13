@@ -4,6 +4,8 @@ ENTRY(_start)
 SECTIONS
 {
     . = ALIGN(4K);
+    _skernel = .;
+    _stext = .;
     .text : {
         *(.text.entry)
         . = ALIGN(4K);
@@ -11,18 +13,24 @@ SECTIONS
     } > VIRT AT> RAM
 
     . = ALIGN(4K);
+    _etext = .;
+    _srodata = .;
     .rodata : {
         *(.rodata .rodata.*)
         *(.srodata .srodata.*)
     } > VIRT AT> RAM
 
     . = ALIGN(4K);
+    _erodata = .;
+    _sdata = .;
     .data : {
         *(.data .data.*)
         *(.sdata .sdata.*)
     } > VIRT AT> RAM
 
     . = ALIGN(4K);
+    _edata = .;
+    _sbss = .;
     .bss : {
         *(.bss.stack)
         *(.bss .bss.*)
@@ -30,6 +38,7 @@ SECTIONS
     } > VIRT AT> RAM
 
     . = ALIGN(4K);
+    _ebss = .;
     _ekernel = .;
 
     /DISCARD/ : {
