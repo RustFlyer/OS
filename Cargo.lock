@@ -72,6 +72,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "790eea4361631c5e7d22598ecd5723ff611904e3344ce8720784c93e3d83d40b"
 
 [[package]]
+name = "driver"
+version = "0.1.0"
+dependencies = [
+ "config",
+]
+
+[[package]]
 name = "embedded-hal"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -98,6 +105,7 @@ dependencies = [
  "cfg-if",
  "config",
  "crate_interface",
+ "driver",
  "executor",
  "id_allocator",
  "lazy_static",

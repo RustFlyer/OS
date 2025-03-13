@@ -1,11 +1,12 @@
 use alloc::sync::Arc;
+use simdebug::when_debug;
 
 use core::future::Future;
 use core::pin::Pin;
 use core::task::{Context, Poll};
 
 use super::Task;
-use crate::processor::hart::current_hart;
+use crate::processor::hart::{current_hart, one_hart};
 use crate::task::task::TaskState;
 use core::task::Waker;
 
@@ -31,7 +32,7 @@ impl<F: Future + Send + 'static> Future for UserFuture<F> {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut future = unsafe { Pin::get_unchecked_mut(self) };
-        let hart = current_hart();
+        let mut hart = current_hart();
         hart.user_switch_in(future.task.clone(), &mut future.pps);
         let ret = unsafe { Pin::new_unchecked(&mut future.future).poll(cx) };
         hart.user_switch_out(&mut future.pps);
@@ -58,7 +59,7 @@ impl<F: Future + Send + 'static> Future for KernelFuture<F> {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut future = unsafe { Pin::get_unchecked_mut(self) };
-        let hart = current_hart();
+        let mut hart = current_hart();
         hart.kernel_switch_in(&mut future.pps);
         let ret = unsafe { Pin::new_unchecked(&mut future.future).poll(cx) };
         hart.kernel_switch_out(&mut future.pps);

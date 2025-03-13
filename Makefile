@@ -11,6 +11,7 @@ DOCKER_NAME = my-os
 PACKAGE_NAME = kernel
 BOOTLOADER = default
 TARGET = riscv64gc-unknown-none-elf
+SMP = 4
 # Target board (QEMU emulator)
 # Build mode (debug/release)
 # Logging level (trace/debug/info/warn/error/off)
@@ -35,7 +36,8 @@ DISASM_ARGS = -d
 QEMU_ARGS = -machine virt \
 			 -nographic \
 			 -bios $(BOOTLOADER) \
-			 -kernel $(KERNEL_ELF)
+			 -kernel $(KERNEL_ELF) \
+			 -smp $(SMP)
 	
 
 # ======================

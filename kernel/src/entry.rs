@@ -62,7 +62,7 @@ unsafe extern "C" fn _start(hart_id: usize) -> ! {
         ",
         // Set stack pointer to the virtual address of the upper bound of the boot stack
         "
-            li      t1, 1
+            addi    t1, a0, 1
             slli    t1, t1, 16              // t1 = `KERNEL_STACK_SIZE`
             la      sp, {boot_stack_pa}
             add     sp, sp, t1
@@ -70,9 +70,9 @@ unsafe extern "C" fn _start(hart_id: usize) -> ! {
         ",
         // Jump to the virtual address of `rust_main`
         "
-            la      a0, rust_main
-            or      a0, a0, t0
-            jr      a0
+            la      a1, rust_main
+            or      a1, a1, t0
+            jr      a1
         ",
         page_table_pa = sym BOOT_PAGE_TABLE,
         boot_stack_pa = sym BOOT_STACK,

@@ -11,7 +11,7 @@ pub struct ProcessorPrivilegeState {
 }
 
 impl ProcessorPrivilegeState {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             sum_cnt: 0,
             sstatus: 0,
