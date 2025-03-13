@@ -26,10 +26,7 @@ use config::mm::{PAGE_SIZE, RAM_END, kernel_end_phys};
 use id_allocator::{IdAllocator, VecIdAllocator};
 use mutex::SpinNoIrqLock;
 
-use crate::{
-    address::{PhysAddr, PhysPageNum, VirtPageNum},
-    mm_error::AllocError,
-};
+use crate::address::{PhysAddr, PhysPageNum, VirtPageNum};
 
 /// The frame allocator type.
 type FrameAllocator = VecIdAllocator;
@@ -91,8 +88,8 @@ impl FrameTracker {
     /// than calling [`FrameTracker::new`] multiple times.
     ///
     /// # Errors
-    /// Returns [`AllocError::OutOfMemory`] if there are no free frames.
-    pub fn build_batch(count: usize) -> Result<Vec<Self>, AllocError> {
+    /// Returns [`ENOMEM`] if there are no free frames.
+    pub fn build_batch(count: usize) -> SysResult<Vec<Self>> {
         let mut allocator_locked = FRAME_ALLOCATOR.lock();
         let mut frames = Vec::new();
         for _ in 0..count {
@@ -102,7 +99,7 @@ impl FrameTracker {
                 });
             } else {
                 FrameDropper::drop(frames);
-                return Err(AllocError::OutOfMemory);
+                return Err(SysError::ENOMEM);
             }
         }
         Ok(frames)
@@ -114,13 +111,11 @@ impl FrameTracker {
     }
 
     /// Gets the virtual page number of the frame in the kernel space.
-    #[deprecated]
     pub fn as_vpn(&self) -> VirtPageNum {
         self.ppn.to_vpn_kernel()
     }
 
     /// Gets a slice pointing to the frame.
-    #[deprecated]
     pub fn as_slice(&self) -> &mut [u8; PAGE_SIZE] {
         // SAFETY: The frame is allocated, and the returned slice does not outlive
         // the `FrameTracker` which lives as long as the frame.
@@ -192,11 +187,11 @@ pub fn frame_alloc_test() {
         let f1 = FrameTracker::new().expect("frame_alloc_test: failed to allocate frame");
         let f2 = FrameTracker::new().expect("frame_alloc_test: failed to allocate frame");
         log::info!(
-            "frame_alloc_test: frame 1: 0x{:x}",
+            "frame_alloc_test: frame 1: {:#x}",
             f1.as_ppn().address().to_usize()
         );
         log::info!(
-            "frame_alloc_test: frame 2: 0x{:x}",
+            "frame_alloc_test: frame 2: {:#x}",
             f2.as_ppn().address().to_usize()
         );
     }
@@ -204,7 +199,7 @@ pub fn frame_alloc_test() {
         log::info!("frame_alloc_test: frames 1 and 2 are dropped");
         let f3 = FrameTracker::new().expect("frame_alloc_test: failed to allocate frame");
         log::info!(
-            "frame_alloc_test: frame 3: 0x{:x}",
+            "frame_alloc_test: frame 3: {:#x}",
             f3.as_ppn().address().to_usize()
         );
         log::info!("frame_alloc_test: frame 3 is dropped");
@@ -215,7 +210,7 @@ pub fn frame_alloc_test() {
             FrameTracker::build_batch(5).expect("frame_alloc_test: failed to allocate frames");
         for (i, f) in frames.iter().enumerate() {
             log::info!(
-                "frame_alloc_test: frame {}: 0x{:x}",
+                "frame_alloc_test: frame {}: {:#x}",
                 i,
                 f.as_ppn().address().to_usize()
             );
@@ -225,7 +220,7 @@ pub fn frame_alloc_test() {
         log::info!("frame_alloc_test: allocate 5 frames in a batch");
         let frames = FrameTracker::build_batch(5).expect("failed to allocate frames");
         for (i, f) in frames.iter().enumerate() {
-            log::info!("frame {}: 0x{:x}", i, f.as_ppn().address().to_usize());
+            log::info!("frame {}: {:#x}", i, f.as_ppn().address().to_usize());
         }
         log::info!("frame_alloc_test: frames are dropped");
     }
