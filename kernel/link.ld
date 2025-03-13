@@ -30,6 +30,7 @@ SECTIONS
     } > VIRT AT> RAM
 
     . = ALIGN(4K);
+    _ekernel = .;
 
     /DISCARD/ : {
         *(.eh_frame)
