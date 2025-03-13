@@ -23,6 +23,6 @@ impl LogInterface for LogInterfaceImpl {
                 record.args()
             ),
             logger::level2color(record.level()),
-        )
+        );
     }
 }

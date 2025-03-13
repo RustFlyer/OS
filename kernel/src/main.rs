@@ -2,6 +2,7 @@
 #![no_main]
 #![feature(naked_functions)]
 #![feature(sync_unsafe_cell)]
+#![allow(dead_code, unused_imports, warnings)]
 
 mod boot;
 mod console;
@@ -75,6 +76,8 @@ pub fn rust_main(hart_id: usize) -> ! {
 
     log::info!("hart {} is running", hart_id);
 
-    loop {}
+    loop {
+        // executor::task_run_always();
+    }
     sbi::shutdown(false);
 }
