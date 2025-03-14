@@ -1,4 +1,5 @@
 use super::csr_env::set_kernel_trap;
+use crate::syscall;
 use crate::task::{Task, TaskState};
 use alloc::sync::Arc;
 use arch::riscv64::{
@@ -22,8 +23,6 @@ pub async fn trap_handler(task: &Arc<Task>) -> bool {
     let mut timer = task.timer_mut();
     timer.record_trap();
 
-    let cx = task.trap_context_mut();
-
     let stval = stval::read();
     let scause = scause::read();
     let sepc = sepc::read();
@@ -34,17 +33,23 @@ pub async fn trap_handler(task: &Arc<Task>) -> bool {
     unsafe { enable_interrupt() };
 
     match cause {
-        Trap::Exception(e) => user_exception_handler(task, e),
+        Trap::Exception(e) => user_exception_handler(task, e).await,
         Trap::Interrupt(i) => user_interrupt_handler(task, i),
     }
     true
 }
 
-pub fn user_exception_handler(task: &Arc<Task>, e: Exception) {
+pub async fn user_exception_handler(task: &Arc<Task>, e: Exception) {
+    let mut cx = task.trap_context_mut();
     match e {
         // 系统调用
         Exception::UserEnvCall => {
             log::trace!("[trap_handler] user env call");
+            let syscall_no = cx.syscall_no();
+            cx.step_one();
+            let ret = syscall(syscall_no, cx.syscall_args()).await;
+            cx = task.trap_context_mut();
+            cx.set_user_a0(ret);
         }
         // 内存错误
         Exception::StorePageFault | Exception::InstructionPageFault | Exception::LoadPageFault => {

@@ -12,6 +12,7 @@ mod loader;
 mod logging;
 mod processor;
 mod sbi;
+mod syscall;
 mod task;
 mod trap;
 
@@ -23,6 +24,8 @@ use mm::{
 };
 
 use core::sync::atomic::Ordering;
+
+pub use syscall::syscall;
 
 extern crate alloc;
 
