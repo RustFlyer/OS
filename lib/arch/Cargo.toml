@@ -7,3 +7,4 @@ edition = "2024"
 config = { path = "../config" }
 riscv = "0.11"
 bit_field = "0.10"
+sbi-rt = { version = "0.0.3", features = ["legacy"] }

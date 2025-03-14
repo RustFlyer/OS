@@ -31,10 +31,11 @@ use super::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TaskState {
     Running,
-    Sleeping,
-    Waiting,
     Zombie,
-    Die,
+    Waiting,
+    Sleeping,
+    Interruptable,
+    UnInterruptable,
 }
 
 /// 任务结构体

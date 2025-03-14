@@ -20,9 +20,6 @@ use timer::TIMER_MANAGER;
 pub async fn trap_handler(task: &Arc<Task>) -> bool {
     unsafe { set_kernel_trap() };
 
-    let mut timer = task.timer_mut();
-    timer.record_trap();
-
     let stval = stval::read();
     let scause = scause::read();
     let sepc = sepc::read();
@@ -62,7 +59,7 @@ pub async fn user_exception_handler(task: &Arc<Task>, e: Exception) {
                 stval::read(),
                 sepc::read(),
             );
-            task.set_state(TaskState::Die);
+            task.set_state(TaskState::Zombie);
         }
         // 其他异常
         e => {

@@ -9,6 +9,7 @@ dependencies = [
  "bit_field",
  "config",
  "riscv",
+ "sbi-rt",
 ]
 
 [[package]]
