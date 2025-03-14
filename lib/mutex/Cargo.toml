@@ -4,6 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-log = "0.4"
-bitflags = "2.5"
-riscv = "0.11"
+log = { workspace = true }
+bitflags = { workspace = true }
+riscv = { workspace = true }

@@ -1,3 +1,17 @@
 [workspace]
-members = [ "kernel", "lib/*", "user"]
+members = ["kernel", "lib/*", "user"]
 resolver = "2"
+
+[workspace.dependencies]
+async-task =  { version = "4.7", default-features = false }
+bitflags = "2.9"
+bit_field = "0.10"
+buddy_system_allocator = "0.11"
+cfg-if = "1.0"
+crate_interface = "0.1"
+lazy_static = { version = "1.5", features = ["spin_no_std"] }
+log = "0.4"
+riscv = { version = "0.13", features = ["s-mode"] }
+riscv-rt = "0.14"
+sbi-rt = { version = "0.0.3", features = ["legacy"] }
+spin = { version = "0.9", features = ["lazy"] }

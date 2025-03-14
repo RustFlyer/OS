@@ -37,8 +37,8 @@ impl Sstatus {
     }
 
     pub fn set_fs(&mut self, fs: FS) {
-        let v: u8 = unsafe { core::mem::transmute(fs) };
-        self.bits.set_bits(13..15, v as usize);
+        let v: usize = unsafe { core::mem::transmute(fs) };
+        self.bits.set_bits(13..15, v);
     }
 
     pub fn empty() -> Self {

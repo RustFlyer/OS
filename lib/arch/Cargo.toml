@@ -5,5 +5,5 @@ edition = "2024"
 
 [dependencies]
 config = { path = "../config" }
-riscv = "0.11"
-bit_field = "0.10"
+riscv = { workspace = true }
+bit_field = { workspace = true }

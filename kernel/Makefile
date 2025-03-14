@@ -18,6 +18,6 @@ env:
 
 PHONY += build
 build: env
-	RUSTFLAGS="$(RUSTFLAGS)" cargo build $(MODE_ARG) 
+	@RUSTFLAGS="$(RUSTFLAGS)" cargo build $(MODE_ARG) 
 
 .PHONY: $(PHONY)
