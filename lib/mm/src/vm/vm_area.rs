@@ -23,8 +23,7 @@
 //! With this design, we avoid using trait objects or an enum for VMA types, while still
 //! maintaining modularization and extensibility.
 
-use alloc::{slice, vec::Vec};
-use config::mm::PAGE_SIZE;
+use alloc::vec::Vec;
 use core::fmt::Debug;
 use systype::{SysError, SysResult};
 
@@ -191,7 +190,7 @@ pub(crate) struct KernelArea;
 
 impl KernelArea {
     /// Maps the kernel area to the kernel page table.
-     pub fn map(area: &VmArea, page_table: &mut PageTable) {
+    pub fn map(area: &VmArea, page_table: &mut PageTable) {
         match area.map_type {
             TypedArea::Kernel(_) => {}
             _ => panic!("KernelArea::map: not a kernel area"),
@@ -270,26 +269,22 @@ impl MemoryBackedArea {
         // Allocate a frame and map the page.
         let frame = FrameTracker::new()?;
         page_table.map_page(fault_addr.page_number(), frame.as_ppn(), flags);
-        pages.push(frame);
 
         // Copy data from the memory backing store to the allocated frame.
-        let fault_page = fault_addr.page_number();
-        let dst_start = {
-            let fault_page_start = fault_page.address().to_usize();
-            let start_va = start_va.to_usize();
-            usize::max(fault_page_start, start_va)
-        };
-        let dst_end = {
-            let fault_page_end = fault_page.address().to_usize() + PAGE_SIZE;
-            let end_va = end_va.to_usize();
-            usize::min(fault_page_end, end_va)
-        };
-        // SAFETY: the range is within the newly allocated page.
-        let dst_slice =
-            unsafe { slice::from_raw_parts_mut(dst_start as *mut u8, dst_end - dst_start) };
-        let src_slice = &memory[(dst_start - start_va.to_usize())..(dst_end - start_va.to_usize())];
-        dst_slice.copy_from_slice(src_slice);
+        let fill_va_start = VirtAddr::max(start_va, fault_addr.round_down());
+        let fill_va_end = VirtAddr::min(end_va, fault_addr.round_up());
+        let fill_len = fill_va_end.to_usize() - fill_va_start.to_usize();
+        let page_offset = fill_va_start.to_usize() - fault_addr.round_down().to_usize();
+        let area_offset = fill_va_start.to_usize() - start_va.to_usize();
 
+        let memory_to_copy = &memory[area_offset..area_offset + fill_len];
+        let memory_to_fill = &mut frame.as_slice_mut()[page_offset..page_offset + fill_len];
+        memory_to_fill.copy_from_slice(memory_to_copy);
+
+        // Track the allocated frame.
+        pages.push(frame);
+
+        // Flush TLB.
         riscv::asm::sfence_vma(page_table.root().to_usize(), fault_addr.to_usize());
 
         Ok(())

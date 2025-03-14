@@ -17,6 +17,8 @@
 //! The kernel creates a new page table for the address space and maps its kernel part
 //! directly. VMAs are then created to manage the user part of the address space.
 
+use core::ops::Bound;
+
 use alloc::collections::btree_map::BTreeMap;
 
 use systype::{SysError, SysResult};
@@ -67,18 +69,40 @@ impl AddrSpace {
         Ok(addr_space)
     }
 
-    /// Inserts a VMA into the address space.
+    /// Adds a VMA into the address space.
     ///
-    /// This function inserts a VMA into the address space, which de facto builds a memory
-    /// mapping in the address space.
-    pub fn insert_area(&mut self, vma: VmArea) {
-        self.vm_areas.insert(vma.start_va(), vma);
+    /// This function adds a VMA into the address space, which de facto builds a memory
+    /// mapping in the address space. The VMA to be added must not overlap with any existing
+    /// VMA in the address space; “overlapping” means that the two VMAs have any common
+    /// pages, not just the starting or ending address.
+    ///
+    /// # Errors
+    /// Returns [`SysError::EINVAL`] if the VMA to be added overlaps with any existing VMA.
+    pub fn add_area(&mut self, area: VmArea) -> SysResult<()> {
+        let lower_gap = self.vm_areas.upper_bound(Bound::Included(&area.start_va()));
+        if lower_gap
+            .peek_prev()
+            .map(|(_, vma)| vma.end_va().round_up() > area.start_va().round_down())
+            .unwrap_or(false)
+        {
+            return Err(SysError::EINVAL);
+        }
+        if lower_gap
+            .peek_next()
+            .map(|(&start_va, _)| start_va.round_down() < area.end_va().round_up())
+            .unwrap_or(false)
+        {
+            return Err(SysError::EINVAL);
+        }
+
+        self.vm_areas.insert(area.start_va(), area);
+        Ok(())
     }
 
-    /// Removes a VMA from the address space.
+    /// Removes a VMA from the address space, specifying its starting virtual address.
     ///
     /// This function removes a VMA from the address space, which de facto unmaps the memory
-    /// region in the address space.
+    /// region in the address space. If there is no such VMA, this function does nothing.
     pub fn remove_area(&mut self, start_va: VirtAddr) {
         self.vm_areas.remove(&start_va);
     }
