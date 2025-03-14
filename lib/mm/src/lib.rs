@@ -1,5 +1,6 @@
 #![no_std]
 #![feature(alloc_error_handler)]
+#![feature(btree_cursors)]
 
 pub mod address;
 pub mod frame;
