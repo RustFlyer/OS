@@ -17,3 +17,7 @@ pub fn get_time_us() -> usize {
 pub fn get_time_duration() -> Duration {
     Duration::from_micros(get_time_us() as u64)
 }
+
+pub fn set_nx_timer_irq() {
+    todo!()
+}

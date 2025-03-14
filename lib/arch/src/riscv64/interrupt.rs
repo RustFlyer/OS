@@ -1,4 +1,6 @@
 use riscv::interrupt;
+use riscv::register::mtvec::TrapMode;
+use riscv::register::stvec;
 
 pub fn enable_interrupt() {
     unsafe {
@@ -11,5 +13,13 @@ pub fn disable_interrupt() {
 }
 
 pub unsafe fn set_trap_handler(handler_addr: usize) {
-    stvec::write(handler_addr, TrapMode::Direct);
+    unsafe {
+        stvec::write(handler_addr, TrapMode::Direct);
+    }
+}
+
+pub fn set_stvec(handler_addr: usize) {
+    unsafe {
+        stvec::write(handler_addr, TrapMode::Direct);
+    }
 }

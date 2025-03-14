@@ -1,7 +1,7 @@
 use arch::riscv64::time::get_time_duration;
 use core::time::Duration;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum TaskState {
     KernelMode,
     UserMode,
@@ -10,6 +10,7 @@ pub enum TaskState {
 /// 任务计时器结构体
 ///
 /// 表示一个任务的计时器，包含任务状态、任务开始时间、用户时间、系统时间、子用户时间、子系统时间和最后一次状态切换时间
+#[derive(Debug, Clone)]
 pub struct TaskTimeStat {
     state: TaskState,
     task_start: Duration,

@@ -32,6 +32,10 @@ impl Sstatus {
         self.bits.set_bit(1, val);
     }
 
+    pub fn sie(&self) -> bool {
+        self.bits.get_bit(1)
+    }
+
     pub fn set_spp(&mut self, spp: SPP) {
         self.bits.set_bit(8, spp == SPP::Supervisor);
     }

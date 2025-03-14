@@ -110,6 +110,9 @@ impl TimerManager {
         self.timers.lock().push(Reverse(timer));
     }
 
+    /// 检查定时器是否到期
+    ///
+    /// current: 当前时间
     pub fn check(&self, current: Duration) {
         let mut timers = self.timers.lock();
         while let Some(Reverse(mut timer)) = timers.peek().cloned() {
