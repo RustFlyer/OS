@@ -31,9 +31,9 @@ use super::{page_table::PageTable, vm_area::VmArea};
 #[derive(Debug)]
 pub struct AddrSpace {
     /// Page table of the address space.
-    pub page_table: PageTable,
+    page_table: PageTable,
     /// VMAs of the address space.
-    pub vm_areas: BTreeMap<VirtAddr, VmArea>,
+    vm_areas: BTreeMap<VirtAddr, VmArea>,
 }
 
 impl AddrSpace {
@@ -69,7 +69,7 @@ impl AddrSpace {
     /// This function inserts a VMA into the address space, which de facto builds a memory
     /// mapping in the address space.
     pub fn insert_vma(&mut self, vma: VmArea) {
-        self.vm_areas.insert(vma.start_va, vma);
+        self.vm_areas.insert(vma.start_va(), vma);
     }
 
     /// Remove a VMA from the address space.

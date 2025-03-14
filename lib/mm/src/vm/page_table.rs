@@ -4,13 +4,14 @@
 //! and tracking allocated pages.
 
 use alloc::vec::Vec;
-use simdebug::when_debug;
 use core::arch::asm;
+use simdebug::when_debug;
 
 use lazy_static::lazy_static;
 
 use config::mm::{
-    bss_end, bss_start, data_end, data_start, kernel_end, kernel_end_phys, kernel_start, rodata_end, rodata_start, text_end, text_start, KERNEL_START, PTE_PER_TABLE
+    PTE_PER_TABLE, bss_end, bss_start, data_end, data_start, kernel_end, kernel_start, rodata_end,
+    rodata_start, text_end, text_start,
 };
 use systype::SysResult;
 
