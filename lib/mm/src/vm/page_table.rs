@@ -285,7 +285,7 @@ impl PageTableMem {
     fn as_slice_mut(&mut self) -> &'static mut [PageTableEntry; PTE_PER_TABLE] {
         // SAFETY: the page `ppn` points to is a valid page table thus allocated.
         // unsafe { &mut *(self.ppn.to_vpn_kernel().as_slice().as_mut_ptr() as *mut _) }
-        let ret = unsafe { &mut *(self.ppn.to_vpn_kernel().as_slice().as_mut_ptr() as *mut _) };
+        let ret = unsafe { &mut *(self.ppn.to_vpn_kernel().as_slice_mut().as_mut_ptr() as *mut _) };
         ret
     }
 

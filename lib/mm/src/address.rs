@@ -234,10 +234,19 @@ impl VirtPageNum {
     /// Gets a slice pointing to the page.
     ///
     /// # Safety
-    ///
     /// The caller must ensure that the page is allocated, and the slice should
     /// not outlive the page.
-    pub unsafe fn as_slice(self) -> &'static mut [u8; PAGE_SIZE] {
+    pub unsafe fn as_slice(self) -> &'static [u8; PAGE_SIZE] {
+        let ptr = self.address().to_usize() as *const [u8; PAGE_SIZE];
+        unsafe { &*ptr }
+    }
+
+    /// Gets a mutable slice pointing to the page.
+    ///
+    /// # Safety
+    /// The caller must ensure that the page is allocated, and the slice should
+    /// not outlive the page.
+    pub unsafe fn as_slice_mut(self) -> &'static mut [u8; PAGE_SIZE] {
         let ptr = self.address().to_usize() as *mut [u8; PAGE_SIZE];
         unsafe { &mut *ptr }
     }
