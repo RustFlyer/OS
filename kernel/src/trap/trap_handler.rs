@@ -19,6 +19,9 @@ use timer::TIMER_MANAGER;
 pub async fn trap_handler(task: &Arc<Task>) -> bool {
     unsafe { set_kernel_trap() };
 
+    let mut timer = task.timer_mut();
+    timer.record_trap();
+
     let cx = task.trap_context_mut();
 
     let stval = stval::read();
