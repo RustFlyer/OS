@@ -5,6 +5,10 @@ edition = "2024"
 
 [dependencies]
 cfg-if = "1.0"
+arch = { path = "../arch" }
+config = { path = "../config" }
+log = "0.4"
+
 
 [features]
 ondebug = []

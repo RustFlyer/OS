@@ -8,7 +8,7 @@ use core::time::Duration;
 use mutex::SpinNoIrqLock;
 use spin::Lazy;
 
-/// Timer states
+/// 定时器状态枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TimerState {
     Active,
@@ -16,7 +16,7 @@ pub enum TimerState {
     Cancelled,
 }
 
-/// A timer with callback functionality
+/// 一个带有回调功能的定时器
 #[derive(Debug, Clone)]
 pub struct Timer {
     expire: Duration,

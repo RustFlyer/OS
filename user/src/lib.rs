@@ -11,7 +11,6 @@ mod lang_items;
 mod syscall;
 
 extern crate alloc;
-extern crate bitflags;
 
 use alloc::vec::Vec;
 

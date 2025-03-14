@@ -18,8 +18,14 @@ use arch::riscv64::time::get_time_duration;
 
 use core::time::Duration;
 
-use super::future;
+use super::{
+    future::{self, spawn_user_task},
+    manager::add_task,
+};
 
+/// 任务状态枚举
+///
+/// 表示一个任务的状态，包括运行、睡眠、等待和僵死
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TaskState {
     Running,
@@ -28,6 +34,9 @@ pub enum TaskState {
     Zombie,
 }
 
+/// 任务结构体
+///
+/// 表示一个任务，包含任务ID、进程关系、状态和内部状态
 pub struct Task {
     tid: TidHandle,
     process: Option<Weak<Task>>,
@@ -36,10 +45,15 @@ pub struct Task {
     inner: UPSafeCell<TaskInner>,
 }
 
+/// 任务内部状态结构体
+///
+/// 表示一个任务的内部状态，包含任务状态、父任务、子任务、唤醒器和计时器
 pub struct TaskInner {
     state: TaskState,
     parent: Option<Weak<Task>>,
     children: BTreeMap<Tid, Weak<Task>>,
+
+    /// 任务的唤醒器
     waker: Option<Waker>,
     timer: TaskTimeStat,
 
@@ -131,6 +145,15 @@ impl Task {
     pub fn enter_kernel_mode(&mut self) {
         self.inner.exclusive_access().enter_kernel_mode();
     }
+
+    pub fn spawn_task(elf_data: &[u8]) {
+        let memory_set = todo!();
+        let trap_context = todo!();
+        let task_inner = todo!();
+        let task = Arc::new(Task::new());
+        add_task(&task);
+        spawn_user_task(task);
+    }
 }
 
 impl TaskInner {
@@ -146,10 +169,12 @@ impl TaskInner {
         }
     }
 
+    /// 当前任务切换到用户模式
     pub fn enter_user_mode(&mut self) {
         self.timer.switch_to_user();
     }
 
+    /// 当前任务切换到内核模式
     pub fn enter_kernel_mode(&mut self) {
         self.timer.switch_to_kernel();
     }
@@ -183,6 +208,7 @@ impl TaskInner {
         self.state == state
     }
 
+    // 挂起当前任务，等待时间到达或被唤醒
     pub async fn suspend_timeout(&self, limit: Duration) -> Duration {
         let expire = get_time_duration() + limit;
         let mut timer = Timer::new(expire);

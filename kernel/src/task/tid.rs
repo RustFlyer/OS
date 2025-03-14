@@ -13,6 +13,9 @@ pub type Tid = usize;
 pub type Pid = usize;
 pub type PGid = usize;
 
+/// RAII形式任务ID句柄结构体
+///
+/// 表示一个任务的ID，并实现Drop特性
 #[derive(Debug)]
 pub struct TidHandle(pub Tid);
 

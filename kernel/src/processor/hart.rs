@@ -23,6 +23,10 @@ pub static mut HARTS: [HART; MAX_HARTS] = [HART_ONE; MAX_HARTS];
 //     pub static ref HARTS: Vec<Arc<HART>> = (0..MAX_HARTS).map(|i| Arc::new(HART::new(i))).collect();
 // }
 
+/// HART结构体
+///
+/// 表示一个HART，包含HART ID、任务和处理器特权状态
+/// 一个cpu核心一个HART
 pub struct HART {
     pub id: usize,
     task: Option<Arc<Task>>,
