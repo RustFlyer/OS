@@ -17,9 +17,12 @@ pub const KERNEL_START_PHYS: usize = RAM_START + KERNEL_RAM_OFFSET;
 pub fn kernel_end_phys() -> usize {
     _ekernel as usize - KERNEL_MAP_OFFSET
 }
-
 /// Start of kernel in virtual memory
 pub const KERNEL_START: usize = VIRT_START + KERNEL_RAM_OFFSET;
+
+// Starting addresses of each section in the kernel are sure to be aligned to page size.
+// Ending addresses of them are not necessarily aligned to page size.
+
 /// Start of kernel in virtual memory. This function should be same as `KERNEL_START`.
 pub fn kernel_start() -> usize {
     _skernel as usize

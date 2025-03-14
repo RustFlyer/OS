@@ -153,12 +153,14 @@ version = "0.1.0"
 dependencies = [
  "bitflags",
  "buddy_system_allocator",
+ "cfg-if",
  "config",
  "id_allocator",
  "lazy_static",
  "log",
  "mutex",
  "riscv",
+ "simdebug",
  "systype",
 ]
 

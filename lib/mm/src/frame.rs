@@ -18,6 +18,7 @@
 
 use alloc::vec::Vec;
 use core::mem::ManuallyDrop;
+use simdebug::when_debug;
 use systype::{SysError, SysResult};
 
 use lazy_static::lazy_static;
@@ -38,11 +39,13 @@ lazy_static! {
     static ref FRAME_ALLOCATOR: SpinNoIrqLock<FrameAllocator> = {
         let frames_ppn_start = PhysAddr::new(kernel_end_phys()).page_number().to_usize();
         let frames_ppn_end = PhysAddr::new(RAM_END).page_number().to_usize();
-        log::info!(
-            "frame allocator: free frame memory from {:#x} - {:#x}",
-            frames_ppn_start * PAGE_SIZE,
-            frames_ppn_end * PAGE_SIZE
-        );
+        when_debug!({
+            log::info!(
+                "frame allocator: free frame memory from {:#x} - {:#x}",
+                frames_ppn_start * PAGE_SIZE,
+                frames_ppn_end * PAGE_SIZE
+            );
+        });
         SpinNoIrqLock::new(FrameAllocator::new(frames_ppn_start, frames_ppn_end))
     };
 }

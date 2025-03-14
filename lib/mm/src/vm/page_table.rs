@@ -4,18 +4,18 @@
 //! and tracking allocated pages.
 
 use alloc::vec::Vec;
+use simdebug::when_debug;
 use core::arch::asm;
 
 use lazy_static::lazy_static;
 
 use config::mm::{
-    KERNEL_START, KERNEL_START_PHYS, PTE_PER_TABLE, bss_end, bss_start, data_end, data_start,
-    kernel_end_phys, rodata_end, rodata_start, text_end,
+    bss_end, bss_start, data_end, data_start, kernel_end, kernel_end_phys, kernel_start, rodata_end, rodata_start, text_end, text_start, KERNEL_START, PTE_PER_TABLE
 };
 use systype::SysResult;
 
 use crate::{
-    address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum},
+    address::{PhysPageNum, VirtAddr, VirtPageNum},
     frame::FrameTracker,
     vm::vm_area::{KernelArea, VmArea},
 };
@@ -73,47 +73,20 @@ impl PageTable {
     /// # Panics
     /// Panics if the kernel page table cannot be constructed due to lack of free
     /// frames, which should not happen in practice.
-    #[deprecated]
-    fn build_kernel() -> Self {
-        let kernel_ppn_start = PhysAddr::new(KERNEL_START_PHYS).page_number().to_usize();
-        let kernel_ppn_end = PhysAddr::new(kernel_end_phys()).page_number().to_usize();
-        let kernel_vpn_start = VirtAddr::new(KERNEL_START).page_number();
-
-        let mut page_table = Self::build().expect("out of memory");
-        let kernel_frames: Vec<PhysPageNum> = (kernel_ppn_start..kernel_ppn_end)
-            .map(PhysPageNum::new)
-            .collect();
-        page_table.map_range(
-            kernel_vpn_start,
-            &kernel_frames,
-            // TODO: make the permission more accurate
-            PteFlags::V | PteFlags::R | PteFlags::W | PteFlags::X,
-        );
-        page_table
-    }
-
-    /// Constructs the kernel page table.
-    ///
-    /// The kernel page table is a page table that maps the entire kernel space.
-    /// The mapping is linear, i.e., VPN = PPN + KERNEL_MAP_OFFSET.
-    ///
-    /// # Panics
-    /// Panics if the kernel page table cannot be constructed due to lack of free
-    /// frames, which should not happen in practice.
     fn build_kernel_page_table() -> Self {
         let mut page_table = Self::build().expect("out of memory");
 
-        log::debug!("--- kernel memory layout ---");
-        // Bug: linker returns an error when using _etext: relocation R_RISCV_PCREL_HI20 out of range
-        // Use the constant `KERNEL_START` as a workaround.
-        // log::debug!(".text {:#x} - {:#x}", text_start(), text_end());
-        log::debug!(".text {:#x} - {:#x}", KERNEL_START, text_end());
-        log::debug!(".rodata {:#x} - {:#x}", rodata_start(), rodata_end());
-        log::debug!(".data {:#x} - {:#x}", data_start(), data_end());
-        log::debug!(".bss {:#x} - {:#x}", bss_start(), bss_end());
+        when_debug!({
+            log::info!("--- kernel memory layout ---");
+            log::info!(".text {:#x} - {:#x}", text_start(), text_end());
+            log::info!(".rodata {:#x} - {:#x}", rodata_start(), rodata_end());
+            log::info!(".data {:#x} - {:#x}", data_start(), data_end());
+            log::info!(".bss {:#x} - {:#x}", bss_start(), bss_end());
+            log::info!("- kernel memory layout end -");
+        });
 
         // let text_start_va = VirtAddr::new(text_start());
-        let text_start_va = VirtAddr::new(KERNEL_START);
+        let text_start_va = VirtAddr::new(text_start());
         let text_end_va = VirtAddr::new(text_end());
         let text_flags = PteFlags::V | PteFlags::R | PteFlags::X;
         let text_vma = VmArea::new_kernel(text_start_va, text_end_va, text_flags);
@@ -266,8 +239,8 @@ impl PageTable {
     /// This method is used to map the kernel space into a new page table for a user process.
     /// This method does not allocate any frame or make this page table own any frame.
     pub fn map_kernel(&mut self) {
-        let kernel_vpn_start = VirtAddr::new(KERNEL_START).page_number();
-        let kernel_vpn_end = VirtAddr::new(kernel_end_phys()).page_number();
+        let kernel_vpn_start = VirtAddr::new(kernel_start()).page_number();
+        let kernel_vpn_end = VirtAddr::new(kernel_end()).round_up().page_number();
         // Range of the top-level PTEs that map the kernel space.
         let index_start = kernel_vpn_start.indices()[2];
         let index_end = kernel_vpn_end.indices()[2];

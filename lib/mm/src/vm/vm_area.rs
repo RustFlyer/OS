@@ -113,7 +113,7 @@ impl VmArea {
             end_va,
             flags,
             perm: MemPerm::from(flags),
-            map_type: TypedArea::Kernel(KernelArea::new()),
+            map_type: TypedArea::Kernel(KernelArea),
             handler: None,
         }
     }
@@ -174,11 +174,6 @@ pub enum TypedArea {
 pub struct KernelArea;
 
 impl KernelArea {
-    /// Creates a new kernel area.
-    fn new() -> Self {
-        Self
-    }
-
     /// Maps the kernel area to the kernel page table.
     pub fn map(area: &VmArea, page_table: &mut PageTable) {
         match area.map_type {
@@ -194,7 +189,7 @@ impl KernelArea {
         } = area;
 
         let start_vpn = start_va.page_number();
-        let end_vpn = end_va.page_number();
+        let end_vpn = end_va.round_up().page_number();
         let start_ppn = start_vpn.to_ppn_kernel().to_usize();
         let end_ppn = end_vpn.to_ppn_kernel().to_usize();
         let ppns = (start_ppn..end_ppn)

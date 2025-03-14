@@ -3,42 +3,37 @@ ENTRY(_start)
 
 SECTIONS
 {
-    . = ALIGN(4K);
-    _skernel = .;
-    _stext = .;
-    .text : {
+    .text : ALIGN(4K) {
+        _skernel = .;
+        _stext = .;
         *(.text.entry)
-        . = ALIGN(4K);
         *(.text .text.*)
+        _etext = .;
     } > VIRT AT> RAM
 
-    . = ALIGN(4K);
-    _etext = .;
-    _srodata = .;
-    .rodata : {
+    .rodata : ALIGN(4K) {
+        _srodata = .;
         *(.rodata .rodata.*)
         *(.srodata .srodata.*)
+        _erodata = .;
     } > VIRT AT> RAM
 
-    . = ALIGN(4K);
-    _erodata = .;
-    _sdata = .;
-    .data : {
+    .data : ALIGN(4K) {
+        _sdata = .;
         *(.data .data.*)
         *(.sdata .sdata.*)
+        _edata = .;
     } > VIRT AT> RAM
 
-    . = ALIGN(4K);
-    _edata = .;
-    _sbss = .;
-    .bss : {
+    .bss : ALIGN(4K) {
+        _sbss = .;
         *(.bss.stack)
         *(.bss .bss.*)
         *(.sbss .sbss.*)
+        _ebss = .;
     } > VIRT AT> RAM
 
     . = ALIGN(4K);
-    _ebss = .;
     _ekernel = .;
 
     /DISCARD/ : {

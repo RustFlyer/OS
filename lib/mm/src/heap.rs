@@ -7,6 +7,7 @@ use core::alloc::Layout;
 use buddy_system_allocator as buddy;
 
 use config::mm::KERNEL_HEAP_SIZE;
+use simdebug::when_debug;
 
 use crate::address::PhysAddr;
 
@@ -34,11 +35,13 @@ pub unsafe fn init_heap_allocator() {
 
         HEAP_ALLOCATOR.lock().init(start_addr, KERNEL_HEAP_SIZE);
 
-        log::info!(
-            "heap memory: {:#x} - {:#x}",
-            start_addr,
-            start_addr + KERNEL_HEAP_SIZE
-        );
+        when_debug!({
+            log::info!(
+                "heap memory: {:#x} - {:#x}",
+                start_addr,
+                start_addr + KERNEL_HEAP_SIZE
+            );
+        });
     }
 }
 
