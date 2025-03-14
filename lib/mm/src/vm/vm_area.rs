@@ -44,7 +44,7 @@ bitflags! {
     ///
     /// Do not set any unknown bits.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    pub(super) struct MemPerm: u8 {
+    pub struct MemPerm: u8 {
         const R = 1 << 1;
         const W = 1 << 2;
         const X = 1 << 3;
@@ -54,7 +54,7 @@ bitflags! {
 
 impl MemPerm {
     /// Create a new `MemPerm` from a set of `PteFlags`.
-    pub(super) fn from(flags: PteFlags) -> Self {
+    pub fn from(flags: PteFlags) -> Self {
         Self::from_bits_truncate(flags.bits())
     }
 }
@@ -63,7 +63,7 @@ impl PteFlags {
     /// Create a new `PteFlags` from a set of `MemPerm`.
     ///
     /// When `MemPerm` does not contain `U`, `G` is set in the returned `PteFlags`.
-    pub(super) fn from(perm: MemPerm) -> Self {
+    pub fn from(perm: MemPerm) -> Self {
         let mut flags = Self::from_bits_retain(perm.bits());
         if !perm.contains(MemPerm::U) {
             flags |= Self::G;
@@ -76,13 +76,13 @@ impl PteFlags {
 ///
 /// This struct is used to pass data to a page fault handler registered in a [`VmArea`].
 #[derive(Debug)]
-pub(super) struct PageFaultInfo<'a> {
+pub(crate) struct PageFaultInfo<'a> {
     /// Faulting virtual address.
-    fault_addr: VirtAddr,
+    pub fault_addr: VirtAddr,
     /// Page table.
-    page_table: &'a mut PageTable,
+    pub page_table: &'a mut PageTable,
     /// How the address was accessed when the fault occurred.
-    access: MemPerm,
+    pub access: MemPerm,
 }
 
 /// A virtual memory area (VMA).
@@ -107,7 +107,7 @@ pub struct VmArea {
 
 impl VmArea {
     /// Constructs a [`VmArea`] whose specific type is [`TypedArea::Kernel`].
-    pub(super) fn new_kernel(start_va: VirtAddr, end_va: VirtAddr, flags: PteFlags) -> Self {
+    pub(crate) fn new_kernel(start_va: VirtAddr, end_va: VirtAddr, flags: PteFlags) -> Self {
         Self {
             start_va,
             end_va,
@@ -136,12 +136,19 @@ impl VmArea {
     }
 
     /// Handles a page fault happened in this VMA.
-    pub(super) fn handle_page_fault(&mut self, info: PageFaultInfo) -> SysResult<()> {
+    ///
+    /// # Errors
+    /// Returns [`SysError::EFAULT`] if the access permission is not allowed.
+    pub(crate) fn handle_page_fault(&mut self, info: PageFaultInfo) -> SysResult<()> {
         if let Some(handler) = self.handler {
             handler(self, info)
         } else {
             panic!("page fault handler: handler not registered");
         }
+    }
+
+    pub fn contains(&self, va: VirtAddr) -> bool {
+        va >= self.start_va && va < self.end_va
     }
 
     /// Returns the starting virtual address of the VMA.
@@ -157,7 +164,7 @@ impl VmArea {
 
 /// Unique data of a specific type of VMA. This enum is used in [`VmArea`].
 #[derive(Debug)]
-pub(super) enum TypedArea {
+pub(crate) enum TypedArea {
     /// A helper VMA representing one in the kernel space.
     Kernel(KernelArea),
     /// A memory-backed VMA.
@@ -180,11 +187,11 @@ pub(super) enum TypedArea {
 ///
 /// A kernel area must be aligned to the size of a page.
 #[derive(Debug)]
-pub(super) struct KernelArea;
+pub(crate) struct KernelArea;
 
 impl KernelArea {
     /// Maps the kernel area to the kernel page table.
-    pub fn map(area: &VmArea, page_table: &mut PageTable) {
+     pub fn map(area: &VmArea, page_table: &mut PageTable) {
         match area.map_type {
             TypedArea::Kernel(_) => {}
             _ => panic!("KernelArea::map: not a kernel area"),
@@ -214,7 +221,7 @@ impl KernelArea {
 /// This is a type for debugging purposes. A memory-backed VMA takes a slice of
 /// memory as its backing store.
 #[derive(Debug)]
-pub(super) struct MemoryBackedArea {
+pub(crate) struct MemoryBackedArea {
     /// The memory backing store.
     pub memory: &'static [u8],
     /// Allocated physical pages.
@@ -257,7 +264,7 @@ impl MemoryBackedArea {
 
         // Check permission.
         if !access.contains(perm) {
-            return Err(SysError::EACCES);
+            return Err(SysError::EFAULT);
         }
 
         // Allocate a frame and map the page.

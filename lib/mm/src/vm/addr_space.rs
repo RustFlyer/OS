@@ -19,11 +19,14 @@
 
 use alloc::collections::btree_map::BTreeMap;
 
-use systype::SysResult;
+use systype::{SysError, SysResult};
 
 use crate::address::VirtAddr;
 
-use super::{page_table::PageTable, vm_area::VmArea};
+use super::{
+    page_table::PageTable,
+    vm_area::{MemPerm, PageFaultInfo, VmArea},
+};
 
 /// A virtual address space.
 ///
@@ -37,7 +40,7 @@ pub struct AddrSpace {
 }
 
 impl AddrSpace {
-    /// Create an empty address space.
+    /// Creates an empty address space.
     ///
     /// This function is private because normally there is no need to create an address
     /// space that is completely empty. Use [`build_user`] to create an address space
@@ -64,19 +67,46 @@ impl AddrSpace {
         Ok(addr_space)
     }
 
-    /// Insert a VMA into the address space.
+    /// Inserts a VMA into the address space.
     ///
     /// This function inserts a VMA into the address space, which de facto builds a memory
     /// mapping in the address space.
-    pub fn insert_vma(&mut self, vma: VmArea) {
+    pub fn insert_area(&mut self, vma: VmArea) {
         self.vm_areas.insert(vma.start_va(), vma);
     }
 
-    /// Remove a VMA from the address space.
+    /// Removes a VMA from the address space.
     ///
     /// This function removes a VMA from the address space, which de facto unmaps the memory
     /// region in the address space.
-    pub fn remove_vma(&mut self, start_va: VirtAddr) {
+    pub fn remove_area(&mut self, start_va: VirtAddr) {
         self.vm_areas.remove(&start_va);
+    }
+
+    /// Handles a page fault happened in the address space.
+    ///
+    /// This function is called when a page fault happens in the address space. It finds the
+    /// VMA that contains the fault address and calls the VMA's page fault handler to handle
+    /// the page fault.
+    ///
+    /// # Errors
+    /// Returns [`SysError::EFAULT`] if the fault address is invalid or the access permission
+    /// is not allowed.
+    pub fn handle_page_fault(&mut self, fault_addr: VirtAddr, access: MemPerm) -> SysResult<()> {
+        let page_table = &mut self.page_table;
+        let vma = self
+            .vm_areas
+            .range_mut(..=fault_addr)
+            .next_back()
+            .filter(|(_, vma)| vma.contains(fault_addr))
+            .map(|(_, vma)| vma)
+            .ok_or(SysError::EFAULT)?;
+
+        let page_fault_info = PageFaultInfo {
+            fault_addr,
+            page_table,
+            access,
+        };
+        vma.handle_page_fault(page_fault_info)
     }
 }

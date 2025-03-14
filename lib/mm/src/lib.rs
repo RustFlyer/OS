@@ -8,3 +8,5 @@ pub mod vm;
 
 #[macro_use]
 extern crate alloc;
+
+pub use vm::page_table::enable_kernel_page_table;

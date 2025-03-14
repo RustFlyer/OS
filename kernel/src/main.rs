@@ -12,7 +12,7 @@ mod processor;
 mod sbi;
 mod task;
 
-use mm::{frame, heap, vm::page_table};
+use mm::{self, frame, heap};
 use simdebug::when_debug;
 
 extern crate alloc;
@@ -31,7 +31,7 @@ pub fn rust_main() -> ! {
     /* Initialize heap allocator and page table */
     unsafe {
         heap::init_heap_allocator();
-        page_table::enable_kernel_page_table();
+        mm::enable_kernel_page_table();
     }
 
     when_debug!({
