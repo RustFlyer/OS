@@ -12,6 +12,6 @@ pub fn start_harts(hart_id: usize) {
             continue;
         }
         let status: isize = sbi::hart_start(i, HART_START_ADDR) as _;
-        println!("[kernel] start to wake up hart {}... status {}", i, status);
+        log::info!("[kernel] start to wake up hart {}... status {}", i, status);
     }
 }

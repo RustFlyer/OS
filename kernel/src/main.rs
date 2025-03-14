@@ -26,22 +26,21 @@ pub use syscall::syscall;
 
 extern crate alloc;
 
-static MAIN_HART: AtomicBool = AtomicBool::new(true);
+static mut INITIALIZED: bool = false;
 
 #[unsafe(no_mangle)]
 pub fn rust_main(hart_id: usize) -> ! {
-    println!("hart {} is running", hart_id);
-    if MAIN_HART
-        .compare_exchange(true, false, Ordering::Relaxed, Ordering::Relaxed)
-        .is_ok()
-    {
+    // SAFETY: Only the first hart will run this code block.
+    if unsafe { !INITIALIZED } {
         /* Initialize logger */
         logger::init();
+        log::info!("hart {} is running", hart_id);
 
         /* Initialize heap allocator and page table */
         unsafe {
             heap::init_heap_allocator();
             mm::enable_kernel_page_table();
+            INITIALIZED = true;
         }
 
         log::info!(
@@ -76,6 +75,9 @@ pub fn rust_main(hart_id: usize) -> ! {
         simdebug::backtrace_test();
     } else {
         log::info!("hart {} is waiting", hart_id);
+        // SAFETY: Only after the first hart has initialized the heap allocator and page table,
+        // do the other harts enable the kernel page table.
+        unsafe { mm::enable_kernel_page_table(); }
     }
 
     log::info!("hart {} is running", hart_id);
