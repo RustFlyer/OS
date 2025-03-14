@@ -23,17 +23,23 @@ pub struct TimeVal {
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
 
-/// Process time statistics structure
+/// 进程时间统计结构体
+///
+/// 包含用户CPU时间、系统CPU时间、终止子进程的用户CPU时间和系统CPU时间
 pub struct TMS {
-    tms_utime: usize,  // User CPU time used by caller
-    tms_stime: usize,  // System CPU time used by caller
-    tms_cutime: usize, // User CPU time of terminated children
-    tms_cstime: usize, // System CPU time of terminated children
+    tms_utime: usize,  // 调用者用户CPU时间
+    tms_stime: usize,  // 调用者系统CPU时间
+    tms_cutime: usize, // 终止子进程的用户CPU时间
+    tms_cstime: usize, // 终止子进程的系统CPU时间
 }
 
 impl TimeSpec {
+    /// 纳秒数
     pub const NANO_PER_SEC: usize = 1_000_000_000;
 
+    /// 创建一个新的TimeSpec
+    ///
+    /// 返回一个新的TimeSpec，包含秒数和纳秒数
     pub fn new(sec: usize, nsec: usize) -> Self {
         Self {
             tv_sec: sec,
@@ -41,6 +47,9 @@ impl TimeSpec {
         }
     }
 
+    /// 从毫秒数创建一个新的TimeSpec
+    ///
+    /// 返回一个新的TimeSpec，包含毫秒数转换的秒数和纳秒数
     pub fn from_ms(ms: usize) -> Self {
         Self {
             tv_sec: ms / 1000,
@@ -48,22 +57,34 @@ impl TimeSpec {
         }
     }
 
+    /// 转换为毫秒数
+    ///
+    /// 返回TimeSpec转换的毫秒数
     pub fn into_ms(&self) -> usize {
         self.tv_sec * 1_000 + self.tv_nsec / 1_000_000
     }
 }
 
 impl TimeValue for TimeSpec {
+    /// 检查TimeSpec是否有效
+    ///
+    /// 返回TimeSpec是否有效
     fn is_valid(&self) -> bool {
         self.tv_nsec < Self::NANO_PER_SEC
     }
 
+    /// 检查TimeSpec是否为零
+    ///
+    /// 返回TimeSpec是否为零
     fn is_zero(&self) -> bool {
         self.tv_sec == 0 && self.tv_nsec == 0
     }
 }
 
 impl From<Duration> for TimeSpec {
+    /// 从Duration创建一个新的TimeSpec
+    ///
+    /// 返回一个新的TimeSpec，包含Duration的秒数和纳秒数
     fn from(duration: Duration) -> Self {
         Self {
             tv_sec: duration.as_secs() as usize,
@@ -73,14 +94,21 @@ impl From<Duration> for TimeSpec {
 }
 
 impl From<TimeSpec> for Duration {
+    /// 从TimeSpec创建一个新的Duration
+    ///
+    /// 返回一个新的Duration，包含TimeSpec的秒数和纳秒数
     fn from(time_spec: TimeSpec) -> Self {
         Duration::new(time_spec.tv_sec as u64, time_spec.tv_nsec as u32)
     }
 }
 
 impl TimeVal {
+    /// 微秒数
     pub const MICRO_PER_SEC: usize = 1_000_000;
 
+    /// 创建一个新的TimeVal
+    ///
+    /// 返回一个新的TimeVal，包含秒数和微秒数
     pub fn new(sec: usize, usec: usize) -> Self {
         Self {
             tv_sec: sec,
@@ -88,6 +116,9 @@ impl TimeVal {
         }
     }
 
+    /// 从微秒数创建一个新的TimeVal
+    ///
+    /// 返回一个新的TimeVal，包含微秒数转换的秒数和微秒数
     pub fn from_usec(usec: usize) -> Self {
         Self {
             tv_sec: usec / Self::MICRO_PER_SEC,
@@ -95,16 +126,30 @@ impl TimeVal {
         }
     }
 
+    /// 转换为微秒数
+    ///
+    /// 返回TimeVal转换的微秒数
     pub fn into_usec(&self) -> usize {
         self.tv_sec * Self::MICRO_PER_SEC + self.tv_usec
+    }
+
+    pub fn get_time_from_us(&mut self, us: usize) {
+        self.tv_sec = us / 1_000_000;
+        self.tv_usec = us % 1_000_000;
     }
 }
 
 impl TimeValue for TimeVal {
+    /// 检查TimeVal是否有效
+    ///
+    /// 返回TimeVal是否有效
     fn is_valid(&self) -> bool {
         self.tv_usec < Self::MICRO_PER_SEC
     }
 
+    /// 检查TimeVal是否为零
+    ///
+    /// 返回TimeVal是否为零
     fn is_zero(&self) -> bool {
         self.tv_sec == 0 && self.tv_usec == 0
     }
@@ -143,6 +188,18 @@ impl From<TimeVal> for TimeSpec {
     }
 }
 
+impl From<usize> for TimeVal {
+    fn from(value: usize) -> Self {
+        Self {
+            tv_sec: value / 1_000_000,
+            tv_usec: value % 1_000_000,
+        }
+    }
+}
+
+/// ITimerVal结构体
+///
+/// 包含定时器间隔和值
 #[derive(Debug, Clone, Copy, Default)]
 #[repr(C)]
 pub struct ITimerVal {
@@ -150,7 +207,11 @@ pub struct ITimerVal {
     pub it_value: TimeVal,
 }
 
+/// ITimerVal实现
 impl ITimerVal {
+    /// 创建一个新的ITimerVal
+    ///
+    /// 返回一个新的ITimerVal，包含定时器间隔和值
     pub fn new(interval: TimeVal, value: TimeVal) -> Self {
         Self {
             it_interval: interval,
@@ -158,16 +219,28 @@ impl ITimerVal {
         }
     }
 
+    /// 检查ITimerVal是否有效
+    ///
+    /// 返回ITimerVal是否有效
     pub fn is_valid(&self) -> bool {
         self.it_interval.is_valid() && self.it_value.is_valid()
     }
 
+    /// 检查ITimerVal是否激活
+    ///
+    /// 返回ITimerVal是否激活
     pub fn is_activated(&self) -> bool {
         !(self.it_interval.is_zero() && self.it_value.is_zero())
     }
 }
 
+/// TMS结构体
+///
+/// 包含用户CPU时间、系统CPU时间、终止子进程的用户CPU时间和系统CPU时间
 impl TMS {
+    /// 创建一个新的TMS
+    ///
+    /// 返回一个新的TMS，包含用户CPU时间、系统CPU时间、终止子进程的用户CPU时间和系统CPU时间
     pub fn new(utime: usize, stime: usize, cutime: usize, cstime: usize) -> Self {
         Self {
             tms_utime: utime,
@@ -177,6 +250,9 @@ impl TMS {
         }
     }
 
+    /// 从TaskTimeStat创建一个新的TMS
+    ///
+    /// 返回一个新的TMS，包含用户CPU时间、系统CPU时间、终止子进程的用户CPU时间和系统CPU时间
     pub fn from_task_time_stat(tts: &TaskTimeStat) -> Self {
         let (utime, stime) = tts.user_and_system_time();
         let (cutime, cstime) = tts.child_user_system_time();

@@ -8,6 +8,7 @@ use alloc::vec::Vec;
 use pps::ProcessorPrivilegeState;
 
 use lazy_static::lazy_static;
+use simdebug::when_debug;
 
 use core::arch::asm;
 use riscv::register::sstatus;
@@ -15,10 +16,17 @@ use riscv::register::sstatus::FS;
 
 use arch::riscv64::interrupt::{disable_interrupt, enable_interrupt};
 
-lazy_static! {
-    pub static ref HARTS: Vec<Arc<HART>> = (0..MAX_HARTS).map(|i| Arc::new(HART::new(i))).collect();
-}
+const HART_ONE: HART = HART::new(0);
+pub static mut HARTS: [HART; MAX_HARTS] = [HART_ONE; MAX_HARTS];
 
+// lazy_static! {
+//     pub static ref HARTS: Vec<Arc<HART>> = (0..MAX_HARTS).map(|i| Arc::new(HART::new(i))).collect();
+// }
+
+/// HART结构体
+///
+/// 表示一个HART，包含HART ID、任务和处理器特权状态
+/// 一个cpu核心一个HART
 pub struct HART {
     pub id: usize,
     task: Option<Arc<Task>>,
@@ -26,12 +34,16 @@ pub struct HART {
 }
 
 impl HART {
-    pub fn new(id: usize) -> Self {
+    pub const fn new(id: usize) -> Self {
         Self {
             id,
             task: None,
             pps: ProcessorPrivilegeState::new(),
         }
+    }
+
+    pub fn set_hart_id(&mut self, hart_id: usize) {
+        self.id = hart_id;
     }
 
     pub fn set_task(&mut self, task: Arc<Task>) {
@@ -114,33 +126,44 @@ impl HART {
     }
 }
 
-pub fn get_hart_by_id(id: usize) -> Arc<HART> {
-    HARTS.get(id).unwrap().clone()
+pub fn get_hart(hart_id: usize) -> &'static mut HART {
+    unsafe { &mut HARTS[hart_id] }
 }
 
 pub fn current_hart() -> &'static mut HART {
-    let hart_addr: usize;
+    let mut ret;
     unsafe {
-        asm!("mv {}, tp", out(reg) hart_addr);
-        &mut *(hart_addr as *mut HART)
+        let tp: usize;
+        asm!("mv {}, tp", out(reg) tp);
+        ret = &mut *(tp as *mut HART);
     }
+    when_debug!({
+        ret = one_hart();
+    });
+
+    ret
 }
 
 pub fn set_current_hart(id: usize) {
-    let hart = get_hart_by_id(id);
-    let hart_addr = Arc::as_ptr(&hart) as usize;
+    let hart = get_hart(id);
+    hart.set_hart_id(id);
+    let hart_addr = hart as *const _ as usize;
     unsafe {
         asm!("mv tp, {}", in(reg) hart_addr);
     }
 }
 
-pub fn init_hart() {
+pub fn init() {
     unsafe {
-        // asm!("csrrw tp, sstatus, zero");
         sstatus::set_fs(FS::Initial);
     }
 }
 
 pub fn current_task() -> Arc<Task> {
     current_hart().get_task().clone()
+}
+
+/// temp for test without driver
+pub fn one_hart() -> &'static mut HART {
+    unsafe { &mut HARTS[0] }
 }

@@ -7,6 +7,10 @@ use riscv::register::{
     sstatus::{self, Sstatus},
 };
 
+/// 处理器特权状态结构体
+///
+/// 表示一个处理器的特权状态，包含保护块计数、sstatus、sepc和satp
+/// 每个CPU核心持有一个，也可额外存储，用于保存与恢复状态
 #[derive(Debug, Clone, Copy)]
 pub struct ProcessorPrivilegeState {
     sum_cnt: usize,
@@ -17,7 +21,7 @@ pub struct ProcessorPrivilegeState {
 }
 
 impl ProcessorPrivilegeState {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             sum_cnt: 0,
             sstatus: 0,

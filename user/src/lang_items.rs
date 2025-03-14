@@ -1,6 +1,5 @@
-use core::panic::PanicInfo;
-
-fn user_panic_handler(panic_info: &PanicInfo) -> ! {
+#[panic_handler]
+fn user_panic_handler(panic_info: &core::panic::PanicInfo) -> ! {
     let err = panic_info.message();
     if let Some(location) = panic_info.location() {
         println!(
@@ -13,9 +12,4 @@ fn user_panic_handler(panic_info: &PanicInfo) -> ! {
         println!("Panicked: {}", err);
     }
     loop {}
-}
-
-#[panic_handler]
-fn panic_handler(panic_info: &PanicInfo) -> ! {
-    user_panic_handler(panic_info);
 }

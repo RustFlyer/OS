@@ -2,7 +2,9 @@
 #![no_main]
 #![feature(naked_functions)]
 #![feature(sync_unsafe_cell)]
+#![allow(dead_code, unused_imports, warnings)]
 
+mod boot;
 mod console;
 mod entry;
 mod lang_item;
@@ -10,31 +12,38 @@ mod loader;
 mod logging;
 mod processor;
 mod sbi;
+mod syscall;
 mod task;
+mod trap;
+
+use core::sync::atomic::Ordering;
+use core::{arch::global_asm, sync::atomic::AtomicBool};
 
 use mm::{self, frame, heap};
 use simdebug::when_debug;
 
+pub use syscall::syscall;
+
 extern crate alloc;
 
-pub fn rust_main() -> ! {
-    /* Initialize logger */
-    logger::init();
-    when_debug!({
-        log::info!("test info");
-        log::error!("test error");
-        log::warn!("test warn");
-        log::debug!("test debug");
-        log::trace!("test trace");
-    });
+static MAIN_HART: AtomicBool = AtomicBool::new(true);
 
-    /* Initialize heap allocator and page table */
-    unsafe {
-        heap::init_heap_allocator();
-        mm::enable_kernel_page_table();
-    }
+#[unsafe(no_mangle)]
+pub fn rust_main(hart_id: usize) -> ! {
+    println!("hart {} is running", hart_id);
+    if MAIN_HART
+        .compare_exchange(true, false, Ordering::Relaxed, Ordering::Relaxed)
+        .is_ok()
+    {
+        /* Initialize logger */
+        logger::init();
 
-    when_debug!({
+        /* Initialize heap allocator and page table */
+        unsafe {
+            heap::init_heap_allocator();
+            mm::enable_kernel_page_table();
+        }
+
         log::info!(
             "RAM: {:#x} - {:#x}",
             config::mm::RAM_START,
@@ -42,18 +51,37 @@ pub fn rust_main() -> ! {
         );
 
         log::info!(
-            "kernel virtual memory: {:#x} - {:#x}",
-            config::mm::kernel_start(),
-            config::mm::kernel_end()
+            "kernel physical memory: {:#x} - {:#x}",
+            config::mm::KERNEL_START_PHYS,
+            config::mm::kernel_end_phys(),
         );
-    });
 
-    /* Simple tests */
-    when_debug!({
-        heap::heap_test();
-        frame::frame_alloc_test();
-    });
+        log::info!(
+            "kernel virtual memory: {:#x} - {:#x}",
+            config::mm::KERNEL_START,
+            config::mm::kernel_end() as usize
+        );
 
+        /* Simple tests */
+        simdebug::when_debug!({
+            heap::heap_test();
+            frame::frame_alloc_test();
+        });
+
+        simdebug::when_debug!({
+            log::info!("start harts");
+            boot::start_harts(hart_id);
+        });
+
+        simdebug::backtrace_test();
+    } else {
+        log::info!("hart {} is waiting", hart_id);
+    }
+
+    log::info!("hart {} is running", hart_id);
+
+    loop {
+        // executor::task_run_always();
+    }
     sbi::shutdown(false);
-    loop {}
 }

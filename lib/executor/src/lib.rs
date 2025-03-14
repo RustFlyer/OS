@@ -12,6 +12,10 @@ lazy_static! {
     static ref TASKLINE: TaskLine = TaskLine::new();
 }
 
+/// 任务队列结构体
+///
+/// 异步调度的任务队列，与内核中TaskManager不同
+/// 用来管理异步的任务
 struct TaskLine {
     tasks: SpinNoIrqLock<VecDeque<Runnable>>,
 }
@@ -52,4 +56,26 @@ where
         }
     };
     async_task::spawn(future, WithInfo(schedule))
+}
+
+pub fn task_run_always() {
+    while let Some(task) = TASKLINE.fetch() {
+        task.run();
+    }
+}
+
+pub fn task_run_once() {
+    if let Some(task) = TASKLINE.fetch() {
+        task.run();
+    }
+}
+
+pub fn task_run_once_front() {
+    if let Some(task) = TASKLINE.fetch_front() {
+        task.run();
+    }
+}
+
+pub fn has_waiting_task() -> bool {
+    TASKLINE.length() > 0
 }

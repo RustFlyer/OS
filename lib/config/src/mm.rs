@@ -95,6 +95,9 @@ pub const PTE_PER_TABLE: usize = PAGE_SIZE / PTE_WIDTH;
 pub const APP_BASE_ADDRESS: usize = 0x1000_0000;
 pub const APP_SIZE_LIMIT: usize = 1024 * 1024 * 1024;
 
+/// boot hart start address
+pub const HART_START_ADDR: usize = 0x80200000;
+
 /* Symbols defined in the linker script */
 unsafe extern "C" {
     fn _skernel();

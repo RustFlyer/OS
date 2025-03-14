@@ -15,6 +15,8 @@ pps = { path = "../lib/pps/" }
 arch = { path = "../lib/arch/" }
 time = { path = "../lib/time/" }
 timer = { path = "../lib/timer/" }
+driver = { path = "../lib/driver/" }
+systype = { path = "../lib/systype/" }
 
 riscv-rt = { workspace = true }
 sbi-rt = { workspace = true }
@@ -23,6 +25,7 @@ crate_interface = { workspace = true }
 cfg-if = { workspace = true }
 lazy_static = { workspace = true }
 riscv = { workspace = true }
+strum = { workspace = true }
 
 [build-dependencies]
 config = { path = "../lib/config/" }

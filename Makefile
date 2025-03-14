@@ -14,6 +14,7 @@ TARGET = riscv64gc-unknown-none-elf
 # Target board (QEMU emulator)
 # Build mode (debug/release)
 # Logging level (trace/debug/info/warn/error/off)
+export SMP = 4
 export BOARD = qemu
 export MODE = debug
 export LOG = trace
@@ -35,7 +36,8 @@ DISASM_ARGS = -d
 QEMU_ARGS = -machine virt \
 			 -nographic \
 			 -bios $(BOOTLOADER) \
-			 -kernel $(KERNEL_ELF)
+			 -kernel $(KERNEL_ELF) \
+			 -smp $(SMP)
 	
 
 # ======================
@@ -43,9 +45,12 @@ QEMU_ARGS = -machine virt \
 # ======================
 TARGET_DIR := target/$(TARGET)/$(MODE)
 KERNEL_ELF := $(TARGET_DIR)/$(PACKAGE_NAME)
-# be aware that make has implict rule on .S suffix
 KERNEL_ASM := $(TARGET_DIR)/$(PACKAGE_NAME).asm
 
+USER_APPS_DIR := ./user/src/bin
+USER_APPS := $(wildcard $(USER_APPS_DIR)/*.rs)
+USER_ELFS := $(patsubst $(USER_APPS_DIR)/%.rs, $(TARGET_DIR)/%, $(USER_APPS))
+USER_BINS := $(patsubst $(USER_APPS_DIR)/%.rs, $(TARGET_DIR)/%.bin, $(USER_APPS))
 # ======================
 # Phony Target Declaration
 # ======================
@@ -148,7 +153,16 @@ PHONY += run-docker-debug
 run-docker-debug:
 	@docker run --rm -it --network="host" -v ${PWD}:/mnt -w /mnt ${DOCKER_NAME} make run-debug
 
+
+PHONY += user
+user:
+	@echo "building user..."
+	@cd user && make build
+	@$(foreach elf, $(USER_ELFS), $(OBJCOPY) $(elf) --strip-all -O binary $(patsubst $(TARGET_DIR)/%, $(TARGET_DIR)/%.bin, $(elf));)
+	@echo "building user finished"
+
 # ======================
 # Final PHONY Declaration
 # ======================
 .PHONY: $(PHONY)
+

@@ -16,3 +16,4 @@ riscv = { version = "0.13", features = ["s-mode"] }
 riscv-rt = "0.14"
 sbi-rt = { version = "0.0.3", features = ["legacy"] }
 spin = { version = "0.9", features = ["lazy"] }
+strum = { version = "0.27", default-features = false, features = ["derive"] }
