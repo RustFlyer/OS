@@ -17,8 +17,11 @@
 //! The kernel creates a new page table for the address space and maps its kernel part
 //! directly. VMAs are then created to manage the user part of the address space.
 
-use alloc::vec::Vec;
+use alloc::collections::btree_map::BTreeMap;
+
 use systype::SysResult;
+
+use crate::address::VirtAddr;
 
 use super::{page_table::PageTable, vm_area::VmArea};
 
@@ -30,7 +33,7 @@ pub struct AddrSpace {
     /// Page table of the address space.
     pub page_table: PageTable,
     /// VMAs of the address space.
-    pub vm_areas: Vec<VmArea>,
+    pub vm_areas: BTreeMap<VirtAddr, VmArea>,
 }
 
 impl AddrSpace {
@@ -45,16 +48,35 @@ impl AddrSpace {
     fn build() -> SysResult<Self> {
         Ok(Self {
             page_table: PageTable::build()?,
-            vm_areas: Vec::new(),
+            vm_areas: BTreeMap::new(),
         })
     }
 
     /// Creates an empty address space with the kernel part mapped for a user process.
     ///
     /// This should be the base of the address space for any user process.
+    ///
+    /// # Errors
+    /// Returns [`ENOMEM`] if memory allocation needed for the address space fails.
     pub fn build_user() -> SysResult<Self> {
         let mut addr_space = Self::build()?;
         addr_space.page_table.map_kernel();
         Ok(addr_space)
+    }
+
+    /// Insert a VMA into the address space.
+    ///
+    /// This function inserts a VMA into the address space, which de facto builds a memory
+    /// mapping in the address space.
+    pub fn insert_vma(&mut self, vma: VmArea) {
+        self.vm_areas.insert(vma.start_va, vma);
+    }
+
+    /// Remove a VMA from the address space.
+    ///
+    /// This function removes a VMA from the address space, which de facto unmaps the memory
+    /// region in the address space.
+    pub fn remove_vma(&mut self, start_va: VirtAddr) {
+        self.vm_areas.remove(&start_va);
     }
 }
