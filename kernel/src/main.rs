@@ -13,6 +13,7 @@ mod logging;
 mod processor;
 mod sbi;
 mod task;
+mod trap;
 
 use core::{arch::global_asm, sync::atomic::AtomicBool};
 

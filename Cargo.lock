@@ -291,6 +291,8 @@ name = "systype"
 version = "0.1.0"
 
 [[package]]
+<<<<<<< HEAD
+=======
 name = "time"
 version = "0.1.0"
 dependencies = [
@@ -308,6 +310,7 @@ dependencies = [
 ]
 
 [[package]]
+>>>>>>> 400a9fba92e46ff4666017928f286a9aba81aec8
 name = "unicode-ident"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
