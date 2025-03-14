@@ -14,6 +14,8 @@ use mutex::UPSafeCell;
 use time::TaskTimeStat;
 use timer::{TIMER_MANAGER, Timer};
 
+use crate::trap::trap_context::TrapContext;
+
 use arch::riscv64::time::get_time_duration;
 
 use core::time::Duration;
@@ -32,6 +34,7 @@ pub enum TaskState {
     Sleeping,
     Waiting,
     Zombie,
+    Die,
 }
 
 /// 任务结构体
@@ -42,20 +45,20 @@ pub struct Task {
     process: Option<Weak<Task>>,
     is_process: bool,
 
+    trap_context: SyncUnsafeCell<TrapContext>,
+    timer: SyncUnsafeCell<TaskTimeStat>,
+    waker: SyncUnsafeCell<Option<Waker>>,
+
     inner: UPSafeCell<TaskInner>,
 }
 
 /// 任务内部状态结构体
 ///
-/// 表示一个任务的内部状态，包含任务状态、父任务、子任务、唤醒器和计时器
+/// 表示一个任务的内部状态，包含任务状态、父任务、子任务和退出代码
 pub struct TaskInner {
     state: TaskState,
     parent: Option<Weak<Task>>,
     children: BTreeMap<Tid, Weak<Task>>,
-
-    /// 任务的唤醒器
-    waker: Option<Waker>,
-    timer: TaskTimeStat,
 
     exit_code: u32,
 }
@@ -77,11 +80,11 @@ impl Task {
         self.is_process
     }
 
-    pub fn is_in_state(&mut self, state: TaskState) -> bool {
+    pub fn is_in_state(&self, state: TaskState) -> bool {
         self.inner.exclusive_access().is_in_state(state)
     }
 
-    pub fn set_state(&mut self, state: TaskState) {
+    pub fn set_state(&self, state: TaskState) {
         self.inner.exclusive_access().set_state(state);
     }
 
@@ -104,12 +107,27 @@ impl Task {
         self.inner.exclusive_access().children.remove(&child.tid());
     }
 
+    pub fn trap_context_mut(&self) -> &mut TrapContext {
+        unsafe { &mut *self.trap_context.get() }
+    }
+
+    pub fn timer_mut(&self) -> &mut TaskTimeStat {
+        unsafe { &mut *self.timer.get() }
+    }
+
+    pub fn waker_mut(&self) -> &mut Option<Waker> {
+        unsafe { &mut *self.waker.get() }
+    }
+
     pub fn new() -> Self {
         let inner = TaskInner::new();
         Task {
             tid: tid_alloc(),
             process: None,
             is_process: false,
+            trap_context: unsafe { SyncUnsafeCell::new(TrapContext::new(0, 0)) },
+            timer: unsafe { SyncUnsafeCell::new(TaskTimeStat::new()) },
+            waker: unsafe { SyncUnsafeCell::new(None) },
             inner: unsafe { UPSafeCell::new(inner) },
         }
     }
@@ -119,11 +137,11 @@ impl Task {
     }
 
     pub fn set_waker(&self, waker: Waker) {
-        self.inner.exclusive_access().set_waker(waker);
+        unsafe { *self.waker_mut() = Some(waker) };
     }
 
     pub fn get_waker(&self) -> Waker {
-        self.inner.exclusive_access().get_waker().clone()
+        unsafe { self.waker_mut().as_ref().unwrap().clone() }
     }
 
     pub fn get_exit_code(&self) -> u32 {
@@ -138,14 +156,6 @@ impl Task {
         self.inner.exclusive_access().clear();
     }
 
-    pub fn enter_user_mode(&mut self) {
-        self.inner.exclusive_access().enter_user_mode();
-    }
-
-    pub fn enter_kernel_mode(&mut self) {
-        self.inner.exclusive_access().enter_kernel_mode();
-    }
-
     pub fn spawn_task(elf_data: &[u8]) {
         let memory_set = todo!();
         let trap_context = todo!();
@@ -153,6 +163,35 @@ impl Task {
         let task = Arc::new(Task::new());
         add_task(&task);
         spawn_user_task(task);
+    }
+
+    pub fn inner_mut(&mut self) -> &mut UPSafeCell<TaskInner> {
+        &mut self.inner
+    }
+
+    /// 当前任务切换到用户模式
+    pub fn enter_user_mode(&mut self) {
+        self.timer_mut().switch_to_user();
+    }
+
+    /// 当前任务切换到内核模式
+    pub fn enter_kernel_mode(&mut self) {
+        self.timer_mut().switch_to_kernel();
+    }
+
+    // 挂起当前任务，等待时间到达或被唤醒
+    pub async fn suspend_timeout(&self, limit: Duration) -> Duration {
+        let expire = get_time_duration() + limit;
+        let mut timer = Timer::new(expire);
+        timer.set_callback(self.get_waker().clone());
+        TIMER_MANAGER.add_timer(timer);
+        future::suspend_now().await;
+        let now = get_time_duration();
+        if expire > now {
+            expire - now
+        } else {
+            Duration::ZERO
+        }
     }
 }
 
@@ -162,34 +201,13 @@ impl TaskInner {
             state: TaskState::Running,
             parent: None,
             children: BTreeMap::new(),
-            waker: None,
             exit_code: 0,
-
-            timer: TaskTimeStat::new(),
         }
-    }
-
-    /// 当前任务切换到用户模式
-    pub fn enter_user_mode(&mut self) {
-        self.timer.switch_to_user();
-    }
-
-    /// 当前任务切换到内核模式
-    pub fn enter_kernel_mode(&mut self) {
-        self.timer.switch_to_kernel();
     }
 
     pub fn clear(&mut self) {
         self.state = TaskState::Zombie;
         self.exit_code = 0;
-    }
-
-    pub fn set_waker(&mut self, waker: Waker) {
-        self.waker = Some(waker);
-    }
-
-    pub fn get_waker(&self) -> &Waker {
-        self.waker.as_ref().unwrap()
     }
 
     pub fn set_state(&mut self, state: TaskState) {
@@ -206,20 +224,5 @@ impl TaskInner {
 
     pub fn is_in_state(&self, state: TaskState) -> bool {
         self.state == state
-    }
-
-    // 挂起当前任务，等待时间到达或被唤醒
-    pub async fn suspend_timeout(&self, limit: Duration) -> Duration {
-        let expire = get_time_duration() + limit;
-        let mut timer = Timer::new(expire);
-        timer.set_callback(self.get_waker().clone());
-        TIMER_MANAGER.add_timer(timer);
-        future::suspend_now().await;
-        let now = get_time_duration();
-        if expire > now {
-            expire - now
-        } else {
-            Duration::ZERO
-        }
     }
 }

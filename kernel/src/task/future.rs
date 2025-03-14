@@ -8,6 +8,7 @@ use core::task::{Context, Poll};
 use super::Task;
 use crate::processor::hart::{current_hart, one_hart};
 use crate::task::task::TaskState;
+use crate::trap;
 use core::task::Waker;
 
 use pps::ProcessorPrivilegeState;
@@ -86,27 +87,27 @@ pub async fn task_executor_unit(task: Arc<Task>) {
     // 设置任务的唤醒器（从当前上下文中获取）
     task.set_waker(take_waker().await);
     loop {
-        todo!(); // trap_return_
+        trap::trap_return(&task); // trap_return_
 
         match task.get_state() {
             TaskState::Zombie => break,
             TaskState::Waiting => {
-                todo!()
+                suspend_now().await;
             }
             _ => {}
         }
 
-        todo!(); // trap_handle_
+        trap::trap_handler(&task); // trap_handle_
 
         match task.get_state() {
             TaskState::Zombie => break,
             TaskState::Waiting => {
-                todo!()
+                suspend_now().await;
             }
             _ => {}
         }
 
-        todo!(); // signal_handle_
+        // signal_handle_
     }
 
     task.exit();
