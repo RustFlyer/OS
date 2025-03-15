@@ -20,6 +20,8 @@ use arch::riscv64::time::get_time_duration;
 
 use core::time::Duration;
 
+use mm::vm::addr_space::AddrSpace;
+
 use super::{
     future::{self, spawn_user_task},
     manager::add_task,
@@ -50,7 +52,7 @@ pub struct Task {
     timer: SyncUnsafeCell<TaskTimeStat>,
     waker: SyncUnsafeCell<Option<Waker>>,
     state: SpinNoIrqLock<TaskState>,
-
+    addrspace: SpinNoIrqLock<AddrSpace>,
     inner: UPSafeCell<TaskInner>,
 }
 
@@ -130,6 +132,7 @@ impl Task {
             timer: unsafe { SyncUnsafeCell::new(TaskTimeStat::new()) },
             waker: unsafe { SyncUnsafeCell::new(None) },
             state: unsafe { SpinNoIrqLock::new(TaskState::Waiting) },
+            addrspace: SpinNoIrqLock::new(AddrSpace::build_user().unwrap()),
             inner: unsafe { UPSafeCell::new(inner) },
         }
     }
@@ -195,6 +198,8 @@ impl Task {
             Duration::ZERO
         }
     }
+
+    pub fn switch_pagetable(&self) {}
 }
 
 impl TaskInner {

@@ -1,6 +1,6 @@
 use super::csr_env::set_kernel_trap;
 use crate::syscall;
-use crate::task::{Task, TaskState};
+use crate::task::{Task, TaskState, yield_now};
 use alloc::sync::Arc;
 use arch::riscv64::{
     interrupt::{disable_interrupt, enable_interrupt},
@@ -32,7 +32,9 @@ pub async fn trap_handler(task: &Arc<Task>) -> bool {
         Trap::Exception(e) => {
             user_exception_handler(task, Exception::from_number(e).unwrap()).await
         }
-        Trap::Interrupt(i) => user_interrupt_handler(task, Interrupt::from_number(i).unwrap()),
+        Trap::Interrupt(i) => {
+            user_interrupt_handler(task, Interrupt::from_number(i).unwrap()).await
+        }
     }
     true
 }
@@ -69,7 +71,7 @@ pub async fn user_exception_handler(task: &Arc<Task>, e: Exception) {
     }
 }
 
-pub fn user_interrupt_handler(task: &Arc<Task>, i: Interrupt) {
+pub async fn user_interrupt_handler(task: &Arc<Task>, i: Interrupt) {
     match i {
         // 时钟中断
         Interrupt::SupervisorTimer => {
@@ -80,8 +82,7 @@ pub fn user_interrupt_handler(task: &Arc<Task>, i: Interrupt) {
             TIMER_MANAGER.check(current);
             unsafe { set_nx_timer_irq() };
             if executor::has_waiting_task() {
-                // yield_now().await;
-                todo!()
+                yield_now().await;
             }
         }
         // 外部中断
