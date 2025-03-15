@@ -10,35 +10,38 @@ use pps::ProcessorPrivilegeState;
 use lazy_static::lazy_static;
 use simdebug::when_debug;
 
-use core::arch::asm;
+use core::{arch::asm, sync::atomic::AtomicUsize};
 use riscv::register::sstatus;
 use riscv::register::sstatus::FS;
 
 use arch::riscv64::interrupt::{disable_interrupt, enable_interrupt};
 
-const HART_ONE: HART = HART::new(0);
-pub static mut HARTS: [HART; MAX_HARTS] = [HART_ONE; MAX_HARTS];
+const HART_ONE: Hart = Hart::new(0);
+pub static mut HARTS: [Hart; MAX_HARTS] = [HART_ONE; MAX_HARTS];
 
 // lazy_static! {
 //     pub static ref HARTS: Vec<Arc<HART>> = (0..MAX_HARTS).map(|i| Arc::new(HART::new(i))).collect();
 // }
 
-/// HART结构体
+/// Hart结构体
 ///
-/// 表示一个HART，包含HART ID、任务和处理器特权状态
+/// 表示一个hart，包含hart ID、任务和处理器特权状态
 /// 一个cpu核心一个HART
-pub struct HART {
+pub struct Hart {
     pub id: usize,
     task: Option<Arc<Task>>,
     pps: ProcessorPrivilegeState,
+    /// Counter for how many [`crate::trap::sum::SumGuard`]s are living.
+    pub sum_count: AtomicUsize,
 }
 
-impl HART {
+impl Hart {
     pub const fn new(id: usize) -> Self {
         Self {
             id,
             task: None,
             pps: ProcessorPrivilegeState::new(),
+            sum_count: AtomicUsize::new(0),
         }
     }
 
@@ -126,16 +129,16 @@ impl HART {
     }
 }
 
-pub fn get_hart(hart_id: usize) -> &'static mut HART {
+pub fn get_hart(hart_id: usize) -> &'static mut Hart {
     unsafe { &mut HARTS[hart_id] }
 }
 
-pub fn current_hart() -> &'static mut HART {
+pub fn current_hart() -> &'static mut Hart {
     let mut ret;
     unsafe {
         let tp: usize;
         asm!("mv {}, tp", out(reg) tp);
-        ret = &mut *(tp as *mut HART);
+        ret = &mut *(tp as *mut Hart);
     }
     when_debug!({
         ret = one_hart();
@@ -153,6 +156,14 @@ pub fn set_current_hart(id: usize) {
     }
 }
 
+pub fn get_current_hart() -> &'static mut Hart {
+    let hart_ptr: *mut Hart;
+    unsafe {
+        asm!("mv {}, tp", out(reg) hart_ptr);
+        &mut *hart_ptr
+    }
+}
+
 pub fn init() {
     unsafe {
         sstatus::set_fs(FS::Initial);
@@ -164,6 +175,6 @@ pub fn current_task() -> Arc<Task> {
 }
 
 /// temp for test without driver
-pub fn one_hart() -> &'static mut HART {
+pub fn one_hart() -> &'static mut Hart {
     unsafe { &mut HARTS[0] }
 }
