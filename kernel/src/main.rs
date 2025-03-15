@@ -34,53 +34,48 @@ pub fn rust_main(hart_id: usize) -> ! {
     if unsafe { !INITIALIZED } {
         /* Initialize logger */
         logger::init();
-        log::info!("hart {} is running", hart_id);
+        log::info!("hart {}: initializing kernel", hart_id);
 
         /* Initialize heap allocator and page table */
         unsafe {
+            log::info!("hart {}: initializing heap allocator", hart_id);
             heap::init_heap_allocator();
+            log::info!("hart {}: initializing page table", hart_id);
             mm::enable_kernel_page_table();
             INITIALIZED = true;
         }
 
+        log::info!("======== kernel memory layout ========");
         log::info!(
             "RAM: {:#x} - {:#x}",
             config::mm::RAM_START,
             config::mm::RAM_END
         );
-
         log::info!(
             "kernel physical memory: {:#x} - {:#x}",
             config::mm::KERNEL_START_PHYS,
             config::mm::kernel_end_phys(),
         );
-
         log::info!(
             "kernel virtual memory: {:#x} - {:#x}",
             config::mm::KERNEL_START,
             config::mm::kernel_end() as usize
         );
+        log::info!("====== kernel memory layout end ======");
 
-        /* Simple tests */
-        simdebug::when_debug!({
-            heap::heap_test();
-            frame::frame_alloc_test();
+        boot::start_harts(hart_id);
+
+        when_debug!({
+            simdebug::backtrace_test();
         });
-
-        simdebug::when_debug!({
-            log::info!("start harts");
-            boot::start_harts(hart_id);
-        });
-
-        simdebug::backtrace_test();
     } else {
-        log::info!("hart {} is waiting", hart_id);
+        log::info!("hart {}: enabling page table", hart_id);
         // SAFETY: Only after the first hart has initialized the heap allocator and page table,
         // do the other harts enable the kernel page table.
         unsafe { mm::enable_kernel_page_table(); }
     }
 
-    log::info!("hart {} is running", hart_id);
+    log::info!("hart {}: running", hart_id);
 
     loop {
         // executor::task_run_always();

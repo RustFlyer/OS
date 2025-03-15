@@ -78,12 +78,12 @@ impl PageTable {
         let mut page_table = Self::build().expect("out of memory");
 
         when_debug!({
-            log::info!("======== kernel memory layout ========");
+            log::info!("============ kernel memory layout ============");
             log::info!(".text {:#x} - {:#x}", text_start(), text_end());
             log::info!(".rodata {:#x} - {:#x}", rodata_start(), rodata_end());
             log::info!(".data {:#x} - {:#x}", data_start(), data_end());
             log::info!(".bss {:#x} - {:#x}", bss_start(), bss_end());
-            log::info!("======== kernel memory layout end ========");
+            log::info!("========== kernel memory layout end ==========");
         });
 
         // let text_start_va = VirtAddr::new(text_start());
