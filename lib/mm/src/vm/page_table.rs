@@ -55,7 +55,7 @@ impl PageTable {
     /// # Errors
     /// Returns an [`ENOMEM`] error if memory allocation for the root page table fails.
     pub fn build() -> SysResult<Self> {
-        let root_frame = FrameTracker::new()?;
+        let root_frame = FrameTracker::build()?;
         // SAFETY: the frame is newly allocated for the root page table.
         unsafe {
             PageTableMem::new(root_frame.as_ppn()).clear();
@@ -77,16 +77,6 @@ impl PageTable {
     fn build_kernel_page_table() -> Self {
         let mut page_table = Self::build().expect("out of memory");
 
-        when_debug!({
-            log::info!("============ kernel memory layout ============");
-            log::info!(".text {:#x} - {:#x}", text_start(), text_end());
-            log::info!(".rodata {:#x} - {:#x}", rodata_start(), rodata_end());
-            log::info!(".data {:#x} - {:#x}", data_start(), data_end());
-            log::info!(".bss {:#x} - {:#x}", bss_start(), bss_end());
-            log::info!("========== kernel memory layout end ==========");
-        });
-
-        // let text_start_va = VirtAddr::new(text_start());
         let text_start_va = VirtAddr::new(text_start());
         let text_end_va = VirtAddr::new(text_end());
         let text_flags = PteFlags::V | PteFlags::R | PteFlags::X;
@@ -140,7 +130,7 @@ impl PageTable {
                 return entry;
             }
             if !entry.is_valid() {
-                let frame = FrameTracker::new().expect("out of memory");
+                let frame = FrameTracker::build().expect("out of memory");
                 *entry = PageTableEntry::new(frame.as_ppn(), PteFlags::V);
                 self.track_frame(frame);
             }

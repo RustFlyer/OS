@@ -71,7 +71,7 @@ impl FrameTracker {
     ///
     /// Returns a `FrameTracker` if the frame is successfully allocated, or an `ENOMEM` error
     /// if there are no free frames.
-    pub fn new() -> SysResult<Self> {
+    pub fn build() -> SysResult<Self> {
         FRAME_ALLOCATOR
             .lock()
             .alloc()
@@ -194,8 +194,8 @@ impl Drop for FrameDropper {
 pub fn frame_alloc_test() {
     log::info!("frame_alloc_test: start");
     {
-        let f1 = FrameTracker::new().expect("frame_alloc_test: failed to allocate frame");
-        let f2 = FrameTracker::new().expect("frame_alloc_test: failed to allocate frame");
+        let f1 = FrameTracker::build().expect("frame_alloc_test: failed to allocate frame");
+        let f2 = FrameTracker::build().expect("frame_alloc_test: failed to allocate frame");
         log::info!(
             "frame_alloc_test: frame 1: {:#x}",
             f1.as_ppn().address().to_usize()
@@ -207,7 +207,7 @@ pub fn frame_alloc_test() {
     }
     {
         log::info!("frame_alloc_test: frames 1 and 2 are dropped");
-        let f3 = FrameTracker::new().expect("frame_alloc_test: failed to allocate frame");
+        let f3 = FrameTracker::build().expect("frame_alloc_test: failed to allocate frame");
         log::info!(
             "frame_alloc_test: frame 3: {:#x}",
             f3.as_ppn().address().to_usize()

@@ -61,6 +61,10 @@ pub fn rust_main(hart_id: usize) -> ! {
             config::mm::KERNEL_START,
             config::mm::kernel_end() as usize
         );
+        log::info!(".text {:#x} - {:#x}", config::mm::text_start(), config::mm::text_end());
+        log::info!(".rodata {:#x} - {:#x}", config::mm::rodata_start(), config::mm::rodata_end());
+        log::info!(".data {:#x} - {:#x}", config::mm::data_start(), config::mm::data_end());
+        log::info!(".bss {:#x} - {:#x}", config::mm::bss_start(), config::mm::bss_end());
         log::info!("====== kernel memory layout end ======");
 
         boot::start_harts(hart_id);

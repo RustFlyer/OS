@@ -267,7 +267,7 @@ impl MemoryBackedArea {
         }
 
         // Allocate a frame and map the page.
-        let mut frame = FrameTracker::new()?;
+        let mut frame = FrameTracker::build()?;
         page_table.map_page(fault_addr.page_number(), frame.as_ppn(), flags);
 
         // Copy data from the memory backing store to the allocated frame.
