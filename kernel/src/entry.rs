@@ -18,13 +18,15 @@
 
 use core::arch::naked_asm;
 
-use config::mm::{KERNEL_MAP_OFFSET, KERNEL_STACK_SIZE, PTE_PER_TABLE};
+use config::{device::MAX_HARTS, mm::{KERNEL_MAP_OFFSET, KERNEL_STACK_SIZE, PTE_PER_TABLE}};
 
 use crate::rust_main;
 
-/// The kernel stack.
+#[repr(C)]
+pub struct BootStack([u8; KERNEL_STACK_SIZE * MAX_HARTS]);
+
 #[unsafe(link_section = ".bss.stack")]
-static mut BOOT_STACK: [u8; KERNEL_STACK_SIZE] = [0; KERNEL_STACK_SIZE];
+pub static mut BOOT_STACK: BootStack = BootStack([0; KERNEL_STACK_SIZE * MAX_HARTS]);
 
 /// Boot page table, which is used temporarily before the real page table is set up.
 #[repr(C, align(4096))]

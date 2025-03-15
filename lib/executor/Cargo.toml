@@ -5,7 +5,5 @@ edition = "2024"
 
 [dependencies]
 mutex = { path = "../mutex/" }
-async-task =  { version = "4.7", default-features = false }
-lazy_static = { version = "1.4", features = ["spin_no_std"] }
-
-[build-dependencies]
+async-task =  { workspace = true }
+lazy_static = { workspace = true }

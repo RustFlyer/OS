@@ -1,6 +1,12 @@
 #![no_std]
 #![no_main]
 
+use riscv::register::{
+    satp::{self, Satp},
+    sepc,
+    sstatus::{self, Sstatus},
+};
+
 /// 处理器特权状态结构体
 ///
 /// 表示一个处理器的特权状态，包含保护块计数、sstatus、sepc和satp
@@ -26,15 +32,15 @@ impl ProcessorPrivilegeState {
 
     pub fn auto_sum(&self) {
         if self.sum_cnt == 0 {
-            unsafe { riscv::register::sstatus::clear_sum() };
+            unsafe { sstatus::clear_sum() };
         } else {
-            unsafe { riscv::register::sstatus::set_sum() };
+            unsafe { sstatus::set_sum() };
         }
     }
 
     pub fn inc_sum_cnt(&mut self) {
         if self.sum_cnt == 0 {
-            unsafe { riscv::register::sstatus::clear_sum() };
+            unsafe { sstatus::clear_sum() };
         }
         self.sum_cnt += 1;
     }
@@ -42,7 +48,7 @@ impl ProcessorPrivilegeState {
     pub fn dec_sum_cnt(&mut self) {
         self.sum_cnt -= 1;
         if self.sum_cnt == 0 {
-            unsafe { riscv::register::sstatus::clear_sum() };
+            unsafe { sstatus::clear_sum() };
         }
     }
 
@@ -51,14 +57,20 @@ impl ProcessorPrivilegeState {
     }
 
     pub fn record(&mut self) {
-        self.sstatus = arch::riscv64::sstatus::read().bits();
-        self.sepc = riscv::register::sepc::read();
-        self.satp = riscv::register::satp::read().bits();
+        self.sstatus = sstatus::read().bits();
+        self.sepc = sepc::read();
+        self.satp = satp::read().bits();
     }
 
     pub fn restore(&mut self) {
-        arch::riscv64::sstatus::write(self.sstatus);
-        riscv::register::sepc::write(self.sepc);
-        riscv::register::satp::write(self.satp);
+        unsafe {
+            sstatus::write(Sstatus::from_bits(self.sstatus));
+        }
+        unsafe {
+            sepc::write(self.sepc);
+        }
+        unsafe {
+            satp::write(Satp::from_bits(self.satp));
+        }
     }
 }

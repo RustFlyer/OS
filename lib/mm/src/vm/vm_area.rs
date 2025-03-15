@@ -23,44 +23,49 @@
 //! With this design, we avoid using trait objects or an enum for VMA types, while still
 //! maintaining modularization and extensibility.
 
-use alloc::{slice, vec::Vec};
-use config::mm::PAGE_SIZE;
+use alloc::vec::Vec;
 use core::fmt::Debug;
 use systype::{SysError, SysResult};
 
 use bitflags::bitflags;
 
 use super::{page_table::PageTable, pte::PteFlags};
-use crate::{address::VirtAddr, frame::FrameTracker};
+use crate::{
+    address::{PhysPageNum, VirtAddr},
+    frame::FrameTracker,
+};
 
 bitflags! {
     /// Memory permission corresponding to R, W, X, and U bits in a page table entry.
+    ///
+    /// The bits of `MemPerm` are a subset of the bits of `PteFlags`, and their bit
+    /// positions are the same as those in `PteFlags` for easy conversion between them.
+    ///
+    /// Do not set any unknown bits.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct MemPerm: u8 {
-        const R = 1 << 0;
-        const W = 1 << 1;
-        const X = 1 << 2;
-        const U = 1 << 3;
+        const R = 1 << 1;
+        const W = 1 << 2;
+        const X = 1 << 3;
+        const U = 1 << 4;
     }
 }
 
-impl From<MemPerm> for PteFlags {
-    /// Convert `MemPerm` to `PteFlags`.
-    fn from(perm: MemPerm) -> Self {
-        let mut flags = Self::empty();
-        if perm.contains(MemPerm::U) {
-            flags |= PteFlags::U;
-        } else {
-            flags |= PteFlags::G;
-        }
-        if perm.contains(MemPerm::R) {
-            flags |= PteFlags::R;
-        }
-        if perm.contains(MemPerm::W) {
-            flags |= PteFlags::W;
-        }
-        if perm.contains(MemPerm::X) {
-            flags |= PteFlags::X;
+impl MemPerm {
+    /// Create a new `MemPerm` from a set of `PteFlags`.
+    pub fn from(flags: PteFlags) -> Self {
+        Self::from_bits_truncate(flags.bits())
+    }
+}
+
+impl PteFlags {
+    /// Create a new `PteFlags` from a set of `MemPerm`.
+    ///
+    /// When `MemPerm` does not contain `U`, `G` is set in the returned `PteFlags`.
+    pub fn from(perm: MemPerm) -> Self {
+        let mut flags = Self::from_bits_retain(perm.bits());
+        if !perm.contains(MemPerm::U) {
+            flags |= Self::G;
         }
         flags
     }
@@ -70,9 +75,9 @@ impl From<MemPerm> for PteFlags {
 ///
 /// This struct is used to pass data to a page fault handler registered in a [`VmArea`].
 #[derive(Debug)]
-pub struct PageFaultInfo<'a> {
+pub(crate) struct PageFaultInfo<'a> {
     /// Faulting virtual address.
-    pub addr: VirtAddr,
+    pub fault_addr: VirtAddr,
     /// Page table.
     pub page_table: &'a mut PageTable,
     /// How the address was accessed when the fault occurred.
@@ -86,51 +91,81 @@ pub struct PageFaultInfo<'a> {
 #[derive(Debug)]
 pub struct VmArea {
     /// Starting virtual address.
-    pub start_va: VirtAddr,
+    start_va: VirtAddr,
     /// Ending virtual address (exclusive).
-    pub end_va: VirtAddr,
+    end_va: VirtAddr,
     /// Page table entry flags.
-    pub flags: PteFlags,
+    flags: PteFlags,
     /// Permission.
-    pub perm: MemPerm,
+    perm: MemPerm,
     /// Unique data of a specific type of VMA.
-    pub map_type: TypedArea,
+    map_type: TypedArea,
     /// Page fault handler.
-    pub handler: Option<fn(&mut Self, PageFaultInfo) -> SysResult<()>>,
+    handler: Option<fn(&mut Self, PageFaultInfo) -> SysResult<()>>,
 }
 
 impl VmArea {
+    /// Constructs a [`VmArea`] whose specific type is [`TypedArea::Kernel`].
+    pub(crate) fn new_kernel(start_va: VirtAddr, end_va: VirtAddr, flags: PteFlags) -> Self {
+        Self {
+            start_va,
+            end_va,
+            flags,
+            perm: MemPerm::from(flags),
+            map_type: TypedArea::Kernel(KernelArea),
+            handler: None,
+        }
+    }
+
     /// Constructs a [`VmArea`] whose specific type is [`TypedArea::MemoryBacked`].
     pub fn new_memory_backed(
         start_va: VirtAddr,
         end_va: VirtAddr,
         flags: PteFlags,
-        perm: MemPerm,
         memory: &'static [u8],
     ) -> Self {
         Self {
             start_va,
             end_va,
             flags,
-            perm,
+            perm: MemPerm::from(flags),
             map_type: TypedArea::MemoryBacked(MemoryBackedArea::new(memory)),
             handler: Some(MemoryBackedArea::fault_handler),
         }
     }
 
     /// Handles a page fault happened in this VMA.
-    pub fn handle_page_fault(&mut self, info: PageFaultInfo) -> SysResult<()> {
+    ///
+    /// # Errors
+    /// Returns [`SysError::EFAULT`] if the access permission is not allowed.
+    pub(crate) fn handle_page_fault(&mut self, info: PageFaultInfo) -> SysResult<()> {
         if let Some(handler) = self.handler {
             handler(self, info)
         } else {
             panic!("page fault handler: handler not registered");
         }
     }
+
+    pub fn contains(&self, va: VirtAddr) -> bool {
+        va >= self.start_va && va < self.end_va
+    }
+
+    /// Returns the starting virtual address of the VMA.
+    pub fn start_va(&self) -> VirtAddr {
+        self.start_va
+    }
+
+    /// Returns the ending virtual address of the VMA.
+    pub fn end_va(&self) -> VirtAddr {
+        self.end_va
+    }
 }
 
 /// Unique data of a specific type of VMA. This enum is used in [`VmArea`].
 #[derive(Debug)]
-pub enum TypedArea {
+pub(crate) enum TypedArea {
+    /// A helper VMA representing one in the kernel space.
+    Kernel(KernelArea),
     /// A memory-backed VMA.
     MemoryBacked(MemoryBackedArea),
     /// A file-backed VMA.
@@ -144,12 +179,48 @@ pub enum TypedArea {
     Anonymous,
 }
 
+/// A helper VMA representing one in the kernel space.
+///
+/// This struct is used to map an area in the kernel space to the kernel page table.
+/// It is of no use after the kernel page table is set up.
+///
+/// A kernel area must be aligned to the size of a page.
+#[derive(Debug)]
+pub(crate) struct KernelArea;
+
+impl KernelArea {
+    /// Maps the kernel area to the kernel page table.
+    pub fn map(area: &VmArea, page_table: &mut PageTable) {
+        match area.map_type {
+            TypedArea::Kernel(_) => {}
+            _ => panic!("KernelArea::map: not a kernel area"),
+        }
+
+        let &VmArea {
+            start_va,
+            end_va,
+            flags,
+            ..
+        } = area;
+
+        let start_vpn = start_va.page_number();
+        let end_vpn = end_va.round_up().page_number();
+        let start_ppn = start_vpn.to_ppn_kernel().to_usize();
+        let end_ppn = end_vpn.to_ppn_kernel().to_usize();
+        let ppns = (start_ppn..end_ppn)
+            .map(PhysPageNum::new)
+            .collect::<Vec<_>>();
+
+        page_table.map_range(start_vpn, &ppns, flags);
+    }
+}
+
 /// A memory-backed VMA.
 ///
 /// This is a type for debugging purposes. A memory-backed VMA takes a slice of
 /// memory as its backing store.
 #[derive(Debug)]
-pub struct MemoryBackedArea {
+pub(crate) struct MemoryBackedArea {
     /// The memory backing store.
     pub memory: &'static [u8],
     /// Allocated physical pages.
@@ -158,7 +229,7 @@ pub struct MemoryBackedArea {
 
 impl MemoryBackedArea {
     /// Creates a new memory-backed VMA.
-    pub fn new(memory: &'static [u8]) -> Self {
+    fn new(memory: &'static [u8]) -> Self {
         Self {
             memory,
             pages: Vec::new(),
@@ -167,52 +238,54 @@ impl MemoryBackedArea {
 
     /// Handles a page fault.
     pub fn fault_handler(area: &mut VmArea, info: PageFaultInfo) -> SysResult<()> {
-        // Extract the specific data of the memory-backed VMA.
-        let Self { memory, pages } = match &mut area.map_type {
+        // Extract data needed for fault handling.
+        let &mut Self {
+            memory,
+            ref mut pages,
+        } = match &mut area.map_type {
             TypedArea::MemoryBacked(memory_backed) => memory_backed,
             _ => panic!("fault_handler: not a memory-backed area"),
         };
 
-        let VmArea {
+        let &mut VmArea {
             start_va,
             end_va,
             flags,
             perm,
             ..
-        } = *area;
+        } = area;
 
         let PageFaultInfo {
-            addr,
+            fault_addr,
             page_table,
             access,
         } = info;
 
         // Check permission.
         if !access.contains(perm) {
-            return Err(SysError::EACCES);
+            return Err(SysError::EFAULT);
         }
 
         // Allocate a frame and map the page.
-        let frame = FrameTracker::new()?;
-        page_table.map_page(addr.page_number(), frame.as_ppn(), flags);
-        pages.push(frame);
+        let mut frame = FrameTracker::build()?;
+        page_table.map_page(fault_addr.page_number(), frame.as_ppn(), flags);
 
         // Copy data from the memory backing store to the allocated frame.
-        let fault_page = addr.page_number();
-        let dst_start = {
-            let fault_page_start = fault_page.address().to_usize();
-            let start_va = start_va.to_usize();
-            usize::max(fault_page_start, start_va)
-        };
-        let dst_end = {
-            let fault_page_end = fault_page.address().to_usize() + PAGE_SIZE;
-            let end_va = end_va.to_usize();
-            usize::min(fault_page_end, end_va)
-        };
-        let dst_slice =
-            unsafe { slice::from_raw_parts_mut(dst_start as *mut u8, dst_end - dst_start) };
-        let src_slice = &memory[(dst_start - start_va.to_usize())..(dst_end - start_va.to_usize())];
-        dst_slice.copy_from_slice(src_slice);
+        let fill_va_start = VirtAddr::max(start_va, fault_addr.round_down());
+        let fill_va_end = VirtAddr::min(end_va, fault_addr.round_up());
+        let fill_len = fill_va_end.to_usize() - fill_va_start.to_usize();
+        let page_offset = fill_va_start.to_usize() - fault_addr.round_down().to_usize();
+        let area_offset = fill_va_start.to_usize() - start_va.to_usize();
+
+        let memory_to_copy = &memory[area_offset..area_offset + fill_len];
+        let memory_to_fill = &mut frame.as_slice_mut()[page_offset..page_offset + fill_len];
+        memory_to_fill.copy_from_slice(memory_to_copy);
+
+        // Track the allocated frame.
+        pages.push(frame);
+
+        // Flush TLB.
+        riscv::asm::sfence_vma(page_table.root().to_usize(), fault_addr.to_usize());
 
         Ok(())
     }

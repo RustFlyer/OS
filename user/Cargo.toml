@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-bitflags = "2.6"
-buddy_system_allocator = "0.11"
+bitflags = { workspace = true }
+buddy_system_allocator = { workspace = true }
+time = { path = "../lib/time/" }

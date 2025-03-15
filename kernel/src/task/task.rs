@@ -31,10 +31,11 @@ use super::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TaskState {
     Running,
-    Sleeping,
-    Waiting,
     Zombie,
-    Die,
+    Waiting,
+    Sleeping,
+    Interruptable,
+    UnInterruptable,
 }
 
 /// 任务结构体
@@ -48,6 +49,7 @@ pub struct Task {
     trap_context: SyncUnsafeCell<TrapContext>,
     timer: SyncUnsafeCell<TaskTimeStat>,
     waker: SyncUnsafeCell<Option<Waker>>,
+    state: SpinNoIrqLock<TaskState>,
 
     inner: UPSafeCell<TaskInner>,
 }
@@ -56,7 +58,6 @@ pub struct Task {
 ///
 /// 表示一个任务的内部状态，包含任务状态、父任务、子任务和退出代码
 pub struct TaskInner {
-    state: TaskState,
     parent: Option<Weak<Task>>,
     children: BTreeMap<Tid, Weak<Task>>,
 
@@ -81,15 +82,15 @@ impl Task {
     }
 
     pub fn is_in_state(&self, state: TaskState) -> bool {
-        self.inner.exclusive_access().is_in_state(state)
+        self.get_state() == state
+    }
+
+    pub fn get_state(&self) -> TaskState {
+        self.state.lock().clone()
     }
 
     pub fn set_state(&self, state: TaskState) {
-        self.inner.exclusive_access().set_state(state);
-    }
-
-    pub fn get_state(&mut self) -> TaskState {
-        self.inner.exclusive_access().get_state()
+        *self.state.lock() = state;
     }
 
     pub fn set_parent(&mut self, parent: Arc<Task>) {
@@ -128,6 +129,7 @@ impl Task {
             trap_context: unsafe { SyncUnsafeCell::new(TrapContext::new(0, 0)) },
             timer: unsafe { SyncUnsafeCell::new(TaskTimeStat::new()) },
             waker: unsafe { SyncUnsafeCell::new(None) },
+            state: unsafe { SpinNoIrqLock::new(TaskState::Waiting) },
             inner: unsafe { UPSafeCell::new(inner) },
         }
     }
@@ -148,11 +150,11 @@ impl Task {
         self.inner.exclusive_access().exit_code
     }
 
-    pub fn exit(&mut self) {
+    pub fn exit(&self) {
         self.inner.exclusive_access().clear();
     }
 
-    pub fn clear(&mut self) {
+    pub fn clear(&self) {
         self.inner.exclusive_access().clear();
     }
 
@@ -198,7 +200,6 @@ impl Task {
 impl TaskInner {
     pub fn new() -> Self {
         Self {
-            state: TaskState::Running,
             parent: None,
             children: BTreeMap::new(),
             exit_code: 0,
@@ -206,23 +207,10 @@ impl TaskInner {
     }
 
     pub fn clear(&mut self) {
-        self.state = TaskState::Zombie;
         self.exit_code = 0;
-    }
-
-    pub fn set_state(&mut self, state: TaskState) {
-        self.state = state;
-    }
-
-    pub fn get_state(&self) -> TaskState {
-        self.state
     }
 
     pub fn set_exit_code(&mut self, exit_code: u32) {
         self.exit_code = exit_code;
-    }
-
-    pub fn is_in_state(&self, state: TaskState) -> bool {
-        self.state == state
     }
 }

@@ -4,14 +4,15 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-buddy_system_allocator = "0.11"
-log = "0.4"
-bitflags = "2.9"
-lazy_static = { version = "1.4", features = ["spin_no_std"] }
 config = { path = "../config" }
 id_allocator = { path = "../id_allocator" }
 mutex = { path = "../mutex" }
+simdebug = { path = "../simdebug" }
 systype = { path = "../systype" }
-
-[build-dependencies]
-config = { path = "../config" }
+bitflags = { workspace = true }
+buddy_system_allocator = { workspace = true }
+cfg-if = { workspace = true }
+elf ={ workspace = true }
+lazy_static = { workspace = true }
+log = { workspace = true }
+riscv = { workspace = true }

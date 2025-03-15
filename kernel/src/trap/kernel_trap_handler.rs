@@ -1,7 +1,11 @@
 use arch::riscv64::time::{get_time_duration, set_nx_timer_irq};
-use riscv::register::{
-    scause::{self, Exception, Interrupt, Scause, Trap},
-    sepc, stval, stvec,
+use riscv::InterruptNumber;
+use riscv::{
+    interrupt::{Exception, Interrupt, Trap},
+    register::{
+        scause::{self, Scause},
+        sepc, stval, stvec,
+    },
 };
 use timer::TIMER_MANAGER;
 
@@ -11,7 +15,7 @@ pub fn kernel_trap_handler() {
     let scause = scause::read();
     let _stval = stval::read();
     match scause.cause() {
-        Trap::Interrupt(i) => kernel_interrupt_handler(i),
+        Trap::Interrupt(i) => kernel_interrupt_handler(Interrupt::from_number(i).unwrap()),
         _ => kernel_panic(),
     }
 }

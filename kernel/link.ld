@@ -3,30 +3,34 @@ ENTRY(_start)
 
 SECTIONS
 {
-    . = ALIGN(4K);
-    .text : {
+    .text : ALIGN(4K) {
+        _skernel = .;
+        _stext = .;
         *(.text.entry)
-        . = ALIGN(4K);
         *(.text .text.*)
+        _etext = .;
     } > VIRT AT> RAM
 
-    . = ALIGN(4K);
-    .rodata : {
+    .rodata : ALIGN(4K) {
+        _srodata = .;
         *(.rodata .rodata.*)
         *(.srodata .srodata.*)
+        _erodata = .;
     } > VIRT AT> RAM
 
-    . = ALIGN(4K);
-    .data : {
+    .data : ALIGN(4K) {
+        _sdata = .;
         *(.data .data.*)
         *(.sdata .sdata.*)
+        _edata = .;
     } > VIRT AT> RAM
 
-    . = ALIGN(4K);
-    .bss : {
+    .bss : ALIGN(4K) {
+        _sbss = .;
         *(.bss.stack)
         *(.bss .bss.*)
         *(.sbss .sbss.*)
+        _ebss = .;
     } > VIRT AT> RAM
 
     . = ALIGN(4K);

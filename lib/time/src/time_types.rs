@@ -132,6 +132,11 @@ impl TimeVal {
     pub fn into_usec(&self) -> usize {
         self.tv_sec * Self::MICRO_PER_SEC + self.tv_usec
     }
+
+    pub fn get_time_from_us(&mut self, us: usize) {
+        self.tv_sec = us / 1_000_000;
+        self.tv_usec = us % 1_000_000;
+    }
 }
 
 impl TimeValue for TimeVal {
@@ -179,6 +184,15 @@ impl From<TimeVal> for TimeSpec {
         Self {
             tv_sec: val.tv_sec,
             tv_nsec: val.tv_usec * 1000,
+        }
+    }
+}
+
+impl From<usize> for TimeVal {
+    fn from(value: usize) -> Self {
+        Self {
+            tv_sec: value / 1_000_000,
+            tv_usec: value % 1_000_000,
         }
     }
 }

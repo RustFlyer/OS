@@ -1,5 +1,3 @@
 /target
 /vendor
 .vscode
-Cargo.lock
-.cargo

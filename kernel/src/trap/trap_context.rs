@@ -93,11 +93,70 @@ impl TrapContext {
     }
 
     pub fn restore_fx(&mut self) {
-        todo!() // 恢复浮点寄存器
+        if self.is_need_restore == 0 {
+            return;
+        }
+        self.is_need_restore = 0;
+        let ptr = unsafe { self.user_fx.as_mut_ptr() };
+        unsafe {
+            macro_rules! load_regs {
+                ($($i:literal),*) => {
+                    $(
+                        asm!(
+                            "fld f{}, {offset}*8({ptr})",
+                            const $i,
+                            offset = const $i,
+                            ptr = in(reg) ptr
+                        );
+                    )*
+                };
+            }
+            load_regs!(
+                0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+                23, 24, 25, 26, 27, 28, 29, 30, 31
+            );
+
+            asm!(
+                "lw  {0}, 32*8({0})
+                csrw fcsr, {0}",
+                in(reg) ptr,
+            );
+        }
     }
 
     pub fn save_fx(&mut self) {
-        todo!() // 保存浮点寄存器
+        if self.is_dirty == 0 {
+            return;
+        }
+        self.is_dirty = 0;
+        let ptr = unsafe { self.user_fx.as_mut_ptr() };
+        unsafe {
+            let mut _t: usize = 1;
+            macro_rules! save_regs {
+                ($($i:literal),*) => {
+                    $(
+                        asm!(
+                            "fsd f{}, {offset}*8({ptr})",
+                            const $i,
+                            offset = const $i,
+                            ptr = in(reg) ptr
+                        );
+                    )*
+                };
+            }
+            save_regs!(
+                0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+                23, 24, 25, 26, 27, 28, 29, 30, 31
+            );
+
+            asm!(
+                "csrr {1}, fcsr
+                sw  {1}, 32*8({0})
+                ",
+                in(reg) ptr,
+                inout(reg) _t
+            );
+        };
     }
 
     pub fn syscall_no(&self) -> usize {

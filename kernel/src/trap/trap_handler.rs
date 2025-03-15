@@ -1,22 +1,22 @@
-use super::trap_env::set_kernel_trap;
-use crate::{task::{Task, TaskState}, trap::trap_env::set_stvec};
+use super::trap_env::set_kernel_stvec;
+use crate::syscall;
+use crate::task::{Task, TaskState};
+use crate::trap::load_trap_handler;
 use alloc::sync::Arc;
 use arch::riscv64::{
-    interrupt::{disable_interrupt, enable_interrupt},
     time::{get_time_duration, set_nx_timer_irq},
 };
-use riscv::register::{
-    scause::{self, Exception, Interrupt, Trap},
-    sepc,
-    sstatus::FS,
-    stval,
+use riscv::{ExceptionNumber, InterruptNumber};
+use riscv::{
+    interrupt::{Exception, Interrupt, Trap},
+    register::{scause, sepc, sstatus::FS, stval},
 };
 use timer::TIMER_MANAGER;
 
 /// handle exception or interrupt from a task, return if success
 #[unsafe(no_mangle)]
 pub async fn trap_handler(task: &Arc<Task>) -> bool {
-    
+
     let stval = stval::read();
     let scause = scause::read();
     let sepc = sepc::read();
@@ -25,23 +25,24 @@ pub async fn trap_handler(task: &Arc<Task>) -> bool {
     log::trace!("[trap_handler] user task trap into kernel");
     log::trace!("[trap_handler] sepc:{:#x}, stval:{:#x}", sepc, stval);
     
-    set_trap_handler();
+    unsafe{ load_trap_handler() };
 
     match cause {
-        Trap::Exception(e) => user_exception_handler(task, e),
-        Trap::Interrupt(i) => user_interrupt_handler(task, i),
+        Trap::Exception(e) => {
+            user_exception_handler(task, Exception::from_number(e).unwrap()).await
+        }
+        Trap::Interrupt(i) => user_interrupt_handler(task, Interrupt::from_number(i).unwrap()),
     }
     true
 }
 
 pub async fn user_exception_handler(task: &Arc<Task>, e: Exception) {
-    let cx = task.trap_context_mut();
-
+    let mut cx = task.trap_context_mut();
     match e {
         // 系统调用
         Exception::UserEnvCall => {
             log::trace!("[trap_handler] user env call");
-
+            let syscall_no = cx.syscall_no();
             cx.sepc_forward();
 
             let sys_ret = syscall(syscall_no, cx.syscall_args()).await;
@@ -60,7 +61,7 @@ pub async fn user_exception_handler(task: &Arc<Task>, e: Exception) {
                 stval::read(),
                 sepc::read(),
             );
-            task.set_state(TaskState::Die);
+            task.set_state(TaskState::Zombie);
         }
         // 其他异常
         e => {

@@ -4,6 +4,8 @@
 //! physical and virtual page numbers. It also provides functions for converting
 //! between these types.
 
+use core::fmt::{self, Debug, Formatter};
+
 use config::mm::{
     KERNEL_MAP_OFFSET, PA_WIDTH_SV39, PAGE_SIZE, PPN_WIDTH_SV39, VA_WIDTH_SV39, VPN_WIDTH_SV39,
 };
@@ -12,7 +14,7 @@ use config::mm::{
 ///
 /// A physical address is a 56-bit integer representing a location in physical
 /// memory. The upper 8 bits of the address must be the same as bit 55.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PhysAddr {
     addr: usize,
 }
@@ -32,7 +34,7 @@ impl PhysAddr {
         let tmp = addr as isize >> PA_WIDTH_SV39;
         debug_assert!(
             tmp == 0 || tmp == -1,
-            "invalid physical address: 0x{:x}",
+            "invalid physical address: {:#x}",
             addr
         );
         PhysAddr { addr }
@@ -55,6 +57,16 @@ impl PhysAddr {
         PhysPageNum::new(page_num)
     }
 
+    /// Rounds the address down to the nearest page boundary.
+    pub fn round_down(self) -> PhysAddr {
+        PhysAddr::new(self.addr & !(PAGE_SIZE - 1))
+    }
+
+    /// Rounds the address up to the nearest page boundary.
+    pub fn round_up(self) -> PhysAddr {
+        PhysAddr::new((self.addr + PAGE_SIZE - 1) & !(PAGE_SIZE - 1))
+    }
+
     /// Translates a physical address into a virtual address in the kernel space.
     pub fn to_va_kernel(self) -> VirtAddr {
         let va = self.addr + KERNEL_MAP_OFFSET;
@@ -62,11 +74,17 @@ impl PhysAddr {
     }
 }
 
+impl Debug for PhysAddr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{:#x}", self.addr)
+    }
+}
+
 /// An address in virtual memory defined in Sv39.
 ///
 /// A virtual address is a 39-bit integer representing a location in virtual
 /// memory. The upper 25 bits of the address must be the same as bit 38.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct VirtAddr {
     addr: usize,
 }
@@ -86,7 +104,7 @@ impl VirtAddr {
         let tmp = addr as isize >> VA_WIDTH_SV39;
         debug_assert!(
             tmp == 0 || tmp == -1,
-            "invalid virtual address: 0x{:x}",
+            "invalid virtual address: {:#x}",
             addr
         );
         VirtAddr { addr }
@@ -109,6 +127,16 @@ impl VirtAddr {
         VirtPageNum::new(page_num)
     }
 
+    /// Rounds the address down to the nearest page boundary.
+    pub fn round_down(self) -> VirtAddr {
+        VirtAddr::new(self.addr & !(PAGE_SIZE - 1))
+    }
+
+    /// Rounds the address up to the nearest page boundary.
+    pub fn round_up(self) -> VirtAddr {
+        VirtAddr::new((self.addr + PAGE_SIZE - 1) & !(PAGE_SIZE - 1))
+    }
+
     /// Translates a virtual address into a physical address, if the VA is in the
     /// kernel space.
     pub fn to_pa_kernel(self) -> PhysAddr {
@@ -117,12 +145,18 @@ impl VirtAddr {
     }
 }
 
+impl Debug for VirtAddr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{:#x}", self.addr)
+    }
+}
+
 /// A physical page number defined in Sv39.
 ///
 /// A physical page number is a 44-bit unsigned integer representing the page
 /// number of a physical address. The upper 20 bits of the page number must be
 /// zero.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PhysPageNum {
     page_num: usize,
 }
@@ -136,7 +170,7 @@ impl PhysPageNum {
     /// are not zero.
     pub fn new(page_num: usize) -> Self {
         let tmp = page_num >> (64 - PPN_WIDTH_SV39);
-        debug_assert!(tmp == 0, "invalid physical page number: 0x{:x}", page_num);
+        debug_assert!(tmp == 0, "invalid physical page number: {:#x}", page_num);
         PhysPageNum { page_num }
     }
 
@@ -157,11 +191,17 @@ impl PhysPageNum {
     }
 }
 
+impl Debug for PhysPageNum {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{:#x}", self.page_num)
+    }
+}
+
 /// A virtual page number defined in Sv39.
 ///
 /// A virtual page number is a 39-bit unsized integer representing the page
 /// number of a virtual address. The upper 25 bits of the page number is zero.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct VirtPageNum {
     page_num: usize,
 }
@@ -175,7 +215,7 @@ impl VirtPageNum {
     /// are not zero.
     pub fn new(page_num: usize) -> Self {
         let tmp = page_num >> (64 - VPN_WIDTH_SV39);
-        debug_assert!(tmp == 0, "invalid virtual page number: 0x{:x}", page_num);
+        debug_assert!(tmp == 0, "invalid virtual page number: {:#x}", page_num);
         VirtPageNum { page_num }
     }
 
@@ -194,10 +234,19 @@ impl VirtPageNum {
     /// Gets a slice pointing to the page.
     ///
     /// # Safety
-    ///
     /// The caller must ensure that the page is allocated, and the slice should
     /// not outlive the page.
-    pub unsafe fn as_slice(self) -> &'static mut [u8; PAGE_SIZE] {
+    pub unsafe fn as_slice(self) -> &'static [u8; PAGE_SIZE] {
+        let ptr = self.address().to_usize() as *const [u8; PAGE_SIZE];
+        unsafe { &*ptr }
+    }
+
+    /// Gets a mutable slice pointing to the page.
+    ///
+    /// # Safety
+    /// The caller must ensure that the page is allocated, and the slice should
+    /// not outlive the page.
+    pub unsafe fn as_slice_mut(self) -> &'static mut [u8; PAGE_SIZE] {
         let ptr = self.address().to_usize() as *mut [u8; PAGE_SIZE];
         unsafe { &mut *ptr }
     }
@@ -209,14 +258,36 @@ impl VirtPageNum {
     }
 
     /// Returns 9-bit indices of the VPN.
+    ///
+    /// `indices[2]` is the index of the root page table.
+    /// `indices[1]` is the index of the second-level page table.
+    /// `indices[0]` is the index of the leaf page table.
     pub fn indices(self) -> [usize; 3] {
         let index_mask = 0x1ff;
         let vpn = self.to_usize();
         let mut indices = [0; 3];
-        indices[0] = (vpn >> 18) & index_mask;
+        indices[0] = vpn & index_mask;
         indices[1] = (vpn >> 9) & index_mask;
-        indices[2] = vpn & index_mask;
+        indices[2] = (vpn >> 18) & index_mask;
         indices
+    }
+}
+
+impl Debug for VirtPageNum {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{:#x}", self.page_num)
+    }
+}
+
+impl From<PhysAddr> for usize {
+    fn from(pa: PhysAddr) -> usize {
+        pa.to_usize()
+    }
+}
+
+impl From<VirtAddr> for usize {
+    fn from(va: VirtAddr) -> usize {
+        va.to_usize()
     }
 }
 
@@ -226,8 +297,20 @@ impl From<PhysPageNum> for PhysAddr {
     }
 }
 
+impl From<PhysPageNum> for usize {
+    fn from(ppn: PhysPageNum) -> usize {
+        ppn.to_usize()
+    }
+}
+
 impl From<VirtPageNum> for VirtAddr {
     fn from(vpn: VirtPageNum) -> VirtAddr {
         vpn.address()
+    }
+}
+
+impl From<VirtPageNum> for usize {
+    fn from(vpn: VirtPageNum) -> usize {
+        vpn.to_usize()
     }
 }

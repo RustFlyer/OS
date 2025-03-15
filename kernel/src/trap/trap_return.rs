@@ -6,12 +6,10 @@ use arch::riscv64::{
     interrupt::{disable_interrupt, enable_interrupt},
     time::{get_time_duration, set_nx_timer_irq},
 };
-use trap_env::{set_kernel_trap, set_user_trap};
-use riscv::register::{
-    scause::{self, Exception, Interrupt, Trap},
-    sepc,
-    sstatus::FS,
-    stval,
+use trap_env::{set_kernel_stvec, set_user_stvec};
+use riscv::{
+    interrupt::{Exception, Interrupt, Trap},
+    register::{scause, sepc, sstatus::FS, stval},
 };
 
 unsafe extern "C" {
@@ -24,10 +22,12 @@ pub fn trap_return(task: &Arc<Task>) {
     log::info!("[kernel] trap return to user...");
     unsafe {
         arch::riscv64::interrupt::disable_interrupt();
-        trap_env::set_user_trap();
+        trap_env::set_user_stvec();
         // warn: stvec 不能在下面被改变。
         // 一个隐藏的错误是隐式使用 `UserPtr`，这将改变 stvec 为 `__trap_from_kernel`。
     };
+    let mut timer = task.timer_mut();
+    timer.record_trap_return();
 
     // 两种情况需要恢复寄存器：
     // 1. 这个任务在最后一次陷阱后已经让出了 CPU
@@ -35,7 +35,7 @@ pub fn trap_return(task: &Arc<Task>) {
     task.trap_context_mut().restore_fx();
     task.trap_context_mut().sstatus.set_fs(FS::Clean);
     assert!(!(task.trap_context_mut().sstatus.sie()));
-    assert!(!(task.is_in_state(TaskState::Zombie) || task.is_in_state(TaskState::Die)));
+    assert!(!(task.is_in_state(TaskState::Zombie) || task.is_in_state(TaskState::Waiting)));
     unsafe {
         let ptr = task.trap_context_mut() as *mut TrapContext;
         __return_to_user(ptr);
@@ -43,7 +43,6 @@ pub fn trap_return(task: &Arc<Task>) {
     }
     task.trap_context_mut()
         .mark_dirty(task.trap_context_mut().sstatus);
-
-    let mut timer = task.timer_mut();
-    timer.record_trap_return();
+    timer = task.timer_mut();
+    timer.record_trap();
 }

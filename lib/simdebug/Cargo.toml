@@ -4,10 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-cfg-if = "1.0"
 arch = { path = "../arch" }
 config = { path = "../config" }
-log = "0.4"
+log = { workspace = true }
+cfg-if = { workspace = true }
 
 
 [features]
