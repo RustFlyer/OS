@@ -191,3 +191,32 @@ impl Future for SuspendFuture {
 pub async fn suspend_now() {
     SuspendFuture::new().await
 }
+
+struct YieldFuture {
+    has_yielded: bool,
+}
+
+impl YieldFuture {
+    const fn new() -> Self {
+        Self { has_yielded: false }
+    }
+}
+
+impl Future for YieldFuture {
+    type Output = ();
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+        match self.has_yielded {
+            true => Poll::Ready(()),
+            false => {
+                self.has_yielded = true;
+                cx.waker().wake_by_ref();
+                Poll::Pending
+            }
+        }
+    }
+}
+
+pub async fn yield_now() {
+    YieldFuture::new().await;
+}

@@ -191,7 +191,7 @@ impl TrapContext {
     }
 
     /// pc 指向下一条指令
-    pub fn step_one(&mut self) {
+    pub fn sepc_forward(&mut self) {
         self.sepc += 4;
     }
 
