@@ -135,6 +135,12 @@ impl AddrSpace {
     }
 }
 
-pub fn switch_to(addr_space: &AddrSpace) {
-    page_table::switch_page_table(&addr_space.page_table);
+/// Switches to a new address space.
+///
+/// This function switches the current address space to a new address space. It is used
+/// when a process is scheduled in or out.
+pub fn switch_to(_old_space: &AddrSpace, new_space: &AddrSpace) {
+    // SAFETY: We force the user of this function to send a reference to the old address space,
+    // so the old page table is still valid.
+    unsafe { page_table::switch_page_table(&new_space.page_table); }
 }

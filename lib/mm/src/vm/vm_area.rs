@@ -271,7 +271,7 @@ impl MemoryBackedArea {
         page_table.map_page(fault_addr.page_number(), frame.as_ppn(), flags);
 
         // Fill the frame with appropriate data.
-        // There are 3 kind of regions in the frame:
+        // There are 3 types of regions in the frame:
         // 1. Region to fill with data from the memory backing store.
         // 2. Region to fill with zeros.
         // 3. Region that is not in the VMA thus not filled.
@@ -282,7 +282,7 @@ impl MemoryBackedArea {
         let area_offset = fill_va_start.to_usize() - vma_start.to_usize();
         let back_store_len = memory.len();
         if area_offset < back_store_len {
-            // If there is a kind 1 region in the frame:
+            // If there is a type 1 region in the frame:
             let copy_len = usize::min(back_store_len - area_offset, fill_len);
             let memory_copy_from = &memory[area_offset..area_offset + copy_len];
             let (memory_copy_to, memory_fill_zero) =
@@ -290,7 +290,7 @@ impl MemoryBackedArea {
             memory_copy_to.copy_from_slice(memory_copy_from);
             memory_fill_zero.fill(0);
         } else {
-            // If there is no kind 1 region in the frame:
+            // If there is no type 1 region in the frame:
             frame.as_slice_mut()[page_offset..page_offset + fill_len].fill(0);
         }
 

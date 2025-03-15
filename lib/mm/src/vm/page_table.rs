@@ -4,7 +4,7 @@
 //! and tracking allocated pages.
 
 use alloc::vec::Vec;
-use core::arch::asm;
+use riscv::register::satp::{self, Satp};
 
 use lazy_static::lazy_static;
 
@@ -301,17 +301,21 @@ impl PageTableMem {
 /// # Safety
 /// This function must be called after the kernel page table is set up.
 pub unsafe fn enable_kernel_page_table() {
-    switch_page_table(&KERNEL_PAGE_TABLE);
+    // SAFETY: the boot page table never gets dropped.
+    unsafe { switch_page_table(&KERNEL_PAGE_TABLE); }
 }
 
 /// Switches to the new page table.
-pub fn switch_page_table(page_table: &PageTable) {
-    let satp = page_table.root().to_usize() | (8 << 60);
+///
+/// # Safety
+/// This function must be called before the current page table is dropped,
+/// or the kernel may lose its memory mappings.
+pub unsafe fn switch_page_table(page_table: &PageTable) {
+    let mut satp = Satp::from_bits(0);
+    satp.set_mode(satp::Mode::Sv39);
+    satp.set_ppn(page_table.root().to_usize());
     unsafe {
-        asm!(
-            "csrw satp, {}",
-            "sfence.vma",
-            in(reg) satp
-        );
+        satp::write(satp);
     }
+    riscv::asm::sfence_vma_all();
 }
