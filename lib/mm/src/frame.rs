@@ -126,7 +126,7 @@ impl FrameTracker {
     }
 
     /// Gets a mutable slice pointing to the frame.
-    pub fn as_slice_mut(&self) -> &mut [u8; PAGE_SIZE] {
+    pub fn as_slice_mut(&mut self) -> &mut [u8; PAGE_SIZE] {
         // SAFETY: The frame is allocated, and the returned slice does not outlive
         // the `FrameTracker` which lives as long as the frame.
         unsafe { self.as_vpn().as_slice_mut() }
