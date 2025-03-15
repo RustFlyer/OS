@@ -9,10 +9,10 @@ unsafe extern "C" {
     fn __trap_from_user();
 }
 
-pub fn set_kernel_trap() {
+pub fn set_kernel_stvec() {
     unsafe { set_trap_handler(__trap_from_kernel as usize) };
 }
 
-pub fn set_user_trap() {
+pub fn set_user_stvec() {
     unsafe { set_trap_handler(__trap_from_user as usize) };
 }

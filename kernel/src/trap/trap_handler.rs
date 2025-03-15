@@ -1,9 +1,9 @@
-use super::csr_env::set_kernel_trap;
+use super::trap_env::set_kernel_stvec;
 use crate::syscall;
 use crate::task::{Task, TaskState, yield_now};
+use crate::trap::load_trap_handler;
 use alloc::sync::Arc;
 use arch::riscv64::{
-    interrupt::{disable_interrupt, enable_interrupt},
     time::{get_time_duration, set_nx_timer_irq},
 };
 use riscv::{ExceptionNumber, InterruptNumber};
@@ -13,11 +13,9 @@ use riscv::{
 };
 use timer::TIMER_MANAGER;
 
-/// 处理用户空间的中断、异常或系统调用
-/// 返回是否是系统调用并且被中断
+/// handle exception or interrupt from a task, return if success
 #[unsafe(no_mangle)]
 pub async fn trap_handler(task: &Arc<Task>) -> bool {
-    unsafe { set_kernel_trap() };
 
     let stval = stval::read();
     let scause = scause::read();
@@ -26,7 +24,8 @@ pub async fn trap_handler(task: &Arc<Task>) -> bool {
 
     log::trace!("[trap_handler] user task trap into kernel");
     log::trace!("[trap_handler] sepc:{:#x}, stval:{:#x}", sepc, stval);
-    unsafe { enable_interrupt() };
+    
+    unsafe{ load_trap_handler() };
 
     match cause {
         Trap::Exception(e) => {
@@ -46,10 +45,12 @@ pub async fn user_exception_handler(task: &Arc<Task>, e: Exception) {
         Exception::UserEnvCall => {
             log::trace!("[trap_handler] user env call");
             let syscall_no = cx.syscall_no();
-            cx.step_one();
-            let ret = syscall(syscall_no, cx.syscall_args()).await;
+            cx.sepc_forward();
+
+            let sys_ret = syscall(syscall_no, cx.syscall_args()).await;
+
             cx = task.trap_context_mut();
-            cx.set_user_a0(ret);
+            cx.set_user_a0(sys_ret);
         }
         // 内存错误
         Exception::StorePageFault | Exception::InstructionPageFault | Exception::LoadPageFault => {
