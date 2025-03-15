@@ -11,10 +11,10 @@ use super::addr_space::AddrSpace;
 
 /// Loads an ELF executable into given address space.
 ///
-/// Returns the entry point of the ELF executable,
+/// Returns the entry point of the ELF executable.
 ///
 /// # Errors
-/// Returns an error if the loading fails. This can happen if the ELF file is invalid or if the
+/// Returns an error if the loading fails. This can happen if the ELF file is invalid.
 ///
 /// # Discussion
 /// Current implementation of this function taks a slice of ELF data as input. This is because

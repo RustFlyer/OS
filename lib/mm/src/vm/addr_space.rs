@@ -26,7 +26,7 @@ use systype::{SysError, SysResult};
 use crate::address::VirtAddr;
 
 use super::{
-    page_table::PageTable,
+    page_table::{self, PageTable},
     vm_area::{MemPerm, PageFaultInfo, VmArea},
 };
 
@@ -133,4 +133,8 @@ impl AddrSpace {
         };
         vma.handle_page_fault(page_fault_info)
     }
+}
+
+pub fn switch_to(addr_space: &AddrSpace) {
+    page_table::switch_page_table(&addr_space.page_table);
 }
