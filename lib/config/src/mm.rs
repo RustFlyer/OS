@@ -9,6 +9,8 @@ pub const RAM_END: usize = RAM_START + RAM_SIZE;
 
 /// Start of kernel address space
 pub const VIRT_START: usize = 0xffff_ffc0_8000_0000;
+/// End of kernel address space
+pub const VIRT_END: usize = VIRT_START + RAM_SIZE;
 /// Offset of kernel from `RAM_START`
 pub const KERNEL_RAM_OFFSET: usize = 0x20_0000;
 /// Start of kernel in physical memory
@@ -27,7 +29,7 @@ pub const KERNEL_START: usize = VIRT_START + KERNEL_RAM_OFFSET;
 pub fn kernel_start() -> usize {
     _skernel as usize
 }
-/// End of kernel in virtual memory
+/// End of kernel in virtual memory. This value is aligned to page size.
 pub fn kernel_end() -> usize {
     _ekernel as usize
 }

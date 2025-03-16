@@ -9,8 +9,7 @@ use riscv::register::satp::{self, Satp};
 use lazy_static::lazy_static;
 
 use config::mm::{
-    PTE_PER_TABLE, bss_end, bss_start, data_end, data_start, kernel_end, kernel_start, rodata_end,
-    rodata_start, text_end, text_start,
+    bss_end, bss_start, data_end, data_start, kernel_end, kernel_end_phys, kernel_start, rodata_end, rodata_start, text_end, text_start, PTE_PER_TABLE, VIRT_END
 };
 use mm::address::{PhysPageNum, VirtAddr, VirtPageNum};
 use systype::SysResult;
@@ -79,6 +78,8 @@ impl PageTable {
     unsafe fn build_kernel_page_table() -> Self {
         let mut page_table = Self::build().expect("out of memory");
 
+        /* Map the kernel's .text, .rodata, .data, and .bss sections */
+
         let text_start_va = VirtAddr::new(text_start());
         let text_end_va = VirtAddr::new(text_end());
         let text_flags = PteFlags::V | PteFlags::R | PteFlags::X;
@@ -102,6 +103,13 @@ impl PageTable {
         let bss_flags = PteFlags::V | PteFlags::R | PteFlags::W;
         let bss_vma = VmArea::new_kernel(bss_start_va, bss_end_va, bss_flags);
         KernelArea::map(&bss_vma, &mut page_table);
+
+        /* Map the allocatable frames */
+        let alloc_start_va = VirtAddr::new(kernel_end());
+        let alloc_end_va = VirtAddr::new(VIRT_END);
+        let alloc_flags = PteFlags::V | PteFlags::R | PteFlags::W;
+        let alloc_vma = VmArea::new_kernel(alloc_start_va, alloc_end_va, alloc_flags);
+        KernelArea::map(&alloc_vma, &mut page_table);
 
         page_table
     }
