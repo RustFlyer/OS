@@ -10,9 +10,10 @@ use alloc::{
 };
 use mutex::SpinNoIrqLock;
 
-use core::{cell::SyncUnsafeCell, num::IntErrorKind};
+use core::{cell::SyncUnsafeCell, num::IntErrorKind, ops::Add};
 use core::{ops::DerefMut, task::Waker};
 
+use super::manager::TASK_MANAGER;
 use mutex::UPSafeCell;
 use time::TaskTimeStat;
 use timer::{TIMER_MANAGER, Timer};
@@ -20,7 +21,6 @@ use timer::{TIMER_MANAGER, Timer};
 use crate::trap::trap_context::TrapContext;
 use crate::vm::addr_space::AddrSpace;
 use crate::vm::addr_space::switch_to;
-use crate::vm::elf::load_elf;
 
 use arch::riscv64::time::get_time_duration;
 
@@ -135,17 +135,17 @@ impl Task {
         &self.addr_space
     }
 
-    pub fn new() -> Self {
+    pub fn new(entry: usize, sp: usize, addrspace: AddrSpace) -> Self {
         let inner = TaskInner::new();
         Task {
             tid: tid_alloc(),
             process: None,
             is_process: false,
-            trap_context: unsafe { SyncUnsafeCell::new(TrapContext::new(0, 0)) },
+            trap_context: unsafe { SyncUnsafeCell::new(TrapContext::new(entry, sp)) },
             timer: unsafe { SyncUnsafeCell::new(TaskTimeStat::new()) },
             waker: unsafe { SyncUnsafeCell::new(None) },
             state: unsafe { SpinNoIrqLock::new(TaskState::Waiting) },
-            addr_space: SpinNoIrqLock::new(AddrSpace::build_user().unwrap()),
+            addr_space: SpinNoIrqLock::new(addrspace),
             inner: unsafe { UPSafeCell::new(inner) },
         }
     }
@@ -203,9 +203,19 @@ impl Task {
         }
     }
 
-    pub fn spawn_from_elf(&self, elf_data: &'static [u8]) {
-        let mut addspace = self.addr_space.lock();
-        let entry_point = load_elf(&mut addspace, elf_data);
+    pub fn spawn_from_elf(elf_data: &'static [u8]) {
+        let mut addrspace = AddrSpace::build_user().unwrap();
+        let entry_point = addrspace.load_elf(elf_data).unwrap();
+        let stack = addrspace.map_stack().unwrap();
+
+        let task = Arc::new(Task::new(
+            entry_point.to_usize(),
+            stack.to_usize(),
+            addrspace,
+        ));
+
+        TASK_MANAGER.add_task(&task);
+        future::spawn_user_task(task);
     }
 
     pub fn switch_pagetable(&self, old_space: &AddrSpace) {

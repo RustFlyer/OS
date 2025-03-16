@@ -16,7 +16,5 @@ use crate::loader::get_app_data_by_name;
 
 pub fn init() {
     let elf_data = get_app_data_by_name("hello_world").unwrap();
-    let task = Arc::new(Task::new());
-    task.spawn_from_elf(elf_data);
-    TASK_MANAGER.add_task(&task);
+    Task::spawn_from_elf(elf_data);
 }
