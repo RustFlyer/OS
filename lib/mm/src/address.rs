@@ -31,13 +31,18 @@ impl PhysAddr {
     /// This function panics if the upper 8 bits of the address are not the same
     /// as bit 55.
     pub fn new(addr: usize) -> Self {
-        let tmp = addr as isize >> PA_WIDTH_SV39;
         debug_assert!(
-            tmp == 0 || tmp == -1,
+            Self::check_validity(addr),
             "invalid physical address: {:#x}",
             addr
         );
         PhysAddr { addr }
+    }
+
+    /// Checks the validity of the address.
+    pub fn check_validity(addr: usize) -> bool {
+        let tmp = addr as isize >> PA_WIDTH_SV39;
+        tmp == 0 || tmp == -1
     }
 
     /// Gets the inner `usize` address.
@@ -101,13 +106,17 @@ impl VirtAddr {
     /// This function panics if the upper 25 bits of the address are not the same
     /// as bit 38.
     pub fn new(addr: usize) -> Self {
-        let tmp = addr as isize >> VA_WIDTH_SV39;
         debug_assert!(
-            tmp == 0 || tmp == -1,
+            Self::check_validity(addr),
             "invalid virtual address: {:#x}",
             addr
         );
         VirtAddr { addr }
+    }
+
+    pub fn check_validity(addr: usize) -> bool {
+        let tmp = addr as isize >> VA_WIDTH_SV39;
+        tmp == 0 || tmp == -1
     }
 
     /// Gets the inner `usize` address.
