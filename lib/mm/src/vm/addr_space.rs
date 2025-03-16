@@ -17,7 +17,7 @@
 //! The kernel creates a new page table for the address space and maps its kernel part
 //! directly. VMAs are then created to manage the user part of the address space.
 
-use core::ops::Bound;
+use core::ops::{Bound, ControlFlow};
 
 use alloc::collections::btree_map::BTreeMap;
 
@@ -99,6 +99,42 @@ impl AddrSpace {
         Ok(())
     }
 
+    /// Checks if certain user memory access is allowed, given the starting address
+    /// and length.
+    pub fn check_user_access(
+        &mut self,
+        addr: VirtAddr,
+        len: usize,
+        perm: MemPerm,
+    ) -> SysResult<()> {
+        todo!()
+    }
+
+    /// Checks if certain user memory access is allowed, given the starting address,
+    /// the length, and a closure which performs additional actions along with the
+    /// check and controls whether to stop the process early.
+    ///
+    /// The closure takes a reference to a `T` value on the memory region, and it
+    /// should return a [`ControlFlow<()>`] value to indicate whether to stop the
+    /// process early.
+    pub fn check_user_access_with<F, T>(
+        &mut self,
+        addr: VirtAddr,
+        len: usize,
+        perm: MemPerm,
+        f: F,
+    ) -> SysResult<()>
+    where
+        F: FnMut(&T) -> ControlFlow<()>,
+    {
+        todo!()
+    }
+
+    /// Checks if certain user memory access in a page is allowed, given the page number.
+    pub fn check_user_access_page(&mut self, page_num: usize, perm: MemPerm) -> SysResult<()> {
+        todo!()
+    }
+
     /// Removes a VMA from the address space, specifying its starting virtual address.
     ///
     /// This function removes a VMA from the address space, which de facto unmaps the memory
@@ -142,5 +178,7 @@ impl AddrSpace {
 pub fn switch_to(_old_space: &AddrSpace, new_space: &AddrSpace) {
     // SAFETY: We force the user of this function to send a reference to the old address space,
     // so the old page table is still valid.
-    unsafe { page_table::switch_page_table(&new_space.page_table); }
+    unsafe {
+        page_table::switch_page_table(&new_space.page_table);
+    }
 }
