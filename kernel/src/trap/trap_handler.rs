@@ -2,10 +2,10 @@ use super::trap_env::set_kernel_stvec;
 use crate::syscall;
 use crate::task::{Task, TaskState, yield_now};
 use crate::trap::load_trap_handler;
+use crate::vm::vm_area::MemPerm;
 use alloc::sync::Arc;
-use arch::riscv64::{
-    time::{get_time_duration, set_nx_timer_irq},
-};
+use arch::riscv64::time::{get_time_duration, set_nx_timer_irq};
+use mm::address::VirtAddr;
 use riscv::{ExceptionNumber, InterruptNumber};
 use riscv::{
     interrupt::{Exception, Interrupt, Trap},
@@ -16,7 +16,6 @@ use timer::TIMER_MANAGER;
 /// handle exception or interrupt from a task, return if success
 #[unsafe(no_mangle)]
 pub async fn trap_handler(task: &Arc<Task>) -> bool {
-
     let stval = stval::read();
     let scause = scause::read();
     let sepc = sepc::read();
@@ -24,8 +23,8 @@ pub async fn trap_handler(task: &Arc<Task>) -> bool {
 
     log::trace!("[trap_handler] user task trap into kernel");
     log::trace!("[trap_handler] sepc:{:#x}, stval:{:#x}", sepc, stval);
-    
-    unsafe{ load_trap_handler() };
+
+    unsafe { load_trap_handler() };
 
     match cause {
         Trap::Exception(e) => {
@@ -54,7 +53,26 @@ pub async fn user_exception_handler(task: &Arc<Task>, e: Exception) {
         }
         // 内存错误
         Exception::StorePageFault | Exception::InstructionPageFault | Exception::LoadPageFault => {
-            todo!()
+            let access = match e {
+                Exception::InstructionPageFault => MemPerm::X,
+                Exception::LoadPageFault => MemPerm::R,
+                Exception::StorePageFault => MemPerm::W | MemPerm::R,
+                _ => unreachable!(),
+            };
+            if let Err(e) = task
+                .addr_space_mut()
+                .lock()
+                .handle_page_fault(VirtAddr::new(stval::read()), access)
+            {
+                // Should send a `SIGSEGV` signal to the task
+                log::debug!(
+                    "[trap_handler] page fault at {:#x}, access: {:?}, error: {:?}",
+                    stval::read(),
+                    access,
+                    e
+                );
+                unimplemented!();
+            }
         }
         // 非法指令
         Exception::IllegalInstruction => {

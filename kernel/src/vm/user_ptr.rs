@@ -1,3 +1,6 @@
+// This module is adapted from Phoenix OS, largely rewritten to improve
+// readability and safety.
+
 //! Module for validating and accessing addresses in user address space.
 //!
 //! This module provides a smart pointer type `UserPtr` that can be used to
@@ -18,7 +21,6 @@
 //! in this way.
 
 use core::{
-    ffi::CStr,
     marker::PhantomData,
     ops::{ControlFlow, Deref, DerefMut},
     slice,

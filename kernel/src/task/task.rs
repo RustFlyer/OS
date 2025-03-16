@@ -52,7 +52,7 @@ pub struct Task {
     timer: SyncUnsafeCell<TaskTimeStat>,
     waker: SyncUnsafeCell<Option<Waker>>,
     state: SpinNoIrqLock<TaskState>,
-    addrspace: SpinNoIrqLock<AddrSpace>,
+    addr_space: SpinNoIrqLock<AddrSpace>,
     inner: UPSafeCell<TaskInner>,
 }
 
@@ -122,6 +122,10 @@ impl Task {
         unsafe { &mut *self.waker.get() }
     }
 
+    pub fn addr_space_mut(&self) -> &SpinNoIrqLock<AddrSpace> {
+        &self.addr_space
+    }
+
     pub fn new() -> Self {
         let inner = TaskInner::new();
         Task {
@@ -132,7 +136,7 @@ impl Task {
             timer: unsafe { SyncUnsafeCell::new(TaskTimeStat::new()) },
             waker: unsafe { SyncUnsafeCell::new(None) },
             state: unsafe { SpinNoIrqLock::new(TaskState::Waiting) },
-            addrspace: SpinNoIrqLock::new(AddrSpace::build_user().unwrap()),
+            addr_space: SpinNoIrqLock::new(AddrSpace::build_user().unwrap()),
             inner: unsafe { UPSafeCell::new(inner) },
         }
     }
