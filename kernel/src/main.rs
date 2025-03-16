@@ -31,8 +31,6 @@ pub use syscall::syscall;
 #[macro_use]
 extern crate alloc;
 
-global_asm!(include_str!("link_app.asm"));
-
 static mut INITIALIZED: bool = false;
 
 #[unsafe(no_mangle)]
@@ -50,6 +48,10 @@ pub fn rust_main(hart_id: usize) -> ! {
             log::info!("hart {}: initializing page table", hart_id);
             vm::enable_kernel_page_table();
             INITIALIZED = true;
+        }
+
+        unsafe {
+            trap::load_trap_handler();
         }
 
         log::info!("======== kernel memory layout ========");
@@ -90,15 +92,14 @@ pub fn rust_main(hart_id: usize) -> ! {
         );
         log::info!("====== kernel memory layout end ======");
 
-        boot::start_harts(hart_id);
+        // boot::start_harts(hart_id);
 
         when_debug!({
             simdebug::backtrace_test();
         });
 
         loader::init();
-        let elf_data = loader::get_app_data_by_name("hello_world").unwrap();
-        task::task::spawn_task(elf_data);
+        task::init();
     } else {
         log::info!("hart {}: enabling page table", hart_id);
         // SAFETY: Only after the first hart has initialized the heap allocator and page table,
