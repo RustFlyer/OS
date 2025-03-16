@@ -1,3 +1,4 @@
+use config::mm::{USER_STACK_LOWER, USER_STACK_UPPER};
 /// Module for loading ELF files.
 use elf::{self, ElfBytes, endian::LittleEndian, file::FileHeader};
 use mm::address::VirtAddr;
@@ -66,5 +67,24 @@ impl AddrSpace {
         }
 
         Ok(VirtAddr::new(e_entry as usize))
+    }
+
+    /// Maps a stack into the address space.
+    ///
+    /// This function maps a stack into the address space. Each address space should have exactly
+    /// one stack.
+    ///
+    /// Returns the address of the stack bottom, i.e., one byte exceeding the highest address of
+    /// the stack.
+    ///
+    /// Current implementation hardcodes the stack size and position in `config::mm` module.
+    pub fn map_stack(&mut self, stack_start: VirtAddr, stack_size: usize) -> SysResult<VirtAddr> {
+        let stack = VmArea::new_stack(
+            VirtAddr::new(USER_STACK_LOWER),
+            VirtAddr::new(USER_STACK_UPPER),
+        );
+        let stack_bottom = stack.end_va();
+        self.add_area(stack)?;
+        Ok(stack_bottom)
     }
 }
