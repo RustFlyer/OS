@@ -31,24 +31,8 @@ use bitflags::bitflags;
 use mm::address::{PhysPageNum, VirtAddr};
 use systype::{SysError, SysResult};
 
-use super::{page_table::PageTable, pte::PteFlags};
+use super::{mem_perm::MemPerm, page_table::PageTable, pte::PteFlags};
 use crate::frame::FrameTracker;
-
-bitflags! {
-    /// Memory permission corresponding to R, W, X, and U bits in a page table entry.
-    ///
-    /// The bits of `MemPerm` are a subset of the bits of `PteFlags`, and their bit
-    /// positions are the same as those in `PteFlags` for easy conversion between them.
-    ///
-    /// Do not set any unknown bits.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    pub struct MemPerm: u8 {
-        const R = 1 << 1;
-        const W = 1 << 2;
-        const X = 1 << 3;
-        const U = 1 << 4;
-    }
-}
 
 impl MemPerm {
     /// Create a new `MemPerm` from a set of `PteFlags`.
@@ -57,24 +41,11 @@ impl MemPerm {
     }
 }
 
-impl PteFlags {
-    /// Create a new `PteFlags` from a set of `MemPerm`.
-    ///
-    /// When `MemPerm` does not contain `U`, `G` is set in the returned `PteFlags`.
-    pub fn from(perm: MemPerm) -> Self {
-        let mut flags = Self::from_bits_retain(perm.bits());
-        if !perm.contains(MemPerm::U) {
-            flags |= Self::G;
-        }
-        flags
-    }
-}
-
 /// Data passed to a page fault handler.
 ///
 /// This struct is used to pass data to a page fault handler registered in a [`VmArea`].
 #[derive(Debug)]
-pub(crate) struct PageFaultInfo<'a> {
+pub(super) struct PageFaultInfo<'a> {
     /// Faulting virtual address.
     pub fault_addr: VirtAddr,
     /// Page table.
@@ -105,7 +76,7 @@ pub struct VmArea {
 
 impl VmArea {
     /// Constructs a [`VmArea`] whose specific type is [`TypedArea::Kernel`].
-    pub(crate) fn new_kernel(start_va: VirtAddr, end_va: VirtAddr, flags: PteFlags) -> Self {
+    pub(super) fn new_kernel(start_va: VirtAddr, end_va: VirtAddr, flags: PteFlags) -> Self {
         Self {
             start_va,
             end_va,
@@ -133,11 +104,24 @@ impl VmArea {
         }
     }
 
+    /// Constructs a [`VmArea`] whose specific type is [`TypedArea::Stack`].
+    pub fn new_stack(start_va: VirtAddr, end_va: VirtAddr) -> Self {
+        Self {
+            start_va,
+            end_va,
+            flags: PteFlags::U | PteFlags::R | PteFlags::W,
+            perm: MemPerm::R | MemPerm::W,
+            map_type: TypedArea::Stack(StackArea { pages: Vec::new() }),
+            handler: Some(StackArea::fault_handler),
+        }
+    }
+
     /// Handles a page fault happened in this VMA.
     ///
     /// # Errors
     /// Returns [`SysError::EFAULT`] if the access permission is not allowed.
-    pub(crate) fn handle_page_fault(&mut self, info: PageFaultInfo) -> SysResult<()> {
+    /// Returns [`SysError::ENOMEM`] if a new frame cannot be allocated.
+    pub(super) fn handle_page_fault(&mut self, info: PageFaultInfo) -> SysResult<()> {
         if let Some(handler) = self.handler {
             handler(self, info)
         } else {
@@ -162,11 +146,15 @@ impl VmArea {
 
 /// Unique data of a specific type of VMA. This enum is used in [`VmArea`].
 #[derive(Debug)]
-pub(crate) enum TypedArea {
+pub(super) enum TypedArea {
     /// A helper VMA representing one in the kernel space.
     Kernel(KernelArea),
     /// A memory-backed VMA.
     MemoryBacked(MemoryBackedArea),
+    /// A stack VMA representing a user stack.
+    Stack(StackArea),
+    /// A heap VMA representing a user heap.
+    Heap,
     /// A file-backed VMA.
     ///
     /// A file-backed VMA is backed by a file. It is used for memory-mapped files.
@@ -185,7 +173,7 @@ pub(crate) enum TypedArea {
 ///
 /// A kernel area must be aligned to the size of a page.
 #[derive(Debug)]
-pub(crate) struct KernelArea;
+pub(super) struct KernelArea;
 
 impl KernelArea {
     /// Maps the kernel area to the kernel page table.
@@ -219,7 +207,7 @@ impl KernelArea {
 /// This is a type for debugging purposes. A memory-backed VMA takes a slice of
 /// memory as its backing store.
 #[derive(Debug)]
-pub(crate) struct MemoryBackedArea {
+pub(super) struct MemoryBackedArea {
     /// The memory backing store.
     pub memory: &'static [u8],
     /// Allocated physical pages.
@@ -245,7 +233,6 @@ impl MemoryBackedArea {
             TypedArea::MemoryBacked(memory_backed) => memory_backed,
             _ => panic!("fault_handler: not a memory-backed area"),
         };
-
         let &mut VmArea {
             start_va: vma_start,
             end_va: vma_end,
@@ -253,7 +240,6 @@ impl MemoryBackedArea {
             perm,
             ..
         } = area;
-
         let PageFaultInfo {
             fault_addr,
             page_table,
@@ -292,6 +278,47 @@ impl MemoryBackedArea {
             // If there is no type 1 region in the frame:
             frame.as_slice_mut()[page_offset..page_offset + fill_len].fill(0);
         }
+
+        // Track the allocated frame.
+        pages.push(frame);
+
+        // Flush TLB.
+        riscv::asm::sfence_vma(page_table.root().to_usize(), fault_addr.to_usize());
+
+        Ok(())
+    }
+}
+
+/// A stack VMA representing a user stack.
+#[derive(Debug)]
+pub(super) struct StackArea {
+    /// Allocated physical pages.
+    pub(super) pages: Vec<FrameTracker>,
+}
+
+impl StackArea {
+    /// Handles a page fault.
+    pub(super) fn fault_handler(area: &mut VmArea, info: PageFaultInfo) -> SysResult<()> {
+        // Extract data needed for fault handling.
+        let &mut Self { ref mut pages } = match &mut area.map_type {
+            TypedArea::Stack(stack) => stack,
+            _ => panic!("fault_handler: not a stack area"),
+        };
+        let &mut VmArea { flags, perm, .. } = area;
+        let PageFaultInfo {
+            fault_addr,
+            page_table,
+            access,
+        } = info;
+
+        // Check permission.
+        if !access.contains(perm) {
+            return Err(SysError::EFAULT);
+        }
+
+        // Allocate a frame and map the page.
+        let mut frame = FrameTracker::build()?;
+        page_table.map_page(fault_addr.page_number(), frame.as_ppn(), flags);
 
         // Track the allocated frame.
         pages.push(frame);

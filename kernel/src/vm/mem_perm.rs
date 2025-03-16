@@ -1,0 +1,20 @@
+//! Module for abstracting memory permissions.
+
+use bitflags::bitflags;
+
+bitflags! {
+    /// Memory permission corresponding to R, W, X, and U bits in a page table entry.
+    ///
+    /// The bits of `MemPerm` are a subset of the bits of `PteFlags`, and their bit
+    /// positions are the same as those in `PteFlags` for easy conversion between them.
+    ///
+    /// Although the `bitflags` crate does allow the user to set unknown bits, do not
+    /// do so.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct MemPerm: u8 {
+        const R = 1 << 1;
+        const W = 1 << 2;
+        const X = 1 << 3;
+        const U = 1 << 4;
+    }
+}

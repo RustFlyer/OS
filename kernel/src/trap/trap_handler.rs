@@ -2,7 +2,7 @@ use super::trap_env::set_kernel_stvec;
 use crate::syscall;
 use crate::task::{Task, TaskState, yield_now};
 use crate::trap::load_trap_handler;
-use crate::vm::vm_area::MemPerm;
+use crate::vm::mem_perm::MemPerm;
 use alloc::sync::Arc;
 use arch::riscv64::time::{get_time_duration, set_nx_timer_irq};
 use mm::address::VirtAddr;

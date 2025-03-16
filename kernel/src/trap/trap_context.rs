@@ -39,7 +39,7 @@ pub struct TrapContext {
 
 impl TrapContext {
     /// 初始化用户态trap context
-    pub fn new(location: usize, sp: usize) -> Self {
+    pub fn new(entry: usize, sp: usize) -> Self {
         disable_interrupt();
         // disable Interrupt until trap handling
         let mut sstatus = sstatus::read();
@@ -51,7 +51,7 @@ impl TrapContext {
         let mut context = Self {
             user_reg: [0; 32],
             sstatus,
-            sepc: location,
+            sepc: entry,
             stvec: 0,
             stval: 0,
             k_sp: 0,

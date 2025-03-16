@@ -27,13 +27,15 @@ use core::{
 };
 
 use alloc::vec::Vec;
+use config::mm::PAGE_SIZE;
 use mm::address::VirtAddr;
-use systype::SysResult;
+use systype::{SysError, SysResult};
 
 use super::{
     addr_space::{self, AddrSpace},
-    vm_area::MemPerm,
+    mem_perm::MemPerm,
 };
+use crate::trap::trap_env::{set_kernel_stvec, set_kernel_stvec_user_rw};
 
 trait AccessType {}
 trait ReadAccess: AccessType {}
@@ -386,5 +388,182 @@ where
         self.addr_space
             .check_user_access(self.ptr as usize, len * size_of::<T>(), MemPerm::W)?;
         Ok(unsafe { slice::from_raw_parts_mut(self.ptr, len) })
+    }
+}
+
+impl AddrSpace {
+    /// Checks if certain user memory access is allowed, given the starting address
+    /// and length.
+    ///
+    /// `perm` must be `R`, `W`, or `RW`. `W` is equivalent to `RW`.
+    ///
+    /// `len` is the length in bytes of the memory region to be accessed.
+    ///
+    /// Returns `Ok(())` if the access is allowed, otherwise returns an `EFAULT` error.
+    fn check_user_access(
+        &mut self,
+        mut addr: usize,
+        len: usize,
+        perm: MemPerm,
+    ) -> SysResult<()> {
+        if len == 0 {
+            return Ok(());
+        }
+        if addr == 0 {
+            return Err(SysError::EFAULT);
+        }
+
+        let end_addr = addr + len - 1;
+        if !VirtAddr::check_validity(addr) || !VirtAddr::check_validity(end_addr) {
+            return Err(SysError::EFAULT);
+        }
+
+        set_kernel_stvec_user_rw();
+
+        let checker = if perm.contains(MemPerm::W) {
+            try_write
+        } else {
+            try_read
+        };
+
+        while addr < end_addr {
+            if unsafe { !checker(addr) } {
+                // If the access failed, manually call the original page fault handler
+                // to try mapping the page. If this also fails, then we know the access
+                // is not allowed.
+                if let Err(e) = self.handle_page_fault(VirtAddr::new(addr), perm) {
+                    set_kernel_stvec();
+                    return Err(e);
+                }
+            }
+            addr += PAGE_SIZE;
+        }
+
+        set_kernel_stvec();
+        Ok(())
+    }
+
+    /// Checks if certain user memory access is allowed, given the starting address,
+    /// the length, and a closure which performs additional actions on primitive
+    /// integer or pointer values along with the check and controls whether to stop
+    /// the process early.
+    ///
+    /// `perm` must be `MemPerm::R`, `MemPerm::W`, or `MemPerm::R` | `MemPerm::W`.
+    ///
+    /// `len` is the max length in bytes of the memory region to be accessed. However,
+    /// the closure may stop the process early, so the actual length may be less than
+    /// `len`.
+    ///
+    /// `T` must be a primitive integer or pointer type, and `addr` must be aligned
+    /// to the size of `T`. `len` must be a multiple of the size of `T`.
+    ///
+    /// The closure takes a shared reference to a `T` value on the memory region, and
+    /// it should return a [`ControlFlow<()>`] value to indicate whether to stop the
+    /// process early.
+    ///
+    /// Returns `Ok(())` if the access is allowed, otherwise returns an `EFAULT` error.
+    ///
+    /// # Safety
+    /// The values that the closure operates on must be valid and properly aligned.
+    unsafe fn check_user_access_with<F, T>(
+        &mut self,
+        mut addr: usize,
+        len: usize,
+        perm: MemPerm,
+        f: &mut F,
+    ) -> SysResult<()>
+    where
+        F: FnMut(T) -> ControlFlow<()>,
+        T: Copy,
+    {
+        if len == 0 {
+            return Ok(());
+        }
+        if addr == 0 {
+            return Err(SysError::EFAULT);
+        }
+
+        debug_assert!(addr % size_of::<T>() == 0);
+        debug_assert!(len % size_of::<T>() == 0);
+
+        let end_addr = addr + len; // exclusive
+        if !VirtAddr::check_validity(addr) || !VirtAddr::check_validity(end_addr - 1) {
+            return Err(SysError::EFAULT);
+        }
+
+        set_kernel_stvec_user_rw();
+
+        let checker = if perm.contains(MemPerm::W) {
+            try_write
+        } else {
+            try_read
+        };
+
+        while addr < end_addr {
+            if unsafe { !checker(addr) } {
+                // If the access failed, manually call the original page fault handler
+                // to try mapping the page. If this also fails, then we know the access
+                // is not allowed.
+                if let Err(e) = self.handle_page_fault(VirtAddr::new(addr), perm) {
+                    set_kernel_stvec();
+                    return Err(e);
+                }
+            }
+            let end_in_page = usize::min(VirtAddr::new(addr).round_up().to_usize(), end_addr);
+            for item_addr in (addr..end_in_page).step_by(size_of::<T>()) {
+                let item = unsafe { *(item_addr as *const T) };
+                match f(item) {
+                    ControlFlow::Continue(()) => {}
+                    ControlFlow::Break(()) => {
+                        set_kernel_stvec();
+                        return Ok(());
+                    }
+                }
+            }
+            addr = end_in_page;
+        }
+
+        set_kernel_stvec();
+        Ok(())
+    }
+}
+
+/// Tries to read from a user memory region.
+///
+/// Returns `true` if the read is successful, otherwise `false`. A failed
+/// read indicates that the memory region cannot be read from, or the address
+/// is not mapped in the page table.
+///
+/// # Safety
+/// This function must be called after calling `set_kernel_stvec_user_rw` to
+/// enable kernel memory access to user space.
+unsafe fn try_read(va: usize) -> bool {
+    unsafe extern "C" {
+        fn __try_read(va: usize) -> usize;
+    }
+    match __try_read(va) {
+        0 => true,
+        1 => false,
+        _ => unreachable!(),
+    }
+}
+
+/// Tries to write to a user memory region.
+///
+/// Returns `true` if the write is successful, otherwise `false`. A failed
+/// write indicates that the memory region cannot be written to, or the address
+/// is not mapped in the page table.
+///
+/// # Safety
+/// This function must be called after calling `set_kernel_stvec_user_rw` to
+/// enable kernel memory access to user space.
+unsafe fn try_write(va: usize) -> bool {
+    unsafe extern "C" {
+        fn __try_write(va: usize) -> usize;
+    }
+    match __try_write(va) {
+        0 => true,
+        1 => false,
+        _ => unreachable!(),
     }
 }
