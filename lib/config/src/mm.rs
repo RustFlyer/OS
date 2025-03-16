@@ -92,8 +92,10 @@ pub const PTE_WIDTH: usize = 8;
 /// Number of page table entries in a page table
 pub const PTE_PER_TABLE: usize = PAGE_SIZE / PTE_WIDTH;
 
-pub const APP_BASE_ADDRESS: usize = 0x1000_0000;
-pub const APP_SIZE_LIMIT: usize = 1024 * 1024 * 1024;
+/// Position of the stack of a user process in the virtual address space
+pub const USER_STACK_UPPER: usize = 0x0000_003f_ffff_f000;
+pub const USER_STACK_SIZE: usize = 8 * 1024 * 1024;
+pub const USER_STACK_LOWER: usize = USER_STACK_UPPER - USER_STACK_SIZE;
 
 /// boot hart start address
 pub const HART_START_ADDR: usize = 0x80200000;

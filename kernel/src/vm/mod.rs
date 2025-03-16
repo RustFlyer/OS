@@ -1,9 +1,10 @@
 pub mod addr_space;
-pub mod elf;
+pub mod mem_perm;
 pub mod user_ptr;
-pub mod vm_area;
 
+mod elf;
 mod page_table;
 mod pte;
+mod vm_area;
 
 pub use page_table::enable_kernel_page_table;
