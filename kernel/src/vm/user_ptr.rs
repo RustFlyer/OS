@@ -9,9 +9,8 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
+use mm::address::VirtAddr;
 use systype::SysResult;
-
-use crate::address::VirtAddr;
 
 use super::addr_space::{self, AddrSpace};
 

@@ -3,6 +3,7 @@ pub mod elf;
 pub mod user_ptr;
 pub mod vm_area;
 
-pub(crate) mod page_table;
-
+mod page_table;
 mod pte;
+
+pub use page_table::enable_kernel_page_table;

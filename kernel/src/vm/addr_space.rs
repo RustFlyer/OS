@@ -21,9 +21,8 @@ use core::ops::{Bound, ControlFlow};
 
 use alloc::collections::btree_map::BTreeMap;
 
+use mm::address::VirtAddr;
 use systype::{SysError, SysResult};
-
-use crate::address::VirtAddr;
 
 use super::{
     page_table::{self, PageTable},

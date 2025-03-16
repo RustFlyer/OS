@@ -15,12 +15,12 @@ use time::TaskTimeStat;
 use timer::{TIMER_MANAGER, Timer};
 
 use crate::trap::trap_context::TrapContext;
+use crate::vm::addr_space::AddrSpace;
 
 use arch::riscv64::time::get_time_duration;
 
 use core::time::Duration;
 
-use mm::vm::addr_space::AddrSpace;
 
 use super::{
     future::{self, spawn_user_task},

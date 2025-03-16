@@ -12,10 +12,10 @@ use config::mm::{
     PTE_PER_TABLE, bss_end, bss_start, data_end, data_start, kernel_end, kernel_start, rodata_end,
     rodata_start, text_end, text_start,
 };
+use mm::address::{PhysPageNum, VirtAddr, VirtPageNum};
 use systype::SysResult;
 
 use crate::{
-    address::{PhysPageNum, VirtAddr, VirtPageNum},
     frame::FrameTracker,
     vm::vm_area::{KernelArea, VmArea},
 };
@@ -302,7 +302,9 @@ impl PageTableMem {
 /// This function must be called after the kernel page table is set up.
 pub unsafe fn enable_kernel_page_table() {
     // SAFETY: the boot page table never gets dropped.
-    unsafe { switch_page_table(&KERNEL_PAGE_TABLE); }
+    unsafe {
+        switch_page_table(&KERNEL_PAGE_TABLE);
+    }
 }
 
 /// Switches to the new page table.

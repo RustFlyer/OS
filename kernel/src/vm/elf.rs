@@ -1,13 +1,10 @@
 /// Module for loading ELF files.
 use elf::{self, ElfBytes, endian::LittleEndian, file::FileHeader};
+use mm::address::VirtAddr;
 use systype::{SysError, SysResult};
 
-use crate::{
-    address::VirtAddr,
-    vm::{pte::PteFlags, vm_area::VmArea},
-};
-
 use super::addr_space::AddrSpace;
+use crate::vm::{pte::PteFlags, vm_area::VmArea};
 
 /// Loads an ELF executable into given address space.
 ///

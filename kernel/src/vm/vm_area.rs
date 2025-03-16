@@ -25,15 +25,14 @@
 
 use alloc::vec::Vec;
 use core::fmt::Debug;
-use systype::{SysError, SysResult};
 
 use bitflags::bitflags;
 
+use mm::address::{PhysPageNum, VirtAddr};
+use systype::{SysError, SysResult};
+
 use super::{page_table::PageTable, pte::PteFlags};
-use crate::{
-    address::{PhysPageNum, VirtAddr},
-    frame::FrameTracker,
-};
+use crate::frame::FrameTracker;
 
 bitflags! {
     /// Memory permission corresponding to R, W, X, and U bits in a page table entry.

@@ -1,5 +1,6 @@
 #![no_std]
 #![no_main]
+#![feature(btree_cursors)]
 #![feature(naked_functions)]
 #![feature(sync_unsafe_cell)]
 #![allow(dead_code, unused_imports, warnings)]
@@ -15,6 +16,7 @@ mod sbi;
 mod syscall;
 mod task;
 mod trap;
+mod vm;
 
 use core::sync::atomic::Ordering;
 use core::{arch::global_asm, sync::atomic::AtomicBool};
@@ -24,6 +26,7 @@ use simdebug::when_debug;
 
 pub use syscall::syscall;
 
+#[macro_use]
 extern crate alloc;
 
 static mut INITIALIZED: bool = false;
@@ -41,7 +44,7 @@ pub fn rust_main(hart_id: usize) -> ! {
             log::info!("hart {}: initializing heap allocator", hart_id);
             heap::init_heap_allocator();
             log::info!("hart {}: initializing page table", hart_id);
-            mm::enable_kernel_page_table();
+            vm::enable_kernel_page_table();
             INITIALIZED = true;
         }
 
@@ -76,7 +79,7 @@ pub fn rust_main(hart_id: usize) -> ! {
         log::info!("hart {}: enabling page table", hart_id);
         // SAFETY: Only after the first hart has initialized the heap allocator and page table,
         // do the other harts enable the kernel page table.
-        unsafe { mm::enable_kernel_page_table(); }
+        unsafe { vm::enable_kernel_page_table(); }
     }
 
     log::info!("hart {}: running", hart_id);
