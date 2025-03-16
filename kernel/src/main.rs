@@ -9,6 +9,7 @@ mod boot;
 mod console;
 mod entry;
 mod lang_item;
+mod link_app;
 mod loader;
 mod logging;
 mod processor;
@@ -18,6 +19,7 @@ mod task;
 mod trap;
 mod vm;
 
+use core::slice;
 use core::sync::atomic::Ordering;
 use core::{arch::global_asm, sync::atomic::AtomicBool};
 
@@ -64,10 +66,26 @@ pub fn rust_main(hart_id: usize) -> ! {
             config::mm::KERNEL_START,
             config::mm::kernel_end() as usize
         );
-        log::info!(".text {:#x} - {:#x}", config::mm::text_start(), config::mm::text_end());
-        log::info!(".rodata {:#x} - {:#x}", config::mm::rodata_start(), config::mm::rodata_end());
-        log::info!(".data {:#x} - {:#x}", config::mm::data_start(), config::mm::data_end());
-        log::info!(".bss {:#x} - {:#x}", config::mm::bss_start(), config::mm::bss_end());
+        log::info!(
+            ".text {:#x} - {:#x}",
+            config::mm::text_start(),
+            config::mm::text_end()
+        );
+        log::info!(
+            ".rodata {:#x} - {:#x}",
+            config::mm::rodata_start(),
+            config::mm::rodata_end()
+        );
+        log::info!(
+            ".data {:#x} - {:#x}",
+            config::mm::data_start(),
+            config::mm::data_end()
+        );
+        log::info!(
+            ".bss {:#x} - {:#x}",
+            config::mm::bss_start(),
+            config::mm::bss_end()
+        );
         log::info!("====== kernel memory layout end ======");
 
         boot::start_harts(hart_id);
@@ -75,17 +93,23 @@ pub fn rust_main(hart_id: usize) -> ! {
         when_debug!({
             simdebug::backtrace_test();
         });
+
+        loader::init();
+        let elf_data = loader::get_app_data_by_name("hello_world").unwrap();
+        task::task::spawn_task(elf_data);
     } else {
         log::info!("hart {}: enabling page table", hart_id);
         // SAFETY: Only after the first hart has initialized the heap allocator and page table,
         // do the other harts enable the kernel page table.
-        unsafe { vm::enable_kernel_page_table(); }
+        unsafe {
+            vm::enable_kernel_page_table();
+        }
     }
 
     log::info!("hart {}: running", hart_id);
 
     loop {
-        // executor::task_run_always();
+        executor::task_run_always();
     }
     sbi::shutdown(false);
 }

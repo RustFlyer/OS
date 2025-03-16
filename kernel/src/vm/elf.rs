@@ -78,7 +78,7 @@ impl AddrSpace {
     /// the stack.
     ///
     /// Current implementation hardcodes the stack size and position in `config::mm` module.
-    pub fn map_stack(&mut self, stack_start: VirtAddr, stack_size: usize) -> SysResult<VirtAddr> {
+    pub fn map_stack(&mut self) -> SysResult<VirtAddr> {
         let stack = VmArea::new_stack(
             VirtAddr::new(USER_STACK_LOWER),
             VirtAddr::new(USER_STACK_UPPER),

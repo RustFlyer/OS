@@ -21,7 +21,6 @@ use arch::riscv64::time::get_time_duration;
 
 use core::time::Duration;
 
-
 use super::{
     future::{self, spawn_user_task},
     manager::add_task,
@@ -165,15 +164,6 @@ impl Task {
         self.inner.exclusive_access().clear();
     }
 
-    pub fn spawn_task(elf_data: &[u8]) {
-        let memory_set = todo!();
-        let trap_context = todo!();
-        let task_inner = todo!();
-        let task = Arc::new(Task::new());
-        add_task(&task);
-        spawn_user_task(task);
-    }
-
     pub fn inner_mut(&mut self) -> &mut UPSafeCell<TaskInner> {
         &mut self.inner
     }
@@ -222,4 +212,25 @@ impl TaskInner {
     pub fn set_exit_code(&mut self, exit_code: u32) {
         self.exit_code = exit_code;
     }
+}
+
+pub fn spawn_task(elf_data: &'static [u8]) {
+    let mut addr_space = AddrSpace::build_user().unwrap();
+    let entry_point = addr_space.load_elf(elf_data).unwrap();
+    let stack_ptr = addr_space.map_stack().unwrap();
+    let trap_context = TrapContext::new(entry_point.to_usize(), stack_ptr.to_usize());
+    let task_inner = TaskInner::new();
+    let task = Arc::new(Task {
+        tid: tid_alloc(),
+        process: None,
+        is_process: true,
+        trap_context: unsafe { SyncUnsafeCell::new(trap_context) },
+        timer: unsafe { SyncUnsafeCell::new(TaskTimeStat::new()) },
+        waker: unsafe { SyncUnsafeCell::new(None) },
+        state: unsafe { SpinNoIrqLock::new(TaskState::Waiting) },
+        addr_space: SpinNoIrqLock::new(addr_space),
+        inner: unsafe { UPSafeCell::new(task_inner) },
+    });
+    add_task(&task);
+    spawn_user_task(task);
 }
