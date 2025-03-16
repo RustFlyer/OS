@@ -45,6 +45,10 @@ impl MutexSupport for Spin {
 }
 
 /// Sie Guard
+/// 
+/// SieGuard 结构体的作用是管理 CPU 的中断使能状态（Supervisor Interrupt Enable, SIE）
+/// ，通常用于在临界区代码中临时禁用中断，以确保代码的原子性执行。
+/// SieGuard(bool): 包含一个布尔值，用于保存进入临界区之前的中断使能状态。
 pub struct SieGuard(bool);
 
 impl SieGuard {

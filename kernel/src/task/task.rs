@@ -25,6 +25,7 @@ use mm::vm::addr_space::AddrSpace;
 use super::{
     future::{self, spawn_user_task},
     manager::add_task,
+    tid::Pid,
 };
 
 /// 任务状态枚举
@@ -69,6 +70,10 @@ pub struct TaskInner {
 impl Task {
     pub fn tid(&self) -> Tid {
         self.tid.0
+    }
+
+    pub fn pid(self: &Arc<Self>) -> Pid {
+        self.process().tid()
     }
 
     pub fn process(self: &Arc<Self>) -> Arc<Task> {

@@ -93,7 +93,7 @@ pub async fn user_interrupt_handler(task: &Arc<Task>, i: Interrupt) {
         // 其他中断
         _ => {
             panic!(
-                "[trap_handler] Unsupported trap {:?}, stval = {:#x}, sepc = {:#x}",
+                "[trap_handler] Unsupported interrupt {:?}, stval = {:#x}, sepc = {:#x}",
                 scause::read().cause(),
                 stval::read(),
                 sepc::read(),

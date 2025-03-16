@@ -65,11 +65,7 @@ impl ProcessorPrivilegeState {
     pub fn restore(&mut self) {
         unsafe {
             sstatus::write(Sstatus::from_bits(self.sstatus));
-        }
-        unsafe {
             sepc::write(self.sepc);
-        }
-        unsafe {
             satp::write(Satp::from_bits(self.satp));
         }
     }
