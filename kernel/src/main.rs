@@ -24,6 +24,7 @@ use core::sync::atomic::Ordering;
 use core::{arch::global_asm, sync::atomic::AtomicBool};
 
 use mm::{self, frame, heap};
+use processor::hart;
 use simdebug::when_debug;
 
 pub use syscall::syscall;
@@ -92,7 +93,7 @@ pub fn rust_main(hart_id: usize) -> ! {
         );
         log::info!("====== kernel memory layout end ======");
 
-        // boot::start_harts(hart_id);
+        boot::start_harts(hart_id);
 
         when_debug!({
             simdebug::backtrace_test();
@@ -108,6 +109,8 @@ pub fn rust_main(hart_id: usize) -> ! {
             vm::enable_kernel_page_table();
         }
     }
+
+    hart::init(hart_id);
 
     log::info!("hart {}: running", hart_id);
 

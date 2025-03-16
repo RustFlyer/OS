@@ -204,9 +204,16 @@ impl Task {
     }
 
     pub fn spawn_from_elf(elf_data: &'static [u8]) {
+        log::debug!("begin to build elf");
+
         let mut addrspace = AddrSpace::build_user().unwrap();
+        log::debug!("basic addrspace finished!");
+
         let entry_point = addrspace.load_elf(elf_data).unwrap();
+        log::debug!("entry point load finished!");
+
         let stack = addrspace.map_stack().unwrap();
+        log::debug!("basic addr load finished!");
 
         let task = Arc::new(Task::new(
             entry_point.to_usize(),
@@ -216,6 +223,8 @@ impl Task {
 
         TASK_MANAGER.add_task(&task);
         future::spawn_user_task(task);
+
+        log::debug!("spawn success");
     }
 
     pub fn switch_pagetable(&self, old_space: &AddrSpace) {

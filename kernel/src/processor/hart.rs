@@ -159,8 +159,9 @@ pub fn get_current_hart() -> &'static mut Hart {
     }
 }
 
-pub fn init() {
+pub fn init(id: usize) {
     unsafe {
+        set_current_hart(id);
         sstatus::set_fs(FS::Initial);
     }
 }
