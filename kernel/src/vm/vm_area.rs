@@ -25,15 +25,14 @@
 
 use alloc::vec::Vec;
 use core::fmt::Debug;
-use systype::{SysError, SysResult};
 
 use bitflags::bitflags;
 
+use mm::address::{PhysPageNum, VirtAddr};
+use systype::{SysError, SysResult};
+
 use super::{page_table::PageTable, pte::PteFlags};
-use crate::{
-    address::{PhysPageNum, VirtAddr},
-    frame::FrameTracker,
-};
+use crate::frame::FrameTracker;
 
 bitflags! {
     /// Memory permission corresponding to R, W, X, and U bits in a page table entry.
@@ -248,8 +247,8 @@ impl MemoryBackedArea {
         };
 
         let &mut VmArea {
-            start_va,
-            end_va,
+            start_va: vma_start,
+            end_va: vma_end,
             flags,
             perm,
             ..
@@ -270,16 +269,29 @@ impl MemoryBackedArea {
         let mut frame = FrameTracker::build()?;
         page_table.map_page(fault_addr.page_number(), frame.as_ppn(), flags);
 
-        // Copy data from the memory backing store to the allocated frame.
-        let fill_va_start = VirtAddr::max(start_va, fault_addr.round_down());
-        let fill_va_end = VirtAddr::min(end_va, fault_addr.round_up());
+        // Fill the frame with appropriate data.
+        // There are 3 types of regions in the frame:
+        // 1. Region to fill with data from the memory backing store.
+        // 2. Region to fill with zeros.
+        // 3. Region that is not in the VMA thus not filled.
+        let fill_va_start = VirtAddr::max(vma_start, fault_addr.round_down());
+        let fill_va_end = VirtAddr::min(vma_end, fault_addr.round_up());
         let fill_len = fill_va_end.to_usize() - fill_va_start.to_usize();
-        let page_offset = fill_va_start.to_usize() - fault_addr.round_down().to_usize();
-        let area_offset = fill_va_start.to_usize() - start_va.to_usize();
-
-        let memory_to_copy = &memory[area_offset..area_offset + fill_len];
-        let memory_to_fill = &mut frame.as_slice_mut()[page_offset..page_offset + fill_len];
-        memory_to_fill.copy_from_slice(memory_to_copy);
+        let page_offset = fill_va_start.page_offset();
+        let area_offset = fill_va_start.to_usize() - vma_start.to_usize();
+        let back_store_len = memory.len();
+        if area_offset < back_store_len {
+            // If there is a type 1 region in the frame:
+            let copy_len = usize::min(back_store_len - area_offset, fill_len);
+            let memory_copy_from = &memory[area_offset..area_offset + copy_len];
+            let (memory_copy_to, memory_fill_zero) =
+                frame.as_slice_mut()[page_offset..page_offset + fill_len].split_at_mut(copy_len);
+            memory_copy_to.copy_from_slice(memory_copy_from);
+            memory_fill_zero.fill(0);
+        } else {
+            // If there is no type 1 region in the frame:
+            frame.as_slice_mut()[page_offset..page_offset + fill_len].fill(0);
+        }
 
         // Track the allocated frame.
         pages.push(frame);

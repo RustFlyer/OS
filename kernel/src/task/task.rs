@@ -1,4 +1,7 @@
-use crate::task::tid::{Tid, TidHandle, tid_alloc};
+use crate::{
+    task::tid::{Tid, TidHandle, tid_alloc},
+    trap,
+};
 
 extern crate alloc;
 use alloc::{
@@ -15,12 +18,13 @@ use time::TaskTimeStat;
 use timer::{TIMER_MANAGER, Timer};
 
 use crate::trap::trap_context::TrapContext;
+use crate::vm::addr_space::AddrSpace;
+use crate::vm::addr_space::switch_to;
+use crate::vm::elf::load_elf;
 
 use arch::riscv64::time::get_time_duration;
 
 use core::time::Duration;
-
-use mm::vm::addr_space::AddrSpace;
 
 use super::{
     future::{self, spawn_user_task},
@@ -53,7 +57,7 @@ pub struct Task {
     timer: SyncUnsafeCell<TaskTimeStat>,
     waker: SyncUnsafeCell<Option<Waker>>,
     state: SpinNoIrqLock<TaskState>,
-    addrspace: SpinNoIrqLock<AddrSpace>,
+    addr_space: SpinNoIrqLock<AddrSpace>,
     inner: UPSafeCell<TaskInner>,
 }
 
@@ -127,6 +131,10 @@ impl Task {
         unsafe { &mut *self.waker.get() }
     }
 
+    pub fn addr_space_mut(&self) -> &SpinNoIrqLock<AddrSpace> {
+        &self.addr_space
+    }
+
     pub fn new() -> Self {
         let inner = TaskInner::new();
         Task {
@@ -137,7 +145,7 @@ impl Task {
             timer: unsafe { SyncUnsafeCell::new(TaskTimeStat::new()) },
             waker: unsafe { SyncUnsafeCell::new(None) },
             state: unsafe { SpinNoIrqLock::new(TaskState::Waiting) },
-            addrspace: SpinNoIrqLock::new(AddrSpace::build_user().unwrap()),
+            addr_space: SpinNoIrqLock::new(AddrSpace::build_user().unwrap()),
             inner: unsafe { UPSafeCell::new(inner) },
         }
     }
@@ -204,7 +212,14 @@ impl Task {
         }
     }
 
-    pub fn switch_pagetable(&self) {}
+    pub fn spawn_from_elf(&self, elf_data: &'static [u8]) {
+        let mut addspace = self.addr_space.lock();
+        let entry_point = load_elf(&mut addspace, elf_data);
+    }
+
+    pub fn switch_pagetable(&self, old_space: &AddrSpace) {
+        switch_to(old_space, &self.addr_space.lock());
+    }
 }
 
 impl TaskInner {

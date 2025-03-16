@@ -4,8 +4,7 @@
 //! and tracking allocated pages.
 
 use alloc::vec::Vec;
-use core::arch::asm;
-use simdebug::when_debug;
+use riscv::register::satp::{self, Satp};
 
 use lazy_static::lazy_static;
 
@@ -13,10 +12,10 @@ use config::mm::{
     PTE_PER_TABLE, bss_end, bss_start, data_end, data_start, kernel_end, kernel_start, rodata_end,
     rodata_start, text_end, text_start,
 };
+use mm::address::{PhysPageNum, VirtAddr, VirtPageNum};
 use systype::SysResult;
 
 use crate::{
-    address::{PhysPageNum, VirtAddr, VirtPageNum},
     frame::FrameTracker,
     vm::vm_area::{KernelArea, VmArea},
 };
@@ -46,7 +45,7 @@ pub struct PageTable {
 
 lazy_static! {
     /// The kernel page table.
-    pub static ref KERNEL_PAGE_TABLE: PageTable = PageTable::build_kernel_page_table();
+    pub static ref KERNEL_PAGE_TABLE: PageTable = unsafe { PageTable::build_kernel_page_table() };
 }
 
 impl PageTable {
@@ -71,10 +70,13 @@ impl PageTable {
     /// The kernel page table is a page table that maps the entire kernel space.
     /// The mapping is linear, i.e., VPN = PPN + KERNEL_MAP_OFFSET.
     ///
+    /// # Safety
+    /// This function should be called only once during the kernel initialization.
+    ///
     /// # Panics
     /// Panics if the kernel page table cannot be constructed due to lack of free
     /// frames, which should not happen in practice.
-    fn build_kernel_page_table() -> Self {
+    unsafe fn build_kernel_page_table() -> Self {
         let mut page_table = Self::build().expect("out of memory");
 
         let text_start_va = VirtAddr::new(text_start());
@@ -249,7 +251,7 @@ impl PageTable {
 /// # Discussion
 /// To achieve thread-safe access to a page table, we need to ensure that only one
 /// thread can get a mutable reference to the page table at a time. Consider using
-/// a lock to protect the page table. We will change the implementation of this struct
+/// locks to protect the page table. We should change the implementation of this struct
 /// in the future.
 #[derive(Debug)]
 struct PageTableMem {
@@ -297,15 +299,25 @@ impl PageTableMem {
 /// Enables the kernel page table.
 ///
 /// # Safety
-/// This function must be called after the heap allocator is initialized
-/// and after the kernel page table is set up.
+/// This function must be called after the kernel page table is set up.
 pub unsafe fn enable_kernel_page_table() {
-    let satp = KERNEL_PAGE_TABLE.root().to_usize() | (8 << 60);
+    // SAFETY: the boot page table never gets dropped.
     unsafe {
-        asm!(
-            "csrw satp, {}",
-            "sfence.vma",
-            in(reg) satp
-        );
+        switch_page_table(&KERNEL_PAGE_TABLE);
     }
+}
+
+/// Switches to the new page table.
+///
+/// # Safety
+/// This function must be called before the current page table is dropped,
+/// or the kernel may lose its memory mappings.
+pub unsafe fn switch_page_table(page_table: &PageTable) {
+    let mut satp = Satp::from_bits(0);
+    satp.set_mode(satp::Mode::Sv39);
+    satp.set_ppn(page_table.root().to_usize());
+    unsafe {
+        satp::write(satp);
+    }
+    riscv::asm::sfence_vma_all();
 }

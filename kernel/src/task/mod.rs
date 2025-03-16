@@ -7,3 +7,16 @@ pub use future::yield_now;
 pub use manager::TASK_MANAGER;
 pub use task::{Task, TaskState};
 pub use tid::{Tid, TidHandle, tid_alloc};
+
+extern crate alloc;
+
+use alloc::sync::Arc;
+
+use crate::loader::get_app_data_by_name;
+
+pub fn init() {
+    let elf_data = get_app_data_by_name("hello_world").unwrap();
+    let task = Arc::new(Task::new());
+    task.spawn_from_elf(elf_data);
+    TASK_MANAGER.add_task(&task);
+}

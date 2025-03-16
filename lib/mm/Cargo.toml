@@ -9,10 +9,6 @@ id_allocator = { path = "../id_allocator" }
 mutex = { path = "../mutex" }
 simdebug = { path = "../simdebug" }
 systype = { path = "../systype" }
-bitflags = { workspace = true }
 buddy_system_allocator = { workspace = true }
-cfg-if = { workspace = true }
-elf ={ workspace = true }
 lazy_static = { workspace = true }
 log = { workspace = true }
-riscv = { workspace = true }

@@ -115,10 +115,12 @@ name = "kernel"
 version = "0.1.0"
 dependencies = [
  "arch",
+ "bitflags",
  "cfg-if",
  "config",
  "crate_interface",
  "driver",
+ "elf",
  "executor",
  "id_allocator",
  "lazy_static",
@@ -174,16 +176,12 @@ dependencies = [
 name = "mm"
 version = "0.1.0"
 dependencies = [
- "bitflags",
  "buddy_system_allocator",
- "cfg-if",
  "config",
- "elf",
  "id_allocator",
  "lazy_static",
  "log",
  "mutex",
- "riscv",
  "simdebug",
  "systype",
 ]

@@ -6,8 +6,7 @@
 use bitflags::bitflags;
 
 use config::mm::PPN_WIDTH_SV39;
-
-use crate::address::PhysPageNum;
+use mm::address::PhysPageNum;
 
 /// Offset of the physical page number in a page table entry. A physical page
 /// number located at bits 10-53 in a page table entry.
