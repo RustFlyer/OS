@@ -66,7 +66,7 @@ pub async fn user_exception_handler(task: &Arc<Task>, e: Exception) {
             {
                 // Should send a `SIGSEGV` signal to the task
                 log::debug!(
-                    "[trap_handler] page fault at {:#x}, access: {:?}, error: {:?}",
+                    "[user_exception_handler] unsolved page fault at {:#x}, access: {:?}, error: {:?}",
                     stval::read(),
                     access,
                     e

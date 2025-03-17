@@ -9,7 +9,8 @@ use riscv::register::satp::{self, Satp};
 use lazy_static::lazy_static;
 
 use config::mm::{
-    bss_end, bss_start, data_end, data_start, kernel_end, kernel_end_phys, kernel_start, rodata_end, rodata_start, text_end, text_start, PTE_PER_TABLE, VIRT_END
+    PTE_PER_TABLE, VIRT_END, bss_end, bss_start, data_end, data_start, kernel_end, kernel_end_phys,
+    kernel_start, rodata_end, rodata_start, text_end, text_start,
 };
 use mm::address::{PhysPageNum, VirtAddr, VirtPageNum};
 use systype::SysResult;
@@ -82,34 +83,36 @@ impl PageTable {
 
         let text_start_va = VirtAddr::new(text_start());
         let text_end_va = VirtAddr::new(text_end());
-        let text_flags = PteFlags::V | PteFlags::R | PteFlags::X;
+        let text_flags = PteFlags::R | PteFlags::X | PteFlags::G;
         let text_vma = VmArea::new_kernel(text_start_va, text_end_va, text_flags);
         KernelArea::map(&text_vma, &mut page_table);
 
         let rodata_start_va = VirtAddr::new(rodata_start());
         let rodata_end_va = VirtAddr::new(rodata_end());
-        let rodata_flags = PteFlags::V | PteFlags::R;
+        let rodata_flags = PteFlags::R | PteFlags::G;
         let rodata_vma = VmArea::new_kernel(rodata_start_va, rodata_end_va, rodata_flags);
         KernelArea::map(&rodata_vma, &mut page_table);
 
         let data_start_va = VirtAddr::new(data_start());
         let data_end_va = VirtAddr::new(data_end());
-        let data_flags = PteFlags::V | PteFlags::R | PteFlags::W;
+        let data_flags = PteFlags::R | PteFlags::W | PteFlags::G;
         let data_vma = VmArea::new_kernel(data_start_va, data_end_va, data_flags);
         KernelArea::map(&data_vma, &mut page_table);
 
         let bss_start_va = VirtAddr::new(bss_start());
         let bss_end_va = VirtAddr::new(bss_end());
-        let bss_flags = PteFlags::V | PteFlags::R | PteFlags::W;
+        let bss_flags = PteFlags::R | PteFlags::W | PteFlags::G;
         let bss_vma = VmArea::new_kernel(bss_start_va, bss_end_va, bss_flags);
         KernelArea::map(&bss_vma, &mut page_table);
 
         /* Map the allocatable frames */
         let alloc_start_va = VirtAddr::new(kernel_end());
         let alloc_end_va = VirtAddr::new(VIRT_END);
-        let alloc_flags = PteFlags::V | PteFlags::R | PteFlags::W;
+        let alloc_flags = PteFlags::R | PteFlags::W | PteFlags::G;
         let alloc_vma = VmArea::new_kernel(alloc_start_va, alloc_end_va, alloc_flags);
         KernelArea::map(&alloc_vma, &mut page_table);
+
+        print_page_table_entries(&page_table, VirtAddr::new(text_start()));
 
         page_table
     }
@@ -130,9 +133,18 @@ impl PageTable {
     /// This method sets any non-present intermediate entries and creates intermediate
     /// page tables if necessary. Note that the returned entry may be invalid.
     ///
+    /// `inner_flags` is the flags for newly created intermediate entries, if any. Only
+    /// bits `UG` are used, as the intermediate entries cannot have bits `XWRAD` and must
+    /// have bit `V` set.
+    ///
     /// This function only support 4 KiB pages.
-    pub fn find_entry_create(&mut self, vpn: VirtPageNum) -> &mut PageTableEntry {
+    pub fn find_entry_create(
+        &mut self,
+        vpn: VirtPageNum,
+        inner_flags: PteFlags,
+    ) -> &mut PageTableEntry {
         let mut ppn = self.root;
+        let inner_flags = PteFlags::V | (inner_flags & (PteFlags::U | PteFlags::G));
         for (i, index) in vpn.indices().into_iter().enumerate().rev() {
             let mut page_table = unsafe { PageTableMem::new(ppn) };
             let entry = page_table.get_entry_mut(index);
@@ -141,7 +153,13 @@ impl PageTable {
             }
             if !entry.is_valid() {
                 let frame = FrameTracker::build().expect("out of memory");
-                *entry = PageTableEntry::new(frame.as_ppn(), PteFlags::V);
+                *entry = PageTableEntry::new(frame.as_ppn(), inner_flags);
+                log::debug!(
+                    "Allocated frame {:#x} for page table at {:#x}, entry at {:#x}",
+                    frame.as_ppn().address().to_usize(),
+                    entry as *mut _ as usize,
+                    index
+                );
                 self.track_frame(frame);
             }
             ppn = entry.ppn();
@@ -172,12 +190,18 @@ impl PageTable {
 
     /// Maps a leaf page by specifying VPN, PPN, and page table entry flags.
     ///
-    /// This method does not allocate the frame for the leaf page. It only sets the mapping
-    /// in the page table. The caller should allocate a frame is allocated and set the
-    /// mapping by calling this method. Be careful that calling this method with an
-    /// already mapped `vpn` will overwrite the existing mapping.
+    /// This method does not allocate the frame for the leaf page. It only sets the
+    /// mapping in the page table. The caller should allocate a frame is allocated
+    /// and set the mapping by calling this method. Be careful that calling this
+    /// method with an already mapped `vpn` will overwrite the existing mapping.
+    ///
+    /// # Note
+    /// This function takes `flags` as the flags for the leaf page table entry, and
+    /// it takes bits `UG` to set the flags for intermediate entries. This design
+    /// reduces the granularity of control over intermediate entries, but it is
+    /// sufficient for the current address space layout.
     pub fn map_page(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PteFlags) {
-        let entry = self.find_entry_create(vpn);
+        let entry = self.find_entry_create(vpn, flags);
         *entry = PageTableEntry::new(ppn, flags);
     }
 
@@ -205,12 +229,12 @@ impl PageTable {
     /// overwrite the existing mapping.
     pub fn map_range(&mut self, start_vpn: VirtPageNum, ppns: &[PhysPageNum], flags: PteFlags) {
         // Optimization is applied to cut down most unnecessary page table lookups.
-        let mut entry = self.find_entry_create(start_vpn);
+        let mut entry = self.find_entry_create(start_vpn, flags);
         *entry = PageTableEntry::new(ppns[0], flags);
         for (i, &ppn) in ppns.iter().enumerate().skip(1) {
             let vpn = start_vpn.to_usize() + i;
             entry = if vpn % PTE_PER_TABLE == 0 {
-                self.find_entry_create(VirtPageNum::new(vpn))
+                self.find_entry_create(VirtPageNum::new(vpn), flags)
             } else {
                 // SAFETY: the entry is not the last one in its page table,
                 // thus the next entry is valid.
@@ -315,7 +339,7 @@ pub unsafe fn enable_kernel_page_table() {
     }
 }
 
-/// Switches to the new page table.
+/// Switches to the specified page table.
 ///
 /// # Safety
 /// This function must be called before the current page table is dropped,
@@ -328,4 +352,29 @@ pub unsafe fn switch_page_table(page_table: &PageTable) {
         satp::write(satp);
     }
     riscv::asm::sfence_vma_all();
+    log::debug!(
+        "Switched to page table at {:#x}, satp: {:#x}",
+        page_table.root().to_usize(),
+        satp::read().bits()
+    );
+}
+
+/// Prints page table entries of each level to resolve a given virtual address.
+pub fn print_page_table_entries(page_table: &PageTable, va: VirtAddr) {
+    let mut ppn = page_table.root();
+    for (i, index) in va.page_number().indices().into_iter().enumerate().rev() {
+        let page_table = unsafe { PageTableMem::new(ppn) };
+        let entry = page_table.get_entry(index);
+        log::debug!(
+            "Level {}: page table at {:#x}, entry at offset {:#x}, entry: {:#x?}",
+            i,
+            ppn.address().to_usize(),
+            index,
+            entry
+        );
+        if !entry.is_valid() {
+            return;
+        }
+        ppn = entry.ppn();
+    }
 }

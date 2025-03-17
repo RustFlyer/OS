@@ -48,6 +48,7 @@ pub enum TaskState {
 /// 任务结构体
 ///
 /// 表示一个任务，包含任务ID、进程关系、状态和内部状态
+#[derive(Debug)]
 pub struct Task {
     tid: TidHandle,
     process: Option<Weak<Task>>,
@@ -64,6 +65,7 @@ pub struct Task {
 /// 任务内部状态结构体
 ///
 /// 表示一个任务的内部状态，包含任务状态、父任务、子任务和退出代码
+#[derive(Debug)]
 pub struct TaskInner {
     parent: Option<Weak<Task>>,
     children: BTreeMap<Tid, Weak<Task>>,
@@ -144,7 +146,7 @@ impl Task {
             trap_context: unsafe { SyncUnsafeCell::new(TrapContext::new(entry, sp)) },
             timer: unsafe { SyncUnsafeCell::new(TaskTimeStat::new()) },
             waker: unsafe { SyncUnsafeCell::new(None) },
-            state: unsafe { SpinNoIrqLock::new(TaskState::Waiting) },
+            state: unsafe { SpinNoIrqLock::new(TaskState::Running) },
             addr_space: SpinNoIrqLock::new(addrspace),
             inner: unsafe { UPSafeCell::new(inner) },
         }
@@ -227,8 +229,15 @@ impl Task {
         log::debug!("spawn success");
     }
 
-    pub fn switch_pagetable(&self, old_space: &AddrSpace) {
-        switch_to(old_space, &self.addr_space.lock());
+    /// Switches to the address space of the task.
+    ///
+    /// # Safety
+    /// This function must be called before the current page table is dropped, or the kernel
+    /// may lose its memory mappings.
+    pub fn switch_addr_space(&self) {
+        unsafe {
+            switch_to(&self.addr_space.lock());
+        }
     }
 }
 
@@ -263,7 +272,7 @@ pub fn spawn_task(elf_data: &'static [u8]) {
         trap_context: unsafe { SyncUnsafeCell::new(trap_context) },
         timer: unsafe { SyncUnsafeCell::new(TaskTimeStat::new()) },
         waker: unsafe { SyncUnsafeCell::new(None) },
-        state: unsafe { SpinNoIrqLock::new(TaskState::Waiting) },
+        state: unsafe { SpinNoIrqLock::new(TaskState::Running) },
         addr_space: SpinNoIrqLock::new(addr_space),
         inner: unsafe { UPSafeCell::new(task_inner) },
     });

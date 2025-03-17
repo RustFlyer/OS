@@ -24,6 +24,8 @@ use alloc::collections::btree_map::BTreeMap;
 use mm::address::VirtAddr;
 use systype::{SysError, SysResult};
 
+use super::page_table::print_page_table_entries;
+
 use super::{
     mem_perm::MemPerm,
     page_table::{self, PageTable},
@@ -66,6 +68,7 @@ impl AddrSpace {
     pub fn build_user() -> SysResult<Self> {
         let mut addr_space = Self::build()?;
         addr_space.page_table.map_kernel();
+        log::debug!("Address space created: {:#x?}", addr_space);
         Ok(addr_space)
     }
 
@@ -117,6 +120,12 @@ impl AddrSpace {
     /// Returns [`SysError::EFAULT`] if the fault address is invalid or the access permission
     /// is not allowed.
     pub fn handle_page_fault(&mut self, fault_addr: VirtAddr, access: MemPerm) -> SysResult<()> {
+        log::info!(
+            "Page fault at {:#x}, access: {:?}",
+            fault_addr.to_usize(),
+            access
+        );
+        print_page_table_entries(&self.page_table, fault_addr);
         let page_table = &mut self.page_table;
         let vma = self
             .vm_areas
@@ -139,9 +148,11 @@ impl AddrSpace {
 ///
 /// This function switches the current address space to a new address space. It is used
 /// when a process is scheduled in or out.
-pub fn switch_to(_old_space: &AddrSpace, new_space: &AddrSpace) {
-    // SAFETY: We force the user of this function to send a reference to the old address space,
-    // so the old page table is still valid.
+///
+/// # Safety
+/// This function must be called before the current page table is dropped, or the kernel
+/// may lose its memory mappings.
+pub unsafe fn switch_to(new_space: &AddrSpace) {
     unsafe {
         page_table::switch_page_table(&new_space.page_table);
     }

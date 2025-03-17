@@ -64,7 +64,8 @@ pub struct VmArea {
     start_va: VirtAddr,
     /// Ending virtual address (exclusive).
     end_va: VirtAddr,
-    /// Page table entry flags.
+    /// Cache for leaf page table entry flags, which are default when creating
+    /// a new leaf entry.
     flags: PteFlags,
     /// Permission.
     perm: MemPerm,
@@ -76,11 +77,13 @@ pub struct VmArea {
 
 impl VmArea {
     /// Constructs a [`VmArea`] whose specific type is [`TypedArea::Kernel`].
+    ///
+    /// `flags` needs to have `RWXUG` bits set properly.
     pub(super) fn new_kernel(start_va: VirtAddr, end_va: VirtAddr, flags: PteFlags) -> Self {
         Self {
             start_va,
             end_va,
-            flags,
+            flags: flags | PteFlags::V | PteFlags::A | PteFlags::D,
             perm: MemPerm::from(flags),
             map_type: TypedArea::Kernel(KernelArea),
             handler: None,
@@ -88,6 +91,8 @@ impl VmArea {
     }
 
     /// Constructs a [`VmArea`] whose specific type is [`TypedArea::MemoryBacked`].
+    ///
+    /// `flags` needs to have `RWXUG` bits set properly.
     pub fn new_memory_backed(
         start_va: VirtAddr,
         end_va: VirtAddr,
@@ -97,7 +102,7 @@ impl VmArea {
         Self {
             start_va,
             end_va,
-            flags,
+            flags: flags | PteFlags::V | PteFlags::A | PteFlags::D,
             perm: MemPerm::from(flags),
             map_type: TypedArea::MemoryBacked(MemoryBackedArea::new(memory)),
             handler: Some(MemoryBackedArea::fault_handler),
@@ -105,12 +110,19 @@ impl VmArea {
     }
 
     /// Constructs a [`VmArea`] whose specific type is [`TypedArea::Stack`].
-    pub fn new_stack(start_va: VirtAddr, end_va: VirtAddr) -> Self {
+    ///
+    /// `flags` needs to have `UG` bits set properly.
+    pub fn new_stack(start_va: VirtAddr, end_va: VirtAddr, flags: PteFlags) -> Self {
         Self {
             start_va,
             end_va,
-            flags: PteFlags::U | PteFlags::R | PteFlags::W,
-            perm: MemPerm::R | MemPerm::W,
+            flags: (flags & (PteFlags::U | PteFlags::G))
+                | PteFlags::R
+                | PteFlags::W
+                | PteFlags::V
+                | PteFlags::A
+                | PteFlags::D,
+            perm: MemPerm::U | MemPerm::R | MemPerm::W,
             map_type: TypedArea::Stack(StackArea { pages: Vec::new() }),
             handler: Some(StackArea::fault_handler),
         }
@@ -206,7 +218,6 @@ impl KernelArea {
 ///
 /// This is a type for debugging purposes. A memory-backed VMA takes a slice of
 /// memory as its backing store.
-#[derive(Debug)]
 pub(super) struct MemoryBackedArea {
     /// The memory backing store.
     pub memory: &'static [u8],
@@ -247,7 +258,12 @@ impl MemoryBackedArea {
         } = info;
 
         // Check permission.
-        if !access.contains(perm) {
+        if !perm.contains(access) {
+            log::trace!(
+                "MemoryBackedArea::fault_handler: access {:?} not allowed, permision is {:?}",
+                access,
+                perm
+            );
             return Err(SysError::EFAULT);
         }
 
@@ -283,9 +299,18 @@ impl MemoryBackedArea {
         pages.push(frame);
 
         // Flush TLB.
-        riscv::asm::sfence_vma(page_table.root().to_usize(), fault_addr.to_usize());
+        riscv::asm::sfence_vma_all();
 
         Ok(())
+    }
+}
+
+impl Debug for MemoryBackedArea {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("MemoryBackedArea")
+            .field("memory back store from", &(self.memory.as_ptr() as usize))
+            .field("allocated frame num", &self.pages.len())
+            .finish()
     }
 }
 

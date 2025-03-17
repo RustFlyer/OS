@@ -97,7 +97,7 @@ pub async fn task_executor_unit(task: Arc<Task>) {
             _ => {}
         }
 
-        trap::trap_handler(&task); // trap_handle_
+        trap::trap_handler(&task).await; // trap_handle_
 
         match task.get_state() {
             TaskState::Zombie => break,

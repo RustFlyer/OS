@@ -71,6 +71,7 @@ impl Drop for SieGuard {
 }
 
 /// SpinNoIrq MutexSupport
+#[derive(Debug)]
 pub struct SpinNoIrq;
 
 impl MutexSupport for SpinNoIrq {
