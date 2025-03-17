@@ -13,7 +13,10 @@ use riscv::{
 };
 use timer::TIMER_MANAGER;
 
-/// handle exception or interrupt from a task, return if success
+/// handle exception or interrupt from a task, return if success.
+/// __trap_from_user saved TrapContext, then jump to 
+/// the middle of trap_return(), and then return to 
+/// task_executor_unit(), which calls this trap_handler() function.
 #[unsafe(no_mangle)]
 pub async fn trap_handler(task: &Arc<Task>) -> bool {
     let stval = stval::read();

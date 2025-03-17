@@ -22,7 +22,7 @@ __trap_from_user:
     csrrw sp, sscratch, sp
     # Now, sp points to *TrapContext in kernel space, sscratch holds the user stack pointer
     
-    # Save other general-purpose registers
+    # Save general-purpose registers
     sd x1, 1*8(sp)
     # Skip sp (x2), it will be saved later
     
@@ -41,7 +41,7 @@ __trap_from_user:
 
     # Read user stack pointer from sscratch and save it into the TrapContext
     csrr t2, sscratch   # Read the user stack pointer into t2
-    sd t2, 2*8(sp)      # Save user stack pointer into the TrapContext
+    sd t2, 2*8(sp)      # Save user stack pointer into the TrapContext(x2)
 
     # Move to kernel stack pointer (kernel_sp)
     # Load the kernel return address
@@ -67,7 +67,7 @@ __trap_from_user:
     # Finally, load the kernel stack pointer from the TrapContext
     ld sp, 34*8(sp)
     
-    # Return to the kernel return address (ra)
+    # Return to the kernel return address (ra) in kernel space.
     ret
 
 # __return_to_user: This label marks the entry point for returning from kernel mode to user mode.
