@@ -54,6 +54,7 @@ pub struct Task {
     is_process: bool,
 
     trap_context: SyncUnsafeCell<TrapContext>,
+    trap_context_spinlock: SpinNoIrqLock<TrapContext>,
     timer: SyncUnsafeCell<TaskTimeStat>,
     waker: SyncUnsafeCell<Option<Waker>>,
     state: SpinNoIrqLock<TaskState>,
@@ -123,6 +124,10 @@ impl Task {
         unsafe { &mut *self.trap_context.get() }
     }
 
+    pub fn trap_context_spinlock_mut(&self) -> &SpinNoIrqLock<TrapContext> {
+        &self.trap_context_spinlock
+    }
+
     pub fn timer_mut(&self) -> &mut TaskTimeStat {
         unsafe { &mut *self.timer.get() }
     }
@@ -142,6 +147,7 @@ impl Task {
             process: None,
             is_process: false,
             trap_context: unsafe { SyncUnsafeCell::new(TrapContext::new(entry, sp)) },
+            trap_context_spinlock: unsafe { SpinNoIrqLock::new(TrapContext::new(entry, sp)) },
             timer: unsafe { SyncUnsafeCell::new(TaskTimeStat::new()) },
             waker: unsafe { SyncUnsafeCell::new(None) },
             state: unsafe { SpinNoIrqLock::new(TaskState::Waiting) },
@@ -204,9 +210,16 @@ impl Task {
     }
 
     pub fn spawn_from_elf(elf_data: &'static [u8]) {
+        log::debug!("begin to build elf");
+
         let mut addrspace = AddrSpace::build_user().unwrap();
+        log::debug!("basic addrspace finished!");
+
         let entry_point = addrspace.load_elf(elf_data).unwrap();
+        log::debug!("entry point load finished!");
+
         let stack = addrspace.map_stack().unwrap();
+        log::debug!("basic addr load finished!");
 
         let task = Arc::new(Task::new(
             entry_point.to_usize(),
@@ -216,6 +229,8 @@ impl Task {
 
         TASK_MANAGER.add_task(&task);
         future::spawn_user_task(task);
+
+        log::debug!("spawn success");
     }
 
     pub fn switch_pagetable(&self, old_space: &AddrSpace) {
@@ -245,19 +260,12 @@ pub fn spawn_task(elf_data: &'static [u8]) {
     let mut addr_space = AddrSpace::build_user().unwrap();
     let entry_point = addr_space.load_elf(elf_data).unwrap();
     let stack_ptr = addr_space.map_stack().unwrap();
-    let trap_context = TrapContext::new(entry_point.to_usize(), stack_ptr.to_usize());
     let task_inner = TaskInner::new();
-    let task = Arc::new(Task {
-        tid: tid_alloc(),
-        process: None,
-        is_process: true,
-        trap_context: unsafe { SyncUnsafeCell::new(trap_context) },
-        timer: unsafe { SyncUnsafeCell::new(TaskTimeStat::new()) },
-        waker: unsafe { SyncUnsafeCell::new(None) },
-        state: unsafe { SpinNoIrqLock::new(TaskState::Waiting) },
-        addr_space: SpinNoIrqLock::new(addr_space),
-        inner: unsafe { UPSafeCell::new(task_inner) },
-    });
+    let task = Arc::new(Task::new(
+        entry_point.to_usize(),
+        stack_ptr.to_usize(),
+        addr_space,
+    ));
     add_task(&task);
     spawn_user_task(task);
 }

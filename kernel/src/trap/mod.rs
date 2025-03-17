@@ -1,6 +1,5 @@
 pub mod trap_env;
 pub mod kernel_trap_handler;
-pub mod sum;
 pub mod trap_context;
 pub mod trap_handler;
 pub mod trap_return;

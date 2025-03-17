@@ -31,8 +31,6 @@ pub struct Hart {
     pub id: usize,
     task: Option<Arc<Task>>,
     pps: ProcessorPrivilegeState,
-    /// Counter for how many [`crate::trap::sum::SumGuard`]s are living.
-    pub sum_count: AtomicUsize,
 }
 
 impl Hart {
@@ -41,7 +39,6 @@ impl Hart {
             id,
             task: None,
             pps: ProcessorPrivilegeState::new(),
-            sum_count: AtomicUsize::new(0),
         }
     }
 
@@ -159,8 +156,9 @@ pub fn get_current_hart() -> &'static mut Hart {
     }
 }
 
-pub fn init() {
+pub fn init(id: usize) {
     unsafe {
+        set_current_hart(id);
         sstatus::set_fs(FS::Initial);
     }
 }

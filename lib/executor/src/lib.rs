@@ -60,6 +60,7 @@ where
 
 pub fn task_run_always() {
     while let Some(task) = TASKLINE.fetch() {
+        log::debug!("try to fetch a task!");
         task.run();
     }
 }

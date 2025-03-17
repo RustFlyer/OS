@@ -35,7 +35,7 @@ use super::{
     addr_space::{self, AddrSpace},
     mem_perm::MemPerm,
 };
-use crate::trap::trap_env::{set_kernel_stvec, set_kernel_stvec_user_rw};
+use crate::{processor::current_hart, trap::trap_env::{set_kernel_stvec, set_kernel_stvec_user_rw}};
 
 trait AccessType {}
 trait ReadAccess: AccessType {}
@@ -80,8 +80,8 @@ where
 
     /// Marker to indicate the access type of the pointer.
     _access: PhantomData<A>,
-    // /// Guard to ensure the `SUM` bit of `sstatus` register is set when accessing the memory.
-    // sum_guard: SumGuard,
+    /// Guard to ensure the `SUM` bit of `sstatus` register is set when accessing the memory.
+    sum_guard: SumGuard,
 }
 
 /// Blanket implementation for general pointers.
@@ -98,7 +98,7 @@ where
             ptr: addr as *mut T,
             addr_space,
             _access: PhantomData,
-            // sum_guard: SumGuard::new(),
+            sum_guard: SumGuard::new(),
         }
     }
 
@@ -565,5 +565,21 @@ unsafe fn try_write(va: usize) -> bool {
         0 => true,
         1 => false,
         _ => unreachable!(),
+    }
+}
+
+#[derive(Debug)]
+struct SumGuard;
+
+impl SumGuard {
+    pub fn new() -> Self {
+        current_hart().get_mut_pps().inc_sum_cnt();
+        Self
+    }
+}
+
+impl Drop for SumGuard {
+    fn drop(&mut self) {
+        current_hart().get_mut_pps().dec_sum_cnt();
     }
 }
