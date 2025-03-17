@@ -38,7 +38,7 @@ pub async fn trap_handler(task: &Arc<Task>) -> bool {
 }
 
 pub async fn user_exception_handler(task: &Arc<Task>, e: Exception) {
-    let mut cx = task.trap_context_mut();
+    let mut cx = task.trap_context_spinlock_mut().lock();
     match e {
         // 系统调用
         Exception::UserEnvCall => {
@@ -47,8 +47,9 @@ pub async fn user_exception_handler(task: &Arc<Task>, e: Exception) {
             cx.sepc_forward();
 
             let sys_ret = syscall(syscall_no, cx.syscall_args()).await;
+            drop(cx);
 
-            cx = task.trap_context_mut();
+            cx = task.trap_context_spinlock_mut().lock();
             cx.set_user_a0(sys_ret);
         }
         // 内存错误

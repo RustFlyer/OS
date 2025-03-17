@@ -93,7 +93,7 @@ pub fn rust_main(hart_id: usize) -> ! {
         );
         log::info!("====== kernel memory layout end ======");
 
-        boot::start_harts(hart_id);
+        // boot::start_harts(hart_id);
 
         when_debug!({
             simdebug::backtrace_test();

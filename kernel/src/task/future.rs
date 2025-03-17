@@ -84,10 +84,15 @@ impl<F: Future + Send + 'static> Future for KernelFuture<F> {
 ///
 /// 这是任务执行的顶层循环，处理任务状态转换和事件处理
 pub async fn task_executor_unit(task: Arc<Task>) {
+    log::debug!("run task in first time!");
     // 设置任务的唤醒器（从当前上下文中获取）
     task.set_waker(take_waker().await);
     loop {
+        log::debug!("try to step into user!");
+
         trap::trap_return(&task); // trap_return_
+
+        log::debug!("return from user!");
 
         match task.get_state() {
             TaskState::Zombie => break,
@@ -98,6 +103,7 @@ pub async fn task_executor_unit(task: Arc<Task>) {
         }
 
         trap::trap_handler(&task); // trap_handle_
+        log::debug!("return from kernel trap_handle!");
 
         match task.get_state() {
             TaskState::Zombie => break,

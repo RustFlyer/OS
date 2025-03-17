@@ -7,3 +7,4 @@ edition = "2024"
 mutex = { path = "../mutex/" }
 async-task =  { workspace = true }
 lazy_static = { workspace = true }
+log = { workspace = true }

@@ -97,6 +97,7 @@ version = "0.1.0"
 dependencies = [
  "async-task",
  "lazy_static",
+ "log",
  "mutex",
 ]
 
