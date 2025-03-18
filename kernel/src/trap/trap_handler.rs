@@ -49,7 +49,9 @@ pub async fn user_exception_handler(task: &Arc<Task>, e: Exception) {
         // 系统调用
         Exception::UserEnvCall => {
             let syscall_no = cx.syscall_no();
-            log::trace!("[trap_handler] user env call: syscall_no = {}", syscall_no);
+            simdebug::when_debug!({
+                log::trace!("[trap_handler] user env call: syscall_no = {}", syscall_no);
+            });
             cx.sepc_forward();
 
             let sys_ret = syscall(syscall_no, cx.syscall_args()).await;

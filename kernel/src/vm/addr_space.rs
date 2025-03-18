@@ -119,11 +119,13 @@ impl AddrSpace {
     /// Returns [`SysError::EFAULT`] if the fault address is invalid or the access permission
     /// is not allowed.
     pub fn handle_page_fault(&mut self, fault_addr: VirtAddr, access: MemPerm) -> SysResult<()> {
-        log::trace!(
-            "Page fault when accessing {:#x}, type: {:?}",
-            fault_addr.to_usize(),
-            access
-        );
+        simdebug::when_debug!({
+            log::trace!(
+                "Page fault when accessing {:#x}, type: {:?}",
+                fault_addr.to_usize(),
+                access
+            );
+        });
         let page_table = &mut self.page_table;
         let vma = self
             .vm_areas
