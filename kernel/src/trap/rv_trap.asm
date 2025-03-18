@@ -22,7 +22,7 @@ __trap_from_user:
     csrrw sp, sscratch, sp
     # Now, sp points to *TrapContext in kernel space, sscratch holds the user stack pointer
     
-    # Save general-purpose registers
+    # Save general-purpose registers, 0*8 is always 0.
     sd x1, 1*8(sp)
     # Skip sp (x2), it will be saved later
     
