@@ -1,5 +1,5 @@
 use super::trap_env::set_kernel_stvec;
-use crate::syscall;
+use crate::syscall::syscall;
 use crate::task::{Task, TaskState, yield_now};
 use crate::trap::load_trap_handler;
 use crate::vm::mem_perm::MemPerm;

@@ -27,8 +27,6 @@ use mm::{self, frame, heap};
 use processor::hart;
 use simdebug::when_debug;
 
-pub use syscall::syscall;
-
 #[macro_use]
 extern crate alloc;
 

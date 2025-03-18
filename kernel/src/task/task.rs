@@ -121,14 +121,17 @@ impl Task {
         self.inner.exclusive_access().children.remove(&child.tid());
     }
 
+    #[allow(clippy::mut_from_ref)]
     pub fn trap_context_mut(&self) -> &mut TrapContext {
         unsafe { &mut *self.trap_context.get() }
     }
 
+    #[allow(clippy::mut_from_ref)]
     pub fn timer_mut(&self) -> &mut TaskTimeStat {
         unsafe { &mut *self.timer.get() }
     }
 
+    #[allow(clippy::mut_from_ref)]
     pub fn waker_mut(&self) -> &mut Option<Waker> {
         unsafe { &mut *self.waker.get() }
     }
