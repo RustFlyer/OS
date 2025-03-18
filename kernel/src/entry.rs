@@ -18,7 +18,10 @@
 
 use core::arch::naked_asm;
 
-use config::{device::MAX_HARTS, mm::{KERNEL_MAP_OFFSET, KERNEL_STACK_SIZE, PTE_PER_TABLE}};
+use config::{
+    device::MAX_HARTS,
+    mm::{KERNEL_MAP_OFFSET, KERNEL_STACK_SIZE, PTE_PER_TABLE},
+};
 
 use crate::rust_main;
 
@@ -38,8 +41,8 @@ struct BootPageTable([u64; PTE_PER_TABLE]);
 static mut BOOT_PAGE_TABLE: BootPageTable = {
     let mut arr: [u64; 512] = [0; 512];
     // Flags: VRWXAD
-    arr[2] = (0x80000 << 10) | 0xcf;
-    arr[258] = (0x80000 << 10) | 0xcf;
+    arr[2] = (0x80000 << 10) | 0xdf;
+    arr[258] = (0x80000 << 10) | 0xdf;
     BootPageTable(arr)
 };
 
@@ -51,6 +54,8 @@ unsafe extern "C" fn _start(hart_id: usize) -> ! {
         // Enable Sv39 page table
         // satp = (8 << 60) | ppn
         "
+            li      t3, 1 << 17
+            csrrs   x0, sstatus, t3
             la      t0, {page_table_pa}
             srli    t0, t0, 12              // t0 = ppn of page table
             li      t1, 8 << 60
@@ -69,6 +74,15 @@ unsafe extern "C" fn _start(hart_id: usize) -> ! {
             la      sp, {boot_stack_pa}
             add     sp, sp, t1
             add     sp, sp, t0
+        ",
+        // just test
+        "
+            auipc   t3, 0
+            addi    t3, t3, 16
+            csrw    sepc, t3
+            sret
+            nop
+            nop
         ",
         // Jump to the virtual address of `rust_main`
         "

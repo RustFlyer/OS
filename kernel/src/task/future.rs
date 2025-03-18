@@ -24,6 +24,7 @@ pub struct UserFuture<F: Future + Send + 'static> {
 }
 
 impl<F: Future + Send + 'static> UserFuture<F> {
+    #[inline]
     pub fn new(task: Arc<Task>, future: F) -> Self {
         Self {
             task,
@@ -88,11 +89,11 @@ pub async fn task_executor_unit(task: Arc<Task>) {
     // 设置任务的唤醒器（从当前上下文中获取）
     task.set_waker(take_waker().await);
     loop {
-        log::debug!("try to step into user!");
+        // log::debug!("try to step into user!");
 
         trap::trap_return(&task); // trap_return_
 
-        log::debug!("return from user!");
+        // log::debug!("return from user!");
 
         match task.get_state() {
             TaskState::Zombie => break,
@@ -102,8 +103,7 @@ pub async fn task_executor_unit(task: Arc<Task>) {
             _ => {}
         }
 
-        trap::trap_handler(&task); // trap_handle_
-        log::debug!("return from kernel trap_handle!");
+        trap::trap_handler(&task).await; // trap_handle_
 
         match task.get_state() {
             TaskState::Zombie => break,

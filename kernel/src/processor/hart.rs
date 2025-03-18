@@ -77,13 +77,11 @@ impl Hart {
     pub fn user_switch_in(&mut self, new_task: &mut Arc<Task>, pps: &mut ProcessorPrivilegeState) {
         // todo!();
         disable_interrupt();
-        pps.auto_sum();
         core::mem::swap(self.get_mut_pps(), pps);
-        let mut old_space: &AddrSpace = unsafe { core::mem::zeroed() };
-        // if let Some(old_task) = &self.task {
-        //     old_space = old_task.addr_space_mut().lock();
-        // }
-        new_task.switch_pagetable(old_space);
+        pps.auto_sum();
+        unsafe {
+            new_task.switch_addr_space();
+        }
         self.set_task(Arc::clone(new_task));
         enable_interrupt();
     }
@@ -132,9 +130,6 @@ pub fn current_hart() -> &'static mut Hart {
         asm!("mv {}, tp", out(reg) tp);
         ret = &mut *(tp as *mut Hart);
     }
-    when_debug!({
-        ret = one_hart();
-    });
 
     ret
 }

@@ -15,6 +15,7 @@ struct MutexGuard<'a, T: ?Sized, S: MutexSupport> {
 }
 
 /// `SpinMutex` can include different `MutexSupport` type
+#[derive(Debug)]
 pub struct SpinMutex<T: ?Sized, S: MutexSupport> {
     // debug_cnt: UnsafeCell<usize>,
     lock: AtomicBool,

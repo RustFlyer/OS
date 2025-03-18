@@ -51,7 +51,7 @@ impl AddrSpace {
             let memory_slice = &elf_data[offset..offset + segment.p_filesz as usize];
 
             let flags = segment.p_flags;
-            let mut pte_flags = PteFlags::U | PteFlags::A | PteFlags::D;
+            let mut pte_flags = PteFlags::U;
             if flags & elf::abi::PF_X != 0 {
                 pte_flags |= PteFlags::X;
             }
@@ -63,6 +63,7 @@ impl AddrSpace {
             }
 
             let area = VmArea::new_memory_backed(va_start, va_end, pte_flags, memory_slice);
+            log::debug!("Added memory-backed VMA: {:#x?}", area);
             self.add_area(area)?;
         }
 
@@ -82,6 +83,7 @@ impl AddrSpace {
         let stack = VmArea::new_stack(
             VirtAddr::new(USER_STACK_LOWER),
             VirtAddr::new(USER_STACK_UPPER),
+            PteFlags::U,
         );
         let stack_bottom = stack.end_va();
         self.add_area(stack)?;

@@ -14,8 +14,8 @@ use riscv::{
 use timer::TIMER_MANAGER;
 
 /// handle exception or interrupt from a task, return if success.
-/// __trap_from_user saved TrapContext, then jump to 
-/// the middle of trap_return(), and then return to 
+/// __trap_from_user saved TrapContext, then jump to
+/// the middle of trap_return(), and then return to
 /// task_executor_unit(), which calls this trap_handler() function.
 #[unsafe(no_mangle)]
 pub async fn trap_handler(task: &Arc<Task>) -> bool {
@@ -24,8 +24,10 @@ pub async fn trap_handler(task: &Arc<Task>) -> bool {
     let sepc = sepc::read();
     let cause = scause.cause();
 
-    log::trace!("[trap_handler] user task trap into kernel");
-    log::trace!("[trap_handler] sepc:{:#x}, stval:{:#x}", sepc, stval);
+    simdebug::when_debug!({
+        log::trace!("[trap_handler] user task trap into kernel");
+        log::trace!("[trap_handler] sepc:{:#x}, stval:{:#x}", sepc, stval);
+    });
 
     unsafe { load_trap_handler() };
 
@@ -41,7 +43,7 @@ pub async fn trap_handler(task: &Arc<Task>) -> bool {
 }
 
 pub async fn user_exception_handler(task: &Arc<Task>, e: Exception) {
-    let mut cx = task.trap_context_spinlock_mut().lock();
+    let mut cx = task.trap_context_mut();
     match e {
         // 系统调用
         Exception::UserEnvCall => {
@@ -52,7 +54,7 @@ pub async fn user_exception_handler(task: &Arc<Task>, e: Exception) {
             let sys_ret = syscall(syscall_no, cx.syscall_args()).await;
             drop(cx);
 
-            cx = task.trap_context_spinlock_mut().lock();
+            cx = task.trap_context_mut();
             cx.set_user_a0(sys_ret);
         }
         // 内存错误
@@ -70,10 +72,10 @@ pub async fn user_exception_handler(task: &Arc<Task>, e: Exception) {
             {
                 // Should send a `SIGSEGV` signal to the task
                 log::debug!(
-                    "[trap_handler] page fault at {:#x}, access: {:?}, error: {:?}",
+                    "[user_exception_handler] unsolved page fault at {:#x}, access: {:?}, error: {:?}",
                     stval::read(),
                     access,
-                    e
+                    e.as_str()
                 );
                 unimplemented!();
             }

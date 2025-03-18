@@ -3,6 +3,8 @@
 //! This module provides the `Pte` type, which represents a page table entry,
 //! along with functions for creating and manipulating page table entries.
 
+use core::fmt::{self, Debug, Formatter};
+
 use bitflags::bitflags;
 
 use config::mm::PPN_WIDTH_SV39;
@@ -56,7 +58,7 @@ bitflags! {
 /// The lower 8 bits of an entry are flags, bits 10-53 are the physical page
 /// number, and the upper 10 bits are reserved for extensions. In our
 /// implementation, the upper 10 bits are always zero.
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 pub struct PageTableEntry {
     bits: usize,
@@ -139,5 +141,14 @@ impl Default for PageTableEntry {
     /// Returns a default page table entry which is invalid (unmapped).
     fn default() -> Self {
         PageTableEntry { bits: 0 }
+    }
+}
+
+impl Debug for PageTableEntry {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PageTableEntry")
+            .field("ppn", &self.ppn())
+            .field("flags", &self.flags())
+            .finish()
     }
 }
