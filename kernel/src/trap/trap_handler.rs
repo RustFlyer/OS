@@ -3,6 +3,7 @@ use crate::syscall;
 use crate::task::{Task, TaskState, yield_now};
 use crate::trap::load_trap_handler;
 use crate::vm::mem_perm::MemPerm;
+use crate::vm::user_ptr::UserReadPtr;
 use alloc::sync::Arc;
 use arch::riscv64::time::{get_time_duration, set_nx_timer_irq};
 use mm::address::VirtAddr;
@@ -47,8 +48,8 @@ pub async fn user_exception_handler(task: &Arc<Task>, e: Exception) {
     match e {
         // 系统调用
         Exception::UserEnvCall => {
-            log::trace!("[trap_handler] user env call");
             let syscall_no = cx.syscall_no();
+            log::trace!("[trap_handler] user env call: syscall_no = {}", syscall_no);
             cx.sepc_forward();
 
             let sys_ret = syscall(syscall_no, cx.syscall_args()).await;
@@ -71,7 +72,7 @@ pub async fn user_exception_handler(task: &Arc<Task>, e: Exception) {
                 .handle_page_fault(VirtAddr::new(stval::read()), access)
             {
                 // Should send a `SIGSEGV` signal to the task
-                log::debug!(
+                log::error!(
                     "[user_exception_handler] unsolved page fault at {:#x}, access: {:?}, error: {:?}",
                     stval::read(),
                     access,
@@ -87,6 +88,11 @@ pub async fn user_exception_handler(task: &Arc<Task>, e: Exception) {
                 stval::read(),
                 sepc::read(),
             );
+            let mut addr_space_lock = task.addr_space_mut().lock();
+            let mut user_ptr = UserReadPtr::<u32>::new(sepc::read(), &mut *addr_space_lock);
+            log::warn!("The illegal instruction is {:#x}", unsafe {
+                user_ptr.read().unwrap()
+            });
             task.set_state(TaskState::Zombie);
         }
         // 其他异常

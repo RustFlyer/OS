@@ -40,7 +40,7 @@ impl ProcessorPrivilegeState {
 
     pub fn inc_sum_cnt(&mut self) {
         if self.sum_cnt == 0 {
-            unsafe { sstatus::clear_sum() };
+            unsafe { sstatus::set_sum() };
         }
         self.sum_cnt += 1;
     }

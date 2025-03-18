@@ -108,7 +108,7 @@ env:
 
 # Main build target: compiles the kernel
 PHONY += build
-build: env
+build: env user
 	@echo Platform: $(BOARD)
 	@cd kernel && make build
 	@echo "Updated: $(KERNEL_ELF)"
@@ -143,12 +143,12 @@ disasm: $(KERNEL_ASM)
 
 # Start QEMU in debug server mode (port 1234)
 PHONY += gdbserver
-gdbserver:
+gdbserver: all
 	@$(QEMU) $(QEMU_ARGS) -s -S
 
 # Connect GDB to running QEMU instance
 PHONY += gdbclient
-gdbclient:
+gdbclient: all
 	@$(GDB) -ex 'file $(KERNEL_ELF)' \
 			-ex 'set arch riscv:rv64' \
 			-ex 'target remote localhost:1234'

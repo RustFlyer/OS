@@ -68,7 +68,6 @@ impl AddrSpace {
     pub fn build_user() -> SysResult<Self> {
         let mut addr_space = Self::build()?;
         addr_space.page_table.map_kernel();
-        log::debug!("Address space created: {:#x?}", addr_space);
         Ok(addr_space)
     }
 
@@ -120,12 +119,11 @@ impl AddrSpace {
     /// Returns [`SysError::EFAULT`] if the fault address is invalid or the access permission
     /// is not allowed.
     pub fn handle_page_fault(&mut self, fault_addr: VirtAddr, access: MemPerm) -> SysResult<()> {
-        log::info!(
-            "Page fault at {:#x}, access: {:?}",
+        log::trace!(
+            "Page fault when accessing {:#x}, type: {:?}",
             fault_addr.to_usize(),
             access
         );
-        print_page_table_entries(&self.page_table, fault_addr);
         let page_table = &mut self.page_table;
         let vma = self
             .vm_areas

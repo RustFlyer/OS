@@ -16,6 +16,5 @@ use crate::loader::get_app_data_by_name;
 
 pub fn init() {
     let elf_data = get_app_data_by_name("hello_world").unwrap();
-    log::debug!("try to load init data in app");
     Task::spawn_from_elf(elf_data);
 }

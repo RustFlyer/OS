@@ -110,13 +110,11 @@ impl VmArea {
     }
 
     /// Constructs a [`VmArea`] whose specific type is [`TypedArea::Stack`].
-    ///
-    /// `flags` needs to have `UG` bits set properly.
-    pub fn new_stack(start_va: VirtAddr, end_va: VirtAddr, flags: PteFlags) -> Self {
+    pub fn new_stack(start_va: VirtAddr, end_va: VirtAddr) -> Self {
         Self {
             start_va,
             end_va,
-            flags: (flags & (PteFlags::U | PteFlags::G))
+            flags: PteFlags::U
                 | PteFlags::R
                 | PteFlags::W
                 | PteFlags::V
@@ -277,7 +275,8 @@ impl MemoryBackedArea {
         // 2. Region to fill with zeros.
         // 3. Region that is not in the VMA thus not filled.
         let fill_va_start = VirtAddr::max(vma_start, fault_addr.round_down());
-        let fill_va_end = VirtAddr::min(vma_end, fault_addr.round_up());
+        let fill_va_end =
+            VirtAddr::min(vma_end, VirtAddr::new(fault_addr.to_usize() + 1).round_up());
         let fill_len = fill_va_end.to_usize() - fill_va_start.to_usize();
         let page_offset = fill_va_start.page_offset();
         let area_offset = fill_va_start.to_usize() - vma_start.to_usize();
@@ -337,7 +336,7 @@ impl StackArea {
         } = info;
 
         // Check permission.
-        if !access.contains(perm) {
+        if !perm.contains(access) {
             return Err(SysError::EFAULT);
         }
 

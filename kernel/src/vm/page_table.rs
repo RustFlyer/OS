@@ -112,8 +112,6 @@ impl PageTable {
         let alloc_vma = VmArea::new_kernel(alloc_start_va, alloc_end_va, alloc_flags);
         KernelArea::map(&alloc_vma, &mut page_table);
 
-        print_page_table_entries(&page_table, VirtAddr::new(text_start()));
-
         page_table
     }
 
@@ -123,28 +121,28 @@ impl PageTable {
     }
 
     /// Adds a `FrameTracker` to the page table so that the frame can be deallocated
-    /// when the `PageTable` is dropped. Any page table frame exclusive to the page table
-    /// must be tracked by calling this method.
+    /// when the `PageTable` is dropped. Any page table frame exclusive to the page
+    /// table must be tracked by calling this method.
     pub fn track_frame(&mut self, frame: FrameTracker) {
         self.frames.push(frame);
     }
 
     /// Returns a mutable reference to a leaf page table entry mapping a given VPN.
-    /// This method sets any non-present intermediate entries and creates intermediate
-    /// page tables if necessary. Note that the returned entry may be invalid.
+    /// This method creates absent non-leaf entries using `inner_flags`. Note that
+    /// the returned entry may be invalid.
     ///
-    /// `inner_flags` is the flags for newly created intermediate entries, if any. Only
-    /// bits `UG` are used, as the intermediate entries cannot have bits `XWRAD` and must
-    /// have bit `V` set.
+    /// `inner_flags` are the flags for newly created non-leaf entries, if any.
+    /// Several bits in the parameter can be set, but only bit `G` of it is used,
+    /// as the non-leaf entries can only have bits `VG` set, and `V` is mandatory.
     ///
-    /// This function only support 4 KiB pages.
+    /// This function only support 4 KiB pages, 3-level page tables.
     pub fn find_entry_create(
         &mut self,
         vpn: VirtPageNum,
         inner_flags: PteFlags,
     ) -> &mut PageTableEntry {
         let mut ppn = self.root;
-        let inner_flags = PteFlags::V | (inner_flags & (PteFlags::U | PteFlags::G));
+        let inner_flags = PteFlags::V | (inner_flags & PteFlags::G);
         for (i, index) in vpn.indices().into_iter().enumerate().rev() {
             let mut page_table = unsafe { PageTableMem::new(ppn) };
             let entry = page_table.get_entry_mut(index);
@@ -154,12 +152,6 @@ impl PageTable {
             if !entry.is_valid() {
                 let frame = FrameTracker::build().expect("out of memory");
                 *entry = PageTableEntry::new(frame.as_ppn(), inner_flags);
-                log::debug!(
-                    "Allocated frame {:#x} for page table at {:#x}, entry at {:#x}",
-                    frame.as_ppn().address().to_usize(),
-                    entry as *mut _ as usize,
-                    index
-                );
                 self.track_frame(frame);
             }
             ppn = entry.ppn();
@@ -168,10 +160,10 @@ impl PageTable {
     }
 
     /// Returns a mutable reference to a leaf page table entry mapping a given VPN.
-    /// If any intermediate entry is not present, returns `None`. Note that the returned
+    /// If any non-leaf entry is not present, returns `None`. Note that the returned
     /// entry may be invalid.
     ///
-    /// This function only support 4 KiB pages.
+    /// This function only support 4 KiB pages, 3-level page tables.
     pub fn find_entry(&mut self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
         let mut ppn = self.root;
         for (i, index) in vpn.indices().into_iter().enumerate().rev() {
@@ -197,8 +189,8 @@ impl PageTable {
     ///
     /// # Note
     /// This function takes `flags` as the flags for the leaf page table entry, and
-    /// it takes bits `UG` to set the flags for intermediate entries. This design
-    /// reduces the granularity of control over intermediate entries, but it is
+    /// it takes bits `G` to set the flags for intermediate entries. This design
+    /// provides a lower granularity of control over intermediate entries, but it is
     /// sufficient for the current address space layout.
     pub fn map_page(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PteFlags) {
         let entry = self.find_entry_create(vpn, flags);
@@ -217,18 +209,24 @@ impl PageTable {
         }
     }
 
-    /// Maps a range of leaf pages by specifying the starting VPN, a slice of PPNs, and
-    /// page table entry flags.
+    /// Maps a range of leaf pages by specifying the starting VPN, a slice of PPNs,
+    /// and page table entry flags.
     ///
     /// The range is `[start_vpn, start_vpn + ppns.len())`. The range must be valid
     /// and not overlap with existing mappings. The range length must not be zero.
     ///
-    /// This methods does not allocate the frames for the leaf pages. It only sets the mappings
-    /// in the page table. The caller should allocate frames and set the mappings by calling
-    /// this method. Be careful that calling this method with an already mapped `vpn` will
-    /// overwrite the existing mapping.
+    /// This methods does not allocate the frames for the leaf pages. It only sets
+    /// the mappings in the page table. The caller should allocate frames and set the
+    /// mappings by calling this method. Be careful that calling this method with an
+    /// already mapped `vpn` will overwrite the existing mapping.
+    ///
+    /// # Note
+    /// By the current implementation, any non-leaf entry is created with the same
+    /// `G` bit as the leaf entries. This design is sufficient for the current
+    /// address space layout.
     pub fn map_range(&mut self, start_vpn: VirtPageNum, ppns: &[PhysPageNum], flags: PteFlags) {
-        // Optimization is applied to cut down most unnecessary page table lookups.
+        // Optimization is applied to cut down redundant lookups to entries in the
+        // same leaf page table.
         let mut entry = self.find_entry_create(start_vpn, flags);
         *entry = PageTableEntry::new(ppns[0], flags);
         for (i, &ppn) in ppns.iter().enumerate().skip(1) {
@@ -236,8 +234,8 @@ impl PageTable {
             entry = if vpn % PTE_PER_TABLE == 0 {
                 self.find_entry_create(VirtPageNum::new(vpn), flags)
             } else {
-                // SAFETY: the entry is not the last one in its page table,
-                // thus the next entry is valid.
+                // SAFETY: the entry is not the last one in its page table, so the
+                // next entry of `entry` is valid.
                 unsafe { &mut *(entry as *mut PageTableEntry).add(1) }
             };
             *entry = PageTableEntry::new(ppn, flags);
@@ -352,7 +350,7 @@ pub unsafe fn switch_page_table(page_table: &PageTable) {
         satp::write(satp);
     }
     riscv::asm::sfence_vma_all();
-    log::debug!(
+    log::info!(
         "Switched to page table at {:#x}, satp: {:#x}",
         page_table.root().to_usize(),
         satp::read().bits()
