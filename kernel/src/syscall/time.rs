@@ -2,14 +2,15 @@ use arch::riscv64::time::get_time_us;
 use systype::SyscallResult;
 use time::TimeVal;
 
-use crate::processor::current_task;
+use crate::{processor::current_task, vm::user_ptr::UserWritePtr};
 
-pub fn sys_gettimeofday(tv: *const TimeVal, _tz: usize) -> SyscallResult {
+pub fn sys_gettimeofday(tv: usize, _tz: usize) -> SyscallResult {
     let task = current_task();
-    if !tv.is_null() {
+    let mut addrspace = task.addr_space_mut().lock();
+    let mut tv_ptr = UserWritePtr::<TimeVal>::new(tv, &mut addrspace);
+    if !tv_ptr.is_null() {
         unsafe {
-            let mut timeval = &mut *(tv as *mut TimeVal);
-            timeval.get_time_from_us(get_time_us());
+            tv_ptr.write(TimeVal::from_usec(get_time_us()))?;
         }
     }
     Ok(0)

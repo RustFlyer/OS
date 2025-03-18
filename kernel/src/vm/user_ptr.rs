@@ -142,11 +142,8 @@ where
     /// # Safety
     /// The value to be read must be valid.
     pub unsafe fn read(&mut self) -> SysResult<T> {
-        self.addr_space.check_user_access(
-            self.ptr as usize,
-            size_of::<T>(),
-            MemPerm::R,
-        )?;
+        self.addr_space
+            .check_user_access(self.ptr as usize, size_of::<T>(), MemPerm::R)?;
         Ok(unsafe { self.ptr.read() })
     }
 
@@ -177,11 +174,8 @@ where
     /// # Safety
     /// The values to be read must be valid.
     pub unsafe fn read_vector(&mut self, len: usize) -> SysResult<Vec<T>> {
-        self.addr_space.check_user_access(
-            self.ptr as usize,
-            len * size_of::<T>(),
-            MemPerm::R,
-        )?;
+        self.addr_space
+            .check_user_access(self.ptr as usize, len * size_of::<T>(), MemPerm::R)?;
         Ok(Vec::from_raw_parts(self.ptr, len, len))
     }
 
@@ -196,11 +190,8 @@ where
     /// # Safety
     /// The value to be read must be valid.
     pub unsafe fn try_into_ref(&mut self) -> SysResult<&T> {
-        self.addr_space.check_user_access(
-            self.ptr as usize,
-            size_of::<T>(),
-            MemPerm::R,
-        )?;
+        self.addr_space
+            .check_user_access(self.ptr as usize, size_of::<T>(), MemPerm::R)?;
         Ok(unsafe { &*self.ptr })
     }
 
@@ -220,11 +211,8 @@ where
     /// # Safety
     /// The values in the slice must be valid.
     pub unsafe fn try_into_slice(&mut self, len: usize) -> SysResult<&[T]> {
-        self.addr_space.check_user_access(
-            self.ptr as usize,
-            len * size_of::<T>(),
-            MemPerm::R,
-        )?;
+        self.addr_space
+            .check_user_access(self.ptr as usize, len * size_of::<T>(), MemPerm::R)?;
         Ok(unsafe { slice::from_raw_parts(self.ptr, len) })
     }
 }
@@ -333,11 +321,8 @@ where
     /// # Safety
     /// The value to be written must be valid.
     pub unsafe fn write(&mut self, value: T) -> SysResult<()> {
-        self.addr_space.check_user_access(
-            self.ptr as usize,
-            size_of::<T>(),
-            MemPerm::W,
-        )?;
+        self.addr_space
+            .check_user_access(self.ptr as usize, size_of::<T>(), MemPerm::W)?;
         unsafe { self.ptr.write(value) };
         Ok(())
     }
@@ -392,11 +377,8 @@ where
     /// # Safety
     /// The value to be written must be valid.
     pub unsafe fn try_into_ref_mut(&mut self) -> SysResult<&mut T> {
-        self.addr_space.check_user_access(
-            self.ptr as usize,
-            size_of::<T>(),
-            MemPerm::W,
-        )?;
+        self.addr_space
+            .check_user_access(self.ptr as usize, size_of::<T>(), MemPerm::W)?;
         Ok(unsafe { &mut *self.ptr })
     }
 
@@ -416,11 +398,8 @@ where
     /// # Safety
     /// The values in the slice must be valid.
     pub unsafe fn try_into_slice_mut(&mut self, len: usize) -> SysResult<&mut [T]> {
-        self.addr_space.check_user_access(
-            self.ptr as usize,
-            len * size_of::<T>(),
-            MemPerm::W,
-        )?;
+        self.addr_space
+            .check_user_access(self.ptr as usize, len * size_of::<T>(), MemPerm::W)?;
         Ok(unsafe { slice::from_raw_parts_mut(self.ptr, len) })
     }
 }
@@ -434,12 +413,7 @@ impl AddrSpace {
     /// `len` is the length in bytes of the memory region to be accessed.
     ///
     /// Returns `Ok(())` if the access is allowed, otherwise returns an `EFAULT` error.
-    fn check_user_access(
-        &mut self,
-        mut addr: usize,
-        len: usize,
-        perm: MemPerm,
-    ) -> SysResult<()> {
+    fn check_user_access(&mut self, mut addr: usize, len: usize, perm: MemPerm) -> SysResult<()> {
         if len == 0 {
             return Ok(());
         }
@@ -543,8 +517,7 @@ impl AddrSpace {
                     return Err(e);
                 }
             }
-            let end_in_page =
-                usize::min(VirtAddr::new(addr + 1).round_up().to_usize(), end_addr);
+            let end_in_page = usize::min(VirtAddr::new(addr + 1).round_up().to_usize(), end_addr);
             for item_addr in (addr..end_in_page).step_by(size_of::<T>()) {
                 let item = unsafe { *(item_addr as *const T) };
                 match f(item) {

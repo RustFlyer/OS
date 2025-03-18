@@ -71,7 +71,7 @@ pub struct TaskInner {
     parent: Option<Weak<Task>>,
     children: BTreeMap<Tid, Weak<Task>>,
 
-    exit_code: u32,
+    exit_code: i32,
 }
 
 impl Task {
@@ -158,7 +158,7 @@ impl Task {
         }
     }
 
-    pub fn set_exit_code(&self, exit_code: u32) {
+    pub fn set_exit_code(&self, exit_code: i32) {
         self.inner.exclusive_access().set_exit_code(exit_code);
     }
 
@@ -170,7 +170,7 @@ impl Task {
         unsafe { self.waker_mut().as_ref().unwrap().clone() }
     }
 
-    pub fn get_exit_code(&self) -> u32 {
+    pub fn get_exit_code(&self) -> i32 {
         self.inner.exclusive_access().exit_code
     }
 
@@ -250,7 +250,7 @@ impl TaskInner {
         self.exit_code = 0;
     }
 
-    pub fn set_exit_code(&mut self, exit_code: u32) {
+    pub fn set_exit_code(&mut self, exit_code: i32) {
         self.exit_code = exit_code;
     }
 }

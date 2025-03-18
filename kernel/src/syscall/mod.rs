@@ -6,9 +6,14 @@ use core::slice;
 
 use ::time::TimeVal;
 use consts::SyscallNo::{self, *};
+use process::sys_exit;
 use time::*;
 
-use crate::{print, processor::current_task, vm::user_ptr::UserReadPtr};
+use crate::{
+    print,
+    processor::current_task,
+    vm::user_ptr::{UserReadPtr, UserWritePtr},
+};
 
 pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
     let Some(syscall_no) = SyscallNo::from_repr(syscall_no) else {
@@ -17,7 +22,8 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
     };
 
     let result = match syscall_no {
-        GETTIMEOFDAY => sys_gettimeofday(args[0] as *const TimeVal, args[1]),
+        GETTIMEOFDAY => sys_gettimeofday(args[0], args[1]),
+        EXIT => sys_exit(args[0] as i32),
         WRITE => {
             // A temporary implementation for writing to console
             if args[0] == 1 {
