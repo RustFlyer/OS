@@ -32,9 +32,7 @@
 //!   for `read_unchecked` and `write_unchecked` functions.
 
 use core::{
-    marker::PhantomData,
-    ops::{ControlFlow, Deref, DerefMut},
-    slice,
+    fmt::Debug, marker::PhantomData, ops::{ControlFlow, Deref, DerefMut}, slice
 };
 
 use alloc::vec::Vec;
@@ -111,7 +109,9 @@ where
 
     /// Marker to indicate the access type of the pointer.
     _access: PhantomData<A>,
-    /// Guard to ensure the `SUM` bit of `sstatus` register is set when accessing the memory.
+
+    /// Guard to ensure the `SUM` bit of `sstatus` register is set when accessing
+    /// the memory.
     sum_guard: SumGuard,
 }
 
@@ -193,7 +193,7 @@ where
     ///
     /// # Safety
     /// See the module-level documentation for safety information.
-    pub unsafe fn read_vector(&mut self, len: usize) -> SysResult<Vec<T>> {
+    pub unsafe fn read_array(&mut self, len: usize) -> SysResult<Vec<T>> {
         self.addr_space.check_user_access(
             self.ptr as usize,
             len * size_of::<T>(),
@@ -202,6 +202,7 @@ where
         let mut vec: Vec<T> = Vec::with_capacity(len);
         unsafe {
             vec.as_mut_ptr().copy_from_nonoverlapping(self.ptr, len);
+            vec.set_len(len);
         }
         Ok(vec)
     }
@@ -229,8 +230,9 @@ where
     ///
     /// `len` is the number of values in the slice.
     ///
-    /// This function distinguish itself from `read_vector` by returning a slice
-    /// in user space, instead of a vector, which may be more efficient in some cases.
+    /// This function distinguish itself from `read_array` by returning a slice
+    /// pointing to somewhre in the user space, instead of a vector, which may be
+    /// more efficient in some cases.
     ///
     /// # Error
     /// Returns an `EFAULT` error if the memory location is not accessible.
@@ -244,7 +246,8 @@ where
     }
 }
 
-/// Blanket implementation for read-access pointers, whose target type is a raw pointer.
+/// Blanket implementation for read-access pointers, whose target type is a
+/// raw pointer.
 impl<T, A> UserPtr<'_, *const T, A>
 where
     A: ReadAccess,
@@ -379,7 +382,7 @@ where
     ///
     /// # Safety
     /// See the module-level documentation for safety information.
-    pub unsafe fn write_vector(&mut self, values: &[T]) -> SysResult<()> {
+    pub unsafe fn write_array(&mut self, values: &[T]) -> SysResult<()> {
         self.addr_space.check_user_access(
             self.ptr as usize,
             values.len() * size_of::<T>(),
@@ -411,15 +414,17 @@ where
         Ok(unsafe { &mut *self.ptr })
     }
 
-    /// Tries to convert the pointer to a mutable slice of values, with the given length.
+    /// Tries to convert the pointer to a mutable slice of values, with the given
+    /// length.
     ///
     /// This function will check if the memory location is accessible and try to
     /// convert the pointer to a mutable slice of values.
     ///
     /// `len` is the number of values in the slice.
     ///
-    /// This function distinguish itself from `write_vector` by returning a mutable slice
-    /// in user space, instead of a vector, which may be more efficient in some cases.
+    /// This function distinguish itself from `write_array` by returning a slice
+    /// pointing to somewhre in the user space, which provides more flexibility
+    /// when writing to user space.
     ///
     /// # Error
     /// Returns an `EFAULT` error if the memory location is not accessible.
