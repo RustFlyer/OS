@@ -35,14 +35,31 @@ use super::{
     addr_space::{self, AddrSpace},
     mem_perm::MemPerm,
 };
-use crate::{processor::current_hart, trap::trap_env::{set_kernel_stvec, set_kernel_stvec_user_rw}};
+use crate::{
+    processor::current_hart,
+    trap::trap_env::{set_kernel_stvec, set_kernel_stvec_user_rw},
+};
+
+/// Smart pointer that can be used to read memory in user address space.
+pub type UserReadPtr<'a, T> = UserPtr<'a, T, ReadMarker>;
+/// Smart pointer that can be used to write memory in user address space.
+pub type UserWritePtr<'a, T> = UserPtr<'a, T, WriteMarker>;
+/// Smart pointer that can be used to read and write memory in user address space.
+pub type UserReadWritePtr<'a, T> = UserPtr<'a, T, ReadWriteMarker>;
 
 trait AccessType {}
 trait ReadAccess: AccessType {}
 trait WriteAccess: AccessType {}
-struct ReadMarker;
-struct WriteMarker;
-struct ReadWriteMarker;
+
+/// Marker for read access.
+/// Do not use this type; it is public only to allow the use of `User*Ptr` types.
+pub struct ReadMarker;
+/// Marker for write access.
+/// Do not use this type; it is public only to allow the use of `User*Ptr` types.
+pub struct WriteMarker;
+/// Marker for read-write access.
+/// Do not use this type; it is public only to allow the use of `User*Ptr` types.
+pub struct ReadWriteMarker;
 
 impl AccessType for ReadMarker {}
 impl AccessType for WriteMarker {}
@@ -52,19 +69,12 @@ impl WriteAccess for WriteMarker {}
 impl ReadAccess for ReadWriteMarker {}
 impl WriteAccess for ReadWriteMarker {}
 
-/// A smart pointer that can be used to read memory in user address space.
-pub type UserReadPtr<'a, T> = UserPtr<'a, T, ReadMarker>;
-
-/// A smart pointer that can be used to write memory in user address space.
-pub type UserWritePtr<'a, T> = UserPtr<'a, T, WriteMarker>;
-
-/// A smart pointer that can be used to read and write memory in user address space.
-pub type UserReadWritePtr<'a, T> = UserPtr<'a, T, ReadWriteMarker>;
-
 /// Base type used to implement the smart pointers for read, write, and read-write access,
 /// uniformly.
+///
+/// Do not use this type; it is public only to allow the use of `User*Ptr` types.
 #[derive(Debug)]
-struct UserPtr<'a, T, A>
+pub struct UserPtr<'a, T, A>
 where
     A: AccessType,
 {
@@ -93,6 +103,9 @@ where
     ///
     /// This function may construct a valid or invalid `UserPtr` depending on the
     /// address provided.
+    ///
+    /// A mutable reference to `AddrSpace` is needed because we may need to handle
+    /// page faults when accessing the memory, which may mutate the page table.
     pub fn new(addr: usize, addr_space: &'a mut AddrSpace) -> Self {
         Self {
             ptr: addr as *mut T,
@@ -114,7 +127,7 @@ where
 }
 
 /// Blanket implementation for read-access pointers.
-impl<'a, T, A> UserPtr<'a, T, A>
+impl<T, A> UserPtr<'_, T, A>
 where
     A: ReadAccess,
 {
@@ -129,8 +142,11 @@ where
     /// # Safety
     /// The value to be read must be valid.
     pub unsafe fn read(&mut self) -> SysResult<T> {
-        self.addr_space
-            .check_user_access(self.ptr as usize, size_of::<T>(), MemPerm::R)?;
+        self.addr_space.check_user_access(
+            self.ptr as usize,
+            size_of::<T>(),
+            MemPerm::R,
+        )?;
         Ok(unsafe { self.ptr.read() })
     }
 
@@ -161,8 +177,11 @@ where
     /// # Safety
     /// The values to be read must be valid.
     pub unsafe fn read_vector(&mut self, len: usize) -> SysResult<Vec<T>> {
-        self.addr_space
-            .check_user_access(self.ptr as usize, len * size_of::<T>(), MemPerm::R)?;
+        self.addr_space.check_user_access(
+            self.ptr as usize,
+            len * size_of::<T>(),
+            MemPerm::R,
+        )?;
         Ok(Vec::from_raw_parts(self.ptr, len, len))
     }
 
@@ -177,8 +196,11 @@ where
     /// # Safety
     /// The value to be read must be valid.
     pub unsafe fn try_into_ref(&mut self) -> SysResult<&T> {
-        self.addr_space
-            .check_user_access(self.ptr as usize, size_of::<T>(), MemPerm::R)?;
+        self.addr_space.check_user_access(
+            self.ptr as usize,
+            size_of::<T>(),
+            MemPerm::R,
+        )?;
         Ok(unsafe { &*self.ptr })
     }
 
@@ -198,14 +220,17 @@ where
     /// # Safety
     /// The values in the slice must be valid.
     pub unsafe fn try_into_slice(&mut self, len: usize) -> SysResult<&[T]> {
-        self.addr_space
-            .check_user_access(self.ptr as usize, len * size_of::<T>(), MemPerm::R)?;
+        self.addr_space.check_user_access(
+            self.ptr as usize,
+            len * size_of::<T>(),
+            MemPerm::R,
+        )?;
         Ok(unsafe { slice::from_raw_parts(self.ptr, len) })
     }
 }
 
 /// Blanket implementation for read-access pointers, whose target type is a raw pointer.
-impl<'a, T, A> UserPtr<'a, *const T, A>
+impl<T, A> UserPtr<'_, *const T, A>
 where
     A: ReadAccess,
 {
@@ -246,7 +271,7 @@ where
     }
 }
 
-impl<'a, A> UserPtr<'a, u8, A>
+impl<A> UserPtr<'_, u8, A>
 where
     A: ReadAccess,
 {
@@ -293,7 +318,7 @@ where
 }
 
 /// Blanket implementation for write-access pointers.
-impl<'a, T, A> UserPtr<'a, T, A>
+impl<T, A> UserPtr<'_, T, A>
 where
     A: WriteAccess,
 {
@@ -308,8 +333,11 @@ where
     /// # Safety
     /// The value to be written must be valid.
     pub unsafe fn write(&mut self, value: T) -> SysResult<()> {
-        self.addr_space
-            .check_user_access(self.ptr as usize, size_of::<T>(), MemPerm::W)?;
+        self.addr_space.check_user_access(
+            self.ptr as usize,
+            size_of::<T>(),
+            MemPerm::W,
+        )?;
         unsafe { self.ptr.write(value) };
         Ok(())
     }
@@ -363,9 +391,12 @@ where
     ///
     /// # Safety
     /// The value to be written must be valid.
-    pub unsafe fn try_into_mut_ref(&mut self) -> SysResult<&mut T> {
-        self.addr_space
-            .check_user_access(self.ptr as usize, size_of::<T>(), MemPerm::W)?;
+    pub unsafe fn try_into_ref_mut(&mut self) -> SysResult<&mut T> {
+        self.addr_space.check_user_access(
+            self.ptr as usize,
+            size_of::<T>(),
+            MemPerm::W,
+        )?;
         Ok(unsafe { &mut *self.ptr })
     }
 
@@ -384,9 +415,12 @@ where
     ///
     /// # Safety
     /// The values in the slice must be valid.
-    pub unsafe fn try_into_mut_slice(&mut self, len: usize) -> SysResult<&mut [T]> {
-        self.addr_space
-            .check_user_access(self.ptr as usize, len * size_of::<T>(), MemPerm::W)?;
+    pub unsafe fn try_into_slice_mut(&mut self, len: usize) -> SysResult<&mut [T]> {
+        self.addr_space.check_user_access(
+            self.ptr as usize,
+            len * size_of::<T>(),
+            MemPerm::W,
+        )?;
         Ok(unsafe { slice::from_raw_parts_mut(self.ptr, len) })
     }
 }
@@ -509,7 +543,8 @@ impl AddrSpace {
                     return Err(e);
                 }
             }
-            let end_in_page = usize::min(VirtAddr::new(addr).round_up().to_usize(), end_addr);
+            let end_in_page =
+                usize::min(VirtAddr::new(addr + 1).round_up().to_usize(), end_addr);
             for item_addr in (addr..end_in_page).step_by(size_of::<T>()) {
                 let item = unsafe { *(item_addr as *const T) };
                 match f(item) {
@@ -539,9 +574,9 @@ impl AddrSpace {
 /// enable kernel memory access to user space.
 unsafe fn try_read(va: usize) -> bool {
     unsafe extern "C" {
-        fn __try_read(va: usize) -> usize;
+        fn __try_read_user(va: usize) -> usize;
     }
-    match __try_read(va) {
+    match __try_read_user(va) {
         0 => true,
         1 => false,
         _ => unreachable!(),
@@ -559,9 +594,9 @@ unsafe fn try_read(va: usize) -> bool {
 /// enable kernel memory access to user space.
 unsafe fn try_write(va: usize) -> bool {
     unsafe extern "C" {
-        fn __try_write(va: usize) -> usize;
+        fn __try_write_user(va: usize) -> usize;
     }
-    match __try_write(va) {
+    match __try_write_user(va) {
         0 => true,
         1 => false,
         _ => unreachable!(),

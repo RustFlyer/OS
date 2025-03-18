@@ -63,7 +63,6 @@ impl AddrSpace {
             }
 
             let area = VmArea::new_memory_backed(va_start, va_end, pte_flags, memory_slice);
-            log::debug!("Added memory-backed VMA: {:#x?}", area);
             self.add_area(area)?;
         }
 
@@ -83,7 +82,6 @@ impl AddrSpace {
         let stack = VmArea::new_stack(
             VirtAddr::new(USER_STACK_LOWER),
             VirtAddr::new(USER_STACK_UPPER),
-            PteFlags::U,
         );
         let stack_bottom = stack.end_va();
         self.add_area(stack)?;
