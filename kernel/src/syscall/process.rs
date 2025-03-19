@@ -2,6 +2,8 @@ use crate::processor::current_task;
 use crate::task::TaskState;
 use systype::SyscallResult;
 
+use crate::task::future::yield_now;
+
 pub fn sys_gettid() -> SyscallResult {
     Ok(current_task().tid())
 }
@@ -22,5 +24,10 @@ pub fn sys_exit(exit_code: i32) -> SyscallResult {
     if task.is_process() {
         task.set_exit_code((exit_code & 0xFF) << 8);
     }
+    Ok(0)
+}
+
+pub async fn sys_sched_yield() -> SyscallResult {
+    yield_now().await;
     Ok(0)
 }

@@ -350,11 +350,13 @@ pub unsafe fn switch_page_table(page_table: &PageTable) {
         satp::write(satp);
     }
     riscv::asm::sfence_vma_all();
-    log::info!(
-        "Switched to page table at {:#x}, satp: {:#x}",
-        page_table.root().to_usize(),
-        satp::read().bits()
-    );
+    simdebug::when_debug!({
+        log::info!(
+            "Switched to page table at {:#x}, satp: {:#x}",
+            page_table.root().to_usize(),
+            satp::read().bits()
+        );
+    });
 }
 
 /// Prints page table entries of each level to resolve a given virtual address.

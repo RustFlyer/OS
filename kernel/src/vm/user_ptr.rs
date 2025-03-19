@@ -13,17 +13,26 @@
 //! If the value is not valid, later use of the value and dropping of the
 //! value are undefined behavior.
 //!
-//! Note that types in this module largely bypass the Rust borrow checker
+//! # Safety
+//!
+//! Types and functions in this module largely bypass the Rust borrow checker
 //! and memory safety guarantees. For example, a `ReadWritePtr` can be used
 //! to get both a shared reference and a mutable reference, or even multiple
 //! mutable references, to the same memory location. This is not safe in Rust;
 //! it is the caller's responsibility to ensure that the memory is not aliased
 //! in this way.
+//!
+//! Functions in this module have some common safety requirements:
+//! - The caller must ensure that the value at the memory location is valid.
+//!   However, because we can never rely on data from user space, this actually
+//!   means that the only types that can be safely read from and write to user
+//!   space are primitive types like integers and pointers. If you create a
+//!   pointer to a struct, you are like to do something wrong.
+//! - The caller must ensure that the memory location is valid and accessible,
+//!   for `read_unchecked` and `write_unchecked` functions.
 
 use core::{
-    marker::PhantomData,
-    ops::{ControlFlow, Deref, DerefMut},
-    slice,
+    fmt::Debug, marker::PhantomData, ops::{ControlFlow, Deref, DerefMut}, slice
 };
 
 use alloc::vec::Vec;
@@ -47,18 +56,28 @@ pub type UserWritePtr<'a, T> = UserPtr<'a, T, WriteMarker>;
 /// Smart pointer that can be used to read and write memory in user address space.
 pub type UserReadWritePtr<'a, T> = UserPtr<'a, T, ReadWriteMarker>;
 
+/// Trait representing the access type of a pointer, i.e., read and/or write.
 trait AccessType {}
+
+/// Trait representing read access.
 trait ReadAccess: AccessType {}
+
+/// Trait representing write access.
 trait WriteAccess: AccessType {}
 
 /// Marker for read access.
 /// Do not use this type; it is public only to allow the use of `User*Ptr` types.
+#[derive(Debug)]
 pub struct ReadMarker;
+
 /// Marker for write access.
 /// Do not use this type; it is public only to allow the use of `User*Ptr` types.
+#[derive(Debug)]
 pub struct WriteMarker;
+
 /// Marker for read-write access.
 /// Do not use this type; it is public only to allow the use of `User*Ptr` types.
+#[derive(Debug)]
 pub struct ReadWriteMarker;
 
 impl AccessType for ReadMarker {}
@@ -90,7 +109,9 @@ where
 
     /// Marker to indicate the access type of the pointer.
     _access: PhantomData<A>,
-    /// Guard to ensure the `SUM` bit of `sstatus` register is set when accessing the memory.
+
+    /// Guard to ensure the `SUM` bit of `sstatus` register is set when accessing
+    /// the memory.
     sum_guard: SumGuard,
 }
 
@@ -140,7 +161,7 @@ where
     /// Returns an `EFAULT` error if the memory location is not accessible.
     ///
     /// # Safety
-    /// The value to be read must be valid.
+    /// See the module-level documentation for safety information.
     pub unsafe fn read(&mut self) -> SysResult<T> {
         self.addr_space
             .check_user_access(self.ptr as usize, size_of::<T>(), MemPerm::R)?;
@@ -155,10 +176,9 @@ where
     /// that the memory location is valid.
     ///
     /// # Safety
-    /// The value to be read must be valid, and the memory location must be
-    /// accessible.
+    /// See the module-level documentation for safety information.
     pub unsafe fn read_uncheked(&mut self) -> T {
-        self.ptr.read()
+        unsafe { self.ptr.read() }
     }
 
     /// Reads an array of values from the memory location.
@@ -172,11 +192,19 @@ where
     /// Returns an `EFAULT` error if the memory location is not accessible.
     ///
     /// # Safety
-    /// The values to be read must be valid.
-    pub unsafe fn read_vector(&mut self, len: usize) -> SysResult<Vec<T>> {
-        self.addr_space
-            .check_user_access(self.ptr as usize, len * size_of::<T>(), MemPerm::R)?;
-        Ok(Vec::from_raw_parts(self.ptr, len, len))
+    /// See the module-level documentation for safety information.
+    pub unsafe fn read_array(&mut self, len: usize) -> SysResult<Vec<T>> {
+        self.addr_space.check_user_access(
+            self.ptr as usize,
+            len * size_of::<T>(),
+            MemPerm::R,
+        )?;
+        let mut vec: Vec<T> = Vec::with_capacity(len);
+        unsafe {
+            vec.as_mut_ptr().copy_from_nonoverlapping(self.ptr, len);
+            vec.set_len(len);
+        }
+        Ok(vec)
     }
 
     /// Tries to convert the pointer to a reference of a value.
@@ -188,7 +216,7 @@ where
     /// Returns an `EFAULT` error if the memory location is not accessible.
     ///
     /// # Safety
-    /// The value to be read must be valid.
+    /// See the module-level documentation for safety information.
     pub unsafe fn try_into_ref(&mut self) -> SysResult<&T> {
         self.addr_space
             .check_user_access(self.ptr as usize, size_of::<T>(), MemPerm::R)?;
@@ -202,14 +230,15 @@ where
     ///
     /// `len` is the number of values in the slice.
     ///
-    /// This function distinguish itself from `read_vector` by returning a slice
-    /// in user space, instead of a vector, which may be more efficient in some cases.
+    /// This function distinguish itself from `read_array` by returning a slice
+    /// pointing to somewhre in the user space, instead of a vector, which may be
+    /// more efficient in some cases.
     ///
     /// # Error
     /// Returns an `EFAULT` error if the memory location is not accessible.
     ///
     /// # Safety
-    /// The values in the slice must be valid.
+    /// See the module-level documentation for safety information.
     pub unsafe fn try_into_slice(&mut self, len: usize) -> SysResult<&[T]> {
         self.addr_space
             .check_user_access(self.ptr as usize, len * size_of::<T>(), MemPerm::R)?;
@@ -217,7 +246,8 @@ where
     }
 }
 
-/// Blanket implementation for read-access pointers, whose target type is a raw pointer.
+/// Blanket implementation for read-access pointers, whose target type is a
+/// raw pointer.
 impl<T, A> UserPtr<'_, *const T, A>
 where
     A: ReadAccess,
@@ -319,7 +349,7 @@ where
     /// Returns an `EFAULT` error if the memory location is not accessible.
     ///
     /// # Safety
-    /// The value to be written must be valid.
+    /// See the module-level documentation for safety information.
     pub unsafe fn write(&mut self, value: T) -> SysResult<()> {
         self.addr_space
             .check_user_access(self.ptr as usize, size_of::<T>(), MemPerm::W)?;
@@ -335,10 +365,9 @@ where
     /// that the memory location is valid.
     ///
     /// # Safety
-    /// The value to be written must be valid, and the memory location must be
-    /// accessible.
+    /// See the module-level documentation for safety information.
     pub unsafe fn write_unchecked(&mut self, value: T) {
-        self.ptr.write(value);
+        unsafe { self.ptr.write(value); }
     }
 
     /// Writes an array of values to the memory location.
@@ -352,8 +381,8 @@ where
     /// Returns an `EFAULT` error if the memory location is not accessible.
     ///
     /// # Safety
-    /// The values to be written must be valid.
-    pub unsafe fn write_vector(&mut self, values: &[T]) -> SysResult<()> {
+    /// See the module-level documentation for safety information.
+    pub unsafe fn write_array(&mut self, values: &[T]) -> SysResult<()> {
         self.addr_space.check_user_access(
             self.ptr as usize,
             values.len() * size_of::<T>(),
@@ -361,8 +390,8 @@ where
         )?;
         unsafe {
             self.ptr
-                .copy_from_nonoverlapping(values.as_ptr(), values.len())
-        };
+                .copy_from_nonoverlapping(values.as_ptr(), values.len());
+        }
         Ok(())
     }
 
@@ -375,31 +404,39 @@ where
     /// Returns an `EFAULT` error if the memory location is not accessible.
     ///
     /// # Safety
-    /// The value to be written must be valid.
-    pub unsafe fn try_into_ref_mut(&mut self) -> SysResult<&mut T> {
-        self.addr_space
-            .check_user_access(self.ptr as usize, size_of::<T>(), MemPerm::W)?;
+    /// See the module-level documentation for safety information.
+    pub unsafe fn try_into_mut_ref(&mut self) -> SysResult<&mut T> {
+        self.addr_space.check_user_access(
+            self.ptr as usize,
+            size_of::<T>(),
+            MemPerm::W,
+        )?;
         Ok(unsafe { &mut *self.ptr })
     }
 
-    /// Tries to convert the pointer to a mutable slice of values, with the given length.
+    /// Tries to convert the pointer to a mutable slice of values, with the given
+    /// length.
     ///
     /// This function will check if the memory location is accessible and try to
     /// convert the pointer to a mutable slice of values.
     ///
     /// `len` is the number of values in the slice.
     ///
-    /// This function distinguish itself from `write_vector` by returning a mutable slice
-    /// in user space, instead of a vector, which may be more efficient in some cases.
+    /// This function distinguish itself from `write_array` by returning a slice
+    /// pointing to somewhre in the user space, which provides more flexibility
+    /// when writing to user space.
     ///
     /// # Error
     /// Returns an `EFAULT` error if the memory location is not accessible.
     ///
     /// # Safety
-    /// The values in the slice must be valid.
-    pub unsafe fn try_into_slice_mut(&mut self, len: usize) -> SysResult<&mut [T]> {
-        self.addr_space
-            .check_user_access(self.ptr as usize, len * size_of::<T>(), MemPerm::W)?;
+    /// See the module-level documentation for safety information.
+    pub unsafe fn try_into_mut_slice(&mut self, len: usize) -> SysResult<&mut [T]> {
+        self.addr_space.check_user_access(
+            self.ptr as usize,
+            len * size_of::<T>(),
+            MemPerm::W,
+        )?;
         Ok(unsafe { slice::from_raw_parts_mut(self.ptr, len) })
     }
 }

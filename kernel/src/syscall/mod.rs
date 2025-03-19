@@ -6,7 +6,7 @@ use core::slice;
 
 use ::time::TimeVal;
 use consts::SyscallNo::{self, *};
-use process::sys_exit;
+use process::*;
 use time::*;
 
 use crate::{
@@ -24,13 +24,14 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
     let result = match syscall_no {
         GETTIMEOFDAY => sys_gettimeofday(args[0], args[1]),
         EXIT => sys_exit(args[0] as i32),
+        SCHED_YIELD => sys_sched_yield().await,
         WRITE => {
             // A temporary implementation for writing to console
             if args[0] == 1 {
                 let task = current_task();
                 let mut addr_space_lock = task.addr_space_mut().lock();
                 let mut data_ptr = UserReadPtr::<u8>::new(args[1], &mut *addr_space_lock);
-                match unsafe { data_ptr.read_vector(args[2]) } {
+                match unsafe { data_ptr.read_array(args[2]) } {
                     Ok(data) => match core::str::from_utf8(&data) {
                         Ok(utf8_str) => {
                             print!("{}", utf8_str);

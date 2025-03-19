@@ -17,3 +17,5 @@ riscv-rt = "0.14"
 sbi-rt = { version = "0.0.3", features = ["legacy"] }
 spin = { version = "0.9", features = ["lazy"] }
 strum = { version = "0.27", default-features = false, features = ["derive"] }
+virtio-drivers = { version = "0.7" }
+uart_16550 = "0.3"

@@ -43,9 +43,8 @@ pub fn kernel_interrupt_handler(i: Interrupt) {
 
 pub fn kernel_panic() -> ! {
     panic!(
-        "[kernel] {:?}(scause:{}) in application, bad addr = {:#x}, bad instruction = {:#x}, kernel panicked!!",
+        "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, kernel panicked!!",
         scause::read().cause(),
-        scause::read().bits(),
         stval::read(),
         sepc::read(),
     );
