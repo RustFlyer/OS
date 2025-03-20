@@ -1,5 +1,6 @@
+//! Module for loading ELF files.
+
 use config::mm::{USER_STACK_LOWER, USER_STACK_UPPER};
-/// Module for loading ELF files.
 use elf::{self, ElfBytes, endian::LittleEndian, file::FileHeader};
 use mm::address::VirtAddr;
 use systype::{SysError, SysResult};
@@ -16,9 +17,10 @@ impl AddrSpace {
     /// Returns an error if the loading fails. This can happen if the ELF file is invalid.
     ///
     /// # Discussion
-    /// Current implementation of this function taks a slice of ELF data as input. This is because
-    /// we have not implemented the file system yet. In the future, this function should take a file
-    /// descriptor as input.
+    /// Current implementation of this function takes a slice of ELF data as input, which
+    /// requires the whole ELF file to be loaded into memory before calling this function.
+    /// This is because we have not implemented the file system yet. In the future, this
+    /// function should take a file descriptor as input.
     pub fn load_elf(&mut self, elf_data: &'static [u8]) -> SysResult<VirtAddr> {
         let elf =
             ElfBytes::<LittleEndian>::minimal_parse(elf_data).map_err(|_| SysError::ENOEXEC)?;
@@ -51,7 +53,7 @@ impl AddrSpace {
             let memory_slice = &elf_data[offset..offset + segment.p_filesz as usize];
 
             let flags = segment.p_flags;
-            let mut pte_flags = PteFlags::U;
+            let mut pte_flags = PteFlags::empty();
             if flags & elf::abi::PF_X != 0 {
                 pte_flags |= PteFlags::X;
             }
@@ -77,7 +79,7 @@ impl AddrSpace {
     /// Returns the address of the stack bottom, i.e., one byte exceeding the highest address of
     /// the stack.
     ///
-    /// Current implementation hardcodes the stack size and position in `config::mm` module.
+    /// Current implementation hardcodes the stack size and position in [`config::mm`] module.
     pub fn map_stack(&mut self) -> SysResult<VirtAddr> {
         let stack = VmArea::new_stack(
             VirtAddr::new(USER_STACK_LOWER),

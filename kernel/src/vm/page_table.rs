@@ -9,8 +9,8 @@ use riscv::register::satp::{self, Satp};
 use lazy_static::lazy_static;
 
 use config::mm::{
-    PTE_PER_TABLE, VIRT_END, bss_end, bss_start, data_end, data_start, kernel_end, kernel_end_phys,
-    kernel_start, rodata_end, rodata_start, text_end, text_start,
+    PTE_PER_TABLE, VIRT_END, bss_end, bss_start, data_end, data_start, kernel_end, kernel_start,
+    rodata_end, rodata_start, text_end, text_start,
 };
 use mm::address::{PhysPageNum, VirtAddr, VirtPageNum};
 use systype::SysResult;
@@ -83,32 +83,32 @@ impl PageTable {
 
         let text_start_va = VirtAddr::new(text_start());
         let text_end_va = VirtAddr::new(text_end());
-        let text_flags = PteFlags::R | PteFlags::X | PteFlags::G;
+        let text_flags = PteFlags::R | PteFlags::X;
         let text_vma = VmArea::new_kernel(text_start_va, text_end_va, text_flags);
         KernelArea::map(&text_vma, &mut page_table);
 
         let rodata_start_va = VirtAddr::new(rodata_start());
         let rodata_end_va = VirtAddr::new(rodata_end());
-        let rodata_flags = PteFlags::R | PteFlags::G;
+        let rodata_flags = PteFlags::R;
         let rodata_vma = VmArea::new_kernel(rodata_start_va, rodata_end_va, rodata_flags);
         KernelArea::map(&rodata_vma, &mut page_table);
 
         let data_start_va = VirtAddr::new(data_start());
         let data_end_va = VirtAddr::new(data_end());
-        let data_flags = PteFlags::R | PteFlags::W | PteFlags::G;
+        let data_flags = PteFlags::R | PteFlags::W;
         let data_vma = VmArea::new_kernel(data_start_va, data_end_va, data_flags);
         KernelArea::map(&data_vma, &mut page_table);
 
         let bss_start_va = VirtAddr::new(bss_start());
         let bss_end_va = VirtAddr::new(bss_end());
-        let bss_flags = PteFlags::R | PteFlags::W | PteFlags::G;
+        let bss_flags = PteFlags::R | PteFlags::W;
         let bss_vma = VmArea::new_kernel(bss_start_va, bss_end_va, bss_flags);
         KernelArea::map(&bss_vma, &mut page_table);
 
         /* Map the allocatable frames */
         let alloc_start_va = VirtAddr::new(kernel_end());
         let alloc_end_va = VirtAddr::new(VIRT_END);
-        let alloc_flags = PteFlags::R | PteFlags::W | PteFlags::G;
+        let alloc_flags = PteFlags::R | PteFlags::W;
         let alloc_vma = VmArea::new_kernel(alloc_start_va, alloc_end_va, alloc_flags);
         KernelArea::map(&alloc_vma, &mut page_table);
 
@@ -285,7 +285,7 @@ impl PageTable {
 /// in the future.
 #[derive(Debug)]
 struct PageTableMem {
-    /// Reference to the page table in memory.
+    /// Physical page number of the page table.
     ppn: PhysPageNum,
 }
 
@@ -329,12 +329,13 @@ impl PageTableMem {
 /// Enables the kernel page table.
 ///
 /// # Safety
-/// This function must be called after the kernel page table is set up.
+/// This function must be called only once, after the kernel page table is set up.
 pub unsafe fn enable_kernel_page_table() {
     // SAFETY: the boot page table never gets dropped.
     unsafe {
         switch_page_table(&KERNEL_PAGE_TABLE);
     }
+    riscv::asm::sfence_vma_all();
 }
 
 /// Switches to the specified page table.
@@ -350,17 +351,17 @@ pub unsafe fn switch_page_table(page_table: &PageTable) {
         satp::write(satp);
     }
     riscv::asm::sfence_vma_all();
-    simdebug::when_debug!({
-        log::info!(
-            "Switched to page table at {:#x}, satp: {:#x}",
-            page_table.root().to_usize(),
-            satp::read().bits()
-        );
-    });
+    log::trace!(
+        "Switched to page table at {:#x}, satp: {:#x}",
+        page_table.root().to_usize(),
+        satp::read().bits()
+    );
 }
 
-/// Prints page table entries of each level to resolve a given virtual address.
-pub fn print_page_table_entries(page_table: &PageTable, va: VirtAddr) {
+/// Prints the lookup process of a virtual address in the specific page table.
+///
+/// For debugging purposes.
+pub fn trace_page_table_lookup(page_table: &PageTable, va: VirtAddr) {
     let mut ppn = page_table.root();
     for (i, index) in va.page_number().indices().into_iter().enumerate().rev() {
         let page_table = unsafe { PageTableMem::new(ppn) };
@@ -377,4 +378,11 @@ pub fn print_page_table_entries(page_table: &PageTable, va: VirtAddr) {
         }
         ppn = entry.ppn();
     }
+}
+
+/// Prints the lookup process of a virtual address in the kernel page table.
+///
+/// For debugging purposes.
+pub fn trace_kernel_page_table_lookup(va: VirtAddr) {
+    trace_page_table_lookup(&KERNEL_PAGE_TABLE, va);
 }
