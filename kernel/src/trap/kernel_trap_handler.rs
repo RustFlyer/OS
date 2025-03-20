@@ -17,7 +17,6 @@ pub fn kernel_trap_handler() {
     match scause.cause() {
         Trap::Exception(e) => kernel_exception_handler(Exception::from_number(e).unwrap()),
         Trap::Interrupt(i) => kernel_interrupt_handler(Interrupt::from_number(i).unwrap()),
-        _ => kernel_panic(),
     }
 }
 

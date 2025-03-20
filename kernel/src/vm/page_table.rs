@@ -13,6 +13,7 @@ use config::mm::{
     rodata_end, rodata_start, text_end, text_start,
 };
 use mm::address::{PhysPageNum, VirtAddr, VirtPageNum};
+use simdebug::when_debug;
 use systype::SysResult;
 
 use crate::{
@@ -150,7 +151,8 @@ impl PageTable {
                 return entry;
             }
             if !entry.is_valid() {
-                let frame = FrameTracker::build().expect("out of memory");
+                let mut frame = FrameTracker::build().expect("out of memory");
+                frame.as_slice_mut().fill(0);
                 *entry = PageTableEntry::new(frame.as_ppn(), inner_flags);
                 self.track_frame(frame);
             }
@@ -263,7 +265,7 @@ impl PageTable {
     /// This method does not allocate any frame or make this page table own any frame.
     pub fn map_kernel(&mut self) {
         let kernel_vpn_start = VirtAddr::new(kernel_start()).page_number();
-        let kernel_vpn_end = VirtAddr::new(kernel_end()).round_up().page_number();
+        let kernel_vpn_end = VirtAddr::new(kernel_end()).page_number();
         // Range of the top-level PTEs that map the kernel space.
         let index_start = kernel_vpn_start.indices()[2];
         let index_end = kernel_vpn_end.indices()[2];
@@ -306,7 +308,6 @@ impl PageTableMem {
 
     fn as_slice_mut(&mut self) -> &'static mut [PageTableEntry; PTE_PER_TABLE] {
         // SAFETY: the page `ppn` points to is a valid page table thus allocated.
-        // unsafe { &mut *(self.ppn.to_vpn_kernel().as_slice().as_mut_ptr() as *mut _) }
         unsafe { &mut *(self.ppn.to_vpn_kernel().as_slice_mut().as_mut_ptr() as *mut _) }
     }
 
@@ -351,11 +352,13 @@ pub unsafe fn switch_page_table(page_table: &PageTable) {
         satp::write(satp);
     }
     riscv::asm::sfence_vma_all();
-    log::trace!(
-        "Switched to page table at {:#x}, satp: {:#x}",
-        page_table.root().to_usize(),
-        satp::read().bits()
-    );
+    when_debug!({
+        log::trace!(
+            "Switched to page table at {:#x}, satp: {:#x}",
+            page_table.root().to_usize(),
+            satp::read().bits()
+        );
+    });
 }
 
 /// Prints the lookup process of a virtual address in the specific page table.
