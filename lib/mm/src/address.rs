@@ -178,9 +178,18 @@ impl PhysPageNum {
     /// This function panics if the upper 20 bits of the page number
     /// are not zero.
     pub fn new(page_num: usize) -> Self {
-        let tmp = page_num >> (64 - PPN_WIDTH_SV39);
-        debug_assert!(tmp == 0, "invalid physical page number: {:#x}", page_num);
+        debug_assert!(
+            Self::check_validity(page_num),
+            "invalid physical page number: {:#x}",
+            page_num
+        );
         PhysPageNum { page_num }
+    }
+
+    /// Checks the validity of the page number.
+    pub fn check_validity(page_num: usize) -> bool {
+        let tmp = page_num >> PPN_WIDTH_SV39;
+        tmp == 0
     }
 
     /// Gets the inner `usize` page number.
@@ -223,9 +232,18 @@ impl VirtPageNum {
     /// This function panics if the upper 25 bits of the page number
     /// are not zero.
     pub fn new(page_num: usize) -> Self {
-        let tmp = page_num >> (64 - VPN_WIDTH_SV39);
-        debug_assert!(tmp == 0, "invalid virtual page number: {:#x}", page_num);
+        debug_assert!(
+            Self::check_validity(page_num),
+            "invalid virtual page number: {:#x}",
+            page_num
+        );
         VirtPageNum { page_num }
+    }
+
+    /// Checks the validity of the page number.
+    pub fn check_validity(page_num: usize) -> bool {
+        let tmp = page_num >> VPN_WIDTH_SV39;
+        tmp == 0
     }
 
     /// Gets the inner `usize` page number.
