@@ -335,6 +335,7 @@ pub unsafe fn enable_kernel_page_table() {
     unsafe {
         switch_page_table(&KERNEL_PAGE_TABLE);
     }
+    riscv::asm::sfence_vma_all();
 }
 
 /// Switches to the specified page table.
@@ -350,7 +351,7 @@ pub unsafe fn switch_page_table(page_table: &PageTable) {
         satp::write(satp);
     }
     riscv::asm::sfence_vma_all();
-    log::info!(
+    log::trace!(
         "Switched to page table at {:#x}, satp: {:#x}",
         page_table.root().to_usize(),
         satp::read().bits()
