@@ -7,4 +7,6 @@ mod page_table;
 mod pte;
 mod vm_area;
 
-pub use page_table::{enable_kernel_page_table, print_page_table_entries};
+pub use page_table::{
+    enable_kernel_page_table, trace_kernel_page_table_lookup, trace_page_table_lookup,
+};

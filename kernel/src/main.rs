@@ -3,7 +3,7 @@
 #![feature(btree_cursors)]
 #![feature(naked_functions)]
 #![feature(sync_unsafe_cell)]
-#![allow(dead_code, unused_imports, warnings)]
+#![allow(dead_code)]
 
 mod boot;
 mod console;
@@ -18,10 +18,6 @@ mod syscall;
 mod task;
 mod trap;
 mod vm;
-
-use core::slice;
-use core::sync::atomic::Ordering;
-use core::{arch::global_asm, sync::atomic::AtomicBool};
 
 use mm::{self, frame, heap};
 use processor::hart;
@@ -67,7 +63,7 @@ pub fn rust_main(hart_id: usize) -> ! {
         log::info!(
             "kernel virtual memory: {:#x} - {:#x}",
             config::mm::KERNEL_START,
-            config::mm::kernel_end() as usize
+            config::mm::kernel_end()
         );
         log::info!(
             ".text {:#x} - {:#x}",
