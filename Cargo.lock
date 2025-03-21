@@ -43,6 +43,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5c8214115b7bf84099f1309324e63141d4c5d7cc26862f97a0a857dbefe165bd"
 
 [[package]]
+name = "bitmap-allocator"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5553d824a3564e1c242975cfc962d15e6299bfa4a90c44c14208673c16df51f3"
+dependencies = [
+ "bit_field",
+]
+
+[[package]]
 name = "buddy_system_allocator"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -206,10 +215,9 @@ dependencies = [
 name = "mm"
 version = "0.1.0"
 dependencies = [
+ "bitmap-allocator",
  "buddy_system_allocator",
  "config",
- "id_allocator",
- "lazy_static",
  "log",
  "mutex",
  "simdebug",

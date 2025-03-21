@@ -38,10 +38,12 @@ pub fn rust_main(hart_id: usize) -> ! {
 
         /* Initialize heap allocator and page table */
         unsafe {
-            log::info!("hart {}: initializing heap allocator", hart_id);
             heap::init_heap_allocator();
-            log::info!("hart {}: initializing page table", hart_id);
+            log::info!("hart {}: initialized heap allocator", hart_id);
+            frame::init_frame_allocator();
+            log::info!("hart {}: initialized frame allocator", hart_id);
             vm::enable_kernel_page_table();
+            log::info!("hart {}: switched to kernel page table", hart_id);
             INITIALIZED = true;
         }
 
