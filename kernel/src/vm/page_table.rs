@@ -151,8 +151,8 @@ impl PageTable {
                 return entry;
             }
             if !entry.is_valid() {
-                let mut frame = FrameTracker::build().expect("out of memory");
-                frame.as_slice_mut().fill(0);
+                let frame = FrameTracker::build().expect("out of memory");
+                unsafe { PageTableMem::new(frame.as_ppn()).clear(); }
                 *entry = PageTableEntry::new(frame.as_ppn(), inner_flags);
                 self.track_frame(frame);
             }
