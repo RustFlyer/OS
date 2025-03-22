@@ -21,13 +21,13 @@ use core::ops::Bound;
 
 use alloc::collections::btree_map::BTreeMap;
 
+use mm::address::VirtAddr;
 use systype::{SysError, SysResult};
 
-use crate::address::VirtAddr;
-
 use super::{
-    page_table::PageTable,
-    vm_area::{MemPerm, PageFaultInfo, VmArea},
+    mem_perm::MemPerm,
+    page_table::{self, PageTable},
+    vm_area::{PageFaultInfo, VmArea},
 };
 
 /// A virtual address space.
@@ -103,8 +103,13 @@ impl AddrSpace {
     ///
     /// This function removes a VMA from the address space, which de facto unmaps the memory
     /// region in the address space. If there is no such VMA, this function does nothing.
+    ///
+    /// # Note
+    /// This function is not implemented yet. It should disable the page table entries
+    /// corresponding to the VMA to be removed.
     pub fn remove_area(&mut self, start_va: VirtAddr) {
         self.vm_areas.remove(&start_va);
+        unimplemented!()
     }
 
     /// Handles a page fault happened in the address space.
@@ -117,6 +122,13 @@ impl AddrSpace {
     /// Returns [`SysError::EFAULT`] if the fault address is invalid or the access permission
     /// is not allowed.
     pub fn handle_page_fault(&mut self, fault_addr: VirtAddr, access: MemPerm) -> SysResult<()> {
+        simdebug::when_debug!({
+            log::trace!(
+                "Page fault when accessing {:#x}, type: {:?}",
+                fault_addr.to_usize(),
+                access
+            );
+        });
         let page_table = &mut self.page_table;
         let vma = self
             .vm_areas
@@ -132,5 +144,19 @@ impl AddrSpace {
             access,
         };
         vma.handle_page_fault(page_fault_info)
+    }
+}
+
+/// Switches to a new address space.
+///
+/// This function switches the current address space to a new address space. It is used
+/// when a process is scheduled in or out.
+///
+/// # Safety
+/// This function must be called before the current page table is dropped, or the kernel
+/// may lose its memory mappings.
+pub unsafe fn switch_to(new_space: &AddrSpace) {
+    unsafe {
+        page_table::switch_page_table(&new_space.page_table);
     }
 }

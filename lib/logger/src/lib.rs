@@ -36,7 +36,7 @@ pub trait LogInterface: Send + Sync {
 }
 
 /// 初始化日志记录器
-/// 
+///
 /// 设置日志记录器和日志级别
 pub fn init() {
     static LOGGER: SimpleLogger = SimpleLogger;

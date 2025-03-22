@@ -1,5 +1,5 @@
 use arch::riscv64::time::{get_time_duration, set_nx_timer_irq};
-use riscv::InterruptNumber;
+use riscv::{ExceptionNumber, InterruptNumber};
 use riscv::{
     interrupt::{Exception, Interrupt, Trap},
     register::{
@@ -15,8 +15,15 @@ pub fn kernel_trap_handler() {
     let scause = scause::read();
     let _stval = stval::read();
     match scause.cause() {
+        Trap::Exception(e) => kernel_exception_handler(Exception::from_number(e).unwrap()),
         Trap::Interrupt(i) => kernel_interrupt_handler(Interrupt::from_number(i).unwrap()),
-        _ => kernel_panic(),
+    }
+}
+
+pub fn kernel_exception_handler(e: Exception) {
+    match e {
+        Exception::StorePageFault => kernel_panic(),
+        _ => log::error!("Something Wrong Happen: {:?}", e),
     }
 }
 
@@ -35,9 +42,8 @@ pub fn kernel_interrupt_handler(i: Interrupt) {
 
 pub fn kernel_panic() -> ! {
     panic!(
-        "[kernel] {:?}(scause:{}) in application, bad addr = {:#x}, bad instruction = {:#x}, kernel panicked!!",
+        "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, kernel panicked!!",
         scause::read().cause(),
-        scause::read().bits(),
         stval::read(),
         sepc::read(),
     );

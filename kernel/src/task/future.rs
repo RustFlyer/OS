@@ -24,6 +24,7 @@ pub struct UserFuture<F: Future + Send + 'static> {
 }
 
 impl<F: Future + Send + 'static> UserFuture<F> {
+    #[inline]
     pub fn new(task: Arc<Task>, future: F) -> Self {
         Self {
             task,
@@ -46,7 +47,7 @@ impl<F: Future + Send + 'static> Future for UserFuture<F> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut future = unsafe { Pin::get_unchecked_mut(self) };
         let mut hart = current_hart();
-        hart.user_switch_in(future.task.clone(), &mut future.pps);
+        hart.user_switch_in(&mut future.task, &mut future.pps);
         let ret = unsafe { Pin::new_unchecked(&mut future.future).poll(cx) };
         hart.user_switch_out(&mut future.pps);
         ret
@@ -84,10 +85,15 @@ impl<F: Future + Send + 'static> Future for KernelFuture<F> {
 ///
 /// 这是任务执行的顶层循环，处理任务状态转换和事件处理
 pub async fn task_executor_unit(task: Arc<Task>) {
+    log::debug!("run task in first time!");
     // 设置任务的唤醒器（从当前上下文中获取）
     task.set_waker(take_waker().await);
     loop {
+        // log::debug!("try to step into user!");
+
         trap::trap_return(&task); // trap_return_
+
+        // log::debug!("return from user!");
 
         match task.get_state() {
             TaskState::Zombie => break,
@@ -97,7 +103,7 @@ pub async fn task_executor_unit(task: Arc<Task>) {
             _ => {}
         }
 
-        trap::trap_handler(&task); // trap_handle_
+        trap::trap_handler(&task).await; // trap_handle_
 
         match task.get_state() {
             TaskState::Zombie => break,

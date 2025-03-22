@@ -5,8 +5,6 @@ use core::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
-// use riscv::register::sstatus;
-
 use super::MutexSupport;
 
 struct MutexGuard<'a, T: ?Sized, S: MutexSupport> {
@@ -15,6 +13,7 @@ struct MutexGuard<'a, T: ?Sized, S: MutexSupport> {
 }
 
 /// `SpinMutex` can include different `MutexSupport` type
+#[derive(Debug)]
 pub struct SpinMutex<T: ?Sized, S: MutexSupport> {
     // debug_cnt: UnsafeCell<usize>,
     lock: AtomicBool,
@@ -76,13 +75,17 @@ impl<'a, T, S: MutexSupport> SpinMutex<T, S> {
             support_guard,
         }
     }
-}
 
-// impl<'a, T: ?Sized, S: MutexSupport> Drop for SpinMutex<T, S> {
-//     fn drop(&mut self) {
-//         println!("spin mutex dieeeeeeeeeeeeeeeeee");
-//     }
-// }
+    /// # Safety
+    ///
+    /// This is highly unsafe.
+    /// You should ensure that context switch won't happen during
+    /// the locked data's lifetime.
+    #[inline(always)]
+    pub unsafe fn sent_lock(&self) -> impl DerefMut<Target = T> + '_ {
+        SendWrapper::new(self.lock())
+    }
+}
 
 impl<'a, T: ?Sized, S: MutexSupport> Deref for MutexGuard<'a, T, S> {
     type Target = T;
@@ -106,5 +109,32 @@ impl<'a, T: ?Sized, S: MutexSupport> Drop for MutexGuard<'a, T, S> {
         // debug_assert!(self.mutex.lock.load(Ordering::Relaxed));
         self.mutex.lock.store(false, Ordering::Release);
         S::after_unlock(&mut self.support_guard);
+    }
+}
+
+/// A wrapper for a data structure that be sent between threads
+pub struct SendWrapper<T>(pub T);
+
+impl<T> SendWrapper<T> {
+    pub fn new(data: T) -> Self {
+        SendWrapper(data)
+    }
+}
+
+unsafe impl<T> Send for SendWrapper<T> {}
+unsafe impl<T> Sync for SendWrapper<T> {}
+
+impl<T: Deref> Deref for SendWrapper<T> {
+    type Target = T::Target;
+    #[inline(always)]
+    fn deref(&self) -> &Self::Target {
+        self.0.deref()
+    }
+}
+
+impl<T: DerefMut> DerefMut for SendWrapper<T> {
+    #[inline(always)]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.0.deref_mut()
     }
 }

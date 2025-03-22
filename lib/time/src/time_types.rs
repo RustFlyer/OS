@@ -22,7 +22,6 @@ pub struct TimeVal {
 
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
-
 /// 进程时间统计结构体
 ///
 /// 包含用户CPU时间、系统CPU时间、终止子进程的用户CPU时间和系统CPU时间
@@ -199,7 +198,10 @@ impl From<usize> for TimeVal {
 
 /// ITimerVal结构体
 ///
-/// 包含定时器间隔和值
+/// ITimerVal 结构体用于表示定时器的间隔和当前值。
+/// 它包含两个字段：it_interval 和 it_value，都是 TimeVal 类型。
+/// it_interval: 表示定时器的间隔时间，即定时器触发的时间间隔。
+/// it_value: 表示定时器的当前值，即定时器下一次触发的时间。
 #[derive(Debug, Clone, Copy, Default)]
 #[repr(C)]
 pub struct ITimerVal {
@@ -221,14 +223,14 @@ impl ITimerVal {
 
     /// 检查ITimerVal是否有效
     ///
-    /// 返回ITimerVal是否有效
+    /// 检查 ITimerVal 是否有效，即 it_interval 和 it_value 是否都有效。
     pub fn is_valid(&self) -> bool {
         self.it_interval.is_valid() && self.it_value.is_valid()
     }
 
     /// 检查ITimerVal是否激活
     ///
-    /// 返回ITimerVal是否激活
+    /// 检查 ITimerVal 是否激活，即 it_interval 和 it_value 是否不全为零。
     pub fn is_activated(&self) -> bool {
         !(self.it_interval.is_zero() && self.it_value.is_zero())
     }

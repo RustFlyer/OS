@@ -12,11 +12,11 @@ pub fn disable_interrupt() {
     interrupt::disable();
 }
 
-pub unsafe fn set_trap_handler(handler_addr: usize) {
+pub fn set_trap_handler(handler_addr: usize, mode: TrapMode) {
     unsafe {
         let mut stvec = Stvec::from_bits(0);
         stvec.set_address(handler_addr);
-        stvec.set_trap_mode(TrapMode::Direct);
+        stvec.set_trap_mode(mode);
         stvec::write(stvec);
     }
 }

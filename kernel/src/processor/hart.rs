@@ -1,4 +1,4 @@
-use crate::task::Task;
+use crate::{task::Task, vm::addr_space::AddrSpace};
 use config::device::MAX_HARTS;
 
 extern crate alloc;
@@ -10,30 +10,30 @@ use pps::ProcessorPrivilegeState;
 use lazy_static::lazy_static;
 use simdebug::when_debug;
 
-use core::arch::asm;
+use core::{arch::asm, sync::atomic::AtomicUsize};
 use riscv::register::sstatus;
 use riscv::register::sstatus::FS;
 
 use arch::riscv64::interrupt::{disable_interrupt, enable_interrupt};
 
-const HART_ONE: HART = HART::new(0);
-pub static mut HARTS: [HART; MAX_HARTS] = [HART_ONE; MAX_HARTS];
+const HART_ONE: Hart = Hart::new(0);
+pub static mut HARTS: [Hart; MAX_HARTS] = [HART_ONE; MAX_HARTS];
 
 // lazy_static! {
 //     pub static ref HARTS: Vec<Arc<HART>> = (0..MAX_HARTS).map(|i| Arc::new(HART::new(i))).collect();
 // }
 
-/// HART结构体
+/// Hart结构体
 ///
-/// 表示一个HART，包含HART ID、任务和处理器特权状态
+/// 表示一个hart，包含hart ID、任务和处理器特权状态
 /// 一个cpu核心一个HART
-pub struct HART {
+pub struct Hart {
     pub id: usize,
     task: Option<Arc<Task>>,
     pps: ProcessorPrivilegeState,
 }
 
-impl HART {
+impl Hart {
     pub const fn new(id: usize) -> Self {
         Self {
             id,
@@ -74,32 +74,25 @@ impl HART {
         &mut self.pps
     }
 
-    pub fn user_switch_in(&mut self, new_task: Arc<Task>, pps: &mut ProcessorPrivilegeState) {
-        todo!();
-
+    pub fn user_switch_in(&mut self, new_task: &mut Arc<Task>, pps: &mut ProcessorPrivilegeState) {
+        // todo!();
         disable_interrupt();
-        pps.auto_sum();
-
         core::mem::swap(self.get_mut_pps(), pps);
-
-        self.set_task(new_task);
-        // switch pagetable...
+        pps.auto_sum();
+        unsafe {
+            new_task.switch_addr_space();
+        }
+        self.set_task(Arc::clone(new_task));
         enable_interrupt();
     }
 
     pub fn user_switch_out(&mut self, pps: &mut ProcessorPrivilegeState) {
-        todo!();
-
+        // todo!();
         disable_interrupt();
         pps.auto_sum();
-
         core::mem::swap(self.get_mut_pps(), pps);
-
         let task = self.get_task();
-        // set old task record out
         self.clear_task();
-
-        // switch pagetable...
         enable_interrupt();
     }
 
@@ -126,20 +119,17 @@ impl HART {
     }
 }
 
-pub fn get_hart(hart_id: usize) -> &'static mut HART {
+pub fn get_hart(hart_id: usize) -> &'static mut Hart {
     unsafe { &mut HARTS[hart_id] }
 }
 
-pub fn current_hart() -> &'static mut HART {
+pub fn current_hart() -> &'static mut Hart {
     let mut ret;
     unsafe {
         let tp: usize;
         asm!("mv {}, tp", out(reg) tp);
-        ret = &mut *(tp as *mut HART);
+        ret = &mut *(tp as *mut Hart);
     }
-    when_debug!({
-        ret = one_hart();
-    });
 
     ret
 }
@@ -153,8 +143,17 @@ pub fn set_current_hart(id: usize) {
     }
 }
 
-pub fn init() {
+pub fn get_current_hart() -> &'static mut Hart {
+    let hart_ptr: *mut Hart;
     unsafe {
+        asm!("mv {}, tp", out(reg) hart_ptr);
+        &mut *hart_ptr
+    }
+}
+
+pub fn init(id: usize) {
+    unsafe {
+        set_current_hart(id);
         sstatus::set_fs(FS::Initial);
     }
 }
@@ -164,6 +163,6 @@ pub fn current_task() -> Arc<Task> {
 }
 
 /// temp for test without driver
-pub fn one_hart() -> &'static mut HART {
+pub fn one_hart() -> &'static mut Hart {
     unsafe { &mut HARTS[0] }
 }

@@ -31,13 +31,18 @@ impl PhysAddr {
     /// This function panics if the upper 8 bits of the address are not the same
     /// as bit 55.
     pub fn new(addr: usize) -> Self {
-        let tmp = addr as isize >> PA_WIDTH_SV39;
         debug_assert!(
-            tmp == 0 || tmp == -1,
+            Self::check_validity(addr),
             "invalid physical address: {:#x}",
             addr
         );
         PhysAddr { addr }
+    }
+
+    /// Checks the validity of the address.
+    pub fn check_validity(addr: usize) -> bool {
+        let tmp = addr as isize >> PA_WIDTH_SV39;
+        tmp == 0 || tmp == -1
     }
 
     /// Gets the inner `usize` address.
@@ -101,13 +106,17 @@ impl VirtAddr {
     /// This function panics if the upper 25 bits of the address are not the same
     /// as bit 38.
     pub fn new(addr: usize) -> Self {
-        let tmp = addr as isize >> VA_WIDTH_SV39;
         debug_assert!(
-            tmp == 0 || tmp == -1,
+            Self::check_validity(addr),
             "invalid virtual address: {:#x}",
             addr
         );
         VirtAddr { addr }
+    }
+
+    pub fn check_validity(addr: usize) -> bool {
+        let tmp = addr as isize >> VA_WIDTH_SV39;
+        tmp == 0 || tmp == -1
     }
 
     /// Gets the inner `usize` address.
@@ -169,9 +178,18 @@ impl PhysPageNum {
     /// This function panics if the upper 20 bits of the page number
     /// are not zero.
     pub fn new(page_num: usize) -> Self {
-        let tmp = page_num >> (64 - PPN_WIDTH_SV39);
-        debug_assert!(tmp == 0, "invalid physical page number: {:#x}", page_num);
+        debug_assert!(
+            Self::check_validity(page_num),
+            "invalid physical page number: {:#x}",
+            page_num
+        );
         PhysPageNum { page_num }
+    }
+
+    /// Checks the validity of the page number.
+    pub fn check_validity(page_num: usize) -> bool {
+        let tmp = page_num >> PPN_WIDTH_SV39;
+        tmp == 0
     }
 
     /// Gets the inner `usize` page number.
@@ -214,9 +232,18 @@ impl VirtPageNum {
     /// This function panics if the upper 25 bits of the page number
     /// are not zero.
     pub fn new(page_num: usize) -> Self {
-        let tmp = page_num >> (64 - VPN_WIDTH_SV39);
-        debug_assert!(tmp == 0, "invalid virtual page number: {:#x}", page_num);
+        debug_assert!(
+            Self::check_validity(page_num),
+            "invalid virtual page number: {:#x}",
+            page_num
+        );
         VirtPageNum { page_num }
+    }
+
+    /// Checks the validity of the page number.
+    pub fn check_validity(page_num: usize) -> bool {
+        let tmp = page_num >> VPN_WIDTH_SV39;
+        tmp == 0
     }
 
     /// Gets the inner `usize` page number.

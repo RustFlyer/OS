@@ -189,6 +189,8 @@ impl TimeSpec {
             && (self._tv_nsec < 1_000_000_000)
     }
 }
+
+#[derive(Debug)]
 pub struct TimeVal {
     _tv_sec: usize,
     _tv_usec: usize,

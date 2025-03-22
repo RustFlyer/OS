@@ -1,13 +1,15 @@
 #![no_std]
 #![no_main]
+#![feature(btree_cursors)]
 #![feature(naked_functions)]
 #![feature(sync_unsafe_cell)]
-#![allow(dead_code, unused_imports, warnings)]
+#![allow(dead_code)]
 
 mod boot;
 mod console;
 mod entry;
 mod lang_item;
+mod link_app;
 mod loader;
 mod logging;
 mod processor;
@@ -15,15 +17,13 @@ mod sbi;
 mod syscall;
 mod task;
 mod trap;
-
-use core::sync::atomic::Ordering;
-use core::{arch::global_asm, sync::atomic::AtomicBool};
+mod vm;
 
 use mm::{self, frame, heap};
+use processor::hart;
 use simdebug::when_debug;
 
-pub use syscall::syscall;
-
+#[macro_use]
 extern crate alloc;
 
 static mut INITIALIZED: bool = false;
@@ -34,56 +34,84 @@ pub fn rust_main(hart_id: usize) -> ! {
     if unsafe { !INITIALIZED } {
         /* Initialize logger */
         logger::init();
-        log::info!("hart {} is running", hart_id);
+        log::info!("hart {}: initializing kernel", hart_id);
 
         /* Initialize heap allocator and page table */
         unsafe {
             heap::init_heap_allocator();
-            mm::enable_kernel_page_table();
+            log::info!("hart {}: initialized heap allocator", hart_id);
+            frame::init_frame_allocator();
+            log::info!("hart {}: initialized frame allocator", hart_id);
+            vm::enable_kernel_page_table();
+            log::info!("hart {}: switched to kernel page table", hart_id);
             INITIALIZED = true;
         }
 
+        unsafe {
+            trap::load_trap_handler();
+        }
+
+        log::info!("======== kernel memory layout ========");
         log::info!(
             "RAM: {:#x} - {:#x}",
             config::mm::RAM_START,
             config::mm::RAM_END
         );
-
         log::info!(
             "kernel physical memory: {:#x} - {:#x}",
             config::mm::KERNEL_START_PHYS,
             config::mm::kernel_end_phys(),
         );
-
         log::info!(
             "kernel virtual memory: {:#x} - {:#x}",
             config::mm::KERNEL_START,
-            config::mm::kernel_end() as usize
+            config::mm::kernel_end()
         );
+        log::info!(
+            ".text {:#x} - {:#x}",
+            config::mm::text_start(),
+            config::mm::text_end()
+        );
+        log::info!(
+            ".rodata {:#x} - {:#x}",
+            config::mm::rodata_start(),
+            config::mm::rodata_end()
+        );
+        log::info!(
+            ".data {:#x} - {:#x}",
+            config::mm::data_start(),
+            config::mm::data_end()
+        );
+        log::info!(
+            ".bss {:#x} - {:#x}",
+            config::mm::bss_start(),
+            config::mm::bss_end()
+        );
+        log::info!("====== kernel memory layout end ======");
 
-        /* Simple tests */
-        simdebug::when_debug!({
-            heap::heap_test();
-            frame::frame_alloc_test();
+        // boot::start_harts(hart_id);
+
+        when_debug!({
+            simdebug::backtrace_test();
         });
 
-        simdebug::when_debug!({
-            log::info!("start harts");
-            boot::start_harts(hart_id);
-        });
-
-        simdebug::backtrace_test();
+        loader::init();
+        task::init();
     } else {
-        log::info!("hart {} is waiting", hart_id);
+        log::info!("hart {}: enabling page table", hart_id);
         // SAFETY: Only after the first hart has initialized the heap allocator and page table,
         // do the other harts enable the kernel page table.
-        unsafe { mm::enable_kernel_page_table(); }
+        unsafe {
+            vm::enable_kernel_page_table();
+        }
     }
 
-    log::info!("hart {} is running", hart_id);
+    hart::init(hart_id);
+
+    log::info!("hart {}: running", hart_id);
 
     loop {
-        // executor::task_run_always();
+        executor::task_run_always();
     }
     sbi::shutdown(false);
 }

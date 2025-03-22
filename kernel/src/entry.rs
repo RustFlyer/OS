@@ -18,7 +18,10 @@
 
 use core::arch::naked_asm;
 
-use config::{device::MAX_HARTS, mm::{KERNEL_MAP_OFFSET, KERNEL_STACK_SIZE, PTE_PER_TABLE}};
+use config::{
+    device::MAX_HARTS,
+    mm::{KERNEL_MAP_OFFSET, KERNEL_STACK_SIZE, PTE_PER_TABLE},
+};
 
 use crate::rust_main;
 

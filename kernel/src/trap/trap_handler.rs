@@ -1,11 +1,12 @@
-use super::csr_env::set_kernel_trap;
-use crate::syscall;
+use super::trap_env::set_kernel_stvec;
+use crate::syscall::syscall;
 use crate::task::{Task, TaskState, yield_now};
+use crate::trap::load_trap_handler;
+use crate::vm::mem_perm::MemPerm;
+use crate::vm::user_ptr::UserReadPtr;
 use alloc::sync::Arc;
-use arch::riscv64::{
-    interrupt::{disable_interrupt, enable_interrupt},
-    time::{get_time_duration, set_nx_timer_irq},
-};
+use arch::riscv64::time::{get_time_duration, set_nx_timer_irq};
+use mm::address::VirtAddr;
 use riscv::{ExceptionNumber, InterruptNumber};
 use riscv::{
     interrupt::{Exception, Interrupt, Trap},
@@ -13,20 +14,23 @@ use riscv::{
 };
 use timer::TIMER_MANAGER;
 
-/// 处理用户空间的中断、异常或系统调用
-/// 返回是否是系统调用并且被中断
+/// handle exception or interrupt from a task, return if success.
+/// __trap_from_user saved TrapContext, then jump to
+/// the middle of trap_return(), and then return to
+/// task_executor_unit(), which calls this trap_handler() function.
 #[unsafe(no_mangle)]
 pub async fn trap_handler(task: &Arc<Task>) -> bool {
-    unsafe { set_kernel_trap() };
-
     let stval = stval::read();
     let scause = scause::read();
     let sepc = sepc::read();
     let cause = scause.cause();
 
-    log::trace!("[trap_handler] user task trap into kernel");
-    log::trace!("[trap_handler] sepc:{:#x}, stval:{:#x}", sepc, stval);
-    unsafe { enable_interrupt() };
+    simdebug::when_debug!({
+        log::trace!("[trap_handler] user task trap into kernel");
+        log::trace!("[trap_handler] sepc:{:#x}, stval:{:#x}", sepc, stval);
+    });
+
+    unsafe { load_trap_handler() };
 
     match cause {
         Trap::Exception(e) => {
@@ -44,16 +48,40 @@ pub async fn user_exception_handler(task: &Arc<Task>, e: Exception) {
     match e {
         // 系统调用
         Exception::UserEnvCall => {
-            log::trace!("[trap_handler] user env call");
             let syscall_no = cx.syscall_no();
-            cx.step_one();
-            let ret = syscall(syscall_no, cx.syscall_args()).await;
+            simdebug::when_debug!({
+                log::trace!("[trap_handler] user env call: syscall_no = {}", syscall_no);
+            });
+            cx.sepc_forward();
+
+            let sys_ret = syscall(syscall_no, cx.syscall_args()).await;
+            drop(cx);
+
             cx = task.trap_context_mut();
-            cx.set_user_a0(ret);
+            cx.set_user_a0(sys_ret);
         }
         // 内存错误
         Exception::StorePageFault | Exception::InstructionPageFault | Exception::LoadPageFault => {
-            todo!()
+            let access = match e {
+                Exception::InstructionPageFault => MemPerm::X,
+                Exception::LoadPageFault => MemPerm::R,
+                Exception::StorePageFault => MemPerm::W | MemPerm::R,
+                _ => unreachable!(),
+            };
+            if let Err(e) = task
+                .addr_space_mut()
+                .lock()
+                .handle_page_fault(VirtAddr::new(stval::read()), access)
+            {
+                // Should send a `SIGSEGV` signal to the task
+                log::error!(
+                    "[user_exception_handler] unsolved page fault at {:#x}, access: {:?}, error: {:?}",
+                    stval::read(),
+                    access,
+                    e.as_str()
+                );
+                unimplemented!();
+            }
         }
         // 非法指令
         Exception::IllegalInstruction => {
@@ -62,6 +90,11 @@ pub async fn user_exception_handler(task: &Arc<Task>, e: Exception) {
                 stval::read(),
                 sepc::read(),
             );
+            let mut addr_space_lock = task.addr_space_mut().lock();
+            let mut user_ptr = UserReadPtr::<u32>::new(sepc::read(), &mut *addr_space_lock);
+            log::warn!("The illegal instruction is {:#x}", unsafe {
+                user_ptr.read().unwrap()
+            });
             task.set_state(TaskState::Zombie);
         }
         // 其他异常
@@ -93,7 +126,7 @@ pub async fn user_interrupt_handler(task: &Arc<Task>, i: Interrupt) {
         // 其他中断
         _ => {
             panic!(
-                "[trap_handler] Unsupported trap {:?}, stval = {:#x}, sepc = {:#x}",
+                "[trap_handler] Unsupported interrupt {:?}, stval = {:#x}, sepc = {:#x}",
                 scause::read().cause(),
                 stval::read(),
                 sepc::read(),

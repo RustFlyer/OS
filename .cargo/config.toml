@@ -1,5 +1,5 @@
-[source.crates-io]
-replace-with = "vendored-sources"
+[build]
+target = "riscv64gc-unknown-none-elf"
 
-[source.vendored-sources]
-directory = "vendor"
+[target.riscv64gc-unknown-none-elf]
+rustflags = ["-Cforce-frame-pointers=yes"]

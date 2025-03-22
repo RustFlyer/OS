@@ -1,4 +1,7 @@
-use crate::task::tid::{Tid, TidHandle, tid_alloc};
+use crate::{
+    task::tid::{Tid, TidHandle, tid_alloc},
+    trap,
+};
 
 extern crate alloc;
 use alloc::{
@@ -7,24 +10,26 @@ use alloc::{
 };
 use mutex::SpinNoIrqLock;
 
-use core::{cell::SyncUnsafeCell, num::IntErrorKind};
+use core::{cell::SyncUnsafeCell, num::IntErrorKind, ops::Add};
 use core::{ops::DerefMut, task::Waker};
 
+use super::manager::TASK_MANAGER;
 use mutex::UPSafeCell;
 use time::TaskTimeStat;
 use timer::{TIMER_MANAGER, Timer};
 
 use crate::trap::trap_context::TrapContext;
+use crate::vm::addr_space::AddrSpace;
+use crate::vm::addr_space::switch_to;
 
 use arch::riscv64::time::get_time_duration;
 
 use core::time::Duration;
 
-use mm::vm::addr_space::AddrSpace;
-
 use super::{
     future::{self, spawn_user_task},
     manager::add_task,
+    tid::Pid,
 };
 
 /// 任务状态枚举
@@ -43,32 +48,39 @@ pub enum TaskState {
 /// 任务结构体
 ///
 /// 表示一个任务，包含任务ID、进程关系、状态和内部状态
+#[derive(Debug)]
 pub struct Task {
     tid: TidHandle,
     process: Option<Weak<Task>>,
     is_process: bool,
 
     trap_context: SyncUnsafeCell<TrapContext>,
+    trap_context_spinlock: SpinNoIrqLock<TrapContext>,
     timer: SyncUnsafeCell<TaskTimeStat>,
     waker: SyncUnsafeCell<Option<Waker>>,
     state: SpinNoIrqLock<TaskState>,
-    addrspace: SpinNoIrqLock<AddrSpace>,
+    addr_space: SpinNoIrqLock<AddrSpace>,
     inner: UPSafeCell<TaskInner>,
 }
 
 /// 任务内部状态结构体
 ///
 /// 表示一个任务的内部状态，包含任务状态、父任务、子任务和退出代码
+#[derive(Debug)]
 pub struct TaskInner {
     parent: Option<Weak<Task>>,
     children: BTreeMap<Tid, Weak<Task>>,
 
-    exit_code: u32,
+    exit_code: i32,
 }
 
 impl Task {
     pub fn tid(&self) -> Tid {
         self.tid.0
+    }
+
+    pub fn pid(self: &Arc<Self>) -> Pid {
+        self.process().tid()
     }
 
     pub fn process(self: &Arc<Self>) -> Arc<Task> {
@@ -110,34 +122,46 @@ impl Task {
         self.inner.exclusive_access().children.remove(&child.tid());
     }
 
+    #[allow(clippy::mut_from_ref)]
     pub fn trap_context_mut(&self) -> &mut TrapContext {
         unsafe { &mut *self.trap_context.get() }
     }
 
+    pub fn trap_context_spinlock_mut(&self) -> &SpinNoIrqLock<TrapContext> {
+        &self.trap_context_spinlock
+    }
+
+    #[allow(clippy::mut_from_ref)]
     pub fn timer_mut(&self) -> &mut TaskTimeStat {
         unsafe { &mut *self.timer.get() }
     }
 
+    #[allow(clippy::mut_from_ref)]
     pub fn waker_mut(&self) -> &mut Option<Waker> {
         unsafe { &mut *self.waker.get() }
     }
 
-    pub fn new() -> Self {
+    pub fn addr_space_mut(&self) -> &SpinNoIrqLock<AddrSpace> {
+        &self.addr_space
+    }
+
+    pub fn new(entry: usize, sp: usize, addrspace: AddrSpace) -> Self {
         let inner = TaskInner::new();
         Task {
             tid: tid_alloc(),
             process: None,
             is_process: false,
-            trap_context: unsafe { SyncUnsafeCell::new(TrapContext::new(0, 0)) },
+            trap_context: unsafe { SyncUnsafeCell::new(TrapContext::new(entry, sp)) },
+            trap_context_spinlock: unsafe { SpinNoIrqLock::new(TrapContext::new(entry, sp)) },
             timer: unsafe { SyncUnsafeCell::new(TaskTimeStat::new()) },
             waker: unsafe { SyncUnsafeCell::new(None) },
-            state: unsafe { SpinNoIrqLock::new(TaskState::Waiting) },
-            addrspace: SpinNoIrqLock::new(AddrSpace::build_user().unwrap()),
+            state: unsafe { SpinNoIrqLock::new(TaskState::Running) },
+            addr_space: SpinNoIrqLock::new(addrspace),
             inner: unsafe { UPSafeCell::new(inner) },
         }
     }
 
-    pub fn set_exit_code(&self, exit_code: u32) {
+    pub fn set_exit_code(&self, exit_code: i32) {
         self.inner.exclusive_access().set_exit_code(exit_code);
     }
 
@@ -149,7 +173,7 @@ impl Task {
         unsafe { self.waker_mut().as_ref().unwrap().clone() }
     }
 
-    pub fn get_exit_code(&self) -> u32 {
+    pub fn get_exit_code(&self) -> i32 {
         self.inner.exclusive_access().exit_code
     }
 
@@ -159,15 +183,6 @@ impl Task {
 
     pub fn clear(&self) {
         self.inner.exclusive_access().clear();
-    }
-
-    pub fn spawn_task(elf_data: &[u8]) {
-        let memory_set = todo!();
-        let trap_context = todo!();
-        let task_inner = todo!();
-        let task = Arc::new(Task::new());
-        add_task(&task);
-        spawn_user_task(task);
     }
 
     pub fn inner_mut(&mut self) -> &mut UPSafeCell<TaskInner> {
@@ -199,7 +214,30 @@ impl Task {
         }
     }
 
-    pub fn switch_pagetable(&self) {}
+    pub fn spawn_from_elf(elf_data: &'static [u8]) {
+        let mut addrspace = AddrSpace::build_user().unwrap();
+        let entry_point = addrspace.load_elf(elf_data).unwrap();
+        let stack = addrspace.map_stack().unwrap();
+        let task = Arc::new(Task::new(
+            entry_point.to_usize(),
+            stack.to_usize(),
+            addrspace,
+        ));
+
+        TASK_MANAGER.add_task(&task);
+        future::spawn_user_task(task);
+    }
+
+    /// Switches to the address space of the task.
+    ///
+    /// # Safety
+    /// This function must be called before the current page table is dropped, or the kernel
+    /// may lose its memory mappings.
+    pub fn switch_addr_space(&self) {
+        unsafe {
+            switch_to(&self.addr_space.lock());
+        }
+    }
 }
 
 impl TaskInner {
@@ -215,7 +253,21 @@ impl TaskInner {
         self.exit_code = 0;
     }
 
-    pub fn set_exit_code(&mut self, exit_code: u32) {
+    pub fn set_exit_code(&mut self, exit_code: i32) {
         self.exit_code = exit_code;
     }
+}
+
+pub fn spawn_task(elf_data: &'static [u8]) {
+    let mut addr_space = AddrSpace::build_user().unwrap();
+    let entry_point = addr_space.load_elf(elf_data).unwrap();
+    let stack_ptr = addr_space.map_stack().unwrap();
+    let task_inner = TaskInner::new();
+    let task = Arc::new(Task::new(
+        entry_point.to_usize(),
+        stack_ptr.to_usize(),
+        addr_space,
+    ));
+    add_task(&task);
+    spawn_user_task(task);
 }

@@ -9,6 +9,8 @@ pub const RAM_END: usize = RAM_START + RAM_SIZE;
 
 /// Start of kernel address space
 pub const VIRT_START: usize = 0xffff_ffc0_8000_0000;
+/// End of kernel address space
+pub const VIRT_END: usize = VIRT_START + RAM_SIZE;
 /// Offset of kernel from `RAM_START`
 pub const KERNEL_RAM_OFFSET: usize = 0x20_0000;
 /// Start of kernel in physical memory
@@ -27,7 +29,7 @@ pub const KERNEL_START: usize = VIRT_START + KERNEL_RAM_OFFSET;
 pub fn kernel_start() -> usize {
     _skernel as usize
 }
-/// End of kernel in virtual memory
+/// End of kernel in virtual memory. This value is aligned to page size.
 pub fn kernel_end() -> usize {
     _ekernel as usize
 }
@@ -92,8 +94,10 @@ pub const PTE_WIDTH: usize = 8;
 /// Number of page table entries in a page table
 pub const PTE_PER_TABLE: usize = PAGE_SIZE / PTE_WIDTH;
 
-pub const APP_BASE_ADDRESS: usize = 0x1000_0000;
-pub const APP_SIZE_LIMIT: usize = 1024 * 1024 * 1024;
+/// Position of the stack of a user process in the virtual address space
+pub const USER_STACK_UPPER: usize = 0x0000_003f_ffff_f000;
+pub const USER_STACK_SIZE: usize = 8 * 1024 * 1024;
+pub const USER_STACK_LOWER: usize = USER_STACK_UPPER - USER_STACK_SIZE;
 
 /// boot hart start address
 pub const HART_START_ADDR: usize = 0x80200000;

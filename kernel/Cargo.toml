@@ -18,6 +18,8 @@ timer = { path = "../lib/timer/" }
 driver = { path = "../lib/driver/" }
 systype = { path = "../lib/systype/" }
 
+bitflags = { workspace = true }
+elf = { workspace = true }
 riscv-rt = { workspace = true }
 sbi-rt = { workspace = true }
 log = { workspace = true }
