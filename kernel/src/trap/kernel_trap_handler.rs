@@ -13,21 +13,21 @@ use timer::TIMER_MANAGER;
 #[unsafe(no_mangle)]
 pub fn kernel_trap_handler() {
     let scause = scause::read();
-    let _stval = stval::read();
+    let stval = stval::read();
     match scause.cause() {
-        Trap::Exception(e) => kernel_exception_handler(Exception::from_number(e).unwrap()),
-        Trap::Interrupt(i) => kernel_interrupt_handler(Interrupt::from_number(i).unwrap()),
+        Trap::Exception(e) => kernel_exception_handler(Exception::from_number(e).unwrap(), stval),
+        Trap::Interrupt(i) => kernel_interrupt_handler(Interrupt::from_number(i).unwrap(), stval),
     }
 }
 
-pub fn kernel_exception_handler(e: Exception) {
+pub fn kernel_exception_handler(e: Exception, stval: usize) {
     match e {
         Exception::StorePageFault => kernel_panic(),
-        _ => log::error!("Something Wrong Happen: {:?}", e),
+        _ => log::error!("Something Wrong Happen: {:?}, stval: {:#x}", e, stval),
     }
 }
 
-pub fn kernel_interrupt_handler(i: Interrupt) {
+pub fn kernel_interrupt_handler(i: Interrupt, _stval: usize) {
     match i {
         Interrupt::SupervisorExternal => {
             log::info!("[kernel] receive externel interrupt");
