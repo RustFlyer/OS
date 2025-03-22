@@ -1,4 +1,3 @@
-use super::trap_env::set_kernel_stvec;
 use crate::syscall::syscall;
 use crate::task::{Task, TaskState, yield_now};
 use crate::trap::load_trap_handler;
@@ -10,7 +9,7 @@ use mm::address::VirtAddr;
 use riscv::{ExceptionNumber, InterruptNumber};
 use riscv::{
     interrupt::{Exception, Interrupt, Trap},
-    register::{scause, sepc, sstatus::FS, stval},
+    register::{scause, sepc, stval},
 };
 use timer::TIMER_MANAGER;
 
@@ -18,6 +17,7 @@ use timer::TIMER_MANAGER;
 /// __trap_from_user saved TrapContext, then jump to
 /// the middle of trap_return(), and then return to
 /// task_executor_unit(), which calls this trap_handler() function.
+#[allow(unused)]
 #[unsafe(no_mangle)]
 pub async fn trap_handler(task: &Arc<Task>) -> bool {
     let stval = stval::read();
@@ -55,7 +55,6 @@ pub async fn user_exception_handler(task: &Arc<Task>, e: Exception) {
             cx.sepc_forward();
 
             let sys_ret = syscall(syscall_no, cx.syscall_args()).await;
-            drop(cx);
 
             cx = task.trap_context_mut();
             cx.set_user_a0(sys_ret);
@@ -113,7 +112,7 @@ pub async fn user_interrupt_handler(task: &Arc<Task>, i: Interrupt) {
             log::trace!("[trap_handler] timer interrupt, sepc {:#x}", sepc::read());
             let current = get_time_duration();
             TIMER_MANAGER.check(current);
-            unsafe { set_nx_timer_irq() };
+            set_nx_timer_irq();
             if executor::has_waiting_task() {
                 yield_now().await;
             }

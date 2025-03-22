@@ -13,11 +13,14 @@ use riscv::register::sstatus;
 
 use self::sleep_mutex::SleepMutex;
 use self::spin_mutex::SpinMutex;
+/// ShareMutex
+pub mod share_mutex;
 /// SleepMutex
 pub mod sleep_mutex;
 /// SpinMutex
 pub mod spin_mutex;
 
+pub use share_mutex::{ShareMutex, new_share_mutex};
 /// SpinLock
 pub type SpinLock<T> = SpinMutex<T, Spin>;
 /// SpinNoIrqLock(Cannot be interrupted)

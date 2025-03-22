@@ -8,9 +8,9 @@ use riscv::register::sstatus::{FS, SPP};
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
 
-/*when sp points to user stack of a task/process, 
-sscratch(in RISCV) points to the start 
-of the TrapContext of this task/process in user address space, 
+/*when sp points to user stack of a task/process,
+sscratch(in RISCV) points to the start
+of the TrapContext of this task/process in user address space,
 until they switch when __trap_from_user, and the context begin to be saved*/
 pub struct TrapContext {
     // integer registers and CSR to be saved when trap from user to kernel
@@ -18,23 +18,23 @@ pub struct TrapContext {
 
     pub sstatus: Sstatus, // 32, controls previlege level. its SIE part enables interrupt
 
-    pub sepc: usize,      // 33, the instruction that occurs trap (or the next instruction when trap returns)
+    pub sepc: usize, // 33, the instruction that occurs trap (or the next instruction when trap returns)
 
-    pub stvec: usize,     // address of __trap_from_user in trampoline
+    pub stvec: usize, // address of __trap_from_user in trampoline
 
-    pub stval: usize,     // appended trap information
+    pub stval: usize, // appended trap information
 
-    // callee-saved registers and constant addresses that guide trap into kernel space, 
+    // callee-saved registers and constant addresses that guide trap into kernel space,
     // seted when kernel return to user
-    pub k_sp: usize,      // 34, kernel stack top of this process
+    pub k_sp: usize, // 34, kernel stack top of this process
 
-    pub k_ra: usize,      // 35, kernel return address, the __return_to_user instruction fn trap_return(task), and then the fn task_executor_unit(task)
+    pub k_ra: usize, // 35, kernel return address, the __return_to_user instruction fn trap_return(task), and then the fn task_executor_unit(task)
 
     pub k_s: [usize; 12], // 36 - 47 callee-saved registers
 
-    pub k_fp: usize,      // 48, kernel stack frame of this process
+    pub k_fp: usize, // 48, kernel stack frame of this process
 
-    pub k_tp: usize,      // 49, thread pointer, the kernel hart(which records CPU status) address, useless for now
+    pub k_tp: usize, // 49, thread pointer, the kernel hart(which records CPU status) address, useless for now
 
     // float register to be saved, useless for now
     pub user_fx: [f64; 32], // 50 - 81
@@ -153,7 +153,7 @@ impl TrapContext {
             return;
         }
         self.is_need_restore = 0;
-        let ptr = unsafe { self.user_fx.as_mut_ptr() };
+        let ptr = self.user_fx.as_mut_ptr();
         unsafe {
             macro_rules! load_regs {
                 ($($i:literal),*) => {
@@ -185,7 +185,7 @@ impl TrapContext {
             return;
         }
         self.is_dirty = 0;
-        let ptr = unsafe { self.user_fx.as_mut_ptr() };
+        let ptr = self.user_fx.as_mut_ptr();
         unsafe {
             let mut _t: usize = 1;
             macro_rules! save_regs {
@@ -214,5 +214,4 @@ impl TrapContext {
             );
         };
     }
-
 }

@@ -113,5 +113,6 @@ pub fn rust_main(hart_id: usize) -> ! {
     loop {
         executor::task_run_always();
     }
+    #[allow(unused)]
     sbi::shutdown(false);
 }

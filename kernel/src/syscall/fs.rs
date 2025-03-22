@@ -1,34 +1,12 @@
-use core::sync::atomic::AtomicBool;
-
-use crate::{
-    print,
-    processor::current_hart,
-    processor::current_task,
-    vm::user_ptr::{UserReadPtr, UserWritePtr},
-};
+use crate::{print, processor::current_task, vm::user_ptr::UserReadPtr};
 use systype::SyscallResult;
 
-use mutex::{SleepLock, SpinNoIrqLock};
+use mutex::SleepLock;
 
-static WriteLock: SleepLock<()> = SleepLock::new(());
-static MySpinLock: AtomicBool = AtomicBool::new(false);
+#[allow(unused)]
+static WRITE_LOCK: SleepLock<()> = SleepLock::new(());
 
 pub fn sys_write(fd: usize, addr: usize, len: usize) -> SyscallResult {
-    // WriteLock.lock();
-    loop {
-        if MySpinLock
-            .compare_exchange(
-                false,
-                true,
-                core::sync::atomic::Ordering::Relaxed,
-                core::sync::atomic::Ordering::Relaxed,
-            )
-            .is_ok()
-        {
-            break;
-        }
-    }
-
     if fd == 1 {
         let task = current_task();
         let mut addr_space_lock = task.addr_space_mut().lock();
@@ -37,7 +15,6 @@ pub fn sys_write(fd: usize, addr: usize, len: usize) -> SyscallResult {
             Ok(data) => match core::str::from_utf8(&data) {
                 Ok(utf8_str) => {
                     print!("{}", utf8_str);
-                    MySpinLock.fetch_and(false, core::sync::atomic::Ordering::Relaxed);
                     Ok(utf8_str.len())
                 }
                 Err(e) => {

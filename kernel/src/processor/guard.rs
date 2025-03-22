@@ -1,5 +1,4 @@
 use crate::processor::hart::current_hart;
-use pps::ProcessorPrivilegeState;
 
 pub struct Guard;
 
@@ -25,7 +24,7 @@ impl Drop for Guard {
 ///
 /// 保护函数，用于保护代码块，防止其他HART访问
 pub fn guard_function<F>(f: impl FnOnce() -> F) -> F {
-    let guard = Guard::new();
+    let _guard = Guard::new();
     let ret = f();
     ret
 }

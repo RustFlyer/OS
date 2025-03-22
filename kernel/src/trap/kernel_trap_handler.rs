@@ -3,8 +3,8 @@ use riscv::{ExceptionNumber, InterruptNumber};
 use riscv::{
     interrupt::{Exception, Interrupt, Trap},
     register::{
-        scause::{self, Scause},
-        sepc, stval, stvec,
+        scause::{self},
+        sepc, stval,
     },
 };
 use timer::TIMER_MANAGER;
@@ -34,7 +34,7 @@ pub fn kernel_interrupt_handler(i: Interrupt) {
         }
         Interrupt::SupervisorTimer => {
             TIMER_MANAGER.check(get_time_duration());
-            unsafe { set_nx_timer_irq() };
+            set_nx_timer_irq();
         }
         _ => kernel_panic(),
     }

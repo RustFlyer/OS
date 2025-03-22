@@ -3,19 +3,10 @@ mod fs;
 mod process;
 mod time;
 
-use core::slice;
-
-use ::time::TimeVal;
 use consts::SyscallNo::{self, *};
 use fs::*;
 use process::*;
 use time::*;
-
-use crate::{
-    print,
-    processor::current_task,
-    vm::user_ptr::{UserReadPtr, UserWritePtr},
-};
 
 pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
     let Some(syscall_no) = SyscallNo::from_repr(syscall_no) else {

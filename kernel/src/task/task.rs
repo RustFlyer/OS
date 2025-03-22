@@ -1,40 +1,35 @@
-use crate::{
-    task::tid::{Tid, TidHandle, tid_alloc},
-    trap,
-};
+use crate::task::tid::{Tid, TidHandle, tid_alloc};
 
 extern crate alloc;
 use alloc::{
     collections::BTreeMap,
     sync::{Arc, Weak},
 };
-use mutex::SpinNoIrqLock;
+use mutex::{ShareMutex, SpinNoIrqLock, new_share_mutex};
 
-use core::{cell::SyncUnsafeCell, num::IntErrorKind, ops::Add};
-use core::{ops::DerefMut, task::Waker};
+use core::cell::SyncUnsafeCell;
+use core::task::Waker;
 
-use super::manager::TASK_MANAGER;
-use mutex::UPSafeCell;
 use time::TaskTimeStat;
-use timer::{TIMER_MANAGER, Timer};
 
 use crate::trap::trap_context::TrapContext;
 use crate::vm::addr_space::AddrSpace;
-use crate::vm::addr_space::switch_to;
 
-use arch::riscv64::time::get_time_duration;
+use super::tid::Pid;
 
-use core::time::Duration;
-
-use super::{
-    future::{self, spawn_user_task},
-    manager::add_task,
-    tid::Pid,
-};
-
-/// 任务状态枚举
+/// State of Task
 ///
-/// 表示一个任务的状态，包括运行、睡眠、等待和僵死
+/// Running: When the task is running, in task_executor_unit loop
+///
+/// Zombie:  When the task exits and wait for the initproc to recycle it
+///
+/// Waiting: When the waiting syscall reaches, the task will be set and suspended
+///
+/// Sleeping: As Waiting. The difference is that its waiting time is longer
+///
+/// Interruptable: When the task is waiting for an long-time event such as I/O
+///
+/// UnInterruptable: As Interruptable. The difference is that it can not be interrupted by signal
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TaskState {
     Running,
@@ -45,9 +40,6 @@ pub enum TaskState {
     UnInterruptable,
 }
 
-/// 任务结构体
-///
-/// 表示一个任务，包含任务ID、进程关系、状态和内部状态
 #[derive(Debug)]
 pub struct Task {
     tid: TidHandle,
@@ -59,26 +51,41 @@ pub struct Task {
     timer: SyncUnsafeCell<TaskTimeStat>,
     waker: SyncUnsafeCell<Option<Waker>>,
     state: SpinNoIrqLock<TaskState>,
-    addr_space: SpinNoIrqLock<AddrSpace>,
-    inner: UPSafeCell<TaskInner>,
+    addr_space: ShareMutex<AddrSpace>,
+
+    parent: ShareMutex<Option<Weak<Task>>>,
+    children: ShareMutex<BTreeMap<Tid, Weak<Task>>>,
+
+    exit_code: SpinNoIrqLock<i32>,
 }
 
-/// 任务内部状态结构体
-///
-/// 表示一个任务的内部状态，包含任务状态、父任务、子任务和退出代码
-#[derive(Debug)]
-pub struct TaskInner {
-    parent: Option<Weak<Task>>,
-    children: BTreeMap<Tid, Weak<Task>>,
-
-    exit_code: i32,
-}
-
+/// This Impl is mainly for getting and setting the property of Task
 impl Task {
+    pub fn new(entry: usize, sp: usize, addrspace: AddrSpace) -> Self {
+        Task {
+            tid: tid_alloc(),
+            process: None,
+            is_process: false,
+            trap_context: SyncUnsafeCell::new(TrapContext::new(entry, sp)),
+            trap_context_spinlock: SpinNoIrqLock::new(TrapContext::new(entry, sp)),
+            timer: SyncUnsafeCell::new(TaskTimeStat::new()),
+            waker: SyncUnsafeCell::new(None),
+            state: SpinNoIrqLock::new(TaskState::Running),
+            addr_space: Arc::new(SpinNoIrqLock::new(addrspace)),
+            parent: new_share_mutex(None),
+            children: new_share_mutex(BTreeMap::new()),
+            exit_code: SpinNoIrqLock::new(0),
+        }
+    }
+
+    // ========== This Part You Can Get the Member of Task ===========
+    // Attention: Returns include reference and clone
+
     pub fn tid(&self) -> Tid {
         self.tid.0
     }
 
+    /// Returns its process tid or its own tid if it's a process.
     pub fn pid(self: &Arc<Self>) -> Pid {
         self.process().tid()
     }
@@ -91,35 +98,8 @@ impl Task {
         }
     }
 
-    pub fn is_process(&self) -> bool {
-        self.is_process
-    }
-
-    pub fn is_in_state(&self, state: TaskState) -> bool {
-        self.get_state() == state
-    }
-
     pub fn get_state(&self) -> TaskState {
         self.state.lock().clone()
-    }
-
-    pub fn set_state(&self, state: TaskState) {
-        *self.state.lock() = state;
-    }
-
-    pub fn set_parent(&mut self, parent: Arc<Task>) {
-        self.inner.exclusive_access().parent = Some(Arc::downgrade(&parent));
-    }
-
-    pub fn add_child(&mut self, child: Arc<Task>) {
-        self.inner
-            .exclusive_access()
-            .children
-            .insert(child.tid(), Arc::downgrade(&child));
-    }
-
-    pub fn remove_child(&mut self, child: Arc<Task>) {
-        self.inner.exclusive_access().children.remove(&child.tid());
     }
 
     #[allow(clippy::mut_from_ref)]
@@ -145,129 +125,48 @@ impl Task {
         &self.addr_space
     }
 
-    pub fn new(entry: usize, sp: usize, addrspace: AddrSpace) -> Self {
-        let inner = TaskInner::new();
-        Task {
-            tid: tid_alloc(),
-            process: None,
-            is_process: false,
-            trap_context: unsafe { SyncUnsafeCell::new(TrapContext::new(entry, sp)) },
-            trap_context_spinlock: unsafe { SpinNoIrqLock::new(TrapContext::new(entry, sp)) },
-            timer: unsafe { SyncUnsafeCell::new(TaskTimeStat::new()) },
-            waker: unsafe { SyncUnsafeCell::new(None) },
-            state: unsafe { SpinNoIrqLock::new(TaskState::Running) },
-            addr_space: SpinNoIrqLock::new(addrspace),
-            inner: unsafe { UPSafeCell::new(inner) },
-        }
-    }
-
-    pub fn set_exit_code(&self, exit_code: i32) {
-        self.inner.exclusive_access().set_exit_code(exit_code);
-    }
-
-    pub fn set_waker(&self, waker: Waker) {
-        unsafe { *self.waker_mut() = Some(waker) };
-    }
-
     pub fn get_waker(&self) -> Waker {
-        unsafe { self.waker_mut().as_ref().unwrap().clone() }
+        self.waker_mut().as_ref().unwrap().clone()
     }
 
     pub fn get_exit_code(&self) -> i32 {
-        self.inner.exclusive_access().exit_code
+        self.exit_code.lock().clone()
     }
 
-    pub fn exit(&self) {
-        self.inner.exclusive_access().clear();
+    // ========== This Part You Can Check the State of Task  ===========
+    pub fn is_process(&self) -> bool {
+        self.is_process
     }
 
-    pub fn clear(&self) {
-        self.inner.exclusive_access().clear();
+    pub fn is_in_state(&self, state: TaskState) -> bool {
+        self.get_state() == state
     }
 
-    pub fn inner_mut(&mut self) -> &mut UPSafeCell<TaskInner> {
-        &mut self.inner
+    // ========== This Part You Can Set the Member of Task  ===========
+    pub fn set_state(&self, state: TaskState) {
+        *self.state.lock() = state;
     }
 
-    /// 当前任务切换到用户模式
-    pub fn enter_user_mode(&mut self) {
-        self.timer_mut().switch_to_user();
+    pub fn set_parent(&mut self, parent: Arc<Task>) {
+        *self.parent.lock() = Some(Arc::downgrade(&parent));
     }
 
-    /// 当前任务切换到内核模式
-    pub fn enter_kernel_mode(&mut self) {
-        self.timer_mut().switch_to_kernel();
+    pub fn set_exit_code(&self, exit_code: i32) {
+        *self.exit_code.lock() = exit_code;
     }
 
-    // 挂起当前任务，等待时间到达或被唤醒
-    pub async fn suspend_timeout(&self, limit: Duration) -> Duration {
-        let expire = get_time_duration() + limit;
-        let mut timer = Timer::new(expire);
-        timer.set_callback(self.get_waker().clone());
-        TIMER_MANAGER.add_timer(timer);
-        future::suspend_now().await;
-        let now = get_time_duration();
-        if expire > now {
-            expire - now
-        } else {
-            Duration::ZERO
-        }
+    pub fn set_waker(&self, waker: Waker) {
+        *self.waker_mut() = Some(waker);
     }
 
-    pub fn spawn_from_elf(elf_data: &'static [u8]) {
-        let mut addrspace = AddrSpace::build_user().unwrap();
-        let entry_point = addrspace.load_elf(elf_data).unwrap();
-        let stack = addrspace.map_stack().unwrap();
-        let task = Arc::new(Task::new(
-            entry_point.to_usize(),
-            stack.to_usize(),
-            addrspace,
-        ));
-
-        TASK_MANAGER.add_task(&task);
-        future::spawn_user_task(task);
+    // ========== This Part You Can Change the Member of Task  ===========
+    pub fn add_child(&mut self, child: Arc<Task>) {
+        self.children
+            .lock()
+            .insert(child.tid(), Arc::downgrade(&child));
     }
 
-    /// Switches to the address space of the task.
-    ///
-    /// # Safety
-    /// This function must be called before the current page table is dropped, or the kernel
-    /// may lose its memory mappings.
-    pub fn switch_addr_space(&self) {
-        unsafe {
-            switch_to(&self.addr_space.lock());
-        }
+    pub fn remove_child(&mut self, child: Arc<Task>) {
+        self.children.lock().remove(&child.tid());
     }
-}
-
-impl TaskInner {
-    pub fn new() -> Self {
-        Self {
-            parent: None,
-            children: BTreeMap::new(),
-            exit_code: 0,
-        }
-    }
-
-    pub fn clear(&mut self) {
-        self.exit_code = 0;
-    }
-
-    pub fn set_exit_code(&mut self, exit_code: i32) {
-        self.exit_code = exit_code;
-    }
-}
-
-pub fn spawn_task(elf_data: &'static [u8]) {
-    let mut addr_space = AddrSpace::build_user().unwrap();
-    let entry_point = addr_space.load_elf(elf_data).unwrap();
-    let stack_ptr = addr_space.map_stack().unwrap();
-    let task_inner = TaskInner::new();
-    let task = Arc::new(Task::new(
-        entry_point.to_usize(),
-        stack_ptr.to_usize(),
-        addr_space,
-    ));
-    add_task(&task);
-    spawn_user_task(task);
 }
