@@ -120,7 +120,8 @@ impl AddrSpace {
     ///
     /// # Errors
     /// Returns [`SysError::EFAULT`] if the fault address is invalid or the access permission
-    /// is not allowed.
+    /// is not allowed. Otherwise, returns [`SysError::ENOMEM`] if memory allocation fails
+    /// when handling the page fault.
     pub fn handle_page_fault(&mut self, fault_addr: VirtAddr, access: MemPerm) -> SysResult<()> {
         simdebug::when_debug!({
             log::trace!(

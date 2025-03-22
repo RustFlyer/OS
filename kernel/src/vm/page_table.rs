@@ -265,7 +265,7 @@ impl PageTable {
         }
     }
 
-    /// Maps a range of leaf pages by specifying the starting VPN, a slice of PPNs,
+    /// Maps a range of leaf pages by specifying the starting VPN, corresponsing PPNs,
     /// and page table entry flags.
     ///
     /// The range is `[start_vpn, start_vpn + ppns.len())`. The range must be valid
@@ -280,7 +280,7 @@ impl PageTable {
     /// By the current implementation, any non-leaf entry is created with the same
     /// `G` bit as the leaf entries. This design is sufficient for the current
     /// address space layout.
-    pub fn map_range(
+    pub fn map_range_to(
         &mut self,
         start_vpn: VirtPageNum,
         ppns: &[PhysPageNum],

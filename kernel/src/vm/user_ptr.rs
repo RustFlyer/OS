@@ -52,13 +52,13 @@ pub type UserWritePtr<'a, T> = UserPtr<'a, T, WriteMarker>;
 pub type UserReadWritePtr<'a, T> = UserPtr<'a, T, ReadWriteMarker>;
 
 /// Trait representing the access type of a pointer, i.e., read and/or write.
-trait AccessType {}
+pub trait AccessType {}
 
 /// Trait representing read access.
-trait ReadAccess: AccessType {}
+pub trait ReadAccess: AccessType {}
 
 /// Trait representing write access.
-trait WriteAccess: AccessType {}
+pub trait WriteAccess: AccessType {}
 
 /// Marker for read access.
 /// Do not use this type; it is public only to allow the use of `User*Ptr` types.
@@ -102,12 +102,12 @@ where
     /// The address space the pointer is in.
     addr_space: &'a mut AddrSpace,
 
-    /// Marker to indicate the access type of the pointer.
-    _access: PhantomData<A>,
-
     /// Guard to ensure the `SUM` bit of `sstatus` register is set when accessing
     /// the memory.
     sum_guard: SumGuard,
+
+    /// Marker to indicate the access type of the pointer.
+    access: PhantomData<A>,
 }
 
 /// Blanket implementation for general pointers.
@@ -126,8 +126,8 @@ where
         Self {
             ptr: addr as *mut T,
             addr_space,
-            _access: PhantomData,
             sum_guard: SumGuard::new(),
+            access: PhantomData,
         }
     }
 
@@ -377,11 +377,8 @@ where
     /// # Safety
     /// See the module-level documentation for safety information.
     pub unsafe fn write_array(&mut self, values: &[T]) -> SysResult<()> {
-        self.addr_space.check_user_access(
-            self.ptr as usize,
-            values.len() * size_of::<T>(),
-            MemPerm::W,
-        )?;
+        self.addr_space
+            .check_user_access(self.ptr as usize, size_of_val(values), MemPerm::W)?;
         unsafe {
             self.ptr
                 .copy_from_nonoverlapping(values.as_ptr(), values.len());
@@ -574,7 +571,7 @@ unsafe fn try_read(va: usize) -> bool {
     unsafe extern "C" {
         fn __try_read_user(va: usize) -> usize;
     }
-    match __try_read_user(va) {
+    match unsafe { __try_read_user(va) } {
         0 => true,
         1 => false,
         _ => unreachable!(),
@@ -594,7 +591,7 @@ unsafe fn try_write(va: usize) -> bool {
     unsafe extern "C" {
         fn __try_write_user(va: usize) -> usize;
     }
-    match __try_write_user(va) {
+    match unsafe { __try_write_user(va) } {
         0 => true,
         1 => false,
         _ => unreachable!(),

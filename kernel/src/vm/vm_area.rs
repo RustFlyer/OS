@@ -124,7 +124,7 @@ impl VmArea {
     ///
     /// # Errors
     /// Returns [`SysError::EFAULT`] if the access permission is not allowed.
-    /// Returns [`SysError::ENOMEM`] if a new frame cannot be allocated.
+    /// Otherwise, returns [`SysError::ENOMEM`] if a new frame cannot be allocated.
     pub fn handle_page_fault(&mut self, info: PageFaultInfo) -> SysResult<()> {
         if let Some(handler) = self.handler {
             handler(self, info)
@@ -202,7 +202,7 @@ impl KernelArea {
             .map(PhysPageNum::new)
             .collect::<Vec<_>>();
 
-        page_table.map_range(start_vpn, &ppns, flags).unwrap();
+        page_table.map_range_to(start_vpn, &ppns, flags).unwrap();
     }
 }
 

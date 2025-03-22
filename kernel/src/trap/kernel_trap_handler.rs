@@ -2,10 +2,7 @@ use arch::riscv64::time::{get_time_duration, set_nx_timer_irq};
 use riscv::{ExceptionNumber, InterruptNumber};
 use riscv::{
     interrupt::{Exception, Interrupt, Trap},
-    register::{
-        scause::{self, Scause},
-        sepc, stval, stvec,
-    },
+    register::{scause, sepc, stval},
 };
 use timer::TIMER_MANAGER;
 
@@ -21,10 +18,13 @@ pub fn kernel_trap_handler() {
 }
 
 pub fn kernel_exception_handler(e: Exception, stval: usize) {
-    match e {
-        Exception::StorePageFault => kernel_panic(),
-        _ => log::error!("Something Wrong Happen: {:?}, stval: {:#x}", e, stval),
-    }
+    log::error!(
+        "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}",
+        e,
+        stval,
+        sepc::read(),
+    );
+    kernel_panic();
 }
 
 pub fn kernel_interrupt_handler(i: Interrupt, _stval: usize) {
@@ -34,7 +34,7 @@ pub fn kernel_interrupt_handler(i: Interrupt, _stval: usize) {
         }
         Interrupt::SupervisorTimer => {
             TIMER_MANAGER.check(get_time_duration());
-            unsafe { set_nx_timer_irq() };
+            set_nx_timer_irq();
         }
         _ => kernel_panic(),
     }
