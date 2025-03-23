@@ -46,6 +46,7 @@ static mut BOOT_PAGE_TABLE: BootPageTable = {
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".text.entry")]
 unsafe extern "C" fn _start(hart_id: usize) -> ! {
+    // Note: The `hart_id` parameter is passed in `a0` register on boot.
     unsafe {
         core::arch::naked_asm!(
             // Enable Sv39 page table

@@ -396,11 +396,11 @@ impl PageTableMem {
     }
 }
 
-/// Enables the kernel page table.
+/// Switch to the kernel page table.
 ///
 /// # Safety
-/// This function must be called only once, after the kernel page table is set up.
-pub unsafe fn enable_kernel_page_table() {
+/// This function must be called after the kernel page table is set up.
+pub unsafe fn switch_to_kernel_page_table() {
     // SAFETY: the boot page table never gets dropped.
     unsafe {
         switch_page_table(&KERNEL_PAGE_TABLE);

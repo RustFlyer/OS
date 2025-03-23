@@ -165,8 +165,8 @@ pub enum TypedArea {
     FileBacked,
     /// An anonymous VMA.
     ///
-    /// An anonymous VMA is not backed by any file or memory. It is used for stack
-    /// and heap.
+    /// An anonymous VMA is not backed by any file or memory. It is created by `mmap`
+    /// system call with `MAP_ANONYMOUS` flag.
     Anonymous,
 }
 
