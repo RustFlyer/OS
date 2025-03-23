@@ -9,6 +9,7 @@ use timer::TIMER_MANAGER;
 /// Kernel trap handler
 #[unsafe(no_mangle)]
 pub fn kernel_trap_handler() {
+    riscv::asm::sfence_vma_all();
     let scause = scause::read();
     let stval = stval::read();
     match scause.cause() {
