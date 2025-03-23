@@ -1,3 +1,4 @@
+use config::process::INIT_PROC_ID;
 use id_allocator::{IdAllocator, VecIdAllocator};
 use lazy_static::lazy_static;
 use mutex::SpinNoIrqLock;
@@ -6,17 +7,14 @@ type TidAllocator = VecIdAllocator;
 
 lazy_static! {
     static ref TID_ALLOCATOR: SpinNoIrqLock<TidAllocator> =
-        SpinNoIrqLock::new(TidAllocator::new(0, usize::MAX));
+        SpinNoIrqLock::new(TidAllocator::new(INIT_PROC_ID, usize::MAX));
 }
 
 pub type Tid = usize;
 pub type Pid = usize;
 pub type PGid = usize;
 
-/// RAII形式任务ID句柄结构体
-///
-/// 表示一个任务的ID，并实现Drop特性
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TidHandle(pub Tid);
 
 impl Drop for TidHandle {

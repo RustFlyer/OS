@@ -12,10 +12,9 @@ use core::task::Waker;
 
 use pps::ProcessorPrivilegeState;
 
-/// 用户态Future封装结构
+/// UserFuture
 ///
-/// 包装用户任务及其关联的Future，管理特权状态切换
-/// 泛型F需满足Send + 'static保证线程安全和静态生命周期
+/// Wrap user tasks and their associated futures to manage privilege state switching
 pub struct UserFuture<F: Future + Send + 'static> {
     task: Arc<Task>,
     pps: ProcessorPrivilegeState,
@@ -36,13 +35,6 @@ impl<F: Future + Send + 'static> UserFuture<F> {
 impl<F: Future + Send + 'static> Future for UserFuture<F> {
     type Output = F::Output;
 
-    /// 核心poll实现
-    ///
-    /// 1. 切换到用户态上下文
-    /// 2. 执行实际Future的poll
-    /// 3. 切换回内核态上下文
-    ///
-    /// 安全性：Pin保证整个结构体在内存中固定，因此可以安全获取内部字段的可变引用
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let future = unsafe { Pin::get_unchecked_mut(self) };
         let hart = current_hart();
@@ -80,17 +72,16 @@ impl<F: Future + Send + 'static> Future for KernelFuture<F> {
     }
 }
 
-/// 任务执行单元异步函数
+/// Top-Level of Task
 ///
-/// 这是任务执行的顶层循环，处理任务状态转换和事件处理
+/// Task will run in this loop in the kernel all the time
 pub async fn task_executor_unit(task: Arc<Task>) {
     log::debug!("run task in first time!");
-    // 设置任务的唤醒器（从当前上下文中获取）
     task.set_waker(take_waker().await);
     loop {
         // log::debug!("try to step into user!");
 
-        trap::trap_return(&task); // trap_return_
+        trap::trap_return(&task);
 
         // log::debug!("return from user!");
 
@@ -102,7 +93,7 @@ pub async fn task_executor_unit(task: Arc<Task>) {
             _ => {}
         }
 
-        trap::trap_handler(&task).await; // trap_handle_
+        trap::trap_handler(&task).await;
 
         match task.get_state() {
             TaskState::Zombie => break,
@@ -118,9 +109,9 @@ pub async fn task_executor_unit(task: Arc<Task>) {
     task.exit();
 }
 
-/// 生成用户任务
+/// spawn user task
 ///
-/// 将用户任务包装为UserFuture并提交给调度器
+/// Wrap the user task as a UserFuture and submit it to the scheduler
 pub fn spawn_user_task(task: Arc<Task>) {
     let future = UserFuture::new(task.clone(), task_executor_unit(task));
     let (task, handle) = executor::spawn(future);
@@ -128,25 +119,25 @@ pub fn spawn_user_task(task: Arc<Task>) {
     handle.detach();
 }
 
-/// 生成内核任务
+/// spawn kernel task
 ///
-/// 将内核Future包装为KernelFuture并提交给调度器
+/// Wrap the Future as a KernelFuture and submit it to the scheduler
 pub fn spawn_kernel_task<F: Future<Output = ()> + Send + 'static>(future: F) {
     let future = KernelFuture::new(future);
     let (task, handle) = executor::spawn(future);
     task.schedule();
-    handle.detach(); // 分离执行句柄（不等待结果）
+    handle.detach();
 }
 
-/// 异步获取当前上下文唤醒器
+/// Gets the current context waker  
 #[inline(always)]
 pub async fn take_waker() -> Waker {
     TakeWakerFuture.await
 }
 
-/// 实现Waker获取的Future
+/// Take Waker Future
 ///
-/// 在首次poll时直接返回当前上下文的Waker克隆
+/// Returns a Waker clone of the current context directly on the first poll
 struct TakeWakerFuture;
 
 impl Future for TakeWakerFuture {
@@ -158,9 +149,9 @@ impl Future for TakeWakerFuture {
     }
 }
 
-/// 挂起Future实现
+/// Suspend Future
 ///
-/// 用于实现suspend_now功能，使当前任务让出执行权
+/// Relinquishes the execution of the current task
 struct SuspendFuture {
     has_suspended: bool,
 }
@@ -176,9 +167,9 @@ impl SuspendFuture {
 impl Future for SuspendFuture {
     type Output = ();
 
-    /// 挂起逻辑实现：
-    /// - 第一次poll返回Pending（触发挂起）
-    /// - 后续poll返回Ready（恢复执行）
+    /// Suspend logic:：
+    /// - The first poll returns Pending (triggers pending)
+    /// - Subsequent polls return to Ready (Resume Execution)
     fn poll(mut self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Self::Output> {
         match self.has_suspended {
             true => Poll::Ready(()),
@@ -190,9 +181,10 @@ impl Future for SuspendFuture {
     }
 }
 
-/// 立即挂起当前任务
+/// Suspend the current task Immediately
 ///
-/// 通过await这个异步函数，当前任务会让出处理器直到被再次调度
+/// With the await function, the current task will be relinquished
+/// to the processor until it is scheduled again
 pub async fn suspend_now() {
     SuspendFuture::new().await
 }

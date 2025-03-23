@@ -1,5 +1,6 @@
 pub mod future;
 pub mod manager;
+pub mod process_manager;
 pub mod task;
 pub mod taskf;
 pub mod tid;

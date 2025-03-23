@@ -15,7 +15,7 @@ use time::TaskTimeStat;
 use crate::trap::trap_context::TrapContext;
 use crate::vm::addr_space::AddrSpace;
 
-use super::tid::Pid;
+use super::tid::{PGid, Pid};
 
 /// State of Task
 ///
@@ -47,7 +47,6 @@ pub struct Task {
     is_process: bool,
 
     trap_context: SyncUnsafeCell<TrapContext>,
-    trap_context_spinlock: SpinNoIrqLock<TrapContext>,
     timer: SyncUnsafeCell<TaskTimeStat>,
     waker: SyncUnsafeCell<Option<Waker>>,
     state: SpinNoIrqLock<TaskState>,
@@ -56,25 +55,60 @@ pub struct Task {
     parent: ShareMutex<Option<Weak<Task>>>,
     children: ShareMutex<BTreeMap<Tid, Weak<Task>>>,
 
+    pgid: ShareMutex<PGid>,
     exit_code: SpinNoIrqLock<i32>,
 }
 
 /// This Impl is mainly for getting and setting the property of Task
 impl Task {
     pub fn new(entry: usize, sp: usize, addrspace: AddrSpace) -> Self {
+        let tid = tid_alloc();
         Task {
-            tid: tid_alloc(),
+            tid: tid.clone(),
             process: None,
             is_process: false,
             trap_context: SyncUnsafeCell::new(TrapContext::new(entry, sp)),
-            trap_context_spinlock: SpinNoIrqLock::new(TrapContext::new(entry, sp)),
             timer: SyncUnsafeCell::new(TaskTimeStat::new()),
             waker: SyncUnsafeCell::new(None),
             state: SpinNoIrqLock::new(TaskState::Running),
             addr_space: Arc::new(SpinNoIrqLock::new(addrspace)),
             parent: new_share_mutex(None),
             children: new_share_mutex(BTreeMap::new()),
+            pgid: new_share_mutex(tid.0),
             exit_code: SpinNoIrqLock::new(0),
+        }
+    }
+
+    pub fn new_fork_clone(
+        tid: TidHandle,
+        process: Option<Weak<Task>>,
+        is_process: bool,
+
+        trap_context: SyncUnsafeCell<TrapContext>,
+        timer: SyncUnsafeCell<TaskTimeStat>,
+        waker: SyncUnsafeCell<Option<Waker>>,
+        state: SpinNoIrqLock<TaskState>,
+        addr_space: ShareMutex<AddrSpace>,
+
+        parent: ShareMutex<Option<Weak<Task>>>,
+        children: ShareMutex<BTreeMap<Tid, Weak<Task>>>,
+
+        pgid: ShareMutex<PGid>,
+        exit_code: SpinNoIrqLock<i32>,
+    ) -> Self {
+        Task {
+            tid,
+            process,
+            is_process,
+            trap_context,
+            timer,
+            waker,
+            state,
+            addr_space,
+            parent,
+            children,
+            pgid,
+            exit_code,
         }
     }
 
@@ -107,10 +141,6 @@ impl Task {
         unsafe { &mut *self.trap_context.get() }
     }
 
-    pub fn trap_context_spinlock_mut(&self) -> &SpinNoIrqLock<TrapContext> {
-        &self.trap_context_spinlock
-    }
-
     #[allow(clippy::mut_from_ref)]
     pub fn timer_mut(&self) -> &mut TaskTimeStat {
         unsafe { &mut *self.timer.get() }
@@ -121,8 +151,20 @@ impl Task {
         unsafe { &mut *self.waker.get() }
     }
 
-    pub fn addr_space_mut(&self) -> &SpinNoIrqLock<AddrSpace> {
+    pub fn addr_space_mut(&self) -> &ShareMutex<AddrSpace> {
         &self.addr_space
+    }
+
+    pub fn parent_mut(&self) -> &ShareMutex<Option<Weak<Task>>> {
+        &self.parent
+    }
+
+    pub fn children_mut(&self) -> &ShareMutex<BTreeMap<Tid, Weak<Task>>> {
+        &self.children
+    }
+
+    pub fn pgid_mut(&self) -> &ShareMutex<PGid> {
+        &self.pgid
     }
 
     pub fn get_waker(&self) -> Waker {
@@ -133,6 +175,9 @@ impl Task {
         self.exit_code.lock().clone()
     }
 
+    pub fn get_pgid(&self) -> PGid {
+        self.pgid.lock().clone()
+    }
     // ========== This Part You Can Check the State of Task  ===========
     pub fn is_process(&self) -> bool {
         self.is_process
@@ -159,14 +204,17 @@ impl Task {
         *self.waker_mut() = Some(waker);
     }
 
+    pub fn set_pgid(&self, pgid: PGid) {
+        *self.pgid_mut().lock() = pgid;
+    }
     // ========== This Part You Can Change the Member of Task  ===========
-    pub fn add_child(&mut self, child: Arc<Task>) {
+    pub fn add_child(&self, child: Arc<Task>) {
         self.children
             .lock()
             .insert(child.tid(), Arc::downgrade(&child));
     }
 
-    pub fn remove_child(&mut self, child: Arc<Task>) {
+    pub fn remove_child(&self, child: Arc<Task>) {
         self.children.lock().remove(&child.tid());
     }
 }

@@ -1,14 +1,22 @@
 extern crate alloc;
+use alloc::collections::btree_map::BTreeMap;
 use alloc::sync::Arc;
+use time::TaskTimeStat;
 
 use super::future::{self};
 use super::manager::TASK_MANAGER;
+use super::process_manager::PROCESS_GROUP_MANAGER;
 use super::task::*;
+use super::tid::tid_alloc;
 
 use crate::vm::addr_space::AddrSpace;
 use crate::vm::addr_space::switch_to;
 use arch::riscv64::time::get_time_duration;
+use config::process::CloneFlags;
+use core::cell::SyncUnsafeCell;
 use core::time::Duration;
+use mutex::SpinNoIrqLock;
+use mutex::new_share_mutex;
 use timer::{TIMER_MANAGER, Timer};
 
 impl Task {
@@ -37,7 +45,7 @@ impl Task {
         }
     }
 
-    /// Spawns app from elf
+    /// Spawns from Elf
     pub fn spawn_from_elf(elf_data: &'static [u8]) {
         let mut addrspace = AddrSpace::build_user().unwrap();
         let entry_point = addrspace.load_elf(elf_data).unwrap();
@@ -63,7 +71,73 @@ impl Task {
         }
     }
 
-    pub fn exit(&self) {}
+    /// fork a application
+    ///
+    /// - todo1: Memory Copy / Cow
+    /// - todo2: Control of relevant Thread Group
+    pub fn fork(self: &Arc<Self>, clonefalgs: CloneFlags) -> Arc<Self> {
+        let tid = tid_alloc();
+        let trap_context = SyncUnsafeCell::new(*self.trap_context_mut());
+        let state = SpinNoIrqLock::new(self.get_state());
 
-    pub fn clear(&self) {}
+        let process;
+        let is_process;
+        let parent;
+        let children;
+
+        let pgid;
+
+        if clonefalgs.contains(CloneFlags::THREAD) {
+            is_process = false;
+            process = Some(Arc::downgrade(self));
+            parent = self.parent_mut().clone();
+            children = self.children_mut().clone();
+            pgid = self.pgid_mut().clone();
+        } else {
+            is_process = true;
+            process = None;
+            parent = new_share_mutex(Some(Arc::downgrade(self)));
+            children = new_share_mutex(BTreeMap::new());
+
+            pgid = new_share_mutex(self.get_pgid());
+        }
+
+        let addr_space;
+        if clonefalgs.contains(CloneFlags::VM) {
+            addr_space = (*self.addr_space_mut()).clone();
+        } else {
+            // TODO: Cow Fork
+            addr_space = (*self.addr_space_mut()).clone();
+        }
+
+        let new = Arc::new(Self::new_fork_clone(
+            tid,
+            process,
+            is_process,
+            trap_context,
+            SyncUnsafeCell::new(TaskTimeStat::new()),
+            SyncUnsafeCell::new(None),
+            state,
+            addr_space,
+            parent,
+            children,
+            pgid,
+            SpinNoIrqLock::new(0),
+        ));
+
+        if !clonefalgs.contains(CloneFlags::THREAD) {
+            self.add_child(new.clone());
+        }
+
+        if new.is_process() {
+            PROCESS_GROUP_MANAGER.add_process(new.get_pgid(), &new);
+        }
+
+        TASK_MANAGER.add_task(&new);
+        new
+    }
+
+    pub fn exit(&self) {
+        self.set_state(TaskState::Zombie);
+    }
 }

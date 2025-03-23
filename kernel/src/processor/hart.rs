@@ -1,4 +1,7 @@
-use crate::task::Task;
+use crate::{
+    task::{Task, TaskState},
+    vm,
+};
 use config::device::MAX_HARTS;
 
 extern crate alloc;
@@ -15,14 +18,10 @@ use arch::riscv64::interrupt::{disable_interrupt, enable_interrupt};
 const HART_ONE: Hart = Hart::new(0);
 pub static mut HARTS: [Hart; MAX_HARTS] = [HART_ONE; MAX_HARTS];
 
-// lazy_static! {
-//     pub static ref HARTS: Vec<Arc<HART>> = (0..MAX_HARTS).map(|i| Arc::new(HART::new(i))).collect();
-// }
-
-/// Hart结构体
+/// Hart
 ///
-/// 表示一个hart，包含hart ID、任务和处理器特权状态
-/// 一个cpu核心一个HART
+/// Used to Manage the State of CPU.
+/// One CPU has One Hart.
 pub struct Hart {
     pub id: usize,
     task: Option<Arc<Task>>,
@@ -71,7 +70,7 @@ impl Hart {
     }
 
     pub fn user_switch_in(&mut self, new_task: &mut Arc<Task>, pps: &mut ProcessorPrivilegeState) {
-        // todo!();
+        assert_ne!(new_task.get_state(), TaskState::Zombie);
         disable_interrupt();
         core::mem::swap(self.get_mut_pps(), pps);
         pps.auto_sum();
@@ -81,11 +80,13 @@ impl Hart {
     }
 
     pub fn user_switch_out(&mut self, pps: &mut ProcessorPrivilegeState) {
-        // todo!();
         disable_interrupt();
         pps.auto_sum();
         core::mem::swap(self.get_mut_pps(), pps);
         let _task = self.get_task();
+        unsafe {
+            vm::enable_kernel_page_table();
+        }
         self.clear_task();
         enable_interrupt();
     }
