@@ -22,11 +22,11 @@ pub fn init() {
     let add1 = get_app_data_by_name("add1").unwrap();
     let add2 = get_app_data_by_name("add2").unwrap();
 
-    Task::spawn_from_elf(hello_world);
-    Task::spawn_from_elf(time_test);
-    Task::spawn_from_elf(add);
-    Task::spawn_from_elf(add1);
-    Task::spawn_from_elf(add2);
+    Task::spawn_from_elf(hello_world, "hello_world");
+    Task::spawn_from_elf(time_test, "time_test");
+    Task::spawn_from_elf(add, "add");
+    Task::spawn_from_elf(add1, "add1");
+    Task::spawn_from_elf(add2, "add2");
 
     // let elf_data2 = get_app_data_by_name("time_test").unwrap();
     // Task::spawn_from_elf(elf_data2);

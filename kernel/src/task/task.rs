@@ -3,8 +3,10 @@ use crate::task::tid::{Tid, TidHandle, tid_alloc};
 extern crate alloc;
 use alloc::{
     collections::BTreeMap,
+    string::{String, ToString},
     sync::{Arc, Weak},
 };
+use driver::println;
 use mutex::{ShareMutex, SpinNoIrqLock, new_share_mutex};
 
 use core::cell::SyncUnsafeCell;
@@ -57,11 +59,13 @@ pub struct Task {
 
     pgid: ShareMutex<PGid>,
     exit_code: SpinNoIrqLock<i32>,
+
+    name: String,
 }
 
 /// This Impl is mainly for getting and setting the property of Task
 impl Task {
-    pub fn new(entry: usize, sp: usize, addrspace: AddrSpace) -> Self {
+    pub fn new(entry: usize, sp: usize, addrspace: AddrSpace, name: String) -> Self {
         let tid = tid_alloc();
         Task {
             tid: tid.clone(),
@@ -76,6 +80,7 @@ impl Task {
             children: new_share_mutex(BTreeMap::new()),
             pgid: new_share_mutex(tid.0),
             exit_code: SpinNoIrqLock::new(0),
+            name,
         }
     }
 
@@ -95,6 +100,7 @@ impl Task {
 
         pgid: ShareMutex<PGid>,
         exit_code: SpinNoIrqLock<i32>,
+        name: String,
     ) -> Self {
         Task {
             tid,
@@ -109,6 +115,7 @@ impl Task {
             children,
             pgid,
             exit_code,
+            name,
         }
     }
 
@@ -178,6 +185,10 @@ impl Task {
     pub fn get_pgid(&self) -> PGid {
         self.pgid.lock().clone()
     }
+
+    pub fn get_name(&self) -> String {
+        self.name.clone()
+    }
     // ========== This Part You Can Check the State of Task  ===========
     pub fn is_process(&self) -> bool {
         self.is_process
@@ -216,5 +227,15 @@ impl Task {
 
     pub fn remove_child(&self, child: Arc<Task>) {
         self.children.lock().remove(&child.tid());
+    }
+}
+
+impl Drop for Task {
+    fn drop(&mut self) {
+        let str = format!("Task [{}] is drop", self.get_name());
+        log::info!("{}", str);
+        log::error!("{}", str);
+        log::debug!("{}", str);
+        log::trace!("{}", str);
     }
 }

@@ -1,5 +1,6 @@
 extern crate alloc;
 use alloc::collections::btree_map::BTreeMap;
+use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use time::TaskTimeStat;
 
@@ -46,7 +47,7 @@ impl Task {
     }
 
     /// Spawns from Elf
-    pub fn spawn_from_elf(elf_data: &'static [u8]) {
+    pub fn spawn_from_elf(elf_data: &'static [u8], name: &str) {
         let mut addrspace = AddrSpace::build_user().unwrap();
         let entry_point = addrspace.load_elf(elf_data).unwrap();
         let stack = addrspace.map_stack().unwrap();
@@ -54,6 +55,7 @@ impl Task {
             entry_point.to_usize(),
             stack.to_usize(),
             addrspace,
+            name.to_string(),
         ));
 
         TASK_MANAGER.add_task(&task);
@@ -123,6 +125,7 @@ impl Task {
             children,
             pgid,
             SpinNoIrqLock::new(0),
+            self.get_name(),
         ));
 
         if !clonefalgs.contains(CloneFlags::THREAD) {
