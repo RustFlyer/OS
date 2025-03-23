@@ -67,8 +67,9 @@ pub struct Task {
 impl Task {
     pub fn new(entry: usize, sp: usize, addrspace: AddrSpace, name: String) -> Self {
         let tid = tid_alloc();
+        let pgid = tid.0;
         Task {
-            tid: tid.clone(),
+            tid,
             process: None,
             is_process: false,
             trap_context: SyncUnsafeCell::new(TrapContext::new(entry, sp)),
@@ -78,7 +79,7 @@ impl Task {
             addr_space: Arc::new(SpinNoIrqLock::new(addrspace)),
             parent: new_share_mutex(None),
             children: new_share_mutex(BTreeMap::new()),
-            pgid: new_share_mutex(tid.0),
+            pgid: new_share_mutex(pgid),
             exit_code: SpinNoIrqLock::new(0),
             name,
         }
