@@ -124,7 +124,7 @@ impl VmArea {
     ///
     /// # Errors
     /// Returns [`SysError::EFAULT`] if the access permission is not allowed.
-    /// Returns [`SysError::ENOMEM`] if a new frame cannot be allocated.
+    /// Otherwise, returns [`SysError::ENOMEM`] if a new frame cannot be allocated.
     pub fn handle_page_fault(&mut self, info: PageFaultInfo) -> SysResult<()> {
         if let Some(handler) = self.handler {
             handler(self, info)
@@ -202,7 +202,7 @@ impl KernelArea {
             .map(PhysPageNum::new)
             .collect::<Vec<_>>();
 
-        page_table.map_range(start_vpn, &ppns, flags);
+        page_table.map_range_to(start_vpn, &ppns, flags).unwrap();
     }
 }
 
@@ -259,9 +259,15 @@ impl MemoryBackedArea {
             return Err(SysError::EFAULT);
         }
 
-        // Allocate a frame and map the page.
-        let mut frame = FrameTracker::build()?;
-        page_table.map_page(fault_addr.page_number(), frame.as_ppn(), flags);
+        // Map the page if it is not already mapped by another thread.
+        let mut frame = match page_table.map_page(fault_addr.page_number(), flags)? {
+            Some(frame) => frame,
+            None => {
+                // Already mapped, just flush the TLB.
+                riscv::asm::sfence_vma(0, fault_addr.to_usize());
+                return Ok(());
+            }
+        };
 
         // Fill the frame with appropriate data.
         // There are 3 types of regions in the frame:
@@ -290,9 +296,6 @@ impl MemoryBackedArea {
 
         // Track the allocated frame.
         pages.push(frame);
-
-        // Flush TLB.
-        riscv::asm::sfence_vma_all();
 
         Ok(())
     }
@@ -334,15 +337,18 @@ impl StackArea {
             return Err(SysError::EFAULT);
         }
 
-        // Allocate a frame and map the page.
-        let frame = FrameTracker::build()?;
-        page_table.map_page(fault_addr.page_number(), frame.as_ppn(), flags);
+        // Map the page if it is not already mapped by another thread.
+        let frame = match page_table.map_page(fault_addr.page_number(), flags)? {
+            Some(frame) => frame,
+            None => {
+                // Already mapped, just flush the TLB.
+                riscv::asm::sfence_vma(0, fault_addr.to_usize());
+                return Ok(());
+            }
+        };
 
         // Track the allocated frame.
         pages.push(frame);
-
-        // Flush TLB.
-        riscv::asm::sfence_vma_all();
 
         Ok(())
     }
