@@ -97,6 +97,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "790eea4361631c5e7d22598ecd5723ff611904e3344ce8720784c93e3d83d40b"
 
 [[package]]
+name = "downcast-rs"
+version = "1.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
+
+[[package]]
 name = "driver"
 version = "0.1.0"
 dependencies = [
@@ -459,6 +465,19 @@ dependencies = [
  "bitflags 2.9.0",
  "buddy_system_allocator",
  "time",
+]
+
+[[package]]
+name = "vfs"
+version = "0.1.0"
+dependencies = [
+ "config",
+ "downcast-rs",
+ "driver",
+ "mm",
+ "mutex",
+ "spin",
+ "systype",
 ]
 
 [[package]]

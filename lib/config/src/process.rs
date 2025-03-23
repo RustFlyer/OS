@@ -1,6 +1,6 @@
 use bitflags::bitflags;
 
-pub const INIT_PROC_ID: usize = 1;
+pub const INIT_PROC_ID: usize = 0;
 
 bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
