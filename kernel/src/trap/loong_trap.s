@@ -53,7 +53,8 @@ __trap_from_user:
 
     ld.d $sp, $sp, 34*8
 
-    //jump to ra(fn trap_return) without offset, drop current pc+4 to r0
+    // jump to ra(fn trap_return) without offset, drop current pc+4 to r0
+    //Sugar: jr $ra
     jirl r0, ra, 0
 
 __return_to_user:
@@ -97,3 +98,29 @@ __return_to_user:
     // XXX: ertn makes pc jump to ERA only when it's not Debug, 
     // Error or TLB exception.
     ertn
+
+__try_read_user:
+    move $a1, $a0
+    move $a0, $r0
+
+    ld.b $a1, $a1, 0
+    jirl $r0, $ra, 0 
+
+__try_write_user:
+    move $a2, $a0
+    move $a0, $r0
+    ld.b $a1, $a2, 0
+    st.b $a1, $a2, 0
+    jirl $r0, $ra, 0
+
+__user_rw_exception_entry:
+    csrrd $a0, 0x6
+    addi.d $a0, $a0, 4
+    csrwr $a0, 0x6
+    addi.d $a0, $a0, 1
+    csrrd $a1, 0x5
+    ertn
+
+    .align 8
+__user_rw_trap_vector:
+    #TODO: what does align do?
