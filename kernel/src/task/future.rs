@@ -95,6 +95,10 @@ pub async fn task_executor_unit(task: Arc<Task>) {
 
         trap::trap_handler(&task).await;
 
+        if task.timer_mut().schedule_time_out() && executor::has_waiting_task() {
+            yield_now().await;
+        }
+
         match task.get_state() {
             TaskState::Zombie => break,
             TaskState::Waiting => {
@@ -144,7 +148,6 @@ impl Future for TakeWakerFuture {
     type Output = Waker;
     #[inline(always)]
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        // 直接返回当前上下文的Waker克隆
         Poll::Ready(cx.waker().clone())
     }
 }
@@ -167,7 +170,7 @@ impl SuspendFuture {
 impl Future for SuspendFuture {
     type Output = ();
 
-    /// Suspend logic:：
+    /// Suspend logic:
     /// - The first poll returns Pending (triggers pending)
     /// - Subsequent polls return to Ready (Resume Execution)
     fn poll(mut self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Self::Output> {

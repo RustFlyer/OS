@@ -19,6 +19,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         EXIT => sys_exit(args[0] as i32),
         SCHED_YIELD => sys_sched_yield().await,
         WRITE => sys_write(args[0], args[1], args[2]),
+        TIMES => sys_times(args[0]),
         _ => {
             log::error!("Syscall not implemented: {syscall_no}");
             unimplemented!()

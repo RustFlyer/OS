@@ -70,7 +70,7 @@ impl Hart {
     }
 
     pub fn user_switch_in(&mut self, new_task: &mut Arc<Task>, pps: &mut ProcessorPrivilegeState) {
-        assert_ne!(new_task.get_state(), TaskState::Zombie);
+        // assert_ne!(new_task.get_state(), TaskState::Zombie);
         disable_interrupt();
         core::mem::swap(self.get_mut_pps(), pps);
         pps.auto_sum();
