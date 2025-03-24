@@ -12,11 +12,11 @@ unsafe extern "C" {
 }
 
 pub fn set_kernel_stvec() {
-    unsafe { set_trap_handler(__trap_from_kernel as usize, TrapMode::Direct) };
+    set_trap_handler(__trap_from_kernel as usize, TrapMode::Direct);
 }
 
 pub fn set_user_stvec() {
-    unsafe { set_trap_handler(__trap_from_user as usize, TrapMode::Direct) };
+    set_trap_handler(__trap_from_user as usize, TrapMode::Direct);
 }
 
 /// Set the trap vector as such:

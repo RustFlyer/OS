@@ -1,17 +1,9 @@
 use super::trap_context::TrapContext;
 use crate::task::{Task, TaskState};
-use crate::trap::{self, trap_env};
+use crate::trap::trap_env;
 use alloc::sync::Arc;
-use arch::riscv64::{
-    interrupt::{disable_interrupt, enable_interrupt},
-    time::{get_time_duration, set_nx_timer_irq},
-};
-use riscv::{
-    interrupt::{Exception, Interrupt, Trap},
-    register::{scause, sepc, sstatus::FS, stval},
-};
-use simdebug::when_debug;
-use trap_env::{set_kernel_stvec, set_user_stvec};
+
+use riscv::register::sstatus::FS;
 
 unsafe extern "C" {
     fn __return_to_user(cx: *mut TrapContext);
@@ -24,12 +16,11 @@ pub fn trap_return(task: &Arc<Task>) {
         log::info!("[kernel] trap return to user...");
     });
 
-    unsafe {
-        arch::riscv64::interrupt::disable_interrupt();
-        trap_env::set_user_stvec();
-        // warn: stvec 不能在下面被改变。
-        // 一个隐藏的错误是隐式使用 `UserPtr`，这将改变 stvec 为 `__trap_from_kernel`。
-    };
+    arch::riscv64::interrupt::disable_interrupt();
+    trap_env::set_user_stvec();
+    // warn: stvec 不能在下面被改变。
+    // 一个隐藏的错误是隐式使用 `UserPtr`，这将改变 stvec 为 `__trap_from_kernel`。
+
     let mut timer = task.timer_mut();
     timer.record_trap_return();
 

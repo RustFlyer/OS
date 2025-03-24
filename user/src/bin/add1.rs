@@ -9,12 +9,9 @@ use user_lib::{exit, println, yield_};
 fn main() {
     let mut a: i32 = 0;
 
-    for i in 0..=100 {
+    for i in 0..=30 {
         a = a + i;
-        println!("thread2: {}", i);
-        if i % 8 == 0 {
-            yield_();
-        }
+        println!("thread banana: {}", i);
     }
 
     exit(a)

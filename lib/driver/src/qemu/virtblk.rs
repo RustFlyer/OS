@@ -31,8 +31,8 @@ impl BlockDevice for VirtBlkDevice {
 
     /// Write Block
     ///
-    /// - ['block_id'] is the id of block in VirtHW
-    /// - ['buf'] is the buffer for datas
+    /// - [block_id] is the id of block in VirtHW
+    /// - [buf] is the buffer for datas
     ///
     /// Data from Buf to Block
     fn write(&self, block_id: usize, buf: &[u8]) {

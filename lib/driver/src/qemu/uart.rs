@@ -24,7 +24,7 @@ impl CharDevice for UartDevice {
 
     /// Put Chars Out
     ///
-    /// - ['datas'] is buffer for chars
+    /// - [datas] is buffer for chars
     fn puts(&self, datas: &[u8]) {
         for data in datas {
             self.device.lock().send(*data);

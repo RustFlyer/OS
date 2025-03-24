@@ -31,3 +31,7 @@ pub async fn sys_sched_yield() -> SyscallResult {
     yield_now().await;
     Ok(0)
 }
+
+pub async fn sys_waitpid() -> SyscallResult {
+    Ok(0)
+}

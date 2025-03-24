@@ -22,7 +22,7 @@ unsafe impl virtio_drivers::Hal for VirtHalImpl {
         assert!(pages > 0);
         let mut base = PhysPageNum::new(0);
         let mut frame_space = FrameSpace.lock();
-        let mut frame_batch = FrameTracker::build_batch(pages).expect("virtio alloc no page!");
+        let mut frame_batch = FrameTracker::build_contiguous(pages).expect("virtio alloc no page!");
         for frame_id in 0..pages {
             let frame = frame_batch.pop().unwrap();
             if frame_id == pages - 1 {
@@ -51,7 +51,7 @@ unsafe impl virtio_drivers::Hal for VirtHalImpl {
         let pa = PhysAddr::new(paddr);
         let ppn_st = pa.page_number();
         let ppn_ed = PhysPageNum::new(ppn_st.to_usize() + pages);
-        for ppn in ppn_st.to_usize()..ppn_ed.to_usize() {
+        for _ppn in ppn_st.to_usize()..ppn_ed.to_usize() {
             // Here frame which owns the ppn should be dealloc
             todo!()
         }

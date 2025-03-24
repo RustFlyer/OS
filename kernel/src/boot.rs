@@ -1,4 +1,3 @@
-use crate::println;
 use config::device::MAX_HARTS;
 use config::mm::HART_START_ADDR;
 use driver::sbi;

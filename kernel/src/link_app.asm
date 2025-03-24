@@ -3,16 +3,18 @@
     .section .data
     .global _num_app
 _num_app:
-    .quad 5
+    .quad 6
     .quad app_0_start
     .quad app_1_start
     .quad app_2_start
     .quad app_3_start
     .quad app_4_start
-    .quad app_4_end
+    .quad app_5_start
+    .quad app_5_end
 
     .global _app_names
 _app_names:
+    .string "init_proc"
     .string "hello_world"
     .string "time_test"
     .string "add"
@@ -24,7 +26,7 @@ _app_names:
     .global app_0_end
     .align 3
 app_0_start:
-    .incbin "./target/riscv64gc-unknown-none-elf/debug/hello_world"
+    .incbin "./target/riscv64gc-unknown-none-elf/debug/init_proc"
 app_0_end:
 
     .section .data
@@ -58,3 +60,11 @@ app_3_end:
 app_4_start:
     .incbin "./target/riscv64gc-unknown-none-elf/debug/add2"
 app_4_end:
+
+    .section .data
+    .global app_5_start
+    .global app_5_end
+    .align 3
+app_5_start:
+    .incbin "./target/riscv64gc-unknown-none-elf/debug/hello_world"
+app_5_end:

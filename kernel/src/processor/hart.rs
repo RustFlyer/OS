@@ -1,16 +1,15 @@
-use crate::{task::Task, vm::addr_space::AddrSpace};
+use crate::{
+    task::{Task, TaskState},
+    vm,
+};
 use config::device::MAX_HARTS;
 
 extern crate alloc;
 use alloc::sync::Arc;
-use alloc::vec::Vec;
 
 use pps::ProcessorPrivilegeState;
 
-use lazy_static::lazy_static;
-use simdebug::when_debug;
-
-use core::{arch::asm, sync::atomic::AtomicUsize};
+use core::arch::asm;
 use riscv::register::sstatus;
 use riscv::register::sstatus::FS;
 
@@ -19,14 +18,10 @@ use arch::riscv64::interrupt::{disable_interrupt, enable_interrupt};
 const HART_ONE: Hart = Hart::new(0);
 pub static mut HARTS: [Hart; MAX_HARTS] = [HART_ONE; MAX_HARTS];
 
-// lazy_static! {
-//     pub static ref HARTS: Vec<Arc<HART>> = (0..MAX_HARTS).map(|i| Arc::new(HART::new(i))).collect();
-// }
-
-/// Hart结构体
+/// Hart
 ///
-/// 表示一个hart，包含hart ID、任务和处理器特权状态
-/// 一个cpu核心一个HART
+/// Used to Manage the State of CPU.
+/// One CPU has One Hart.
 pub struct Hart {
     pub id: usize,
     task: Option<Arc<Task>>,
@@ -75,23 +70,25 @@ impl Hart {
     }
 
     pub fn user_switch_in(&mut self, new_task: &mut Arc<Task>, pps: &mut ProcessorPrivilegeState) {
-        // todo!();
+        // log::info!("switch to [{}]", new_task.get_name());
+        // assert_ne!(new_task.get_state(), TaskState::Zombie);
         disable_interrupt();
         core::mem::swap(self.get_mut_pps(), pps);
         pps.auto_sum();
-        unsafe {
-            new_task.switch_addr_space();
-        }
+        new_task.switch_addr_space();
+        new_task.timer_mut().record_switch_in();
         self.set_task(Arc::clone(new_task));
         enable_interrupt();
     }
 
     pub fn user_switch_out(&mut self, pps: &mut ProcessorPrivilegeState) {
-        // todo!();
         disable_interrupt();
         pps.auto_sum();
         core::mem::swap(self.get_mut_pps(), pps);
-        let task = self.get_task();
+        let _task = self.get_task();
+        unsafe {
+            vm::enable_kernel_page_table();
+        }
         self.clear_task();
         enable_interrupt();
     }
@@ -124,7 +121,7 @@ pub fn get_hart(hart_id: usize) -> &'static mut Hart {
 }
 
 pub fn current_hart() -> &'static mut Hart {
-    let mut ret;
+    let ret;
     unsafe {
         let tp: usize;
         asm!("mv {}, tp", out(reg) tp);

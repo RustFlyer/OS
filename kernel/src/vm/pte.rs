@@ -138,7 +138,7 @@ impl PageTableEntry {
 }
 
 impl Default for PageTableEntry {
-    /// Returns a default page table entry which is invalid (unmapped).
+    /// Returns a default page table entry which is zeroed.
     fn default() -> Self {
         PageTableEntry { bits: 0 }
     }

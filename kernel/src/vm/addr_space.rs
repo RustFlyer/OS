@@ -17,14 +17,12 @@
 //! The kernel creates a new page table for the address space and maps its kernel part
 //! directly. VMAs are then created to manage the user part of the address space.
 
-use core::ops::{Bound, ControlFlow};
+use core::ops::Bound;
 
 use alloc::collections::btree_map::BTreeMap;
 
 use mm::address::VirtAddr;
 use systype::{SysError, SysResult};
-
-use super::page_table::print_page_table_entries;
 
 use super::{
     mem_perm::MemPerm,
@@ -105,8 +103,13 @@ impl AddrSpace {
     ///
     /// This function removes a VMA from the address space, which de facto unmaps the memory
     /// region in the address space. If there is no such VMA, this function does nothing.
+    ///
+    /// # Note
+    /// This function is not implemented yet. It should disable the page table entries
+    /// corresponding to the VMA to be removed.
     pub fn remove_area(&mut self, start_va: VirtAddr) {
         self.vm_areas.remove(&start_va);
+        unimplemented!()
     }
 
     /// Handles a page fault happened in the address space.
@@ -117,7 +120,8 @@ impl AddrSpace {
     ///
     /// # Errors
     /// Returns [`SysError::EFAULT`] if the fault address is invalid or the access permission
-    /// is not allowed.
+    /// is not allowed. Otherwise, returns [`SysError::ENOMEM`] if memory allocation fails
+    /// when handling the page fault.
     pub fn handle_page_fault(&mut self, fault_addr: VirtAddr, access: MemPerm) -> SysResult<()> {
         simdebug::when_debug!({
             log::trace!(

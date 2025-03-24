@@ -3,7 +3,7 @@
 #![feature(btree_cursors)]
 #![feature(naked_functions)]
 #![feature(sync_unsafe_cell)]
-#![allow(dead_code, unused_imports, warnings)]
+#![allow(dead_code)]
 
 mod boot;
 mod console;
@@ -18,10 +18,6 @@ mod syscall;
 mod task;
 mod trap;
 mod vm;
-
-use core::slice;
-use core::sync::atomic::Ordering;
-use core::{arch::global_asm, sync::atomic::AtomicBool};
 
 use mm::{self, frame, heap};
 use processor::hart;
@@ -42,10 +38,12 @@ pub fn rust_main(hart_id: usize) -> ! {
 
         /* Initialize heap allocator and page table */
         unsafe {
-            log::info!("hart {}: initializing heap allocator", hart_id);
             heap::init_heap_allocator();
-            log::info!("hart {}: initializing page table", hart_id);
+            log::info!("hart {}: initialized heap allocator", hart_id);
+            frame::init_frame_allocator();
+            log::info!("hart {}: initialized frame allocator", hart_id);
             vm::enable_kernel_page_table();
+            log::info!("hart {}: switched to kernel page table", hart_id);
             INITIALIZED = true;
         }
 
@@ -67,7 +65,7 @@ pub fn rust_main(hart_id: usize) -> ! {
         log::info!(
             "kernel virtual memory: {:#x} - {:#x}",
             config::mm::KERNEL_START,
-            config::mm::kernel_end() as usize
+            config::mm::kernel_end()
         );
         log::info!(
             ".text {:#x} - {:#x}",
@@ -115,5 +113,6 @@ pub fn rust_main(hart_id: usize) -> ! {
     loop {
         executor::task_run_always();
     }
+    #[allow(unused)]
     sbi::shutdown(false);
 }

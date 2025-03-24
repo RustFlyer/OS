@@ -11,17 +11,21 @@
 
 use riscv::register::sstatus;
 
+use self::sleep_mutex::SleepMutex;
 use self::spin_mutex::SpinMutex;
-
+/// ShareMutex
+pub mod share_mutex;
 /// SleepMutex
 pub mod sleep_mutex;
 /// SpinMutex
 pub mod spin_mutex;
 
+pub use share_mutex::{ShareMutex, new_share_mutex};
 /// SpinLock
 pub type SpinLock<T> = SpinMutex<T, Spin>;
 /// SpinNoIrqLock(Cannot be interrupted)
 pub type SpinNoIrqLock<T> = SpinMutex<T, SpinNoIrq>;
+pub type SleepLock<T> = SleepMutex<T, SpinNoIrq>;
 
 /// Low-level support for mutex(spinlock, sleeplock, etc)
 pub trait MutexSupport {
@@ -45,7 +49,7 @@ impl MutexSupport for Spin {
 }
 
 /// Sie Guard
-/// 
+///
 /// SieGuard 结构体的作用是管理 CPU 的中断使能状态（Supervisor Interrupt Enable, SIE）
 /// ，通常用于在临界区代码中临时禁用中断，以确保代码的原子性执行。
 /// SieGuard(bool): 包含一个布尔值，用于保存进入临界区之前的中断使能状态。
