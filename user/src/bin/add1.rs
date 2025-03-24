@@ -9,7 +9,7 @@ use user_lib::{exit, println, yield_};
 fn main() {
     let mut a: i32 = 0;
 
-    for i in 0..=3000 {
+    for i in 0..=30 {
         a = a + i;
         println!("thread banana: {}", i);
     }

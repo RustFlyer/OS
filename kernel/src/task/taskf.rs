@@ -33,7 +33,7 @@ impl Task {
 
     /// Suspends the Task until it is waken or time out
     pub async fn suspend_timeout(&self, limit: Duration) -> Duration {
-        let expire = get_time_duration() + limit;
+        let expire = limit;
         let mut timer = Timer::new(expire);
         timer.set_callback(self.get_waker().clone());
         TIMER_MANAGER.add_timer(timer);
