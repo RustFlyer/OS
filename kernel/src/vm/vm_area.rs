@@ -48,7 +48,7 @@ pub struct PageFaultInfo<'a> {
     pub fault_addr: VirtAddr,
     /// Page table.
     pub page_table: &'a mut PageTable,
-    /// How the address was accessed when the fault occurred.
+    /// How the address was accessed when the fault occurred. Only one bit should be set.
     pub access: MemPerm,
 }
 
@@ -56,6 +56,7 @@ pub struct PageFaultInfo<'a> {
 ///
 /// A VMA is a contiguous region of virtual memory in an address space that has
 /// a common set of attributes, such as permissions and mapping type.
+#[derive(Clone)]
 pub struct VmArea {
     /// Starting virtual address.
     start_va: VirtAddr,
@@ -77,11 +78,13 @@ pub struct VmArea {
 impl VmArea {
     /// Constructs a global [`VmArea`] whose specific type is [`KernelArea`].
     ///
+    /// `start_va` must be page-aligned.
+    ///
     /// `flags` needs to have `RWX` bits set properly; other bits must be zero.
     pub fn new_kernel(start_va: VirtAddr, end_va: VirtAddr, flags: PteFlags) -> Self {
         Self {
             start_va,
-            end_va,
+            end_va: end_va.round_up(),
             // Set bits A and D because kernel pages are never swapped out.
             flags: flags | PteFlags::V | PteFlags::G | PteFlags::A | PteFlags::D,
             perm: MemPerm::from(flags),
@@ -93,6 +96,8 @@ impl VmArea {
 
     /// Constructs a user space [`VmArea`] whose specific type is [`MemoryBackedArea`].
     ///
+    /// `start_va` must be page-aligned.
+    ///
     /// `flags` needs to have `RWX` bits set properly; other bits must be zero.
     pub fn new_memory_backed(
         start_va: VirtAddr,
@@ -102,7 +107,7 @@ impl VmArea {
     ) -> Self {
         Self {
             start_va,
-            end_va,
+            end_va: end_va.round_up(),
             flags: flags | PteFlags::V | PteFlags::U,
             perm: MemPerm::from(flags),
             pages: BTreeMap::new(),
@@ -112,6 +117,8 @@ impl VmArea {
     }
 
     /// Constructs a user space [`VmArea`] whose specific type is [`StackArea`].
+    ///
+    /// `start_va` and `end_va` must be page-aligned.
     pub fn new_stack(start_va: VirtAddr, end_va: VirtAddr) -> Self {
         Self {
             start_va,
@@ -130,11 +137,40 @@ impl VmArea {
     /// Returns [`SysError::EFAULT`] if the access permission is not allowed.
     /// Otherwise, returns [`SysError::ENOMEM`] if a new frame cannot be allocated.
     pub fn handle_page_fault(&mut self, info: PageFaultInfo) -> SysResult<()> {
-        if let Some(handler) = self.handler {
-            handler(self, info)
+        if info.access == MemPerm::W && self.perm.contains(MemPerm::W) {
+            // COW page fault.
+            self.handle_cow_fault(info)
         } else {
-            panic!("page fault handler: handler not registered");
+            // Normal page fault.
+            let handler = self
+                .handler
+                .expect("page fault handler: handler not registered");
+            handler(self, info)
         }
+    }
+
+    /// Handles a COW page fault.
+    fn handle_cow_fault(&mut self, info: PageFaultInfo) -> SysResult<()> {
+        let fault_va = info.fault_addr;
+        let fault_vpn = fault_va.page_number();
+        let fault_page = self.pages.get(&fault_vpn).unwrap();
+        let pte = info.page_table.find_entry(fault_vpn).unwrap();
+        if Arc::strong_count(fault_page) > 1 {
+            // Allocate a new page and copy the content if the page is shared.
+            let new_page = Page::build()?;
+            new_page.copy_data_from_another(fault_page);
+            let mut new_pte = *pte;
+            new_pte.set_flags(new_pte.flags() | PteFlags::W);
+            new_pte.set_ppn(new_page.ppn());
+            *pte = new_pte;
+            riscv::asm::sfence_vma(0, fault_va.to_usize());
+            self.pages.insert(fault_vpn, Arc::new(new_page));
+        } else {
+            // If the page is not shared, just set the write bit.
+            pte.set_flags(pte.flags() | PteFlags::W);
+            riscv::asm::sfence_vma(0, fault_va.to_usize());
+        }
+        Ok(())
     }
 
     pub fn contains(&self, va: VirtAddr) -> bool {
@@ -149,6 +185,16 @@ impl VmArea {
     /// Returns the ending virtual address of the VMA.
     pub fn end_va(&self) -> VirtAddr {
         self.end_va
+    }
+
+    /// Returns the PTE flags of the VMA.
+    pub fn flags(&self) -> PteFlags {
+        self.flags
+    }
+
+    /// Returns the mapping from virtual page numbers to `Arc<Page>`s mapped in this VMA.
+    pub fn pages(&self) -> &BTreeMap<VirtPageNum, Arc<Page>> {
+        &self.pages
     }
 }
 
@@ -166,7 +212,7 @@ impl Debug for VmArea {
 }
 
 /// Unique data of a specific type of VMA. This enum is used in [`VmArea`].
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TypedArea {
     /// A helper VMA representing one in the kernel space.
     Kernel(KernelArea),
@@ -193,7 +239,7 @@ pub enum TypedArea {
 /// It is of no use after the kernel page table is set up.
 ///
 /// A kernel area must be aligned to the size of a page.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct KernelArea;
 
 impl KernelArea {
@@ -212,7 +258,7 @@ impl KernelArea {
         } = area;
 
         let start_vpn = start_va.page_number();
-        let end_vpn = end_va.round_up().page_number();
+        let end_vpn = end_va.page_number();
         let start_ppn = start_vpn.to_ppn_kernel().to_usize();
         let end_ppn = end_vpn.to_ppn_kernel().to_usize();
         let ppns = (start_ppn..end_ppn)
@@ -227,6 +273,7 @@ impl KernelArea {
 ///
 /// This is a type for debugging purposes. A memory-backed VMA takes a slice of
 /// memory as its backing store.
+#[derive(Clone)]
 pub struct MemoryBackedArea {
     /// The memory backing store.
     pub memory: &'static [u8],
@@ -295,13 +342,15 @@ impl MemoryBackedArea {
             // If there is a type 1 region in the frame:
             let copy_len = usize::min(back_store_len - area_offset, fill_len);
             let memory_copy_from = &memory[area_offset..area_offset + copy_len];
-            let (memory_copy_to, memory_fill_zero) =
-                page.bytes_array_range(page_offset..page_offset + fill_len).split_at_mut(copy_len);
+            let (memory_copy_to, memory_fill_zero) = page
+                .bytes_array_range(page_offset..page_offset + fill_len)
+                .split_at_mut(copy_len);
             memory_copy_to.copy_from_slice(memory_copy_from);
             memory_fill_zero.fill(0);
         } else {
             // If there is no type 1 region in the frame:
-            page.bytes_array_range(page_offset..page_offset + fill_len).fill(0);
+            page.bytes_array_range(page_offset..page_offset + fill_len)
+                .fill(0);
         }
 
         // Track the allocated frame.
@@ -314,14 +363,14 @@ impl MemoryBackedArea {
 impl Debug for MemoryBackedArea {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("MemoryBackedArea")
-            .field("memory back store addr", &(self.memory.as_ptr() as usize))
-            .field("memory back store len", &self.memory.len())
+            .field("memory back store addr", &format_args!("{:p}", self.memory.as_ptr()))
+            .field("memory back store len", &format_args!("{:#x}", self.memory.len()))
             .finish()
     }
 }
 
 /// A stack VMA representing a user stack.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct StackArea;
 
 impl StackArea {

@@ -21,8 +21,11 @@ use core::ops::Bound;
 
 use alloc::collections::btree_map::BTreeMap;
 
+use config::mm::{USER_END, USER_START};
 use mm::address::VirtAddr;
 use systype::{SysError, SysResult};
+
+use crate::vm::pte::PteFlags;
 
 use super::{
     mem_perm::MemPerm,
@@ -82,14 +85,14 @@ impl AddrSpace {
         let lower_gap = self.vm_areas.upper_bound(Bound::Included(&area.start_va()));
         if lower_gap
             .peek_prev()
-            .map(|(_, vma)| vma.end_va().round_up() > area.start_va().round_down())
+            .map(|(_, vma)| vma.end_va() > area.start_va())
             .unwrap_or(false)
         {
             return Err(SysError::EINVAL);
         }
         if lower_gap
             .peek_next()
-            .map(|(&start_va, _)| start_va.round_down() < area.end_va().round_up())
+            .map(|(&start_va, _)| start_va < area.end_va())
             .unwrap_or(false)
         {
             return Err(SysError::EINVAL);
@@ -97,6 +100,61 @@ impl AddrSpace {
 
         self.vm_areas.insert(area.start_va(), area);
         Ok(())
+    }
+
+    /// Finds a vacant memory region in the user part of the address space.
+    ///
+    /// This function first tries to find a vacant memory region that starts from `start_va`
+    /// and has a length of `length`. If such requirement cannot be satisfied, it tries to
+    /// find a vacant memory region that has a length of `length` and starts from any address.
+    ///
+    /// `start_va` must be page-aligned. `length` need not to be. However, the region to be
+    /// found is rounded up to the page size.
+    ///
+    /// Returns the starting address of the vacant memory region if found.
+    pub fn find_vacant_memory(&self, start_va: VirtAddr, length: usize) -> Option<VirtAddr> {
+        let length = VirtAddr::new(length).round_up().to_usize();
+
+        // Check if the specified range is vacant.
+        let gap = self.vm_areas.upper_bound(Bound::Included(&start_va));
+        let vma_prev = gap.peek_prev().map(|(_, vma)| vma);
+        let vma_next = gap.peek_next().map(|(_, vma)| vma);
+        if vma_prev.map(|vma| vma.end_va() <= start_va).unwrap_or(true)
+            && vma_next
+                .map(|vma| vma.start_va() >= VirtAddr::new(start_va.to_usize() + length))
+                .unwrap_or(true)
+        {
+            return Some(start_va);
+        }
+
+        // Find a vacant region elsewhere.
+
+        // If there are more than two VMAs, try to find a gap between two VMAs.
+        let mut iter = self.vm_areas.iter().peekable();
+        while let Some((&_, vma)) = iter.next() {
+            let end_va = vma.end_va();
+            if let Some(&(&next_start_va, _)) = iter.peek() {
+                if next_start_va.to_usize() - end_va.to_usize() >= length {
+                    return Some(end_va);
+                }
+            }
+        }
+
+        // Look at the regions before the first VMA and after the last VMA.
+        if let Some((_, first_vma)) = self.vm_areas.iter().next() {
+            if first_vma.start_va().to_usize() - USER_START >= length {
+                return Some(VirtAddr::new(USER_START));
+            }
+            let (_, last_vma) = self.vm_areas.iter().next_back().unwrap();
+            if USER_END - last_vma.end_va().to_usize() >= length {
+                return Some(last_vma.end_va());
+            }
+        } else {
+            // If there is no VMA, the whole user part is vacant.
+            return Some(VirtAddr::new(USER_START));
+        }
+
+        None
     }
 
     /// Removes mappings for the specified address range.
@@ -112,7 +170,7 @@ impl AddrSpace {
         // Align `length` to the page size.
         let length = VirtAddr::new(length).round_up().to_usize();
         // Find all VMAs that overlap with the range.
-        while let Some(vma) = {
+        while let Some(_vma) = {
             let gap = self
                 .vm_areas
                 .upper_bound(Bound::Excluded(&VirtAddr::new(addr.to_usize() + length)));
@@ -127,6 +185,38 @@ impl AddrSpace {
             }
         } {}
         unimplemented!();
+    }
+
+    /// Clones the address space.
+    ///
+    /// This function creates a new address space with the same mappings as the original
+    /// address space. Specifically, the new address space maps virtual memory areas to
+    /// data identical to the original address space when the function is called.
+    ///
+    /// This function uses the copy-on-write (COW) mechanism to share the same physical
+    /// memory pages between the original address space and the new address space. When
+    /// one of them writes to a shared page, the page is copied and the writer gets a
+    /// new physical page elsewhere.
+    pub fn clone_cow(&mut self) -> SysResult<Self> {
+        let mut new_space = Self::build_user()?;
+
+        new_space.vm_areas = self.vm_areas.clone();
+
+        for &vpn in self.vm_areas.iter().flat_map(|(_, vma)| vma.pages().keys()) {
+            let old_pte = self.page_table.find_entry(vpn).unwrap();
+            let new_pte = new_space
+                .page_table
+                .find_entry_force(vpn, old_pte.flags())?
+                .0;
+            let mut pte = *old_pte;
+            if pte.flags().contains(PteFlags::W) {
+                pte.set_flags(pte.flags().difference(PteFlags::W));
+                *old_pte = pte;
+            }
+            *new_pte = pte;
+        }
+
+        Ok(new_space)
     }
 
     /// Handles a page fault happened in the address space.

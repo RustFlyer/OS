@@ -3,6 +3,7 @@
 #![feature(btree_cursors)]
 #![feature(naked_functions)]
 #![feature(sync_unsafe_cell)]
+#![allow(clippy::module_inception)]
 #![allow(dead_code)]
 
 mod boot;
