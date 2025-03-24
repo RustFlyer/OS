@@ -1,6 +1,6 @@
 use spin::Once;
 
-use crate::inode::Inode;
+use crate::{inode::Inode, page::Page};
 extern crate alloc;
 use alloc::{
     collections::BTreeMap,
@@ -9,8 +9,6 @@ use alloc::{
 use config::mm::PAGE_SIZE;
 use mm::frame::FrameTracker;
 use mutex::SpinNoIrqLock;
-
-type Page = FrameTracker;
 
 pub struct Inopages {
     inode: Once<Weak<dyn Inode>>,

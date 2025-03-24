@@ -22,6 +22,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         TIMES => sys_times(args[0]),
         NANOSLEEP => sys_nanosleep(args[0], args[1]).await,
         WAIT4 => sys_waitpid().await,
+        CLONE => sys_clone(args[0], args[1], args[2], args[3], args[4]),
         _ => {
             log::error!("Syscall not implemented: {syscall_no}");
             unimplemented!()

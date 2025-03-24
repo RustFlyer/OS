@@ -100,11 +100,8 @@ where
 }
 
 pub fn task_run_always_alone(hart_id: usize) {
-    unsafe {
-        while let Some(task) = fetch_one(hart_id) {
-            // log::info!("new task to run!");
-            task.run();
-        }
+    while let Some(task) = fetch_one(hart_id) {
+        task.run();
     }
 }
 

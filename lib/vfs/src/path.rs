@@ -2,7 +2,9 @@ extern crate alloc;
 use alloc::{
     string::{String, ToString},
     sync::Arc,
+    vec::Vec,
 };
+use systype::{SysError, SysResult};
 
 use crate::dentry::Dentry;
 
@@ -28,5 +30,31 @@ impl Path {
             start,
             path: path.to_string(),
         }
+    }
+
+    /// walk the path to return the final dentry
+    pub fn walk(&self) -> SysResult<Arc<dyn Dentry>> {
+        let path = self.path.as_str();
+        let mut dentry = if path.starts_with("/") {
+            self.root.clone()
+        } else {
+            self.start.clone()
+        };
+        let nodes: Vec<&str> = path
+            .split("/")
+            .filter(|name| !name.is_empty() && *name != ".")
+            .collect();
+        for node in nodes {
+            match node {
+                ".." => {
+                    dentry = dentry.parent().ok_or(SysError::ENOENT)?;
+                }
+                name => match dentry.lookup(name) {
+                    Ok(child_dentry) => dentry = child_dentry,
+                    Err(e) => return Err(e),
+                },
+            }
+        }
+        Ok(dentry)
     }
 }

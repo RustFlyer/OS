@@ -31,6 +31,7 @@ impl ProcessGroupManager {
         }
         process.set_pgid(pgid);
         let mut inner = self.0.lock();
+        log::info!("pgid is [{}]", pgid);
         let vec = inner.get_mut(&pgid).unwrap();
         vec.push(Arc::downgrade(process));
     }
