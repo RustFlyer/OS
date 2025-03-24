@@ -225,6 +225,7 @@ dependencies = [
  "systype",
  "time",
  "timer",
+ "vfs",
 ]
 
 [[package]]

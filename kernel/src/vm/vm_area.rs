@@ -23,14 +23,14 @@
 //! With this design, we avoid using trait objects or an enum for VMA types, while still
 //! maintaining modularization and extensibility.
 
-use alloc::{collections::btree_map::BTreeMap, vec::Vec};
+use alloc::{collections::btree_map::BTreeMap, sync::Arc, vec::Vec};
 use core::fmt::Debug;
+use vfs::page::Page;
 
-use mm::{address::{PhysPageNum, VirtAddr, VirtPageNum}, frame::FrameDropper};
+use mm::address::{PhysPageNum, VirtAddr, VirtPageNum};
 use systype::{SysError, SysResult};
 
 use super::{mem_perm::MemPerm, page_table::PageTable, pte::PteFlags};
-use crate::frame::FrameTracker;
 
 impl MemPerm {
     /// Create a new `MemPerm` from a set of `PteFlags`.
@@ -67,7 +67,7 @@ pub struct VmArea {
     /// Permission.
     perm: MemPerm,
     /// Allocated physical pages.
-    pages: BTreeMap<VirtPageNum, FrameTracker>,
+    pages: BTreeMap<VirtPageNum, Arc<Page>>,
     /// Unique data of a specific type of VMA.
     map_type: TypedArea,
     /// Page fault handler.
@@ -162,17 +162,6 @@ impl Debug for VmArea {
             .field("num of pages", &self.pages.len())
             .field("map_type", &self.map_type)
             .finish()
-    }
-}
-
-impl Drop for VmArea {
-    /// Drops the VMA.
-    ///
-    /// This function does not unmap page table entries. It only releases the physical pages
-    /// allocated for the VMA.
-    fn drop(&mut self) {
-        let pages = core::mem::take(&mut self.pages);
-        FrameDropper::drop(pages.into_values().collect());
     }
 }
 
@@ -281,8 +270,8 @@ impl MemoryBackedArea {
         }
 
         // Map the page if it is not already mapped by another thread.
-        let mut frame = match page_table.map_page(fault_addr.page_number(), flags)? {
-            Some(frame) => frame,
+        let page = match page_table.map_page(fault_addr.page_number(), flags)? {
+            Some(page) => page,
             None => {
                 // Already mapped, just flush the TLB.
                 riscv::asm::sfence_vma(0, fault_addr.to_usize());
@@ -307,16 +296,16 @@ impl MemoryBackedArea {
             let copy_len = usize::min(back_store_len - area_offset, fill_len);
             let memory_copy_from = &memory[area_offset..area_offset + copy_len];
             let (memory_copy_to, memory_fill_zero) =
-                frame.as_slice_mut()[page_offset..page_offset + fill_len].split_at_mut(copy_len);
+                page.bytes_array_range(page_offset..page_offset + fill_len).split_at_mut(copy_len);
             memory_copy_to.copy_from_slice(memory_copy_from);
             memory_fill_zero.fill(0);
         } else {
             // If there is no type 1 region in the frame:
-            frame.as_slice_mut()[page_offset..page_offset + fill_len].fill(0);
+            page.bytes_array_range(page_offset..page_offset + fill_len).fill(0);
         }
 
         // Track the allocated frame.
-        pages.insert(fault_addr.page_number(), frame);
+        pages.insert(fault_addr.page_number(), Arc::new(page));
 
         Ok(())
     }
@@ -371,7 +360,7 @@ impl StackArea {
         };
 
         // Track the allocated frame.
-        pages.insert(fault_addr.page_number(), frame);
+        pages.insert(fault_addr.page_number(), Arc::new(frame));
 
         Ok(())
     }

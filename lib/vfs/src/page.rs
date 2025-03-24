@@ -1,3 +1,13 @@
+//! Module for managing physical pages.
+//!
+//! This module defines the [`Page`] struct, which represents a physical page in the system.
+//! [`Page`] differs from [`FrameTracker`] in that [`Page`] is a higher-level abstraction
+//! that provides more functionalities and tracks the status of a physical page. On the
+//! other hand, [`FrameTracker`] only represents a physical frame and is used for memory
+//! management. Most of the time, we use [`Page`] instead of [`FrameTracker`]; however,
+//! [`FrameTracker`] is still useful in some cases, such as being used as a page of a
+//! page table.
+
 use core::cmp;
 
 use config::mm::PAGE_SIZE;
@@ -5,6 +15,7 @@ use mm::{
     address::{PhysPageNum, VirtAddr},
     frame::FrameTracker,
 };
+use systype::SysResult;
 
 pub struct Page {
     frame: FrameTracker,
@@ -17,10 +28,10 @@ impl core::fmt::Debug for Page {
 }
 
 impl Page {
-    pub fn new() -> Self {
-        Self {
-            frame: FrameTracker::build().unwrap(),
-        }
+    pub fn build() -> SysResult<Self> {
+        Ok(Self {
+            frame: FrameTracker::build()?,
+        })
     }
 
     pub fn copy_data_from_another(&self, another: &Page) {

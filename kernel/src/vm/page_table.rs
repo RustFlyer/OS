@@ -15,6 +15,7 @@ use config::mm::{
 use mm::address::{PhysPageNum, VirtAddr, VirtPageNum};
 use simdebug::when_debug;
 use systype::SysResult;
+use vfs::page::Page;
 
 use crate::{
     frame::FrameTracker,
@@ -199,7 +200,7 @@ impl PageTable {
     /// allocated frame.
     ///
     /// This method allocates a frame for the leaf page, sets the mapping in the
-    /// page table, and returns the [`FrameTracker`] of the allocated frame. If the
+    /// page table, and returns a [`Page`] struct of the allocated frame. If the
     /// page is already mapped, this method does nothing and returns `None`.
     ///
     /// Returns a [`SysResult`] indicating whether the operation is successful.
@@ -215,19 +216,19 @@ impl PageTable {
         &mut self,
         vpn: VirtPageNum,
         flags: PteFlags,
-    ) -> SysResult<Option<FrameTracker>> {
+    ) -> SysResult<Option<Page>> {
         let (entry, non_leaf_created) = self.find_entry_force(vpn, flags)?;
         if entry.is_valid() {
             return Ok(None);
         }
-        let frame = FrameTracker::build()?;
-        *entry = PageTableEntry::new(frame.as_ppn(), flags);
+        let page = Page::build()?;
+        *entry = PageTableEntry::new(page.ppn(), flags);
         if non_leaf_created {
             riscv::asm::sfence_vma(0, 0);
         } else {
             riscv::asm::sfence_vma(0, vpn.address().to_usize());
         }
-        Ok(Some(frame))
+        Ok(Some(page))
     }
 
     /// Maps a leaf page by specifying VPN, PPN, and page table entry flags.

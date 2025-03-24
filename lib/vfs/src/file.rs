@@ -179,7 +179,7 @@ impl dyn File {
                 len
             } else {
                 log::trace!("[File::read] offset {offset_aligned} not cached in address space");
-                let page = Page::new();
+                let page = Page::build()?;
                 let len = self
                     .base_read_at(offset_aligned, page.bytes_array())
                     .await?;
