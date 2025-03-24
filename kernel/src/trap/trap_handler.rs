@@ -1,5 +1,4 @@
 use crate::syscall::syscall;
-use crate::task::future::suspend_now;
 use crate::task::{Task, TaskState, yield_now};
 use crate::trap::load_trap_handler;
 use crate::vm::mem_perm::MemPerm;
@@ -10,7 +9,7 @@ use mm::address::VirtAddr;
 use riscv::{ExceptionNumber, InterruptNumber};
 use riscv::{
     interrupt::{Exception, Interrupt, Trap},
-    register::{scause, sepc, stval},
+    register,
 };
 use timer::TIMER_MANAGER;
 
@@ -21,21 +20,29 @@ use timer::TIMER_MANAGER;
 #[allow(unused)]
 #[unsafe(no_mangle)]
 pub async fn trap_handler(task: &Arc<Task>) -> bool {
-    let stval = stval::read();
-    let scause = scause::read();
-    let sepc = sepc::read();
-    let cause = scause.cause();
+    let stval = register::stval::read();
+    let cause = register::scause::read().cause();
 
     simdebug::when_debug!({
-        log::trace!("[trap_handler] user task trap into kernel");
-        log::trace!("[trap_handler] sepc:{:#x}, stval:{:#x}", sepc, stval);
+        log::trace!(
+            "[trap_handler] user task trap into kernel, type: {:?}, stval: {:#x}",
+            cause,
+            stval
+        );
     });
 
     unsafe { load_trap_handler() };
 
+    let current = get_time_duration();
+    TIMER_MANAGER.check(current);
+    set_nx_timer_irq();
+    if executor::has_waiting_task() {
+        yield_now().await;
+    }
+
     match cause {
         Trap::Exception(e) => {
-            user_exception_handler(task, Exception::from_number(e).unwrap()).await
+            user_exception_handler(task, Exception::from_number(e).unwrap(), stval).await
         }
         Trap::Interrupt(i) => {
             user_interrupt_handler(task, Interrupt::from_number(i).unwrap()).await
@@ -44,7 +51,7 @@ pub async fn trap_handler(task: &Arc<Task>) -> bool {
     true
 }
 
-pub async fn user_exception_handler(task: &Arc<Task>, e: Exception) {
+pub async fn user_exception_handler(task: &Arc<Task>, e: Exception, stval: usize) {
     let mut cx = task.trap_context_mut();
     match e {
         // 系统调用
@@ -68,15 +75,16 @@ pub async fn user_exception_handler(task: &Arc<Task>, e: Exception) {
                 Exception::StorePageFault => MemPerm::W | MemPerm::R,
                 _ => unreachable!(),
             };
+            let fault_addr = VirtAddr::new(stval);
             if let Err(e) = task
                 .addr_space_mut()
                 .lock()
-                .handle_page_fault(VirtAddr::new(stval::read()), access)
+                .handle_page_fault(fault_addr, access)
             {
                 // Should send a `SIGSEGV` signal to the task
                 log::error!(
                     "[user_exception_handler] unsolved page fault at {:#x}, access: {:?}, error: {:?}",
-                    stval::read(),
+                    fault_addr.to_usize(),
                     access,
                     e.as_str()
                 );
@@ -85,16 +93,20 @@ pub async fn user_exception_handler(task: &Arc<Task>, e: Exception) {
         }
         // 非法指令
         Exception::IllegalInstruction => {
-            log::warn!(
-                "[trap_handler] detected illegal instruction, stval {:#x}, sepc {:#x}",
-                stval::read(),
-                sepc::read(),
-            );
+            log::warn!("[trap_handler] illegal instruction at {:#x}", stval);
             let mut addr_space_lock = task.addr_space_mut().lock();
-            let mut user_ptr = UserReadPtr::<u32>::new(sepc::read(), &mut *addr_space_lock);
-            log::warn!("The illegal instruction is {:#x}", unsafe {
-                user_ptr.read().unwrap()
-            });
+            let mut user_ptr = UserReadPtr::<u32>::new(stval, &mut addr_space_lock);
+
+            let old_sstatus = register::sstatus::read();
+            unsafe {
+                register::sstatus::set_mxr();
+            }
+            // SAFETY: the instruction must reside in a `X` page since it's an instruction fetch,
+            // and we have set `MXR` bit in `sstatus` register.
+            let inst = unsafe { user_ptr.read().unwrap() };
+            unsafe { register::sstatus::write(old_sstatus) };
+
+            log::warn!("The illegal instruction is {:#x}", inst);
             task.set_state(TaskState::Zombie);
         }
         // 其他异常
@@ -104,13 +116,13 @@ pub async fn user_exception_handler(task: &Arc<Task>, e: Exception) {
     }
 }
 
-pub async fn user_interrupt_handler(task: &Arc<Task>, i: Interrupt) {
+pub async fn user_interrupt_handler(_task: &Arc<Task>, i: Interrupt) {
     match i {
         // 时钟中断
         Interrupt::SupervisorTimer => {
             // note: 用户若频繁陷入内核，则可能是因为时钟中断未触发，
             // 而是 supervisor 模式下触发了，导致用户程序在 CPU 上运行了很长时间。
-            log::trace!("[trap_handler] timer interrupt, sepc {:#x}", sepc::read());
+            log::trace!("[trap_handler] timer interrupt");
             let current = get_time_duration();
             TIMER_MANAGER.check(current);
             set_nx_timer_irq();
@@ -125,12 +137,7 @@ pub async fn user_interrupt_handler(task: &Arc<Task>, i: Interrupt) {
         }
         // 其他中断
         _ => {
-            panic!(
-                "[trap_handler] Unsupported interrupt {:?}, stval = {:#x}, sepc = {:#x}",
-                scause::read().cause(),
-                stval::read(),
-                sepc::read(),
-            );
+            panic!("[trap_handler] Unsupported interrupt {:?}", i);
         }
     }
 }
