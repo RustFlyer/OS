@@ -5,6 +5,9 @@ edition = "2024"
 
 [dependencies]
 mutex = { path = "../mutex/" }
+config = { path = "../config/" }
+
+
 async-task =  { workspace = true }
 lazy_static = { workspace = true }
 log = { workspace = true }

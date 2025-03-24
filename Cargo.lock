@@ -143,6 +143,7 @@ name = "executor"
 version = "0.1.0"
 dependencies = [
  "async-task",
+ "config",
  "lazy_static",
  "log",
  "mutex",
@@ -440,6 +441,7 @@ dependencies = [
  "arch",
  "log",
  "mutex",
+ "simdebug",
  "spin",
 ]
 

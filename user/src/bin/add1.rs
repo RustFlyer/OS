@@ -14,5 +14,5 @@ fn main() {
         println!("thread banana: {}", i);
     }
 
-    exit(a)
+    exit(114514)
 }

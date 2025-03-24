@@ -9,11 +9,11 @@ use user_lib::{exit, println, sleep, yield_};
 fn main() {
     let mut a: i32 = 0;
 
-    for i in 0..=3000 {
+    for i in 0..=10 {
         a = a + i;
         println!("thread apple: {}", i);
         sleep(1000);
     }
 
-    exit(a)
+    exit(880008800)
 }

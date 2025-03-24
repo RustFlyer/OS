@@ -1,3 +1,4 @@
+use crate::processor::current_hart;
 use crate::syscall::syscall;
 use crate::task::{Task, TaskState, yield_now};
 use crate::trap::load_trap_handler;
@@ -37,7 +38,8 @@ pub async fn trap_handler(task: &Arc<Task>) -> bool {
     TIMER_MANAGER.check(current);
     set_nx_timer_irq();
 
-    if task.timer_mut().schedule_time_out() && executor::has_waiting_task() {
+    let id = current_hart().id;
+    if task.timer_mut().schedule_time_out() && executor::has_waiting_task_alone(id) {
         yield_now().await;
     }
 

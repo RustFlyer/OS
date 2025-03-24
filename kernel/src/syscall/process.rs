@@ -20,7 +20,7 @@ pub fn sys_exit(exit_code: i32) -> SyscallResult {
     let task = current_task();
     task.set_state(TaskState::Zombie);
     // non-leader thread are detached (see CLONE_THREAD flag in manual page clone.2)
-    log::info!("success exit with {}", exit_code);
+    log::info!("task [{}] exit with {}", task.get_name(), exit_code);
     if task.is_process() {
         task.set_exit_code((exit_code & 0xFF) << 8);
     }

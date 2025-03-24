@@ -30,6 +30,8 @@ static mut INITIALIZED: bool = false;
 
 #[unsafe(no_mangle)]
 pub fn rust_main(hart_id: usize) -> ! {
+    executor::init(hart_id);
+
     // SAFETY: Only the first hart will run this code block.
     if unsafe { !INITIALIZED } {
         /* Initialize logger */
@@ -89,7 +91,7 @@ pub fn rust_main(hart_id: usize) -> ! {
         );
         log::info!("====== kernel memory layout end ======");
 
-        // boot::start_harts(hart_id);
+        boot::start_harts(hart_id);
 
         when_debug!({
             simdebug::backtrace_test();
@@ -111,7 +113,7 @@ pub fn rust_main(hart_id: usize) -> ! {
     log::info!("hart {}: running", hart_id);
 
     loop {
-        executor::task_run_always();
+        executor::task_run_always_alone(hart_id);
     }
     #[allow(unused)]
     sbi::shutdown(false);

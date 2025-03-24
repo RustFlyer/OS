@@ -134,11 +134,11 @@ impl TimerManager {
 
             // Wake up the task
             if let Some(waker) = timer.callback.take() {
-                log::debug!(
-                    "[Timer Manager] Timer expired at {:?}, scheduled for {:?}",
-                    current,
-                    timer.expire
-                );
+                // log::debug!(
+                //     "[Timer Manager] Timer expired at {:?}, scheduled for {:?}",
+                //     current,
+                //     timer.expire
+                // );
                 waker.wake();
             }
         }
