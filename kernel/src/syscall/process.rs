@@ -44,6 +44,7 @@ pub fn sys_clone(
     _tls_ptr: usize,
     chilren_tid_ptr: usize,
 ) -> SyscallResult {
+    return Ok(0);
     let _exit_signal = flags & 0xff;
     let flags = CloneFlags::from_bits(flags as u64 & !0xff).ok_or(SysError::EINVAL)?;
     log::info!("[sys_clone] flags {flags:?}");
