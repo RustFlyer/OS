@@ -3,11 +3,13 @@
 
 extern crate user_lib;
 
-use user_lib::{exit, println, sleep, yield_};
+use user_lib::{exit, fork, println, sleep, yield_};
 
 #[unsafe(no_mangle)]
 fn main() {
     let mut a: i32 = 0;
+
+    fork();
 
     for i in 0..=10 {
         a = a + i;

@@ -6,7 +6,7 @@ use time::TaskTimeStat;
 
 use super::future::{self};
 use super::manager::TASK_MANAGER;
-use super::process_manager::PROCESS_GROUP_MANAGER;
+use super::process_manager::{PROCESS_GROUP_MANAGER, ProcessGroupManager};
 use super::task::*;
 use super::tid::tid_alloc;
 
@@ -21,7 +21,7 @@ use mutex::new_share_mutex;
 use timer::{TIMER_MANAGER, Timer};
 
 impl Task {
-    /// Switchse Task to User
+    /// Switches Task to User
     pub fn enter_user_mode(&mut self) {
         self.timer_mut().switch_to_user();
     }
@@ -58,6 +58,7 @@ impl Task {
             name.to_string(),
         ));
 
+        PROCESS_GROUP_MANAGER.add_group(&task);
         TASK_MANAGER.add_task(&task);
         future::spawn_user_task(task);
     }
@@ -77,7 +78,7 @@ impl Task {
     ///
     /// - todo1: Memory Copy / Cow
     /// - todo2: Control of relevant Thread Group
-    pub fn fork(self: &Arc<Self>, clonefalgs: CloneFlags) -> Arc<Self> {
+    pub fn fork(self: &Arc<Self>, cloneflags: CloneFlags) -> Arc<Self> {
         let tid = tid_alloc();
         let trap_context = SyncUnsafeCell::new(*self.trap_context_mut());
         let state = SpinNoIrqLock::new(self.get_state());
@@ -89,7 +90,7 @@ impl Task {
 
         let pgid;
 
-        if clonefalgs.contains(CloneFlags::THREAD) {
+        if cloneflags.contains(CloneFlags::THREAD) {
             is_process = false;
             process = Some(Arc::downgrade(self));
             parent = self.parent_mut().clone();
@@ -105,7 +106,7 @@ impl Task {
         }
 
         let addr_space;
-        if clonefalgs.contains(CloneFlags::VM) {
+        if cloneflags.contains(CloneFlags::VM) {
             addr_space = (*self.addr_space_mut()).clone();
         } else {
             // TODO: Cow Fork
@@ -128,7 +129,7 @@ impl Task {
             self.get_name(),
         ));
 
-        if !clonefalgs.contains(CloneFlags::THREAD) {
+        if !cloneflags.contains(CloneFlags::THREAD) {
             self.add_child(new.clone());
         }
 
