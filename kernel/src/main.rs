@@ -19,6 +19,8 @@ mod task;
 mod trap;
 mod vm;
 
+use core::ptr;
+
 use mm::{self, frame, heap};
 use processor::hart;
 use simdebug::when_debug;
@@ -44,9 +46,10 @@ pub fn rust_main(hart_id: usize) -> ! {
             log::info!("hart {}: initialized heap allocator", hart_id);
             frame::init_frame_allocator();
             log::info!("hart {}: initialized frame allocator", hart_id);
-            vm::enable_kernel_page_table();
+            vm::switch_to_kernel_page_table();
             log::info!("hart {}: switched to kernel page table", hart_id);
-            INITIALIZED = true;
+            riscv::asm::fence();
+            ptr::write_volatile(&raw mut INITIALIZED, true);
         }
 
         unsafe {
@@ -104,7 +107,7 @@ pub fn rust_main(hart_id: usize) -> ! {
         // SAFETY: Only after the first hart has initialized the heap allocator and page table,
         // do the other harts enable the kernel page table.
         unsafe {
-            vm::enable_kernel_page_table();
+            vm::switch_to_kernel_page_table();
         }
     }
 

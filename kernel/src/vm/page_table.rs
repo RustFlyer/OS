@@ -134,8 +134,11 @@ impl PageTable {
     /// Returns a mutable reference to the leaf page table entry, and a boolean
     /// indicating whether any non-leaf entry is created. If any non-leaf entry is
     /// created, `sfence.vma` on a specific address is not enough to ensure the
-    /// non-leaf entry is visible to the hart. Returns an [`ENOMEM`] error if the
-    /// method needs to allocate a frame but fails to do so.
+    /// non-leaf entry is visible to the hart; use `sfence_vma(0, 0)` if that is
+    /// the case.
+    ///
+    /// Returns an [`ENOMEM`] error if the method needs to allocate a frame but fails
+    /// to do so.
     pub fn find_entry_force(
         &mut self,
         vpn: VirtPageNum,
@@ -151,6 +154,13 @@ impl PageTable {
                 return Ok((entry, inner_created));
             }
             if !entry.is_valid() {
+                // Returning an error immediately is safe even when a non-leaf entry
+                // is created and a sub-table is allocated. An error happening here
+                // means that at least one page table on the path is not allocated.
+                // Therefore, the next time the kernel tries to find a leaf entry under
+                // the former allocated sub-table, it must allocate a frame for missing
+                // page tables, which will cause a `sfence_vma(0, 0)` later, which ensures
+                // the visibility of the former allocated sub-table.
                 let frame = FrameTracker::build()?;
                 unsafe {
                     PageTableMem::new(frame.as_ppn()).clear();
@@ -213,7 +223,7 @@ impl PageTable {
         let frame = FrameTracker::build()?;
         *entry = PageTableEntry::new(frame.as_ppn(), flags);
         if non_leaf_created {
-            riscv::asm::sfence_vma_all();
+            riscv::asm::sfence_vma(0, 0);
         } else {
             riscv::asm::sfence_vma(0, vpn.address().to_usize());
         }
@@ -245,7 +255,7 @@ impl PageTable {
         let (entry, non_leaf_created) = self.find_entry_force(vpn, flags)?;
         *entry = PageTableEntry::new(ppn, flags);
         if non_leaf_created {
-            riscv::asm::sfence_vma_all();
+            riscv::asm::sfence_vma(0, 0);
         } else {
             riscv::asm::sfence_vma(0, vpn.address().to_usize());
         }
@@ -261,7 +271,15 @@ impl PageTable {
     pub fn unmap_page(&mut self, vpn: VirtPageNum) {
         if let Some(entry) = self.find_entry(vpn) {
             *entry = PageTableEntry::default();
-            riscv::asm::sfence_vma(0, vpn.address().to_usize());
+            // Flush TLB entries for the page for all harts.
+            // Later, we can optimize this by only flushing the TLB for harts that
+            // execute the current process.
+            sbi_rt::remote_sfence_vma_asid(
+                sbi_rt::HartMask::from_mask_base(0, usize::MAX),
+                vpn.address().to_usize(),
+                1,
+                1,
+            );
         }
     }
 
@@ -301,7 +319,8 @@ impl PageTable {
             };
             *entry = PageTableEntry::new(ppn, flags);
         }
-        riscv::asm::sfence_vma_all();
+        // Simply flush all TLB entries, as the range may be large.
+        riscv::asm::sfence_vma(0, 0);
         Ok(())
     }
 
@@ -318,7 +337,15 @@ impl PageTable {
             let vpn = VirtPageNum::new(start_vpn.to_usize() + i);
             self.unmap_page(vpn);
         }
-        riscv::asm::sfence_vma_all();
+        // Flush all TLB entries for all harts.
+        // Later, we can optimize this by only flushing the TLB for harts that
+        // execute the current process.
+        sbi_rt::remote_sfence_vma_asid(
+            sbi_rt::HartMask::from_mask_base(0, usize::MAX),
+            start_vpn.address().to_usize(),
+            count,
+            1,
+        );
     }
 
     /// Maps the kernel part of the address space into this page table.
@@ -396,16 +423,15 @@ impl PageTableMem {
     }
 }
 
-/// Enables the kernel page table.
+/// Switch to the kernel page table.
 ///
 /// # Safety
-/// This function must be called only once, after the kernel page table is set up.
-pub unsafe fn enable_kernel_page_table() {
+/// This function must be called after the kernel page table is set up.
+pub unsafe fn switch_to_kernel_page_table() {
     // SAFETY: the boot page table never gets dropped.
     unsafe {
         switch_page_table(&KERNEL_PAGE_TABLE);
     }
-    riscv::asm::sfence_vma_all();
 }
 
 /// Switches to the specified page table.
@@ -420,7 +446,7 @@ pub unsafe fn switch_page_table(page_table: &PageTable) {
     unsafe {
         satp::write(satp);
     }
-    riscv::asm::sfence_vma_all();
+    riscv::asm::sfence_vma(0, 0);
     when_debug!({
         log::trace!(
             "Switched to page table at {:#x}, satp: {:#x}",
