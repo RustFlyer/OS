@@ -14,7 +14,7 @@ pub type Tid = usize;
 pub type Pid = usize;
 pub type PGid = usize;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct TidHandle(pub Tid);
 
 impl Drop for TidHandle {

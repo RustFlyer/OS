@@ -23,10 +23,10 @@
 //! With this design, we avoid using trait objects or an enum for VMA types, while still
 //! maintaining modularization and extensibility.
 
-use alloc::vec::Vec;
+use alloc::{collections::btree_map::BTreeMap, vec::Vec};
 use core::fmt::Debug;
 
-use mm::address::{PhysPageNum, VirtAddr};
+use mm::{address::{PhysPageNum, VirtAddr, VirtPageNum}, frame::FrameDropper};
 use systype::{SysError, SysResult};
 
 use super::{mem_perm::MemPerm, page_table::PageTable, pte::PteFlags};
@@ -56,7 +56,6 @@ pub struct PageFaultInfo<'a> {
 ///
 /// A VMA is a contiguous region of virtual memory in an address space that has
 /// a common set of attributes, such as permissions and mapping type.
-#[derive(Debug)]
 pub struct VmArea {
     /// Starting virtual address.
     start_va: VirtAddr,
@@ -67,6 +66,8 @@ pub struct VmArea {
     flags: PteFlags,
     /// Permission.
     perm: MemPerm,
+    /// Allocated physical pages.
+    pages: BTreeMap<VirtPageNum, FrameTracker>,
     /// Unique data of a specific type of VMA.
     map_type: TypedArea,
     /// Page fault handler.
@@ -84,6 +85,7 @@ impl VmArea {
             // Set bits A and D because kernel pages are never swapped out.
             flags: flags | PteFlags::V | PteFlags::G | PteFlags::A | PteFlags::D,
             perm: MemPerm::from(flags),
+            pages: BTreeMap::new(),
             map_type: TypedArea::Kernel(KernelArea),
             handler: None,
         }
@@ -103,6 +105,7 @@ impl VmArea {
             end_va,
             flags: flags | PteFlags::V | PteFlags::U,
             perm: MemPerm::from(flags),
+            pages: BTreeMap::new(),
             map_type: TypedArea::MemoryBacked(MemoryBackedArea::new(memory)),
             handler: Some(MemoryBackedArea::fault_handler),
         }
@@ -115,7 +118,8 @@ impl VmArea {
             end_va,
             flags: PteFlags::V | PteFlags::R | PteFlags::W | PteFlags::U,
             perm: MemPerm::R | MemPerm::W | MemPerm::U,
-            map_type: TypedArea::Stack(StackArea { pages: Vec::new() }),
+            pages: BTreeMap::new(),
+            map_type: TypedArea::Stack(StackArea),
             handler: Some(StackArea::fault_handler),
         }
     }
@@ -145,6 +149,30 @@ impl VmArea {
     /// Returns the ending virtual address of the VMA.
     pub fn end_va(&self) -> VirtAddr {
         self.end_va
+    }
+}
+
+impl Debug for VmArea {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("VmArea")
+            .field("start_va", &self.start_va)
+            .field("end_va", &self.end_va)
+            .field("flags", &self.flags)
+            .field("perm", &self.perm)
+            .field("num of pages", &self.pages.len())
+            .field("map_type", &self.map_type)
+            .finish()
+    }
+}
+
+impl Drop for VmArea {
+    /// Drops the VMA.
+    ///
+    /// This function does not unmap page table entries. It only releases the physical pages
+    /// allocated for the VMA.
+    fn drop(&mut self) {
+        let pages = core::mem::take(&mut self.pages);
+        FrameDropper::drop(pages.into_values().collect());
     }
 }
 
@@ -213,26 +241,18 @@ impl KernelArea {
 pub struct MemoryBackedArea {
     /// The memory backing store.
     pub memory: &'static [u8],
-    /// Allocated physical pages.
-    pub pages: Vec<FrameTracker>,
 }
 
 impl MemoryBackedArea {
     /// Creates a new memory-backed VMA.
     fn new(memory: &'static [u8]) -> Self {
-        Self {
-            memory,
-            pages: Vec::new(),
-        }
+        Self { memory }
     }
 
     /// Handles a page fault.
     pub fn fault_handler(area: &mut VmArea, info: PageFaultInfo) -> SysResult<()> {
         // Extract data needed for fault handling.
-        let &mut Self {
-            memory,
-            ref mut pages,
-        } = match &mut area.map_type {
+        let &mut Self { memory } = match &mut area.map_type {
             TypedArea::MemoryBacked(memory_backed) => memory_backed,
             _ => panic!("fault_handler: not a memory-backed area"),
         };
@@ -241,6 +261,7 @@ impl MemoryBackedArea {
             end_va: vma_end,
             flags,
             perm,
+            ref mut pages,
             ..
         } = area;
         let PageFaultInfo {
@@ -295,7 +316,7 @@ impl MemoryBackedArea {
         }
 
         // Track the allocated frame.
-        pages.push(frame);
+        pages.insert(fault_addr.page_number(), frame);
 
         Ok(())
     }
@@ -304,28 +325,30 @@ impl MemoryBackedArea {
 impl Debug for MemoryBackedArea {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("MemoryBackedArea")
-            .field("memory back store from", &(self.memory.as_ptr() as usize))
-            .field("allocated frame num", &self.pages.len())
+            .field("memory back store addr", &(self.memory.as_ptr() as usize))
+            .field("memory back store len", &self.memory.len())
             .finish()
     }
 }
 
 /// A stack VMA representing a user stack.
 #[derive(Debug)]
-pub struct StackArea {
-    /// Allocated physical pages.
-    pub pages: Vec<FrameTracker>,
-}
+pub struct StackArea;
 
 impl StackArea {
     /// Handles a page fault.
     pub fn fault_handler(area: &mut VmArea, info: PageFaultInfo) -> SysResult<()> {
         // Extract data needed for fault handling.
-        let &mut Self { ref mut pages } = match &mut area.map_type {
-            TypedArea::Stack(stack) => stack,
-            _ => panic!("fault_handler: not a stack area"),
-        };
-        let &mut VmArea { flags, perm, .. } = area;
+        if let TypedArea::Stack(_) = area.map_type {
+        } else {
+            panic!("StackArea::fault_handler: not a stack area");
+        }
+        let &mut VmArea {
+            flags,
+            perm,
+            ref mut pages,
+            ..
+        } = area;
         let PageFaultInfo {
             fault_addr,
             page_table,
@@ -348,7 +371,7 @@ impl StackArea {
         };
 
         // Track the allocated frame.
-        pages.push(frame);
+        pages.insert(fault_addr.page_number(), frame);
 
         Ok(())
     }

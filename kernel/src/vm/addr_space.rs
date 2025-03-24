@@ -99,17 +99,34 @@ impl AddrSpace {
         Ok(())
     }
 
-    /// Removes a VMA from the address space, specifying its starting virtual address.
+    /// Removes mappings for the specified address range.
     ///
-    /// This function removes a VMA from the address space, which de facto unmaps the memory
-    /// region in the address space. If there is no such VMA, this function does nothing.
+    /// This function removes mappings for the specified address range, and causes
+    /// further references to addresses within the range to generate invalid memory
+    /// references. If the range is not mapped, this function does nothing. If the
+    /// range covers only part of any VMA, the VMA may shrink or split.
     ///
-    /// # Note
-    /// This function is not implemented yet. It should disable the page table entries
-    /// corresponding to the VMA to be removed.
-    pub fn remove_area(&mut self, start_va: VirtAddr) {
-        self.vm_areas.remove(&start_va);
-        unimplemented!()
+    /// `addr` must be a multiple of the page size. `length` need not to be. However,
+    /// the range to be removed is rounded up to the page size.
+    pub fn remove_mapping(&mut self, addr: VirtAddr, length: usize) {
+        // Align `length` to the page size.
+        let length = VirtAddr::new(length).round_up().to_usize();
+        // Find all VMAs that overlap with the range.
+        while let Some(vma) = {
+            let gap = self
+                .vm_areas
+                .upper_bound(Bound::Excluded(&VirtAddr::new(addr.to_usize() + length)));
+            if let Some((&va, vma)) = gap.peek_prev() {
+                if vma.end_va() > addr {
+                    Some(self.vm_areas.remove(&va).unwrap())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } {}
+        unimplemented!();
     }
 
     /// Handles a page fault happened in the address space.
