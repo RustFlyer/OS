@@ -36,7 +36,7 @@ pub async fn trap_handler(task: &Arc<Task>) -> bool {
     let current = get_time_duration();
     TIMER_MANAGER.check(current);
     set_nx_timer_irq();
-    if executor::has_waiting_task() {
+    if task.timer_mut().schedule_time_out() && executor::has_waiting_task() {
         yield_now().await;
     }
 

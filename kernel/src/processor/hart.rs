@@ -76,6 +76,7 @@ impl Hart {
         core::mem::swap(self.get_mut_pps(), pps);
         pps.auto_sum();
         new_task.switch_addr_space();
+        new_task.timer_mut().record_switch_in();
         self.set_task(Arc::clone(new_task));
         enable_interrupt();
     }
