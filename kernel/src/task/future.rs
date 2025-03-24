@@ -95,7 +95,8 @@ pub async fn task_executor_unit(task: Arc<Task>) {
 
         trap::trap_handler(&task).await;
 
-        if task.timer_mut().schedule_time_out() && executor::has_waiting_task() {
+        let id = current_hart().id;
+        if task.timer_mut().schedule_time_out() && executor::has_waiting_task_alone(id) {
             yield_now().await;
         }
 
