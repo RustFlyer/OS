@@ -199,13 +199,17 @@ impl PageTable {
     /// Maps a leaf page by specifying VPN and page table entry flags, to a newly
     /// allocated frame.
     ///
-    /// This method allocates a frame for the leaf page, sets the mapping in the
-    /// page table, and returns a [`Page`] struct of the allocated frame. If the
-    /// page is already mapped, this method does nothing and returns `None`.
+    /// This method allocates a frame for the leaf page and sets the mapping in the
+    /// page table
     ///
     /// Returns a [`SysResult`] indicating whether the operation is successful.
     /// Returns an [`ENOMEM`] error if the method needs to allocate a frame but fails
     /// to do so.
+    ///
+    /// In the successful case, if the VPN is already mapped, the function returns
+    /// a mutable reference to the existing page table entry wrapped as
+    /// `SysResult::Ok(Err(entry))`. Otherwise, the function allocates a new frame
+    /// for it and returns the new page wrapped as `SysResult::Ok(Ok(page))`.
     ///
     /// # Note
     /// This function takes `flags` as the flags for the leaf page table entry, and
@@ -216,10 +220,10 @@ impl PageTable {
         &mut self,
         vpn: VirtPageNum,
         flags: PteFlags,
-    ) -> SysResult<Option<Page>> {
+    ) -> SysResult<Result<Page, &mut PageTableEntry>> {
         let (entry, non_leaf_created) = self.find_entry_force(vpn, flags)?;
         if entry.is_valid() {
-            return Ok(None);
+            return Ok(Err(entry));
         }
         let page = Page::build()?;
         *entry = PageTableEntry::new(page.ppn(), flags);
@@ -228,7 +232,7 @@ impl PageTable {
         } else {
             riscv::asm::sfence_vma(0, vpn.address().to_usize());
         }
-        Ok(Some(page))
+        Ok(Ok(page))
     }
 
     /// Maps a leaf page by specifying VPN, PPN, and page table entry flags.
