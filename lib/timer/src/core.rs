@@ -2,6 +2,7 @@ extern crate alloc;
 
 use alloc::collections::BinaryHeap;
 use arch::riscv64::time::get_time_duration;
+use simdebug::when_debug;
 use core::cmp::Reverse;
 use core::task::Waker;
 use core::time::Duration;
@@ -117,7 +118,9 @@ impl TimerManager {
         let mut timers = self.timers.lock();
         while let Some(Reverse(mut timer)) = timers.peek().cloned() {
             if current < timer.expire || !timer.is_active() {
-                log::info!("{} < {}", current.as_nanos(), timer.expire.as_nanos());
+                when_debug!({
+                    log::info!("{} < {}", current.as_nanos(), timer.expire.as_nanos());
+                });
                 break;
             }
 

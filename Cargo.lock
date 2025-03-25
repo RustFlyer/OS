@@ -485,6 +485,7 @@ name = "timer"
 version = "0.1.0"
 dependencies = [
  "arch",
+ "cfg-if",
  "log",
  "mutex",
  "simdebug",
