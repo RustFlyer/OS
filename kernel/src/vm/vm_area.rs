@@ -24,6 +24,7 @@
 //! maintaining modularization and extensibility.
 
 use alloc::{collections::btree_map::BTreeMap, sync::Arc, vec::Vec};
+use arch::riscv64::mm::sfence_vma_addr;
 use core::fmt::Debug;
 use vfs::page::Page;
 
@@ -61,7 +62,7 @@ pub struct PageFaultInfo<'a> {
 /// The handler is responsible for handling a “normal” page fault, which is not a COW page fault
 /// or a page fault due to TLB not being flushed. The handler is called when the permission is
 /// allowed, the fault is not a COW fault, and the page is not already mapped by another thread.
-/// 
+///
 /// The [`Page`] parameter is the physical page allocated for the faulting virtual address, which
 /// the handler may need to fill with appropriate data.
 type PageFaultHandler = fn(&mut VmArea, PageFaultInfo, Page) -> SysResult<()>;
@@ -178,7 +179,7 @@ impl VmArea {
                     self.handle_cow_fault(fault_addr, pte)?;
                 } else {
                     // If the page is already mapped by another thread, just flush the TLB.
-                    riscv::asm::sfence_vma(0, fault_addr.to_usize());
+                    sfence_vma_addr(fault_addr.to_usize());
                 }
             }
         }
@@ -201,7 +202,7 @@ impl VmArea {
             new_pte.set_flags(new_pte.flags() | PteFlags::W);
             new_pte.set_ppn(new_page.ppn());
             *pte = new_pte;
-            riscv::asm::sfence_vma(0, fault_addr.to_usize());
+            sfence_vma_addr(fault_addr.to_usize());
             // Here, the `insert` will drop the old `Arc<Page>` tracked by the VMA,
             // which will decrement the reference count of the `Page`.
             self.pages.insert(fault_vpn, Arc::new(new_page));
@@ -210,7 +211,7 @@ impl VmArea {
             let mut new_pte = *pte;
             new_pte.set_flags(new_pte.flags() | PteFlags::W);
             *pte = new_pte;
-            riscv::asm::sfence_vma(0, fault_addr.to_usize());
+            sfence_vma_addr(fault_addr.to_usize());
         }
         Ok(())
     }

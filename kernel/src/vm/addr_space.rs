@@ -21,6 +21,7 @@ use core::ops::Bound;
 
 use alloc::collections::btree_map::BTreeMap;
 
+use arch::riscv64::mm::{fence, tlb_shootdown_all};
 use config::mm::{USER_END, USER_START};
 use mm::address::VirtAddr;
 use systype::{SysError, SysResult};
@@ -215,6 +216,9 @@ impl AddrSpace {
             }
             *new_pte = pte;
         }
+        // Because the permission of PTEs is downgraded, we need to do a TLB shootdown.
+        fence();
+        tlb_shootdown_all();
 
         Ok(new_space)
     }
