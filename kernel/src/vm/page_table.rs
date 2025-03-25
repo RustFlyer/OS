@@ -4,6 +4,7 @@
 //! and tracking allocated pages.
 
 use alloc::vec::Vec;
+use arch::riscv64::mm::{fence, sfence_vma_addr, sfence_vma_all_except_global, tlb_shootdown};
 use riscv::register::satp::{self, Satp};
 
 use lazy_static::lazy_static;
@@ -160,7 +161,7 @@ impl PageTable {
                 // means that at least one page table on the path is not allocated.
                 // Therefore, the next time the kernel tries to find a leaf entry under
                 // the former allocated sub-table, it must allocate a frame for missing
-                // page tables, which will cause a `sfence_vma(0, 0)` later, which ensures
+                // page tables, which will cause a `sfence_vma` later, which ensures
                 // the visibility of the former allocated sub-table.
                 let frame = FrameTracker::build()?;
                 unsafe {
@@ -199,13 +200,17 @@ impl PageTable {
     /// Maps a leaf page by specifying VPN and page table entry flags, to a newly
     /// allocated frame.
     ///
-    /// This method allocates a frame for the leaf page, sets the mapping in the
-    /// page table, and returns a [`Page`] struct of the allocated frame. If the
-    /// page is already mapped, this method does nothing and returns `None`.
+    /// This method allocates a frame for the leaf page and sets the mapping in the
+    /// page table
     ///
     /// Returns a [`SysResult`] indicating whether the operation is successful.
     /// Returns an [`ENOMEM`] error if the method needs to allocate a frame but fails
     /// to do so.
+    ///
+    /// In the successful case, if the VPN is already mapped, the function returns
+    /// a mutable reference to the existing page table entry wrapped as
+    /// `SysResult::Ok(Err(entry))`. Otherwise, the function allocates a new frame
+    /// for it and returns the new page wrapped as `SysResult::Ok(Ok(page))`.
     ///
     /// # Note
     /// This function takes `flags` as the flags for the leaf page table entry, and
@@ -216,19 +221,19 @@ impl PageTable {
         &mut self,
         vpn: VirtPageNum,
         flags: PteFlags,
-    ) -> SysResult<Option<Page>> {
+    ) -> SysResult<Result<Page, &mut PageTableEntry>> {
         let (entry, non_leaf_created) = self.find_entry_force(vpn, flags)?;
         if entry.is_valid() {
-            return Ok(None);
+            return Ok(Err(entry));
         }
         let page = Page::build()?;
         *entry = PageTableEntry::new(page.ppn(), flags);
         if non_leaf_created {
-            riscv::asm::sfence_vma(0, 0);
+            sfence_vma_all_except_global();
         } else {
-            riscv::asm::sfence_vma(0, vpn.address().to_usize());
+            sfence_vma_addr(vpn.address().to_usize());
         }
-        Ok(Some(page))
+        Ok(Ok(page))
     }
 
     /// Maps a leaf page by specifying VPN, PPN, and page table entry flags.
@@ -256,9 +261,9 @@ impl PageTable {
         let (entry, non_leaf_created) = self.find_entry_force(vpn, flags)?;
         *entry = PageTableEntry::new(ppn, flags);
         if non_leaf_created {
-            riscv::asm::sfence_vma(0, 0);
+            sfence_vma_all_except_global();
         } else {
-            riscv::asm::sfence_vma(0, vpn.address().to_usize());
+            sfence_vma_addr(vpn.address().to_usize());
         }
         Ok(())
     }
@@ -275,12 +280,8 @@ impl PageTable {
             // Flush TLB entries for the page for all harts.
             // Later, we can optimize this by only flushing the TLB for harts that
             // execute the current process.
-            sbi_rt::remote_sfence_vma_asid(
-                sbi_rt::HartMask::from_mask_base(0, usize::MAX),
-                vpn.address().to_usize(),
-                1,
-                1,
-            );
+            fence();
+            tlb_shootdown(vpn.address().to_usize(), 1);
         }
     }
 
@@ -321,7 +322,7 @@ impl PageTable {
             *entry = PageTableEntry::new(ppn, flags);
         }
         // Simply flush all TLB entries, as the range may be large.
-        riscv::asm::sfence_vma(0, 0);
+        sfence_vma_all_except_global();
         Ok(())
     }
 
@@ -341,12 +342,8 @@ impl PageTable {
         // Flush all TLB entries for all harts.
         // Later, we can optimize this by only flushing the TLB for harts that
         // execute the current process.
-        sbi_rt::remote_sfence_vma_asid(
-            sbi_rt::HartMask::from_mask_base(0, usize::MAX),
-            start_vpn.address().to_usize(),
-            count,
-            1,
-        );
+        fence();
+        tlb_shootdown(start_vpn.address().to_usize(), count);
     }
 
     /// Maps the kernel part of the address space into this page table.
@@ -447,7 +444,7 @@ pub unsafe fn switch_page_table(page_table: &PageTable) {
     unsafe {
         satp::write(satp);
     }
-    riscv::asm::sfence_vma(0, 0);
+    sfence_vma_all_except_global();
     when_debug!({
         log::trace!(
             "Switched to page table at {:#x}, satp: {:#x}",

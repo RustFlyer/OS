@@ -37,7 +37,7 @@ bitflags! {
     /// the current implementation.
     ///
     /// Do not set any unknown bits.
-    #[derive(Debug, Clone, Copy)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct PteFlags: u8 {
         const V = 1 << 0;
         const R = 1 << 1;
