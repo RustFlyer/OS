@@ -2,6 +2,7 @@ extern crate alloc;
 use alloc::collections::btree_map::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
+use riscv::asm::sfence_vma_all;
 use time::TaskTimeStat;
 
 use super::future::{self};
@@ -110,8 +111,15 @@ impl Task {
             addr_space = (*self.addr_space_mut()).clone();
         } else {
             // TODO: Cow Fork
-            addr_space = (*self.addr_space_mut()).clone();
+            let cow_address_space = self.addr_space_mut().lock().clone_cow().unwrap();
+            addr_space = Arc::new(SpinNoIrqLock::new(cow_address_space));
+            unsafe {
+                sfence_vma_all();
+            }
+            // addr_space = (*self.addr_space_mut()).clone();
         }
+
+        let name = self.get_name() + "(fork)";
 
         let new = Arc::new(Self::new_fork_clone(
             tid,
@@ -126,7 +134,7 @@ impl Task {
             children,
             pgid,
             SpinNoIrqLock::new(0),
-            self.get_name(),
+            name,
         ));
 
         if !cloneflags.contains(CloneFlags::THREAD) {

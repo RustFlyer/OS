@@ -11,6 +11,8 @@ fn main() {
 
     fork();
 
+    println!("fork begin to run!");
+
     for i in 0..=10 {
         a = a + i;
         println!("thread apple: {}", i);
