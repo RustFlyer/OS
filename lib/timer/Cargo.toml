@@ -8,5 +8,6 @@ arch = { path = "../arch/" }
 mutex = { path = "../mutex/" }
 simdebug = { path = "../simdebug" }
 
+cfg-if = { workspace = true }
 log = { workspace = true }
 spin = { workspace = true }

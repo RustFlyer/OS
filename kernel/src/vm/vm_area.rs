@@ -24,13 +24,18 @@
 //! maintaining modularization and extensibility.
 
 use alloc::{collections::btree_map::BTreeMap, sync::Arc, vec::Vec};
+use arch::riscv64::mm::sfence_vma_addr;
 use core::fmt::Debug;
 use vfs::page::Page;
 
 use mm::address::{PhysPageNum, VirtAddr, VirtPageNum};
 use systype::{SysError, SysResult};
 
-use super::{mem_perm::MemPerm, page_table::PageTable, pte::PteFlags};
+use super::{
+    mem_perm::MemPerm,
+    page_table::PageTable,
+    pte::{PageTableEntry, PteFlags},
+};
 
 impl MemPerm {
     /// Create a new `MemPerm` from a set of `PteFlags`.
@@ -52,6 +57,16 @@ pub struct PageFaultInfo<'a> {
     pub access: MemPerm,
 }
 
+/// Page fault handler function type.
+///
+/// The handler is responsible for handling a “normal” page fault, which is not a COW page fault
+/// or a page fault due to TLB not being flushed. The handler is called when the permission is
+/// allowed, the fault is not a COW fault, and the page is not already mapped by another thread.
+///
+/// The [`Page`] parameter is the physical page allocated for the faulting virtual address, which
+/// the handler may need to fill with appropriate data.
+type PageFaultHandler = fn(&mut VmArea, PageFaultInfo, Page) -> SysResult<()>;
+
 /// A virtual memory area (VMA).
 ///
 /// A VMA is a contiguous region of virtual memory in an address space that has
@@ -72,7 +87,7 @@ pub struct VmArea {
     /// Unique data of a specific type of VMA.
     map_type: TypedArea,
     /// Page fault handler.
-    handler: Option<fn(&mut Self, PageFaultInfo) -> SysResult<()>>,
+    handler: Option<PageFaultHandler>,
 }
 
 impl VmArea {
@@ -136,25 +151,49 @@ impl VmArea {
     /// # Errors
     /// Returns [`SysError::EFAULT`] if the access permission is not allowed.
     /// Otherwise, returns [`SysError::ENOMEM`] if a new frame cannot be allocated.
-    pub fn handle_page_fault(&mut self, info: PageFaultInfo) -> SysResult<()> {
-        if info.access == MemPerm::W && self.perm.contains(MemPerm::W) {
-            // COW page fault.
-            self.handle_cow_fault(info)
-        } else {
-            // Normal page fault.
-            let handler = self
-                .handler
-                .expect("page fault handler: handler not registered");
-            handler(self, info)
+    pub fn handle_page_fault(&mut self, mut info: PageFaultInfo) -> SysResult<()> {
+        let &mut VmArea { flags, perm, .. } = self;
+        let &mut PageFaultInfo {
+            fault_addr,
+            ref mut page_table,
+            access,
+        } = &mut info;
+
+        // Check permission.
+        if !perm.contains(access) {
+            log::trace!(
+                "MemoryBackedArea::fault_handler: access {:?} not allowed, permision is {:?}",
+                access,
+                perm
+            );
+            return Err(SysError::EFAULT);
         }
+
+        match page_table.map_page(fault_addr.page_number(), flags)? {
+            Ok(page) => {
+                self.handler.unwrap()(self, info, page)?;
+            }
+            Err(pte) => {
+                if !pte.flags().contains(PteFlags::W) && access.contains(MemPerm::W) {
+                    // Copy-on-write page fault.
+                    self.handle_cow_fault(fault_addr, pte)?;
+                } else {
+                    // If the page is already mapped by another thread, just flush the TLB.
+                    sfence_vma_addr(fault_addr.to_usize());
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Handles a COW page fault.
-    fn handle_cow_fault(&mut self, info: PageFaultInfo) -> SysResult<()> {
-        let fault_va = info.fault_addr;
-        let fault_vpn = fault_va.page_number();
+    fn handle_cow_fault(
+        &mut self,
+        fault_addr: VirtAddr,
+        pte: &mut PageTableEntry,
+    ) -> SysResult<()> {
+        let fault_vpn = fault_addr.page_number();
         let fault_page = self.pages.get(&fault_vpn).unwrap();
-        let pte = info.page_table.find_entry(fault_vpn).unwrap();
         if Arc::strong_count(fault_page) > 1 {
             // Allocate a new page and copy the content if the page is shared.
             let new_page = Page::build()?;
@@ -163,12 +202,16 @@ impl VmArea {
             new_pte.set_flags(new_pte.flags() | PteFlags::W);
             new_pte.set_ppn(new_page.ppn());
             *pte = new_pte;
-            riscv::asm::sfence_vma(0, fault_va.to_usize());
+            sfence_vma_addr(fault_addr.to_usize());
+            // Here, the `insert` will drop the old `Arc<Page>` tracked by the VMA,
+            // which will decrement the reference count of the `Page`.
             self.pages.insert(fault_vpn, Arc::new(new_page));
         } else {
             // If the page is not shared, just set the write bit.
-            pte.set_flags(pte.flags() | PteFlags::W);
-            riscv::asm::sfence_vma(0, fault_va.to_usize());
+            let mut new_pte = *pte;
+            new_pte.set_flags(new_pte.flags() | PteFlags::W);
+            *pte = new_pte;
+            sfence_vma_addr(fault_addr.to_usize());
         }
         Ok(())
     }
@@ -286,7 +329,7 @@ impl MemoryBackedArea {
     }
 
     /// Handles a page fault.
-    pub fn fault_handler(area: &mut VmArea, info: PageFaultInfo) -> SysResult<()> {
+    pub fn fault_handler(area: &mut VmArea, info: PageFaultInfo, page: Page) -> SysResult<()> {
         // Extract data needed for fault handling.
         let &mut Self { memory } = match &mut area.map_type {
             TypedArea::MemoryBacked(memory_backed) => memory_backed,
@@ -295,36 +338,10 @@ impl MemoryBackedArea {
         let &mut VmArea {
             start_va: vma_start,
             end_va: vma_end,
-            flags,
-            perm,
             ref mut pages,
             ..
         } = area;
-        let PageFaultInfo {
-            fault_addr,
-            page_table,
-            access,
-        } = info;
-
-        // Check permission.
-        if !perm.contains(access) {
-            log::trace!(
-                "MemoryBackedArea::fault_handler: access {:?} not allowed, permision is {:?}",
-                access,
-                perm
-            );
-            return Err(SysError::EFAULT);
-        }
-
-        // Map the page if it is not already mapped by another thread.
-        let page = match page_table.map_page(fault_addr.page_number(), flags)? {
-            Some(page) => page,
-            None => {
-                // Already mapped, just flush the TLB.
-                riscv::asm::sfence_vma(0, fault_addr.to_usize());
-                return Ok(());
-            }
-        };
+        let PageFaultInfo { fault_addr, .. } = info;
 
         // Fill the frame with appropriate data.
         // There are 3 types of regions in the frame:
@@ -353,7 +370,6 @@ impl MemoryBackedArea {
                 .fill(0);
         }
 
-        // Track the allocated frame.
         pages.insert(fault_addr.page_number(), Arc::new(page));
 
         Ok(())
@@ -363,8 +379,14 @@ impl MemoryBackedArea {
 impl Debug for MemoryBackedArea {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("MemoryBackedArea")
-            .field("memory back store addr", &format_args!("{:p}", self.memory.as_ptr()))
-            .field("memory back store len", &format_args!("{:#x}", self.memory.len()))
+            .field(
+                "memory back store addr",
+                &format_args!("{:p}", self.memory.as_ptr()),
+            )
+            .field(
+                "memory back store len",
+                &format_args!("{:#x}", self.memory.len()),
+            )
             .finish()
     }
 }
@@ -375,41 +397,11 @@ pub struct StackArea;
 
 impl StackArea {
     /// Handles a page fault.
-    pub fn fault_handler(area: &mut VmArea, info: PageFaultInfo) -> SysResult<()> {
-        // Extract data needed for fault handling.
-        if let TypedArea::Stack(_) = area.map_type {
-        } else {
-            panic!("StackArea::fault_handler: not a stack area");
-        }
-        let &mut VmArea {
-            flags,
-            perm,
-            ref mut pages,
-            ..
-        } = area;
-        let PageFaultInfo {
-            fault_addr,
-            page_table,
-            access,
-        } = info;
+    pub fn fault_handler(area: &mut VmArea, info: PageFaultInfo, page: Page) -> SysResult<()> {
+        let &mut VmArea { ref mut pages, .. } = area;
+        let PageFaultInfo { fault_addr, .. } = info;
 
-        // Check permission.
-        if !perm.contains(access) {
-            return Err(SysError::EFAULT);
-        }
-
-        // Map the page if it is not already mapped by another thread.
-        let frame = match page_table.map_page(fault_addr.page_number(), flags)? {
-            Some(frame) => frame,
-            None => {
-                // Already mapped, just flush the TLB.
-                riscv::asm::sfence_vma(0, fault_addr.to_usize());
-                return Ok(());
-            }
-        };
-
-        // Track the allocated frame.
-        pages.insert(fault_addr.page_number(), Arc::new(frame));
+        pages.insert(fault_addr.page_number(), Arc::new(page));
 
         Ok(())
     }

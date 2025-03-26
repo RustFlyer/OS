@@ -119,7 +119,7 @@ build: env user
 
 # Run kernel in QEMU emulator
 PHONY += run
-run: build
+run: clean build
 	@$(QEMU) $(QEMU_ARGS)
 
 # Clean build artifacts

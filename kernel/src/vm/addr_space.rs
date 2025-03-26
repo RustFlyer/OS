@@ -21,6 +21,7 @@ use core::ops::Bound;
 
 use alloc::collections::btree_map::BTreeMap;
 
+use arch::riscv64::mm::{fence, tlb_shootdown_all};
 use config::mm::{USER_END, USER_START};
 use mm::address::VirtAddr;
 use systype::{SysError, SysResult};
@@ -215,6 +216,9 @@ impl AddrSpace {
             }
             *new_pte = pte;
         }
+        // Because the permission of PTEs is downgraded, we need to do a TLB shootdown.
+        fence();
+        tlb_shootdown_all();
 
         Ok(new_space)
     }
@@ -267,4 +271,147 @@ pub unsafe fn switch_to(new_space: &AddrSpace) {
     unsafe {
         page_table::switch_page_table(&new_space.page_table);
     }
+}
+
+pub fn test_find_vacant_memory() {
+    let mut addr_space = AddrSpace::build_user().unwrap();
+
+    static MEMORY_1: &[u8] = &[0u8; 0x2000];
+    static MEMORY_2: &[u8] = &[1u8; 0x3000];
+    static MEMORY_3: &[u8] = &[2u8; 0x4000];
+    static MEMORY_4: &[u8] = &[3u8; 0x2000];
+
+    let area1 = VmArea::new_memory_backed(
+        VirtAddr::new(0x1000),
+        VirtAddr::new(0x3000),
+        PteFlags::R | PteFlags::W,
+        MEMORY_1,
+    );
+    let area2 = VmArea::new_memory_backed(
+        VirtAddr::new(0x4000),
+        VirtAddr::new(0x7000),
+        PteFlags::R | PteFlags::W,
+        MEMORY_2,
+    );
+    let area3 = VmArea::new_memory_backed(
+        VirtAddr::new(0xa000),
+        VirtAddr::new(0xe000),
+        PteFlags::R | PteFlags::W,
+        MEMORY_3,
+    );
+
+    addr_space.add_area(area1).unwrap();
+    // These assertions should be suitable for the current implementation,
+    // but they are not necessarily true for the purpose of the function.
+    assert_eq!(
+        addr_space.find_vacant_memory(VirtAddr::new(0x0000), 0x1000),
+        Some(VirtAddr::new(0x0000))
+    );
+    assert_eq!(
+        addr_space.find_vacant_memory(VirtAddr::new(0x1000), 0x3000),
+        Some(VirtAddr::new(0x3000))
+    );
+
+    addr_space.add_area(area2).unwrap();
+    addr_space.add_area(area3).unwrap();
+    if let Some(addr) = addr_space.find_vacant_memory(VirtAddr::new(0x0000), 0x2000) {
+        assert_eq!(addr.to_usize(), 0x7000);
+        let area4 = VmArea::new_memory_backed(
+            addr,
+            VirtAddr::new(addr.to_usize() + 0x2000),
+            PteFlags::R | PteFlags::W,
+            MEMORY_4,
+        );
+        addr_space.add_area(area4).unwrap();
+    }
+
+    log::debug!("{:?}", addr_space.vm_areas);
+}
+
+pub fn test_clone_cow() {
+    let mut old_space = AddrSpace::build_user().unwrap();
+
+    static MEMORY_1: &[u8] = &[0u8; 0x2000];
+    static MEMORY_2: &[u8] = &[1u8; 0x3000];
+
+    let area1 = VmArea::new_memory_backed(
+        VirtAddr::new(0x1000),
+        VirtAddr::new(0x3000),
+        PteFlags::R | PteFlags::W,
+        MEMORY_1,
+    );
+    let area2 = VmArea::new_memory_backed(
+        VirtAddr::new(0x4000),
+        VirtAddr::new(0x7000),
+        PteFlags::R | PteFlags::W,
+        MEMORY_2,
+    );
+
+    old_space.add_area(area1).unwrap();
+    old_space.add_area(area2).unwrap();
+
+    // Manually handle a page fault to make the page mapped in the page table.
+    old_space
+        .handle_page_fault(VirtAddr::new(0x2100), MemPerm::W)
+        .unwrap();
+
+    let mut new_space = old_space.clone_cow().unwrap();
+    // Now the two address spaces share the same physical page, which is marked as read-only.
+    let old_pte = old_space
+        .page_table
+        .find_entry(VirtAddr::new(0x2100).page_number())
+        .unwrap();
+    let new_pte = new_space
+        .page_table
+        .find_entry(VirtAddr::new(0x2100).page_number())
+        .unwrap();
+    assert!(old_pte.flags().contains(PteFlags::R));
+    assert!(new_pte.flags().contains(PteFlags::R));
+    assert!(!old_pte.flags().contains(PteFlags::W));
+    assert!(!new_pte.flags().contains(PteFlags::W));
+    let old_ppn = old_pte.ppn();
+    assert_eq!(new_pte.ppn(), old_ppn);
+
+    // When the page is written, the write gets a newly copied physical page, and the PTE flags
+    // are changed to writable.
+    old_space
+        .handle_page_fault(VirtAddr::new(0x2100), MemPerm::W)
+        .unwrap();
+    assert!(
+        old_space
+            .page_table
+            .find_entry(VirtAddr::new(0x2100).page_number())
+            .unwrap()
+            .flags()
+            .contains(PteFlags::R | PteFlags::W)
+    );
+    assert_ne!(
+        old_space
+            .page_table
+            .find_entry(VirtAddr::new(0x2100).page_number())
+            .unwrap()
+            .ppn(),
+        old_ppn
+    );
+
+    new_space
+        .handle_page_fault(VirtAddr::new(0x2100), MemPerm::W)
+        .unwrap();
+    assert!(
+        new_space
+            .page_table
+            .find_entry(VirtAddr::new(0x2100).page_number())
+            .unwrap()
+            .flags()
+            .contains(PteFlags::R | PteFlags::W)
+    );
+    // Here, because `new_space` is the only one that owns the page, the page is not copied.
+    assert_eq!(
+        new_space
+            .page_table
+            .find_entry(VirtAddr::new(0x2100).page_number())
+            .unwrap()
+            .ppn(),
+        old_ppn
+    );
 }

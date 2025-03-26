@@ -38,6 +38,7 @@ impl Disk {
         self.offset = buf % BLOCK_SIZE as usize;
     }
 
+    /// Reads one block (whole or partial)
     pub fn read_one(&mut self, buf: &mut [u8]) -> SysResult<usize> {
         let read_size = if self.offset == 0 && buf.len() >= BLOCK_SIZE {
             self.dev.read(self.block_id, &mut buf[..BLOCK_SIZE]);
@@ -58,6 +59,7 @@ impl Disk {
         Ok(read_size)
     }
 
+    /// Writes one block (whole or partial)
     pub fn write_one(&mut self, buf: &[u8]) -> SysResult<usize> {
         let write_size = if self.offset == 0 && buf.len() >= BLOCK_SIZE {
             self.dev.write(self.block_id, &mut buf[..BLOCK_SIZE]);
@@ -88,6 +90,7 @@ impl KernelDevOp for Disk {
         Ok(0)
     }
 
+    /// Reads blocks until buf is full
     fn read(dev: &mut Self::DevType, mut buf: &mut [u8]) -> Result<usize, i32> {
         let mut read_size = 0;
         while !buf.is_empty() {
@@ -104,6 +107,7 @@ impl KernelDevOp for Disk {
         Ok(read_size)
     }
 
+    /// Writes blocks until buf is empty
     fn write(dev: &mut Self::DevType, mut buf: &[u8]) -> Result<usize, i32> {
         let mut write_size = 0;
         while !buf.is_empty() {
@@ -119,6 +123,7 @@ impl KernelDevOp for Disk {
         Ok(write_size)
     }
 
+    #[allow(non_snake_case)]
     fn seek(dev: &mut Self::DevType, off: i64, whence: i32) -> Result<i64, i32> {
         let new_pos = match whence {
             SEEK_SET => Some(off),

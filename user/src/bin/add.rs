@@ -9,7 +9,11 @@ use user_lib::{exit, fork, println, sleep, yield_};
 fn main() {
     let mut a: i32 = 0;
 
-    fork();
+    if fork() == 0 {
+        if fork() == 0 {
+            println!("PKL PKL FTT FTT AHC AHC");
+        }
+    }
 
     println!("fork begin to run!");
 

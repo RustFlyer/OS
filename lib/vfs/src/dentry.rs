@@ -52,6 +52,7 @@ pub trait Dentry: Send + Sync {
     fn base_open(self: Arc<Self>) -> SysResult<Arc<dyn File>>;
     fn base_lookup(self: Arc<Self>, name: &str) -> SysResult<Arc<dyn Dentry>>;
     fn base_create(self: Arc<Self>, name: &str, mode: InodeMode) -> SysResult<Arc<dyn Dentry>>;
+    fn base_link(self: Arc<Self>, new: &Arc<dyn Dentry>) -> SysResult<()>;
     fn base_unlink(self: Arc<Self>, name: &str) -> SyscallResult;
     fn base_rmdir(self: Arc<Self>, name: &str) -> SyscallResult;
     fn base_new_child(self: Arc<Self>, _name: &str) -> Arc<dyn Dentry>;

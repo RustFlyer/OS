@@ -1,6 +1,6 @@
 use core::sync::atomic::AtomicUsize;
 
-use crate::inopage::Inopages;
+use crate::{inoid::alloc_ino, inopage::Inopages, superblock::SuperBlock};
 use config::{
     inode::{InodeMode, InodeState, InodeType},
     vfs::{Stat, TimeSpec},
@@ -9,7 +9,7 @@ use downcast_rs::{Downcast, impl_downcast};
 use mutex::SpinNoIrqLock;
 
 extern crate alloc;
-use alloc::sync::Arc;
+use alloc::sync::{Arc, Weak};
 
 use systype::SysResult;
 
@@ -19,11 +19,25 @@ pub struct InodeMeta {
     pub ino: usize,
     pub inomode: InodeMode,
     pub inopages: Option<Inopages>,
-    pub superblock: usize,
+    pub superblock: Weak<dyn SuperBlock>,
 
     pub size: AtomicUsize,
     pub time: [TimeSpec; 3],
     pub inostate: SpinNoIrqLock<InodeState>,
+}
+
+impl InodeMeta {
+    pub fn new(inomode: InodeMode, superblock: Arc<dyn SuperBlock>, size: usize) -> Self {
+        Self {
+            ino: alloc_ino(),
+            inomode,
+            inopages: None,
+            superblock: Arc::downgrade(&superblock),
+            size: AtomicUsize::new(size),
+            time: [TimeSpec::default(); 3],
+            inostate: SpinNoIrqLock::new(InodeState::Init),
+        }
+    }
 }
 
 pub trait Inode: Send + Sync + Downcast {
