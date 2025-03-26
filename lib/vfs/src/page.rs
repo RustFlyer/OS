@@ -34,7 +34,7 @@ impl Page {
         })
     }
 
-    pub fn copy_data_from_another(&self, another: &Page) {
+    pub fn copy_from(&self, another: &Page) {
         fn usize_array(ppn: &PhysPageNum) -> &'static mut [usize] {
             let va: VirtAddr = ppn.to_vpn_kernel().into();
             unsafe {
