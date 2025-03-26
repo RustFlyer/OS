@@ -74,9 +74,9 @@ type PageFaultHandler = fn(&mut VmArea, PageFaultInfo, Page) -> SysResult<()>;
 #[derive(Clone)]
 pub struct VmArea {
     /// Starting virtual address.
-    start_va: VirtAddr,
+    start: VirtAddr,
     /// Ending virtual address (exclusive).
-    end_va: VirtAddr,
+    end: VirtAddr,
     /// Cache for leaf page table entry flags, which are default when creating
     /// a new leaf entry.
     flags: PteFlags,
@@ -98,8 +98,8 @@ impl VmArea {
     /// `flags` needs to have `RWX` bits set properly; other bits must be zero.
     pub fn new_kernel(start_va: VirtAddr, end_va: VirtAddr, flags: PteFlags) -> Self {
         Self {
-            start_va,
-            end_va: end_va.round_up(),
+            start: start_va,
+            end: end_va.round_up(),
             // Set bits A and D because kernel pages are never swapped out.
             flags: flags | PteFlags::V | PteFlags::G | PteFlags::A | PteFlags::D,
             perm: MemPerm::from(flags),
@@ -111,7 +111,8 @@ impl VmArea {
 
     /// Constructs a user space [`VmArea`] whose specific type is [`MemoryBackedArea`].
     ///
-    /// `start_va` must be page-aligned.
+    /// `start_va` is the virtual address from which data in `memory` is mapped, not the
+    /// starting virtual address of the VMA.
     ///
     /// `flags` needs to have `RWX` bits set properly; other bits must be zero.
     pub fn new_memory_backed(
@@ -121,12 +122,12 @@ impl VmArea {
         memory: &'static [u8],
     ) -> Self {
         Self {
-            start_va,
-            end_va: end_va.round_up(),
+            start: start_va.round_down(),
+            end: end_va.round_up(),
             flags: flags | PteFlags::V | PteFlags::U,
             perm: MemPerm::from(flags),
             pages: BTreeMap::new(),
-            map_type: TypedArea::MemoryBacked(MemoryBackedArea::new(memory)),
+            map_type: TypedArea::MemoryBacked(MemoryBackedArea::new(memory, start_va)),
             handler: Some(MemoryBackedArea::fault_handler),
         }
     }
@@ -136,8 +137,8 @@ impl VmArea {
     /// `start_va` and `end_va` must be page-aligned.
     pub fn new_stack(start_va: VirtAddr, end_va: VirtAddr) -> Self {
         Self {
-            start_va,
-            end_va,
+            start: start_va,
+            end: end_va,
             flags: PteFlags::V | PteFlags::R | PteFlags::W | PteFlags::U,
             perm: MemPerm::R | MemPerm::W | MemPerm::U,
             pages: BTreeMap::new(),
@@ -217,17 +218,17 @@ impl VmArea {
     }
 
     pub fn contains(&self, va: VirtAddr) -> bool {
-        va >= self.start_va && va < self.end_va
+        va >= self.start && va < self.end
     }
 
     /// Returns the starting virtual address of the VMA.
     pub fn start_va(&self) -> VirtAddr {
-        self.start_va
+        self.start
     }
 
     /// Returns the ending virtual address of the VMA.
     pub fn end_va(&self) -> VirtAddr {
-        self.end_va
+        self.end
     }
 
     /// Returns the PTE flags of the VMA.
@@ -244,8 +245,8 @@ impl VmArea {
 impl Debug for VmArea {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("VmArea")
-            .field("start_va", &self.start_va)
-            .field("end_va", &self.end_va)
+            .field("start_va", &self.start)
+            .field("end_va", &self.end)
             .field("flags", &self.flags)
             .field("perm", &self.perm)
             .field("num of pages", &self.pages.len())
@@ -294,8 +295,8 @@ impl KernelArea {
         }
 
         let &VmArea {
-            start_va,
-            end_va,
+            start: start_va,
+            end: end_va,
             flags,
             ..
         } = area;
@@ -314,49 +315,55 @@ impl KernelArea {
 
 /// A memory-backed VMA.
 ///
-/// This is a type for debugging purposes. A memory-backed VMA takes a slice of
-/// memory as its backing store.
+/// This is a temporary VMA used as an analogy to a file-backed VMA.
+///
+/// `memroy` is mapped from `start_va` to `start_va + memory.len()`. The region before
+/// `start_va` and after `VmArea::start` is not mapped. The region after
+/// `start_va + memory.len()` and before `VmArea::end` is filled with zeros, which is
+/// like the `.bss` section in an executable file.
 #[derive(Clone)]
 pub struct MemoryBackedArea {
     /// The memory backing store.
-    pub memory: &'static [u8],
+    memory: &'static [u8],
+    /// The virtual address from which `memory` is mapped.
+    start_va: VirtAddr,
 }
 
 impl MemoryBackedArea {
     /// Creates a new memory-backed VMA.
-    fn new(memory: &'static [u8]) -> Self {
-        Self { memory }
+    fn new(memory: &'static [u8], start_va: VirtAddr) -> Self {
+        Self { memory, start_va }
     }
 
     /// Handles a page fault.
     pub fn fault_handler(area: &mut VmArea, info: PageFaultInfo, page: Page) -> SysResult<()> {
         // Extract data needed for fault handling.
-        let &mut Self { memory } = match &mut area.map_type {
+        let &mut Self { memory, start_va } = match &mut area.map_type {
             TypedArea::MemoryBacked(memory_backed) => memory_backed,
             _ => panic!("fault_handler: not a memory-backed area"),
         };
         let &mut VmArea {
-            start_va: vma_start,
-            end_va: vma_end,
+            end: end_va,
             ref mut pages,
             ..
         } = area;
         let PageFaultInfo { fault_addr, .. } = info;
 
-        // Fill the frame with appropriate data.
-        // There are 3 types of regions in the frame:
+        // Fill the page with appropriate data.
+        // There are 3 types of regions in the page:
         // 1. Region to fill with data from the memory backing store.
-        // 2. Region to fill with zeros.
-        // 3. Region that is not in the VMA thus not filled.
-        let fill_va_start = VirtAddr::max(vma_start, fault_addr.round_down());
-        let fill_va_end =
-            VirtAddr::min(vma_end, VirtAddr::new(fault_addr.to_usize() + 1).round_up());
-        let fill_len = fill_va_end.to_usize() - fill_va_start.to_usize();
-        let page_offset = fill_va_start.page_offset();
-        let area_offset = fill_va_start.to_usize() - vma_start.to_usize();
+        // 2. Region to fill with zeros. (addr >= start_va + memory.len() && addr < end_va)
+        // 3. Region that is not in the VMA thus not filled. (addr < start_va || addr >= end_va)
+        let page_start = fault_addr.round_down();
+        let page_end = VirtAddr::new(fault_addr.to_usize() + 1).round_up();
+        let fill_start = VirtAddr::max(start_va, page_start);
+        let fill_end = VirtAddr::min(end_va, page_end);
+        let fill_len = fill_end.to_usize() - fill_start.to_usize();
+        let page_offset = fill_start.page_offset();
+        let area_offset = fill_start.to_usize() - start_va.to_usize();
         let back_store_len = memory.len();
         if area_offset < back_store_len {
-            // If there is a type 1 region in the frame:
+            // If there is a type 1 region in the page:
             let copy_len = usize::min(back_store_len - area_offset, fill_len);
             let memory_copy_from = &memory[area_offset..area_offset + copy_len];
             let (memory_copy_to, memory_fill_zero) = page
@@ -365,7 +372,7 @@ impl MemoryBackedArea {
             memory_copy_to.copy_from_slice(memory_copy_from);
             memory_fill_zero.fill(0);
         } else {
-            // If there is no type 1 region in the frame:
+            // If there is no type 1 region in the page:
             page.bytes_array_range(page_offset..page_offset + fill_len)
                 .fill(0);
         }
