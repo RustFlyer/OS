@@ -37,36 +37,6 @@ use super::{
     pte::{PageTableEntry, PteFlags},
 };
 
-impl MemPerm {
-    /// Create a new `MemPerm` from a set of `PteFlags`.
-    pub fn from(flags: PteFlags) -> Self {
-        Self::from_bits_truncate(flags.bits())
-    }
-}
-
-/// Data passed to a page fault handler.
-///
-/// This struct is used to pass data to a page fault handler registered in a [`VmArea`].
-#[derive(Debug)]
-pub struct PageFaultInfo<'a> {
-    /// Faulting virtual address.
-    pub fault_addr: VirtAddr,
-    /// Page table.
-    pub page_table: &'a mut PageTable,
-    /// How the address was accessed when the fault occurred. Only one bit should be set.
-    pub access: MemPerm,
-}
-
-/// Page fault handler function type.
-///
-/// The handler is responsible for handling a “normal” page fault, which is not a COW page fault
-/// or a page fault due to TLB not being flushed. The handler is called when the permission is
-/// allowed, the fault is not a COW fault, and the page is not already mapped by another thread.
-///
-/// The [`Page`] parameter is the physical page allocated for the faulting virtual address, which
-/// the handler may need to fill with appropriate data.
-type PageFaultHandler = fn(&mut VmArea, PageFaultInfo, Page) -> SysResult<()>;
-
 /// A virtual memory area (VMA).
 ///
 /// A VMA is a contiguous region of virtual memory in an address space that has
@@ -88,6 +58,50 @@ pub struct VmArea {
     map_type: TypedArea,
     /// Page fault handler.
     handler: Option<PageFaultHandler>,
+}
+
+/// Unique data of a specific type of VMA. This enum is used in [`VmArea`].
+#[derive(Debug, Clone)]
+pub enum TypedArea {
+    /// A helper VMA representing one in the kernel space.
+    Kernel(KernelArea),
+    /// A memory-backed VMA.
+    MemoryBacked(MemoryBackedArea),
+    /// An anonymous VMA.
+    ///
+    /// An anonymous VMA is not backed by any file or memory. A user heap or stack,
+    /// or an area created by `mmap` with `MAP_ANONYMOUS` flag, is an anonymous VMA.
+    Anonymous(AnonymousArea),
+    /// A heap VMA representing a user heap. This is just a special case of an
+    /// anonymous area.
+    Heap(AnonymousArea),
+    /// A file-backed VMA.
+    ///
+    /// A file-backed VMA is backed by a file. It is used for memory-mapped files.
+    FileBacked,
+}
+
+/// Page fault handler function type.
+///
+/// The handler is responsible for handling a “normal” page fault, which is not a COW page fault
+/// or a page fault due to TLB not being flushed. The handler is called when the permission is
+/// allowed, the fault is not a COW fault, and the page is not already mapped by another thread.
+///
+/// The [`Page`] parameter is the physical page allocated for the faulting virtual address, which
+/// the handler may need to fill with appropriate data.
+type PageFaultHandler = fn(&mut VmArea, PageFaultInfo, Page) -> SysResult<()>;
+
+/// Data passed to a page fault handler.
+///
+/// This struct is used to pass data to a page fault handler registered in a [`VmArea`].
+#[derive(Debug)]
+pub struct PageFaultInfo<'a> {
+    /// Faulting virtual address.
+    pub fault_addr: VirtAddr,
+    /// Page table.
+    pub page_table: &'a mut PageTable,
+    /// How the address was accessed when the fault occurred. Only one bit should be set.
+    pub access: MemPerm,
 }
 
 impl VmArea {
@@ -132,7 +146,7 @@ impl VmArea {
         }
     }
 
-    /// Constructs a user space [`VmArea`] whose specific type is [`StackArea`].
+    /// Constructs a user space stack area.
     ///
     /// `start_va` and `end_va` must be page-aligned.
     pub fn new_stack(start_va: VirtAddr, end_va: VirtAddr) -> Self {
@@ -142,9 +156,29 @@ impl VmArea {
             flags: PteFlags::V | PteFlags::R | PteFlags::W | PteFlags::U,
             perm: MemPerm::R | MemPerm::W | MemPerm::U,
             pages: BTreeMap::new(),
-            map_type: TypedArea::Stack(StackArea),
-            handler: Some(StackArea::fault_handler),
+            map_type: TypedArea::Anonymous(AnonymousArea),
+            handler: Some(AnonymousArea::fault_handler),
         }
+    }
+
+    /// Constructs a user space heap area.
+    ///
+    /// `start_va` and `end_va` must be page-aligned.
+    pub fn new_heap(start_va: VirtAddr, end_va: VirtAddr) -> Self {
+        Self {
+            start: start_va,
+            end: end_va,
+            flags: PteFlags::V | PteFlags::R | PteFlags::W | PteFlags::U,
+            perm: MemPerm::R | MemPerm::W | MemPerm::U,
+            pages: BTreeMap::new(),
+            map_type: TypedArea::Heap(AnonymousArea),
+            handler: Some(AnonymousArea::fault_handler),
+        }
+    }
+
+    /// Returns whether this VMA is a heap.
+    pub fn is_heap(&self) -> bool {
+        matches!(self.map_type, TypedArea::Heap(_))
     }
 
     /// Handles a page fault happened in this VMA.
@@ -226,9 +260,27 @@ impl VmArea {
         self.start
     }
 
+    /// Sets the starting virtual address of the VMA.
+    ///
+    /// # Safety
+    /// The caller must ensure that the new starting virtual address is page-aligned,
+    /// and the new range of the VMA does not overlap with other VMAs.
+    pub unsafe fn set_start_va(&mut self, start_va: VirtAddr) {
+        self.start = start_va;
+    }
+
     /// Returns the ending virtual address of the VMA.
     pub fn end_va(&self) -> VirtAddr {
         self.end
+    }
+
+    /// Sets the ending virtual address of the VMA.
+    ///
+    /// # Safety
+    /// The caller must ensure that the new starting virtual address is page-aligned,
+    /// and the new range of the VMA does not overlap with other VMAs.
+    pub unsafe fn set_end_va(&mut self, end_va: VirtAddr) {
+        self.end = end_va;
     }
 
     /// Returns the PTE flags of the VMA.
@@ -253,28 +305,6 @@ impl Debug for VmArea {
             .field("map_type", &self.map_type)
             .finish()
     }
-}
-
-/// Unique data of a specific type of VMA. This enum is used in [`VmArea`].
-#[derive(Debug, Clone)]
-pub enum TypedArea {
-    /// A helper VMA representing one in the kernel space.
-    Kernel(KernelArea),
-    /// A memory-backed VMA.
-    MemoryBacked(MemoryBackedArea),
-    /// A stack VMA representing a user stack.
-    Stack(StackArea),
-    /// A heap VMA representing a user heap.
-    Heap,
-    /// A file-backed VMA.
-    ///
-    /// A file-backed VMA is backed by a file. It is used for memory-mapped files.
-    FileBacked,
-    /// An anonymous VMA.
-    ///
-    /// An anonymous VMA is not backed by any file or memory. It is created by `mmap`
-    /// system call with `MAP_ANONYMOUS` flag.
-    Anonymous,
 }
 
 /// A helper VMA representing one in the kernel space.
@@ -398,11 +428,11 @@ impl Debug for MemoryBackedArea {
     }
 }
 
-/// A stack VMA representing a user stack.
+/// An anonymous VMA which is not backed by a file or device, such as a user heap or stack.
 #[derive(Debug, Clone)]
-pub struct StackArea;
+pub struct AnonymousArea;
 
-impl StackArea {
+impl AnonymousArea {
     /// Handles a page fault.
     pub fn fault_handler(area: &mut VmArea, info: PageFaultInfo, page: Page) -> SysResult<()> {
         let &mut VmArea { ref mut pages, .. } = area;

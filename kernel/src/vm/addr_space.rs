@@ -223,6 +223,52 @@ impl AddrSpace {
         Ok(new_space)
     }
 
+    /// Changes the size of the heap.
+    ///
+    /// This function changes the size of the heap by changing the end of the heap area.
+    ///
+    /// In order to implement `brk` and `sbrk` at the same time, this function takes an address
+    /// and an increment value, and only one of them is used. Unused value should be set to 0.
+    /// If both of them are set to 0, this function do as if `sbrk(0)` is called.
+    ///
+    /// # Errors
+    /// Returns [`SysError::ENOMEM`] if it is impossible to change the heap size as specified.
+    pub fn change_heap_size(&mut self, mut addr: usize, incr: isize) -> SysResult<usize> {
+        if addr != 0 && (!VirtAddr::check_validity(addr) || !VirtAddr::new(addr).in_user_space()) {
+            return Err(SysError::ENOMEM);
+        }
+
+        // Find the heap area
+        // let heap_area = self
+        let mut vma_iter = self.vm_areas.iter_mut();
+        let heap_area = vma_iter.find(|(_, vma)| vma.is_heap()).unwrap().1;
+        let heap_start = heap_area.start_va().to_usize();
+        let heap_end = heap_area.end_va().to_usize();
+
+        // Calculate the new heap end
+        if addr == 0 {
+            addr = heap_end.checked_add_signed(incr).ok_or(SysError::ENOMEM)?;
+        }
+
+        // Check if the new heap end is valid
+        if addr < heap_start
+            || !VirtAddr::check_validity(addr)
+            || !VirtAddr::new(addr).in_user_space()
+        {
+            return Err(SysError::ENOMEM);
+        }
+        let next_vma_start = vma_iter.next().map(|(va, _)| va.to_usize());
+        match next_vma_start {
+            Some(next_start) if addr > next_start => Err(SysError::ENOMEM),
+            _ => {
+                unsafe {
+                    heap_area.set_end_va(VirtAddr::new(addr));
+                }
+                Ok(addr)
+            }
+        }
+    }
+
     /// Handles a page fault happened in the address space.
     ///
     /// This function is called when a page fault happens in the address space. It finds the
