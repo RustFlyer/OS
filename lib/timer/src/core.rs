@@ -117,7 +117,7 @@ impl TimerManager {
         let mut timers = self.timers.lock();
         while let Some(Reverse(mut timer)) = timers.peek().cloned() {
             if current < timer.expire || !timer.is_active() {
-                log::info!("{} < {}", current.as_nanos(), timer.expire.as_nanos());
+                // log::info!("{} < {}", current.as_nanos(), timer.expire.as_nanos());
                 break;
             }
 

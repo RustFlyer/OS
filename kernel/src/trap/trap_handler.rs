@@ -23,11 +23,11 @@ pub async fn trap_handler(task: &Task) -> bool {
     let stval = register::stval::read();
     let cause = register::scause::read().cause();
 
-    log::trace!(
-        "[trap_handler] user task trap into kernel, type: {:?}, stval: {:#x}",
-        cause,
-        stval
-    );
+    // log::trace!(
+    //     "[trap_handler] user task trap into kernel, type: {:?}, stval: {:#x}",
+    //     cause,
+    //     stval
+    // );
 
     unsafe { load_trap_handler() };
 

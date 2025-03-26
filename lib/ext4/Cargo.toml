@@ -1,0 +1,12 @@
+[package]
+name = "ext4"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+driver = { path = "../driver/" }
+config = { path = "../config/" }
+systype = { path = "../systype/" }
+
+lwext4_rust = { workspace = true }
+log = { workspace = true }
