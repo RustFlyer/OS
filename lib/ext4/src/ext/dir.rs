@@ -2,7 +2,7 @@ extern crate alloc;
 
 use alloc::ffi::CString;
 use core::mem::MaybeUninit;
-use lwext4_rust::bindings::{ext4_dir_close, ext4_dir_open};
+use lwext4_rust::bindings::{ext4_dir, ext4_dir_close, ext4_dir_open};
 
 pub struct ExtDir(ext4_dir);
 
