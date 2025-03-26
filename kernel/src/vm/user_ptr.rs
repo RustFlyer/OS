@@ -443,8 +443,11 @@ impl AddrSpace {
             return Err(SysError::EFAULT);
         }
 
-        let end_addr = addr + len - 1;
-        if !VirtAddr::check_validity(addr) || !VirtAddr::check_validity(end_addr) {
+        let end_addr = addr + len;
+        if !VirtAddr::check_validity(addr)
+            || !VirtAddr::check_validity(end_addr - 1)
+            || !VirtAddr::new(end_addr - 1).in_user_space()
+        {
             return Err(SysError::EFAULT);
         }
 
@@ -516,8 +519,11 @@ impl AddrSpace {
         debug_assert!(addr % size_of::<T>() == 0);
         debug_assert!(len % size_of::<T>() == 0);
 
-        let end_addr = addr + len; // exclusive
-        if !VirtAddr::check_validity(addr) || !VirtAddr::check_validity(end_addr - 1) {
+        let end_addr = addr + len;
+        if !VirtAddr::check_validity(addr)
+            || !VirtAddr::check_validity(end_addr - 1)
+            || !VirtAddr::new(end_addr - 1).in_user_space()
+        {
             return Err(SysError::EFAULT);
         }
 
