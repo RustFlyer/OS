@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use core::mem::MaybeUninit;
 use lwext4_rust::{
     InodeTypes,
-    bindings::{ext4_dir, ext4_dir_close, ext4_dir_entry_next, ext4_dir_open},
+    bindings::{ext4_dir, ext4_dir_close, ext4_dir_entry_next, ext4_dir_mk, ext4_dir_open},
 };
 
 pub struct ExtDirEntry<'a> {
@@ -26,6 +26,27 @@ impl Drop for ExtDir {
 impl ExtDir {
     pub fn open(path: &str) -> Result<Self, i32> {
         let c_path = CString::new(path).expect("CString::new failed");
+        let mut dir = MaybeUninit::uninit();
+        let r = unsafe { ext4_dir_open(dir.as_mut_ptr(), c_path.as_ptr()) };
+        match r {
+            0 => unsafe { Ok(Self(dir.assume_init())) },
+            e => {
+                error!("ext4_dir_open: {}, rc = {}", path, r);
+                Err(e)
+            }
+        }
+    }
+
+    pub fn create(path: &str) -> Result<Self, i32> {
+        let c_path = CString::new(path).expect("CString::new failed");
+        let r = unsafe { ext4_dir_mk(c_path.as_ptr()) };
+        match r {
+            0 => {}
+            e => {
+                error!("ext4_dir_mk: {}, rc = {}", path, r);
+                return Err(e);
+            }
+        }
         let mut dir = MaybeUninit::uninit();
         let r = unsafe { ext4_dir_open(dir.as_mut_ptr(), c_path.as_ptr()) };
         match r {

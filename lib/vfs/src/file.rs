@@ -137,6 +137,10 @@ pub trait File: Send + Sync {
     fn size(&self) -> usize {
         self.get_meta().inode.size()
     }
+
+    async fn readlink(&self, buf: &mut [u8]) -> SyscallResult {
+        todo!()
+    }
 }
 
 impl dyn File {

@@ -1,6 +1,8 @@
 #![no_std]
 #![no_main]
 
+extern crate alloc;
+
 pub mod dentry;
 pub mod disk;
 pub mod ext;

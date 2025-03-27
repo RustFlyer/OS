@@ -1,4 +1,4 @@
-use core::sync::atomic::AtomicUsize;
+use core::sync::{self, atomic::AtomicUsize};
 
 use crate::{inoid::alloc_ino, inopage::Inopages, superblock::SuperBlock};
 use config::{
@@ -79,4 +79,4 @@ impl dyn Inode {
     }
 }
 
-impl_downcast!(Inode);
+impl_downcast!(sync Inode);
