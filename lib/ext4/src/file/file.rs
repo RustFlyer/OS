@@ -1,8 +1,10 @@
 extern crate alloc;
 use alloc::sync::Arc;
 
+use config::inode::InodeType;
+use lwext4_rust::bindings::SEEK_SET;
 use mutex::ShareMutex;
-use systype::SyscallResult;
+use systype::{SysError, SyscallResult};
 use vfs::{
     dentry,
     file::{File, FileMeta},
@@ -33,13 +35,25 @@ impl File for ExtFileFile {
         &self.meta
     }
 
-    /// # todo: read datas from file at offset to buf!
     async fn base_read_at(&self, offset: usize, buf: &mut [u8]) -> SyscallResult {
-        todo!()
+        match self.itype() {
+            InodeType::File => {
+                let mut file = self.file.lock();
+                file.seek(offset, SEEK_SET)?;
+                file.read(buf)?;
+            }
+            _ => todo!(),
+        }
     }
 
-    /// # todo: write datas from buf to file at offset!
     async fn base_write_at(&self, offset: usize, buf: &[u8]) -> SyscallResult {
-        todo!()
+        match self.itype() {
+            InodeType::File => {
+                let mut file = self.file.lock();
+                file.seek(offset, SEEK_SET)?;
+                file.write(buf)?;
+            }
+            _ => todo!(),
+        }
     }
 }
