@@ -78,5 +78,3 @@ impl dyn Inode {
         *self.get_meta().inostate.lock() = state;
     }
 }
-
-impl_downcast!(sync Inode);

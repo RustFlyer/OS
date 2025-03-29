@@ -2,23 +2,36 @@
 //!
 //! This module defines the [`Page`] struct, which represents a physical page in the system.
 //! [`Page`] differs from [`FrameTracker`] in that [`Page`] is a higher-level abstraction
-//! that provides more functionalities and tracks the status of a physical page. On the
-//! other hand, [`FrameTracker`] only represents a physical frame and is used for memory
-//! management. Most of the time, we use [`Page`] instead of [`FrameTracker`]; however,
-//! [`FrameTracker`] is still useful in some cases, such as being used as a page of a
-//! page table.
+//! that provides more functionalities and tracks the status of a physical page. For example,
+//! a [`Page`] may be associated with a specific file in the filesystem, and may be associated
+//! with the buffer cache. In contrast, [`FrameTracker`] only tracks a physical page.
+//! If the user wants to manage bare physical pages, such as allocating a page for a page
+//! table, they should use [`FrameTracker`] directly.
+//!
+//! Note that a page is tracked either by a [`FrameTracker`] or a [`Page`] (which wraps a
+//! [`FrameTracker`]). When either of them is dropped, the page is freed. The user has no way
+//! to have a page that is tracked by both a [`FrameTracker`] and a [`Page`] at the same time.
+//!
+//! A [`Page`] does not provide any synchronization mechanism, and multiple mutable references
+//! to a [`Page`] can be created. The user is responsible for ensuring its thread-safety, if
+//! needed.
 
-use core::cmp;
+use core::cell::SyncUnsafeCell;
 
 use config::mm::PAGE_SIZE;
-use mm::{
-    address::{PhysPageNum, VirtAddr},
-    frame::FrameTracker,
-};
+use mm::{address::PhysPageNum, frame::FrameTracker};
 use systype::SysResult;
 
+/// A physical page in the system.
+///
+/// See the module-level documentation for more details.
 pub struct Page {
-    frame: FrameTracker,
+    /// The underlying physical page.
+    ///
+    /// # Note
+    /// This is a `SyncUnsafeCell` because we do not care about synchronization
+    /// when accessing the page data simultaneously from multiple threads.
+    frame: SyncUnsafeCell<FrameTracker>,
 }
 
 impl core::fmt::Debug for Page {
@@ -28,44 +41,43 @@ impl core::fmt::Debug for Page {
 }
 
 impl Page {
+    /// Allocates a new page and returns a [`Page`] object.
+    ///
+    /// # Errors
+    /// Returns an [`ENOMEM`] error if the allocation fails.
     pub fn build() -> SysResult<Self> {
         Ok(Self {
-            frame: FrameTracker::build()?,
+            frame: SyncUnsafeCell::new(FrameTracker::build()?),
         })
     }
 
-    pub fn copy_data_from_another(&self, another: &Page) {
-        fn usize_array(ppn: &PhysPageNum) -> &'static mut [usize] {
-            let va: VirtAddr = ppn.to_vpn_kernel().into();
-            unsafe {
-                core::slice::from_raw_parts_mut(
-                    va.to_usize() as *mut usize,
-                    PAGE_SIZE / size_of::<usize>(),
-                )
-            }
+    /// Creates a new [`Page`] from an existing [`FrameTracker`].
+    pub fn from_frame(frame: FrameTracker) -> Self {
+        Self {
+            frame: SyncUnsafeCell::new(frame),
         }
-        let dst = usize_array(&self.ppn());
-        let src = usize_array(&another.ppn());
+    }
+
+    /// Copies the contents of another [`Page`] into this [`Page`].
+    pub fn copy_from_page(&self, another: &Page) {
+        let dst = self.as_mut_slice();
+        let src = another.as_slice();
         dst.copy_from_slice(src);
     }
 
-    pub fn copy_from_slice(&self, data: &[u8]) {
-        let len = cmp::min(PAGE_SIZE, data.len());
-        self.bytes_array_range(0..len).copy_from_slice(data)
-    }
-
+    /// Returns the physical page number of the page.
     pub fn ppn(&self) -> PhysPageNum {
-        self.frame.as_ppn()
+        unsafe { self.frame.get().as_ref_unchecked().ppn() }
     }
 
-    pub fn bytes_array(&self) -> &'static mut [u8] {
-        let va: VirtAddr = self.ppn().to_vpn_kernel().into();
-        unsafe { core::slice::from_raw_parts_mut(va.to_usize() as *mut u8, PAGE_SIZE) }
+    /// Returns a reference to the underlying [`FrameTracker`].
+    pub fn as_slice(&self) -> &[u8; PAGE_SIZE] {
+        unsafe { self.frame.get().as_ref_unchecked().as_slice() }
     }
 
-    pub fn bytes_array_range(&self, range: core::ops::Range<usize>) -> &'static mut [u8] {
-        let mut va: VirtAddr = self.ppn().to_vpn_kernel().into();
-        va = VirtAddr::new(va.to_usize() + range.start);
-        unsafe { core::slice::from_raw_parts_mut(va.to_usize() as *mut u8, range.len()) }
+    /// Returns a mutable reference to the underlying page.
+    #[allow(clippy::mut_from_ref)]
+    pub fn as_mut_slice(&self) -> &mut [u8; PAGE_SIZE] {
+        unsafe { self.frame.get().as_mut_unchecked().as_mut_slice() }
     }
 }

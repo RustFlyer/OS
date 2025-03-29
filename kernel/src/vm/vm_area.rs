@@ -197,7 +197,7 @@ impl VmArea {
         if Arc::strong_count(fault_page) > 1 {
             // Allocate a new page and copy the content if the page is shared.
             let new_page = Page::build()?;
-            new_page.copy_data_from_another(fault_page);
+            new_page.copy_from_page(fault_page);
             let mut new_pte = *pte;
             new_pte.set_flags(new_pte.flags() | PteFlags::W);
             new_pte.set_ppn(new_page.ppn());
@@ -359,15 +359,13 @@ impl MemoryBackedArea {
             // If there is a type 1 region in the frame:
             let copy_len = usize::min(back_store_len - area_offset, fill_len);
             let memory_copy_from = &memory[area_offset..area_offset + copy_len];
-            let (memory_copy_to, memory_fill_zero) = page
-                .bytes_array_range(page_offset..page_offset + fill_len)
-                .split_at_mut(copy_len);
+            let (memory_copy_to, memory_fill_zero) =
+                page.as_mut_slice()[page_offset..page_offset + fill_len].split_at_mut(copy_len);
             memory_copy_to.copy_from_slice(memory_copy_from);
             memory_fill_zero.fill(0);
         } else {
             // If there is no type 1 region in the frame:
-            page.bytes_array_range(page_offset..page_offset + fill_len)
-                .fill(0);
+            page.as_mut_slice()[page_offset..page_offset + fill_len].fill(0);
         }
 
         pages.insert(fault_addr.page_number(), Arc::new(page));

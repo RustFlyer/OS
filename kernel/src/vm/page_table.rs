@@ -60,10 +60,10 @@ impl PageTable {
         let root_frame = FrameTracker::build()?;
         // SAFETY: the frame is newly allocated for the root page table.
         unsafe {
-            PageTableMem::new(root_frame.as_ppn()).clear();
+            PageTableMem::new(root_frame.ppn()).clear();
         }
         Ok(PageTable {
-            root: root_frame.as_ppn(),
+            root: root_frame.ppn(),
             frames: vec![root_frame],
         })
     }
@@ -165,9 +165,9 @@ impl PageTable {
                 // the visibility of the former allocated sub-table.
                 let frame = FrameTracker::build()?;
                 unsafe {
-                    PageTableMem::new(frame.as_ppn()).clear();
+                    PageTableMem::new(frame.ppn()).clear();
                 }
-                *entry = PageTableEntry::new(frame.as_ppn(), inner_flags);
+                *entry = PageTableEntry::new(frame.ppn(), inner_flags);
                 self.track_frame(frame);
                 inner_created = true;
             }

@@ -179,13 +179,13 @@ impl dyn File {
                 log::trace!("[File::read] offset {offset_aligned} cached in address space");
                 let len = cmp::min(buf.len(), PAGE_SIZE - offset_in_page).min(self.size() - offset);
                 buf[0..len]
-                    .copy_from_slice(page.bytes_array_range(offset_in_page..offset_in_page + len));
+                    .copy_from_slice(&page.as_mut_slice()[offset_in_page..offset_in_page + len]);
                 len
             } else {
                 log::trace!("[File::read] offset {offset_aligned} not cached in address space");
                 let page = Page::build()?;
                 let len = self
-                    .base_read_at(offset_aligned, page.bytes_array())
+                    .base_read_at(offset_aligned, page.as_mut_slice())
                     .await?;
                 if len == 0 {
                     log::warn!("[File::read] reach file end");
@@ -193,7 +193,7 @@ impl dyn File {
                 }
                 let len = cmp::min(buf.len(), len);
                 buf[0..len]
-                    .copy_from_slice(page.bytes_array_range(offset_in_page..offset_in_page + len));
+                    .copy_from_slice(&page.as_mut_slice()[offset_in_page..offset_in_page + len]);
                 pages.insert_page(offset_aligned, page);
                 len
             };
