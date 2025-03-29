@@ -5,7 +5,7 @@ use config::{
     inode::{InodeMode, InodeState, InodeType},
     vfs::{Stat, TimeSpec},
 };
-use downcast_rs::{Downcast, impl_downcast};
+use downcast_rs::{Downcast, DowncastSync, impl_downcast};
 use mutex::SpinNoIrqLock;
 
 extern crate alloc;
@@ -40,7 +40,7 @@ impl InodeMeta {
     }
 }
 
-pub trait Inode: Send + Sync + Downcast {
+pub trait Inode: Send + Sync + DowncastSync {
     fn get_meta(&self) -> &InodeMeta;
 
     fn get_attr(&self) -> SysResult<Stat>;
