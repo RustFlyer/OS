@@ -14,7 +14,7 @@ endif
 PHONY :=
 
 PHONY += build
-build: $(APPS)
+build:
 	cargo build $(CARGO_BUILD_ARGS)
 
 .PHONY: build

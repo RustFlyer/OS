@@ -11,3 +11,5 @@ mod vm_area;
 pub use page_table::{
     switch_to_kernel_page_table, trace_kernel_page_table_lookup, trace_page_table_lookup,
 };
+#[allow(unused)]
+pub use vm_area::test_unmap_range;

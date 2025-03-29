@@ -25,7 +25,7 @@
 
 use alloc::{collections::btree_map::BTreeMap, sync::Arc, vec::Vec};
 use arch::riscv64::mm::sfence_vma_addr;
-use core::fmt::Debug;
+use core::{fmt::Debug, mem};
 use vfs::page::Page;
 
 use mm::address::{PhysPageNum, VirtAddr, VirtPageNum};
@@ -176,9 +176,77 @@ impl VmArea {
         }
     }
 
-    /// Returns whether this VMA is a heap.
-    pub fn is_heap(&self) -> bool {
-        matches!(self.map_type, TypedArea::Heap(_))
+    /// Removes mappings in a given range of virtual addresses from the VMA
+    /// in a given [`PageTable`], possibly splitting the VMA and invalidating
+    /// page table entries.
+    ///
+    /// The range is defined by `remove_from` and `remove_to`, which must both be
+    /// page-aligned. The range is inclusive of `remove_from` and exclusive of
+    /// `remove_to`. `remove_from` and `remove_to` do not need to be contained
+    /// in the VMA; only range that overlaps with the VMA is removed. It is allowed
+    /// that the range does not overlap with the VMA at all, in which case the VMA is
+    /// unchanged.
+    ///
+    /// `remove_from` must be less than `remove_to`.
+    ///
+    /// Returns a tuple of two `Option<VmArea>`, which are the new VMAs created
+    /// by splitting the original VMA. If one of the new VMAs is `None`, it means
+    /// the range covers the starting or ending part of the original VMA, which
+    /// leaves only a single VMA. If both are `None`, it means the range covers
+    /// the whole VMA, so the original VMA is totally removed.
+    pub fn unmap_range(
+        mut self,
+        page_table: &mut PageTable,
+        remove_from: VirtAddr,
+        remove_to: VirtAddr,
+    ) -> (Option<Self>, Option<Self>) {
+        debug_assert!(remove_from < remove_to);
+        let start_va = VirtAddr::max(self.start, remove_from);
+        let end_va = VirtAddr::min(self.end, remove_to);
+
+        if start_va == self.start && end_va == self.end {
+            // The range to be removed is the whole VMA.
+            return (None, None);
+        }
+        if start_va >= end_va {
+            // The range to be removed is empty.
+            return (Some(self), None);
+        }
+
+        // Re-assign `Page`s in the old VMA to the new VMA(s).
+        let (pages_low, pages_mid, pages_high) = {
+            let mut pages = mem::take(&mut self.pages);
+            let mut pages_mid_high = pages.split_off(&start_va.page_number());
+            let pages_high = pages_mid_high.split_off(&end_va.page_number());
+            (pages, pages_mid_high, pages_high)
+        };
+
+        // Unmap the pages to be removed in the page table.
+        for (vpn, _) in pages_mid {
+            let pte = page_table.find_entry(vpn).unwrap();
+            *pte = PageTableEntry::default();
+        }
+
+        let vma_low = if remove_from > self.start {
+            Some(Self {
+                end: start_va,
+                pages: pages_low,
+                ..self.clone()
+            })
+        } else {
+            None
+        };
+        let vma_high = if remove_to < self.end {
+            Some(Self {
+                start: end_va,
+                pages: pages_high,
+                ..self.clone()
+            })
+        } else {
+            None
+        };
+
+        (vma_low, vma_high)
     }
 
     /// Handles a page fault happened in this VMA.
@@ -291,6 +359,11 @@ impl VmArea {
     /// Returns the mapping from virtual page numbers to `Arc<Page>`s mapped in this VMA.
     pub fn pages(&self) -> &BTreeMap<VirtPageNum, Arc<Page>> {
         &self.pages
+    }
+
+    /// Returns whether this VMA is a heap.
+    pub fn is_heap(&self) -> bool {
+        matches!(self.map_type, TypedArea::Heap(_))
     }
 }
 
@@ -430,6 +503,10 @@ impl Debug for MemoryBackedArea {
 }
 
 /// An anonymous VMA which is not backed by a file or device, such as a user heap or stack.
+///
+/// Each anonymous VMA is filled with zeros when a process first accesses it, in order to
+/// avoid leaking data from other processes or the kernel. This is similar to the
+/// `.bss` section in an executable file.
 #[derive(Debug, Clone)]
 pub struct AnonymousArea;
 
@@ -443,5 +520,111 @@ impl AnonymousArea {
         pages.insert(fault_addr.page_number(), Arc::new(page));
 
         Ok(())
+    }
+}
+
+pub fn test_unmap_range() {
+    {
+        let mut vma = VmArea::new_kernel(VirtAddr::new(0x1000), VirtAddr::new(0x8000), PteFlags::V);
+        let mut page_table = PageTable::build().unwrap();
+
+        for vpn in vma.start_va().page_number().to_usize()..vma.end_va().page_number().to_usize() {
+            let vpn = VirtPageNum::new(vpn);
+            let page = page_table.map_page(vpn, PteFlags::V).unwrap().unwrap();
+            vma.pages.insert(vpn, Arc::new(page));
+        }
+
+        let (vma_low, vma_high) = vma.unmap_range(
+            &mut page_table,
+            VirtAddr::new(0x1000),
+            VirtAddr::new(0x5000),
+        );
+
+        assert!(vma_low.is_none());
+        assert!(vma_high.is_some());
+        let vma_high = vma_high.unwrap();
+        assert!(vma_high.start_va() == VirtAddr::new(0x5000));
+        assert!(vma_high.end_va() == VirtAddr::new(0x8000));
+        assert!(vma_high.contains(VirtAddr::new(0x7000)));
+        assert!(vma_high.contains(VirtAddr::new(0x5000)));
+        assert!(!vma_high.contains(VirtAddr::new(0x4000)));
+        assert!(!vma_high.contains(VirtAddr::new(0x1000)));
+    }
+    {
+        let mut vma = VmArea::new_kernel(VirtAddr::new(0x1000), VirtAddr::new(0x8000), PteFlags::V);
+        let mut page_table = PageTable::build().unwrap();
+
+        for vpn in vma.start_va().page_number().to_usize()..vma.end_va().page_number().to_usize() {
+            let vpn = VirtPageNum::new(vpn);
+            let page = page_table.map_page(vpn, PteFlags::V).unwrap().unwrap();
+            vma.pages.insert(vpn, Arc::new(page));
+        }
+
+        let (vma_low, vma_high) = vma.unmap_range(
+            &mut page_table,
+            VirtAddr::new(0x3000),
+            VirtAddr::new(0x6000),
+        );
+
+        assert!(vma_low.is_some());
+        let vma_low = vma_low.unwrap();
+        assert!(vma_low.start_va() == VirtAddr::new(0x1000));
+        assert!(vma_low.end_va() == VirtAddr::new(0x3000));
+        assert!(vma_low.contains(VirtAddr::new(0x1000)));
+        assert!(vma_low.contains(VirtAddr::new(0x2000)));
+        assert!(!vma_low.contains(VirtAddr::new(0x3000)));
+        assert!(!vma_low.contains(VirtAddr::new(0x6000)));
+        assert!(!vma_low.contains(VirtAddr::new(0x7000)));
+        assert!(vma_high.is_some());
+        let vma_high = vma_high.unwrap();
+        assert!(vma_high.start_va() == VirtAddr::new(0x6000));
+        assert!(vma_high.end_va() == VirtAddr::new(0x8000));
+        assert!(vma_high.contains(VirtAddr::new(0x7000)));
+        assert!(vma_high.contains(VirtAddr::new(0x6000)));
+        assert!(!vma_high.contains(VirtAddr::new(0x5000)));
+        assert!(!vma_high.contains(VirtAddr::new(0x1000)));
+    }
+    {
+        let mut vma = VmArea::new_kernel(VirtAddr::new(0x1000), VirtAddr::new(0x8000), PteFlags::V);
+        let mut page_table = PageTable::build().unwrap();
+
+        for vpn in vma.start_va().page_number().to_usize()..vma.end_va().page_number().to_usize() {
+            let vpn = VirtPageNum::new(vpn);
+            let page = page_table.map_page(vpn, PteFlags::V).unwrap().unwrap();
+            vma.pages.insert(vpn, Arc::new(page));
+        }
+
+        let (vma_low, vma_high) = vma.unmap_range(
+            &mut page_table,
+            VirtAddr::new(0x0000),
+            VirtAddr::new(0x9000),
+        );
+
+        assert!(vma_low.is_none());
+        assert!(vma_high.is_none());
+    }
+    {
+        let mut vma = VmArea::new_kernel(VirtAddr::new(0x5000), VirtAddr::new(0x8000), PteFlags::V);
+        let mut page_table = PageTable::build().unwrap();
+
+        for vpn in vma.start_va().page_number().to_usize()..vma.end_va().page_number().to_usize() {
+            let vpn = VirtPageNum::new(vpn);
+            let page = page_table.map_page(vpn, PteFlags::V).unwrap().unwrap();
+            vma.pages.insert(vpn, Arc::new(page));
+        }
+
+        let (vma_low, vma_high) = vma.unmap_range(
+            &mut page_table,
+            VirtAddr::new(0x1000),
+            VirtAddr::new(0x4000),
+        );
+
+        assert!(vma_low.is_some());
+        let vma_low = vma_low.unwrap();
+        assert!(vma_low.start_va() == VirtAddr::new(0x5000));
+        assert!(vma_low.end_va() == VirtAddr::new(0x8000));
+        assert!(vma_low.contains(VirtAddr::new(0x5000)));
+        assert!(vma_low.contains(VirtAddr::new(0x7000)));
+        assert!(vma_high.is_none());
     }
 }
