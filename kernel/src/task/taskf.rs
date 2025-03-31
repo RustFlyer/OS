@@ -2,15 +2,16 @@ extern crate alloc;
 use alloc::collections::btree_map::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
-use mm::vm::addr_space::{switch_to, AddrSpace};
+use mm::vm::addr_space::{AddrSpace, switch_to};
 use riscv::asm::sfence_vma_all;
 use time::TaskTimeStat;
 
 use super::future::{self};
 use super::manager::TASK_MANAGER;
 use super::process_manager::{PROCESS_GROUP_MANAGER, ProcessGroupManager};
-use super::task::*;
+use super::threadgroup::ThreadGroup;
 use super::tid::tid_alloc;
+use super::{task::*, threadgroup};
 
 use arch::riscv64::time::get_time_duration;
 use config::process::CloneFlags;
@@ -86,6 +87,8 @@ impl Task {
 
         let process;
         let is_process;
+        let threadgroup;
+
         let parent;
         let children;
 
@@ -94,12 +97,14 @@ impl Task {
         if cloneflags.contains(CloneFlags::THREAD) {
             is_process = false;
             process = Some(Arc::downgrade(self));
+            threadgroup = new_share_mutex(ThreadGroup::new());
             parent = self.parent_mut().clone();
             children = self.children_mut().clone();
             pgid = self.pgid_mut().clone();
         } else {
             is_process = true;
             process = None;
+            threadgroup = new_share_mutex(ThreadGroup::new());
             parent = new_share_mutex(Some(Arc::downgrade(self)));
             children = new_share_mutex(BTreeMap::new());
 
@@ -110,13 +115,11 @@ impl Task {
         if cloneflags.contains(CloneFlags::VM) {
             addr_space = (*self.addr_space_mut()).clone();
         } else {
-            // TODO: Cow Fork
             let cow_address_space = self.addr_space_mut().lock().clone_cow().unwrap();
             addr_space = Arc::new(SpinNoIrqLock::new(cow_address_space));
             unsafe {
                 sfence_vma_all();
             }
-            // addr_space = (*self.addr_space_mut()).clone();
         }
 
         let name = self.get_name() + "(fork)";
@@ -125,6 +128,7 @@ impl Task {
             tid,
             process,
             is_process,
+            threadgroup,
             trap_context,
             SyncUnsafeCell::new(TaskTimeStat::new()),
             SyncUnsafeCell::new(None),

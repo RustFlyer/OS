@@ -3,6 +3,7 @@ pub mod manager;
 pub mod process_manager;
 pub mod task;
 pub mod taskf;
+pub mod threadgroup;
 pub mod tid;
 
 pub use future::yield_now;

@@ -17,7 +17,10 @@ use time::TaskTimeStat;
 
 use crate::trap::trap_context::TrapContext;
 
-use super::tid::{PGid, Pid};
+use super::{
+    threadgroup::ThreadGroup,
+    tid::{PGid, Pid},
+};
 
 /// State of Task
 ///
@@ -48,6 +51,8 @@ pub struct Task {
     process: Option<Weak<Task>>,
     is_process: bool,
 
+    threadgroup: ShareMutex<ThreadGroup>,
+
     trap_context: SyncUnsafeCell<TrapContext>,
     timer: SyncUnsafeCell<TaskTimeStat>,
     waker: SyncUnsafeCell<Option<Waker>>,
@@ -72,6 +77,7 @@ impl Task {
             tid,
             process: None,
             is_process: false,
+            threadgroup: new_share_mutex(ThreadGroup::new()),
             trap_context: SyncUnsafeCell::new(TrapContext::new(entry, sp)),
             timer: SyncUnsafeCell::new(TaskTimeStat::new()),
             waker: SyncUnsafeCell::new(None),
@@ -90,6 +96,8 @@ impl Task {
         process: Option<Weak<Task>>,
         is_process: bool,
 
+        threadgroup: ShareMutex<ThreadGroup>,
+
         trap_context: SyncUnsafeCell<TrapContext>,
         timer: SyncUnsafeCell<TaskTimeStat>,
         waker: SyncUnsafeCell<Option<Waker>>,
@@ -107,6 +115,7 @@ impl Task {
             tid,
             process,
             is_process,
+            threadgroup,
             trap_context,
             timer,
             waker,
