@@ -44,7 +44,7 @@ impl Inode for ExtDirInode {
         Ok(Stat {
             st_dev: 0,
             st_ino: self.meta.ino,
-            st_mode: self.meta.inomode.bits(),
+            st_mode: self.meta.mode.bits(),
             st_nlink: 0, //todo!
             st_uid: 0,
             st_gid: 0,

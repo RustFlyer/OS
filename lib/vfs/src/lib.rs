@@ -13,3 +13,5 @@ pub mod inoid;
 pub mod kstat;
 pub mod path;
 pub mod superblock;
+
+extern crate alloc;
