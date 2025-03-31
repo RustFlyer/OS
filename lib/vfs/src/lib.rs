@@ -10,7 +10,6 @@ pub mod file;
 pub mod fstype;
 pub mod inode;
 pub mod inoid;
-pub mod inopage;
 pub mod kstat;
 pub mod path;
 pub mod superblock;

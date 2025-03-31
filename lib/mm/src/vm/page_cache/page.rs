@@ -1,31 +1,43 @@
 //! Module for managing physical pages.
 //!
 //! This module defines the [`Page`] struct, which represents a physical page in the system.
-//! [`Page`] differs from [`FrameTracker`] in that [`Page`] is a higher-level abstraction
-//! that provides more functionalities and tracks the status of a physical page. For example,
-//! a [`Page`] may be associated with a specific file in the filesystem, and may be associated
-//! with the buffer cache. In contrast, [`FrameTracker`] only tracks a physical page.
-//! If the user wants to manage bare physical pages, such as allocating a page for a page
-//! table, they should use [`FrameTracker`] directly.
+//! [`Page`] differs from [`FrameTracker`] in several ways:
+//! - [`FrameTracker`] represents a bare physical page, while [`Page`] represents a page that is
+//!   associated with a process, a file, and/or a device, and so on.
+//! - [`Page`] provides interior mutability, allowing the user to modify the page contents without
+//!   taking a mutable reference to the [`Page`]. However, it does not provide any synchronization
+//!   mechanism, so the user is responsible for doing so if needed.
 //!
 //! Note that a page is tracked either by a [`FrameTracker`] or a [`Page`] (which wraps a
 //! [`FrameTracker`]). When either of them is dropped, the page is freed. The user has no way
 //! to have a page that is tracked by both a [`FrameTracker`] and a [`Page`] at the same time.
 //!
-//! A [`Page`] does not provide any synchronization mechanism, and multiple mutable references
-//! to a [`Page`] can be created. The user is responsible for ensuring its thread-safety, if
-//! needed.
+//! A [`Page`] is used in the following scenarios:
+//! - Processes: A [`Page`] is tracked by a process when it is created for the process. Because of
+//!   the mechanism of shared memory, a [`Page`] can be tracked by several processes simultaneously.
+//! - Files: A [`Page`] is tracked by a disk file when it is created as a page in the page cache
+//!   of the file. Because `mmap` allows a file to be mapped into processes directly, such a
+//!   [`Page`] can also be tracked by processes.
+//! - Devices: A [`Page`] is tracked by a block device when it is created as a container for blocks
+//!   in the buffer cache of the device. Such a [`Page`] is not tracked by any process or file.
+//!
+//! A [`Page`] also provides a way to find which process, file, or device it is tracked by. This is
+//! necessary, because a [`Page`] may be destroyed when it is swapped out or flushed to disk.
 
 use core::cell::SyncUnsafeCell;
 
+use alloc::sync::Arc;
 use config::mm::PAGE_SIZE;
 use systype::SysResult;
 
 use crate::{address::PhysPageNum, frame::FrameTracker};
 
+use super::PageCache;
+
 /// A physical page in the system.
 ///
-/// See the module-level documentation for more details.
+/// See the module-level documentation for more information.
+#[derive(Debug)]
 pub struct Page {
     /// The underlying physical page.
     ///
@@ -33,22 +45,32 @@ pub struct Page {
     /// This is a `SyncUnsafeCell` because we do not care about synchronization
     /// when accessing the page data simultaneously from multiple threads.
     frame: SyncUnsafeCell<FrameTracker>,
+    /// Which mapping this page comes from.
+    mapping: Mapping,
 }
 
-impl core::fmt::Debug for Page {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("Page").field("frame", &self.ppn()).finish()
-    }
+/// The mapping of a page.
+///
+/// This is used to find out:
+/// - VMAs that is sharing this page, if it is an anonymous page.
+/// - the inode from which this page is read, if it is a file-backed page.
+/// - the buffer heads that is sharing this page, if it is a block device page.
+#[derive(Debug)]
+pub enum Mapping {
+    Anonymous,
+    // File(Arc<PageCache>),
+    // BlockDevice(Vec<BufferHead>),
 }
 
 impl Page {
-    /// Allocates a new page and returns a [`Page`] object.
+    /// Creates an anonymous page.
     ///
     /// # Errors
     /// Returns an [`ENOMEM`] error if the allocation fails.
     pub fn build() -> SysResult<Self> {
         Ok(Self {
             frame: SyncUnsafeCell::new(FrameTracker::build()?),
+            mapping: Mapping::Anonymous,
         })
     }
 
