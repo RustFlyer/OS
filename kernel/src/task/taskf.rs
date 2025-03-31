@@ -2,6 +2,7 @@ extern crate alloc;
 use alloc::collections::btree_map::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
+use mm::vm::addr_space::{switch_to, AddrSpace};
 use riscv::asm::sfence_vma_all;
 use time::TaskTimeStat;
 
@@ -11,8 +12,6 @@ use super::process_manager::{PROCESS_GROUP_MANAGER, ProcessGroupManager};
 use super::task::*;
 use super::tid::tid_alloc;
 
-use crate::vm::addr_space::AddrSpace;
-use crate::vm::addr_space::switch_to;
 use arch::riscv64::time::get_time_duration;
 use config::process::CloneFlags;
 use core::cell::SyncUnsafeCell;

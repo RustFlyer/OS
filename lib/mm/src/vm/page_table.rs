@@ -4,26 +4,27 @@
 //! and tracking allocated pages.
 
 use alloc::vec::Vec;
-use arch::riscv64::mm::{fence, sfence_vma_addr, sfence_vma_all_except_global, tlb_shootdown};
-use riscv::register::satp::{self, Satp};
 
 use lazy_static::lazy_static;
+use riscv::register::satp::{self, Satp};
 
+use arch::riscv64::mm::{fence, sfence_vma_addr, sfence_vma_all_except_global, tlb_shootdown};
 use config::mm::{
     PTE_PER_TABLE, VIRT_END, bss_end, bss_start, data_end, data_start, kernel_end, kernel_start,
     rodata_end, rodata_start, text_end, text_start,
 };
-use mm::address::{PhysPageNum, VirtAddr, VirtPageNum};
 use simdebug::when_debug;
 use systype::SysResult;
-use vfs::page::Page;
 
+use super::{
+    page_cache::page::Page,
+    pte::{PageTableEntry, PteFlags},
+};
 use crate::{
+    address::{PhysPageNum, VirtAddr, VirtPageNum},
     frame::FrameTracker,
     vm::vm_area::{KernelArea, VmArea},
 };
-
-use super::pte::{PageTableEntry, PteFlags};
 
 /// A data structure for manipulating page tables and manage memory mappings.
 ///

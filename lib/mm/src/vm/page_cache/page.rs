@@ -19,8 +19,9 @@
 use core::cell::SyncUnsafeCell;
 
 use config::mm::PAGE_SIZE;
-use mm::{address::PhysPageNum, frame::FrameTracker};
 use systype::SysResult;
+
+use crate::{address::PhysPageNum, frame::FrameTracker};
 
 /// A physical page in the system.
 ///

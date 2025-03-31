@@ -1,13 +1,13 @@
 use spin::Once;
 
-use crate::{inode::Inode, page::Page};
+use crate::inode::Inode;
 extern crate alloc;
 use alloc::{
     collections::BTreeMap,
     sync::{Arc, Weak},
 };
 use config::mm::PAGE_SIZE;
-use mm::frame::FrameTracker;
+use mm::vm::page_cache::page::Page;
 use mutex::SpinNoIrqLock;
 
 pub struct Inopages {

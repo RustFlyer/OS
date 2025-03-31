@@ -5,7 +5,7 @@ use core::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use crate::{dentry::Dentry, direntry::DirEntry, inode::Inode, page::Page, superblock::SuperBlock};
+use crate::{dentry::Dentry, direntry::DirEntry, inode::Inode, superblock::SuperBlock};
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -15,6 +15,7 @@ use config::{
     mm::PAGE_SIZE,
     vfs::{OpenFlags, PollEvents, SeekFrom},
 };
+use mm::vm::page_cache::page::Page;
 use mutex::SpinNoIrqLock;
 use systype::{SysError, SysResult, SyscallResult};
 

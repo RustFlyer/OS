@@ -24,18 +24,19 @@
 //! maintaining modularization and extensibility.
 
 use alloc::{collections::btree_map::BTreeMap, sync::Arc, vec::Vec};
-use arch::riscv64::mm::sfence_vma_addr;
 use core::{fmt::Debug, mem};
-use vfs::page::Page;
 
-use mm::address::{PhysPageNum, VirtAddr, VirtPageNum};
+use arch::riscv64::mm::sfence_vma_addr;
+
 use systype::{SysError, SysResult};
 
 use super::{
     mem_perm::MemPerm,
+    page_cache::page::Page,
     page_table::PageTable,
     pte::{PageTableEntry, PteFlags},
 };
+use crate::address::{PhysPageNum, VirtAddr, VirtPageNum};
 
 /// A virtual memory area (VMA).
 ///

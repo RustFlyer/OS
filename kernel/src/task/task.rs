@@ -7,6 +7,7 @@ use alloc::{
     sync::{Arc, Weak},
 };
 use driver::println;
+use mm::vm::addr_space::AddrSpace;
 use mutex::{ShareMutex, SpinNoIrqLock, new_share_mutex};
 
 use core::cell::SyncUnsafeCell;
@@ -15,7 +16,6 @@ use core::task::Waker;
 use time::TaskTimeStat;
 
 use crate::trap::trap_context::TrapContext;
-use crate::vm::addr_space::AddrSpace;
 
 use super::tid::{PGid, Pid};
 

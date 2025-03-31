@@ -23,10 +23,9 @@ use alloc::{collections::btree_map::BTreeMap, vec::Vec};
 
 use arch::riscv64::mm::{fence, tlb_shootdown_all};
 use config::mm::{USER_END, USER_START};
-use mm::address::VirtAddr;
 use systype::{SysError, SysResult};
 
-use crate::vm::pte::PteFlags;
+use crate::{address::VirtAddr, vm::pte::PteFlags};
 
 use super::{
     mem_perm::MemPerm,
