@@ -19,7 +19,7 @@
 
 use core::ops::Bound;
 
-use alloc::collections::btree_map::BTreeMap;
+use alloc::{collections::btree_map::BTreeMap, vec::Vec};
 
 use arch::riscv64::mm::{fence, tlb_shootdown_all};
 use config::mm::{USER_END, USER_START};
@@ -160,32 +160,47 @@ impl AddrSpace {
 
     /// Removes mappings for the specified address range.
     ///
-    /// This function removes mappings for the specified address range, and causes
-    /// further references to addresses within the range to generate invalid memory
-    /// references. If the range is not mapped, this function does nothing. If the
+    /// This function removes mappings for the specified address range.
+    /// If the range is not mapped, this function does nothing. If the
     /// range covers only part of any VMA, the VMA may shrink or split.
+    /// Page table entries in the range are also invalidated.
     ///
-    /// `addr` must be a multiple of the page size. `length` need not to be. However,
-    /// the range to be removed is rounded up to the page size.
+    /// `addr` must be a multiple of the page size. `length` need not to be.
+    /// However, the range to be removed is rounded up to page size, which
+    /// means more than `length` bytes will be removed if `length` is not
+    /// page-aligned. `addr + length` should be a valid address.
     pub fn remove_mapping(&mut self, addr: VirtAddr, length: usize) {
-        // Align `length` to the page size.
         let length = VirtAddr::new(length).round_up().to_usize();
-        // Find all VMAs that overlap with the range.
-        while let Some(_vma) = {
-            let gap = self
-                .vm_areas
-                .upper_bound(Bound::Excluded(&VirtAddr::new(addr.to_usize() + length)));
-            if let Some((&va, vma)) = gap.peek_prev() {
-                if vma.end_va() > addr {
-                    Some(self.vm_areas.remove(&va).unwrap())
-                } else {
-                    None
-                }
-            } else {
-                None
+        let end_addr = VirtAddr::new(addr.to_usize() + length);
+
+        // Find VMAs that overlap with the specified range.
+        let mut keys = self
+            .vm_areas
+            .range(addr..end_addr)
+            .map(|(&va, _)| va)
+            .collect::<Vec<_>>();
+        match self
+            .vm_areas
+            .upper_bound(Bound::Excluded(&addr))
+            .peek_prev()
+        {
+            Some((&va, vma)) if vma.end_va() > addr => {
+                keys.push(va);
             }
-        } {}
-        unimplemented!();
+            _ => {}
+        }
+
+        // Remove mappings for these VMAs.
+        for key in keys {
+            let vma = self.vm_areas.remove(&key).unwrap();
+            let (vma1, vma2) = vma.unmap_range(&mut self.page_table, addr, end_addr);
+            if let Some(vma_low) = vma1 {
+                self.vm_areas.insert(vma_low.start_va(), vma_low);
+            }
+            if let Some(vma_high) = vma2 {
+                self.vm_areas.insert(vma_high.start_va(), vma_high);
+            }
+        }
     }
 
     /// Clones the address space.
@@ -203,7 +218,7 @@ impl AddrSpace {
 
         new_space.vm_areas = self.vm_areas.clone();
 
-        for &vpn in self.vm_areas.iter().flat_map(|(_, vma)| vma.pages().keys()) {
+        for &vpn in self.vm_areas.values().flat_map(|vma| vma.pages().keys()) {
             let old_pte = self.page_table.find_entry(vpn).unwrap();
             let new_pte = new_space
                 .page_table
@@ -221,6 +236,52 @@ impl AddrSpace {
         tlb_shootdown_all();
 
         Ok(new_space)
+    }
+
+    /// Changes the size of the heap.
+    ///
+    /// This function changes the size of the heap by changing the end of the heap area.
+    ///
+    /// In order to implement `brk` and `sbrk` at the same time, this function takes an address
+    /// and an increment value, and only one of them is used. Unused value should be set to 0.
+    /// If both of them are set to 0, this function do as if `sbrk(0)` is called.
+    ///
+    /// # Errors
+    /// Returns [`SysError::ENOMEM`] if it is impossible to change the heap size as specified.
+    pub fn change_heap_size(&mut self, mut addr: usize, incr: isize) -> SysResult<usize> {
+        if addr != 0 && (!VirtAddr::check_validity(addr) || !VirtAddr::new(addr).in_user_space()) {
+            return Err(SysError::ENOMEM);
+        }
+
+        // Find the heap area
+        // let heap_area = self
+        let mut vma_iter = self.vm_areas.iter_mut();
+        let heap_area = vma_iter.find(|(_, vma)| vma.is_heap()).unwrap().1;
+        let heap_start = heap_area.start_va().to_usize();
+        let heap_end = heap_area.end_va().to_usize();
+
+        // Calculate the new heap end
+        if addr == 0 {
+            addr = heap_end.checked_add_signed(incr).ok_or(SysError::ENOMEM)?;
+        }
+
+        // Check if the new heap end is valid
+        if addr < heap_start
+            || !VirtAddr::check_validity(addr)
+            || !VirtAddr::new(addr).in_user_space()
+        {
+            return Err(SysError::ENOMEM);
+        }
+        let next_vma_start = vma_iter.next().map(|(va, _)| va.to_usize());
+        match next_vma_start {
+            Some(next_start) if addr > next_start => Err(SysError::ENOMEM),
+            _ => {
+                unsafe {
+                    heap_area.set_end_va(VirtAddr::new(addr));
+                }
+                Ok(addr)
+            }
+        }
     }
 
     /// Handles a page fault happened in the address space.

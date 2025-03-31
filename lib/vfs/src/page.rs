@@ -51,13 +51,6 @@ impl Page {
         })
     }
 
-    /// Creates a new [`Page`] from an existing [`FrameTracker`].
-    pub fn from_frame(frame: FrameTracker) -> Self {
-        Self {
-            frame: SyncUnsafeCell::new(frame),
-        }
-    }
-
     /// Copies the contents of another [`Page`] into this [`Page`].
     pub fn copy_from_page(&self, another: &Page) {
         let dst = self.as_mut_slice();

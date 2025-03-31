@@ -52,6 +52,7 @@ impl Task {
         let mut addrspace = AddrSpace::build_user().unwrap();
         let entry_point = addrspace.load_elf(elf_data).unwrap();
         let stack = addrspace.map_stack().unwrap();
+        addrspace.map_heap().unwrap();
         let task = Arc::new(Task::new(
             entry_point.to_usize(),
             stack.to_usize(),
