@@ -30,7 +30,7 @@ impl Inode for ExtLinkInode {
         Ok(Stat {
             st_dev: 0,
             st_ino: self.meta.ino,
-            st_mode: self.meta.inomode,
+            st_mode: self.meta.mode,
             st_nlink: 0,
             st_uid: 0,
             st_gid: 0,

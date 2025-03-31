@@ -1,42 +1,79 @@
-use core::sync::{self, atomic::AtomicUsize};
+use alloc::sync::Weak;
 
-use crate::{inoid::alloc_ino, superblock::SuperBlock};
+use downcast_rs::{DowncastSync, impl_downcast};
+
 use config::{
     inode::{InodeMode, InodeState, InodeType},
     vfs::{Stat, TimeSpec},
 };
-use downcast_rs::{Downcast, DowncastSync, impl_downcast};
 use mm::vm::page_cache::PageCache;
 use mutex::SpinNoIrqLock;
-
-extern crate alloc;
-use alloc::sync::{Arc, Weak};
-
 use systype::SysResult;
 
-use core::sync::atomic::Ordering;
+use crate::superblock::SuperBlock;
 
+/// Data that is common to all inodes.
 pub struct InodeMeta {
+    /// Inode number of the inode in its filesystem.
     pub ino: usize,
-    pub inomode: InodeMode,
-    pub page_cache: Option<PageCache>,
+    /// Reference to the superblock of the filesystem this inode belongs to.
     pub superblock: Weak<dyn SuperBlock>,
+    /// Page cache for the inode. If the inode is not a regular file or a block
+    /// device, this field is not used.
+    pub page_cache: PageCache,
+    /// Interior mutable data of the inode.
+    pub inner: SpinNoIrqLock<InodeMetaInner>,
+}
 
-    pub size: AtomicUsize,
-    pub time: [TimeSpec; 3],
-    pub inostate: SpinNoIrqLock<InodeState>,
+pub struct InodeMetaInner {
+    /// Mode of the inode.
+    ///
+    /// This includes the type of the inode (regular file, directory, etc.),
+    /// and group/user permissions.
+    pub mode: InodeMode,
+    /// Size of a file in bytes.
+    pub size: usize,
+    /// Link count.
+    pub nlink: usize,
+    /// Last access time.
+    pub atime: TimeSpec,
+    /// Last modification time.
+    pub mtime: TimeSpec,
+    /// Last status change time.
+    pub ctime: TimeSpec,
+    /// State of the inode, i.e., dirty or clean.
+    pub state: InodeState,
 }
 
 impl InodeMeta {
-    pub fn new(inomode: InodeMode, superblock: Arc<dyn SuperBlock>, size: usize) -> Self {
+    /// Creates a default inode metadata. The caller should fill each field after this call.
+    pub fn new(ino: usize, superblock: Weak<dyn SuperBlock>) -> Self {
         Self {
-            ino: alloc_ino(),
-            inomode,
-            page_cache: None,
-            superblock: Arc::downgrade(&superblock),
-            size: AtomicUsize::new(size),
-            time: [TimeSpec::default(); 3],
-            inostate: SpinNoIrqLock::new(InodeState::Init),
+            ino,
+            superblock,
+            page_cache: PageCache::default(),
+            inner: SpinNoIrqLock::new(InodeMetaInner {
+                mode: InodeMode::empty(),
+                size: 0,
+                nlink: 0,
+                atime: TimeSpec::default(),
+                mtime: TimeSpec::default(),
+                ctime: TimeSpec::default(),
+                state: InodeState::Uninit,
+            }),
+        }
+    }
+}
+
+impl Drop for InodeMeta {
+    fn drop(&mut self) {
+        match self.inner.lock().state {
+            InodeState::Uninit => {}
+            InodeState::DirtyInode | InodeState::DirtyData | InodeState::DirtyAll => {
+                log::trace!("Drop inode {} with dirty state", self.ino);
+                // TODO: flush dirty data
+            }
+            InodeState::Synced => {}
         }
     }
 }
@@ -45,35 +82,33 @@ pub trait Inode: Send + Sync + DowncastSync {
     fn get_meta(&self) -> &InodeMeta;
 
     fn get_attr(&self) -> SysResult<Stat>;
-}
 
-impl dyn Inode {
-    pub fn ino(&self) -> usize {
+    fn ino(&self) -> usize {
         self.get_meta().ino
     }
 
-    pub fn inotype(&self) -> InodeType {
-        self.get_meta().inomode.to_type()
+    fn inotype(&self) -> InodeType {
+        self.get_meta().inner.lock().mode.to_type()
     }
 
-    pub fn pages<'a>(self: &'a Arc<dyn Inode>) -> Option<&'a PageCache> {
-        self.get_meta().page_cache.as_ref()
+    fn size(&self) -> usize {
+        self.get_meta().inner.lock().size
     }
 
-    pub fn size(&self) -> usize {
-        self.get_meta().size.load(Ordering::Relaxed)
+    fn set_size(&self, size: usize) {
+        self.get_meta().inner.lock().size = size;
     }
 
-    pub fn set_size(&self, size: usize) {
-        self.get_meta().size.store(size, Ordering::Relaxed);
+    fn state(&self) -> InodeState {
+        self.get_meta().inner.lock().state
     }
 
-    pub fn state(&self) -> InodeState {
-        *self.get_meta().inostate.lock()
+    fn set_state(&self, state: InodeState) {
+        self.get_meta().inner.lock().state = state;
     }
 
-    pub fn set_state(&self, state: InodeState) {
-        *self.get_meta().inostate.lock() = state;
+    fn page_cache(&self) -> &PageCache {
+        &self.get_meta().page_cache
     }
 }
 

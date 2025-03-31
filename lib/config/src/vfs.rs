@@ -162,12 +162,6 @@ bitflags! {
    }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum Time {
-    AccessTime(TimeSpec),
-    ModifiedTime(TimeSpec),
-}
-
 bitflags! {
     #[derive(Debug)]
     pub struct MountFlags:u32 {

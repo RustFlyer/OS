@@ -167,11 +167,12 @@ impl dyn File {
         let mut count = 0;
         let mut offset = offset;
         let inode = self.inode();
-        let Some(pages) = inode.pages() else {
+        if !(inode.inotype().is_file() || inode.inotype().is_block_device()) {
             log::debug!("[File::read] read without pages");
             let count = self.base_read_at(offset, buf).await?;
             return Ok(count);
         };
+        let pages = inode.page_cache();
         log::debug!("[File::read] read with address_space");
         while !buf.is_empty() && offset < self.size() {
             let offset_aligned = offset & !(PAGE_SIZE - 1);
@@ -233,7 +234,7 @@ impl dyn File {
 
     pub fn load_dir(&self) -> SysResult<()> {
         let inode = self.inode();
-        if inode.state() == InodeState::Init {
+        if inode.state() == InodeState::Uninit {
             self.base_load_dir()?;
             inode.set_state(InodeState::Synced)
         }
