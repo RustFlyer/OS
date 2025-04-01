@@ -1,0 +1,81 @@
+use alloc::{sync::Arc, vec::Vec};
+use config::{fs::MAX_FDS, vfs::OpenFlags};
+use systype::{SysError, SysResult};
+use vfs::file::File;
+
+pub type Fd = usize;
+
+#[derive(Clone)]
+pub struct FdInfo {
+    file: Arc<dyn File>,
+    flags: OpenFlags,
+}
+
+#[derive(Clone)]
+pub struct FdTable {
+    table: Vec<Option<FdInfo>>,
+}
+
+impl FdInfo {
+    pub fn new(file: Arc<dyn File>, flags: OpenFlags) -> Self {
+        Self { file, flags }
+    }
+
+    pub fn file(&self) -> Arc<dyn File> {
+        self.file
+    }
+
+    pub fn flags(&self) -> OpenFlags {
+        self.flags
+    }
+
+    pub fn set_flags(&mut self, flags: OpenFlags) {
+        self.flags = flags;
+    }
+
+    pub fn close(&mut self) {
+        self.flags = OpenFlags::O_CLOEXEC;
+    }
+}
+
+impl FdTable {
+    pub fn new() -> Self {
+        let mut table: Vec<Option<FdInfo>> = Vec::with_capacity(MAX_FDS);
+
+        Self { table }
+    }
+
+    fn get_available_slot(&mut self) -> Option<usize> {
+        let inner_slot = self
+            .table
+            .iter()
+            .enumerate()
+            .find(|(_, e)| e.is_none())
+            .map(|(i, _)| i);
+
+        inner_slot
+    }
+
+    pub fn alloc(&mut self, file: Arc<dyn File>, flags: OpenFlags) -> SysResult<Fd> {
+        let fdinfo = FdInfo::new(file, flags);
+
+        if let Some(fd) = self.get_available_slot() {
+            self.table[fd] = Some(fdinfo);
+            Ok(fd)
+        } else {
+            Err(SysError::EMFILE)
+        }
+    }
+
+    pub fn get(&self, fd: Fd) -> SysResult<&FdInfo> {
+        self.table.get(fd)?.as_ref().ok_or(SysError::EBADF)
+    }
+
+    pub fn get_mut(&mut self, fd: Fd) -> SysResult<&mut FdInfo> {
+        self.table.get_mut(fd)?.as_mut().ok_or(SysError::EBADF)
+    }
+
+    pub fn get_file(&self, fd: Fd) -> SysResult<Arc<dyn File>> {
+        Ok(self.get(fd)?.file())
+    }
+}

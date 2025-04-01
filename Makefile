@@ -24,31 +24,13 @@ export MODE = debug
 export LOG = trace
 export DEBUG = off
 
-# ======================
-# Toolchain Configuration
-# ======================
-
 QEMU = qemu-system-riscv64
 GDB = riscv64-unknown-elf-gdb
 OBJDUMP = rust-objdump --arch-name=riscv64
 OBJCOPY = rust-objcopy --binary-architecture=riscv64
 PAGER = less
 
-# ======================
-# QEMU Emulator Arguments
-# ======================
-
 DISASM_ARGS = -d
-QEMU_ARGS = -machine virt \
-			-nographic \
-			-bios $(BOOTLOADER) \
-			-kernel $(KERNEL_ELF) \
-			-smp $(SMP)
-
-
-# ======================
-# File Path Configuration
-# ======================
 
 TARGET_DIR := target/$(TARGET)/$(MODE)
 KERNEL_ELF := $(TARGET_DIR)/$(PACKAGE_NAME)
@@ -59,107 +41,91 @@ USER_APPS := $(wildcard $(USER_APPS_DIR)/*.rs)
 USER_ELFS := $(patsubst $(USER_APPS_DIR)/%.rs, $(TARGET_DIR)/%, $(USER_APPS))
 USER_BINS := $(patsubst $(USER_APPS_DIR)/%.rs, $(TARGET_DIR)/%.bin, $(USER_APPS))
 
-# ======================
-# Phony Target Declaration
-# ======================
+
+FS_IMG_DIR := ./fsimg
+FS_IMG := $(FS_IMG_DIR)/sdcard.img
+
+
+QEMU_ARGS :=
+QEMU_ARGS += -machine virt 
+QEMU_ARGS += -nographic 
+QEMU_ARGS += -bios $(BOOTLOADER) 
+QEMU_ARGS += -kernel $(KERNEL_ELF) 
+QEMU_ARGS += -smp $(SMP)
+QEMU_ARGS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
+QEMU_ARGS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+
+
 PHONY := all
-
-# ======================
-# Default Build Target
-# ======================
-
-# Build both kernel ELF and disassembly file
 all: $(KERNEL_ELF) $(KERNEL_ASM) $(USER_APPS)
 
-# ======================
-# File Dependency Rules
-# ======================
 
-# Kernel ELF depends on build target
 $(KERNEL_ELF): build
-
-# Generate disassembly from ELF
 $(KERNEL_ASM): $(KERNEL_ELF)
 	@$(OBJDUMP) $(DISASM_ARGS) $(KERNEL_ELF) > $(KERNEL_ASM)
 	@echo "Updated: $(KERNEL_ASM)"
 
-# ======================
-# Development Environment Targets
-# ======================
-
-# Build Docker development image
+ 
 PHONY += build2docker
 build2docker:
 	@docker build -t ${DOCKER_NAME} .
 
-# Start interactive Docker container with current directory mounted
+
 PHONY += docker
 docker:
 	@docker run --rm -it --network="host" -v ${PWD}:/mnt -w /mnt ${DOCKER_NAME} bash
 
-# ======================
-# Build System Targets
-# ======================
-
-# Install required Rust toolchain components
+ 
 PHONY += env
 env:
 	@(cargo install --list | grep "cargo-binutils" > /dev/null 2>&1) || cargo install cargo-binutils
 
-# Main build target: compiles the kernel
+
 PHONY += build
 build: env user
 	@echo Platform: $(BOARD)
 	@cd kernel && make build
 	@echo "Updated: $(KERNEL_ELF)"
 
-# ======================
-# Execution & Debugging Targets
-# ======================
-
-# Run kernel in QEMU emulator
+ 
 PHONY += run
 run: build
+	@echo $(QEMU_ARGS)
 	@$(QEMU) $(QEMU_ARGS)
 
-# Clean build artifacts
+
 PHONY += clean
 clean:
 	@cargo clean
 	@rm -rf $(TARGET_DIR)/*
 
-# ======================
-# Diagnostic Targets
-# ======================
-
-# View kernel disassembly (supports pager navigation)
+ 
 PHONY += disasm
 disasm: $(KERNEL_ASM)
 	@cat $(KERNEL_ASM) | $(PAGER)
 
-# ======================
-# Debugging Targets
-# ======================
-
-# Start QEMU in debug server mode (port 1234)
+ 
 PHONY += gdbserver
 gdbserver: all
 	@$(QEMU) $(QEMU_ARGS) -s -S
 
-# Connect GDB to running QEMU instance
+
 PHONY += gdbclient
 gdbclient: all
 	@$(GDB) -ex 'file $(KERNEL_ELF)' \
 			-ex 'set arch riscv:rv64' \
 			-ex 'target remote localhost:1234'
 
+
 PHONY += run-debug
 run-debug:
 	@make run DEBUG=on
 
+
 PHONY += run-docker
 run-docker:
 	@docker run --rm -it --network="host" -v ${PWD}:/mnt -w /mnt ${DOCKER_NAME} make run
+
 
 PHONY += run-docker-debug
 run-docker-debug:
@@ -172,9 +138,23 @@ user:
 	@cd user && make build
 	@echo "building user finished"
 
-# ======================
-# Final PHONY Declaration
-# ======================
+
+PHONY += fs-img
+fs-img:
+	@echo "building fs-img ext4..."
+	@echo $(FS_IMG)
+	@rm -rf $(FS_IMG)
+	@mkdir -p $(FS_IMG_DIR)
+	@dd if=/dev/zero of=$(FS_IMG) bs=1M count=1400 status=progress
+	@mkfs.ext4 -F $(FS_IMG)
+	@mkdir -p mnt
+	@sudo mount -t ext4 -o loop,rw,user,exec,noatime $(FS_IMG) mnt
+	@sudo cp -r $(USER_ELFS) mnt/
+	@sudo chmod -R 755 mnt/
+	@sudo umount mnt
+	@rm -rf mnt
+	@echo "building fs-img finished"
+
 
 .PHONY: $(PHONY)
 

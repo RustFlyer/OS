@@ -12,11 +12,7 @@ pub struct ExtLinkInode {
 impl ExtLinkInode {
     pub fn new(target: &str, superblock: Arc<dyn SuperBlock>) -> Self {
         Self {
-            meta: InodeMeta::new(
-                InodeMode::from_type(InodeType::SymLink),
-                superblock.clone(),
-                tasget.len,
-            ),
+            meta: InodeMeta::new(InodeMode::from_type(InodeType::SymLink), superblock.clone()),
         }
     }
 }

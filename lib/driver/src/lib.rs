@@ -13,8 +13,8 @@ pub mod sbi;
 
 pub use sbi::sbi_print;
 
-static BLOCK_DEVICE: Once<Arc<dyn BlockDevice>> = Once::new();
-static CHAR_DEVICE: Once<Arc<dyn CharDevice>> = Once::new();
+pub static BLOCK_DEVICE: Once<Arc<dyn BlockDevice>> = Once::new();
+pub static CHAR_DEVICE: Once<Arc<dyn CharDevice>> = Once::new();
 
 pub trait BlockDevice: Send + Sync {
     fn read(&self, block_id: usize, buf: &mut [u8]);
@@ -30,6 +30,11 @@ pub trait CharDevice: Send + Sync {
     fn waker(&self, _waker: Waker) {
         todo!()
     }
+}
+
+pub fn init() {
+    init_block_device();
+    init_char_device();
 }
 
 pub fn init_block_device() {

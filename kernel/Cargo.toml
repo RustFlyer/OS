@@ -18,6 +18,7 @@ timer = { path = "../lib/timer/" }
 driver = { path = "../lib/driver/" }
 systype = { path = "../lib/systype/" }
 vfs = { path = "../lib/vfs/" }
+osfs = { path = "../lib/osfs" }
 
 bitflags = { workspace = true }
 elf = { workspace = true }

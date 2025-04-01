@@ -44,6 +44,11 @@ impl Dentry for ExtDentry {
         &self.meta
     }
 
+    /// When Dentry acts as a Dir, it can create a sub-dentry with a specific mode
+    /// - InodeType::File -> ExtFileInode
+    /// - InodeType::Dir  -> ExtDirInode
+    ///
+    /// Returns a result of sub dentry
     fn base_create(
         self: Arc<Self>,
         name: &str,

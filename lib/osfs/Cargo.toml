@@ -1,0 +1,16 @@
+[package]
+name = "osfs"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+config = { path = "../config" }
+ext4   = { path = "../ext4" }
+vfs    = { path = "../vfs" }
+systype =  { path = "../systype" }
+mutex  = { path = "../mutex" }
+driver = { path = "../driver" }
+
+
+bitflags = { workspace = true }
+spin = { workspace = true }
