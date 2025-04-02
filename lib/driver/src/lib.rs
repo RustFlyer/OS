@@ -38,10 +38,12 @@ pub fn init() {
 }
 
 pub fn init_block_device() {
+    log::info!("BLOCK_DEVICE init");
     BLOCK_DEVICE.call_once(|| Arc::new(VirtBlkDevice::new()));
 }
 
 pub fn init_char_device() {
+    log::info!("CHAR_DEVICE init");
     CHAR_DEVICE.call_once(|| Arc::new(UartDevice::new()));
 }
 

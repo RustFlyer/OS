@@ -22,7 +22,7 @@ impl FdInfo {
     }
 
     pub fn file(&self) -> Arc<dyn File> {
-        self.file
+        self.file.clone()
     }
 
     pub fn flags(&self) -> OpenFlags {
@@ -40,7 +40,7 @@ impl FdInfo {
 
 impl FdTable {
     pub fn new() -> Self {
-        let mut table: Vec<Option<FdInfo>> = Vec::with_capacity(MAX_FDS);
+        let table: Vec<Option<FdInfo>> = Vec::with_capacity(MAX_FDS);
 
         Self { table }
     }
@@ -68,11 +68,15 @@ impl FdTable {
     }
 
     pub fn get(&self, fd: Fd) -> SysResult<&FdInfo> {
-        self.table.get(fd)?.as_ref().ok_or(SysError::EBADF)
+        self.table.get(fd).unwrap().as_ref().ok_or(SysError::EBADF)
     }
 
     pub fn get_mut(&mut self, fd: Fd) -> SysResult<&mut FdInfo> {
-        self.table.get_mut(fd)?.as_mut().ok_or(SysError::EBADF)
+        self.table
+            .get_mut(fd)
+            .unwrap()
+            .as_mut()
+            .ok_or(SysError::EBADF)
     }
 
     pub fn get_file(&self, fd: Fd) -> SysResult<Arc<dyn File>> {

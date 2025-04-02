@@ -54,10 +54,13 @@ impl BlockDevice for VirtBlkDevice {
 impl VirtBlkDevice {
     pub fn new() -> Self {
         unsafe {
+            log::info!("rrr1");
             let header = &mut *(VIRTIO0 as *mut VirtIOHeader);
+            log::info!("rrr2");
             let blk = VirtIOBlk::<VirtHalImpl, MmioTransport>::new(
                 MmioTransport::new(header.into()).unwrap(),
             );
+            log::info!("rrr3");
             Self(SpinNoIrqLock::new(blk.unwrap()))
         }
     }

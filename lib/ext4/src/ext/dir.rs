@@ -2,6 +2,7 @@ extern crate alloc;
 use alloc::ffi::CString;
 use alloc::vec::Vec;
 use core::mem::MaybeUninit;
+use log::error;
 use lwext4_rust::{
     InodeTypes,
     bindings::{ext4_dir, ext4_dir_close, ext4_dir_entry_next, ext4_dir_mk, ext4_dir_open},

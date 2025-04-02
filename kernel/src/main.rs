@@ -42,9 +42,6 @@ pub fn rust_main(hart_id: usize) -> ! {
         logger::init();
         log::info!("hart {}: initializing kernel", hart_id);
 
-        driver::init();
-        osfs::init();
-
         /* Initialize heap allocator and page table */
         unsafe {
             heap::init_heap_allocator();
@@ -92,6 +89,12 @@ pub fn rust_main(hart_id: usize) -> ! {
             config::mm::bss_end()
         );
         log::info!("====== kernel memory layout end ======");
+
+        driver::init();
+        log::info!("hart {}: initializing driver", hart_id);
+
+        osfs::init();
+        log::info!("hart {}: initializing FS", hart_id);
 
         boot::start_harts(hart_id);
 

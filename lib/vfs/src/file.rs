@@ -6,15 +6,16 @@ use core::{
 };
 
 use crate::{dentry::Dentry, direntry::DirEntry, inode::Inode, superblock::SuperBlock};
-use alloc::boxed::Box;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use alloc::{boxed::Box, sync};
 use async_trait::async_trait;
 use config::{
     inode::{InodeState, InodeType},
     mm::PAGE_SIZE,
     vfs::{OpenFlags, PollEvents, SeekFrom},
 };
+use downcast_rs::{Downcast, DowncastSync, impl_downcast};
 use mm::vm::page_cache::page::Page;
 use mutex::SpinNoIrqLock;
 use systype::{SysError, SysResult, SyscallResult};
@@ -39,14 +40,14 @@ impl FileMeta {
 }
 
 #[async_trait]
-pub trait File: Send + Sync {
+pub trait File: Send + Sync + DowncastSync {
     fn get_meta(&self) -> &FileMeta;
 
-    async fn base_read_at(&self, offset: usize, buf: &mut [u8]) -> SyscallResult {
+    fn base_read_at(&self, offset: usize, buf: &mut [u8]) -> SyscallResult {
         todo!()
     }
 
-    async fn base_write_at(&self, offset: usize, buf: &[u8]) -> SyscallResult {
+    fn base_write_at(&self, offset: usize, buf: &[u8]) -> SyscallResult {
         todo!()
     }
 
@@ -60,6 +61,10 @@ pub trait File: Send + Sync {
 
     /// Load all dentry and inodes in a directory. Will not advance dir offset.
     fn base_load_dir(&self) -> SysResult<()> {
+        todo!()
+    }
+
+    fn base_read_link(&self, buf: &mut [u8]) -> SyscallResult {
         todo!()
     }
 
@@ -140,7 +145,7 @@ pub trait File: Send + Sync {
     }
 
     async fn readlink(&self, buf: &mut [u8]) -> SyscallResult {
-        todo!()
+        self.base_read_link(buf)
     }
 }
 
@@ -157,7 +162,7 @@ impl dyn File {
     /// reached. Will not advance offset.
     ///
     /// Returns count of bytes actually read or an error.
-    pub async fn read_at(&self, offset: usize, buf: &mut [u8]) -> SyscallResult {
+    pub fn read_at(&self, offset: usize, buf: &mut [u8]) -> SyscallResult {
         log::info!(
             "[File::read] file {}, offset {offset}, buf len {}",
             self.dentry().path(),
@@ -169,7 +174,7 @@ impl dyn File {
         let inode = self.inode();
         if !(inode.inotype().is_file() || inode.inotype().is_block_device()) {
             log::debug!("[File::read] read without pages");
-            let count = self.base_read_at(offset, buf).await?;
+            let count = self.base_read_at(offset, buf)?;
             return Ok(count);
         };
         let pages = inode.page_cache();
@@ -186,9 +191,7 @@ impl dyn File {
             } else {
                 log::trace!("[File::read] offset {offset_aligned} not cached in address space");
                 let page = Page::build()?;
-                let len = self
-                    .base_read_at(offset_aligned, page.as_mut_slice())
-                    .await?;
+                let len = self.base_read_at(offset_aligned, page.as_mut_slice())?;
                 if len == 0 {
                     log::warn!("[File::read] reach file end");
                     break;
@@ -212,22 +215,22 @@ impl dyn File {
     ///
     /// On success, the number of bytes written is returned, and the file offset
     /// is incremented by the number of bytes actually written.
-    pub async fn write_at(&self, offset: usize, buf: &[u8]) -> SyscallResult {
-        self.base_write_at(offset, buf).await
+    pub fn write_at(&self, offset: usize, buf: &[u8]) -> SyscallResult {
+        self.base_write_at(offset, buf)
     }
 
     /// Read from offset in self, and will fill `buf` until `buf` is full or eof
     /// is reached. Will advance offset.
-    pub async fn read(&self, buf: &mut [u8]) -> SyscallResult {
+    pub fn read(&self, buf: &mut [u8]) -> SyscallResult {
         let pos = self.pos();
-        let ret = self.read_at(pos, buf).await?;
+        let ret = self.read_at(pos, buf)?;
         self.set_pos(pos + ret);
         Ok(ret)
     }
 
-    pub async fn write(&self, buf: &[u8]) -> SyscallResult {
+    pub fn write(&self, buf: &[u8]) -> SyscallResult {
         let pos = self.pos();
-        let ret = self.write_at(pos, buf).await?;
+        let ret = self.write_at(pos, buf)?;
         self.set_pos(pos + ret);
         Ok(ret)
     }
@@ -265,10 +268,12 @@ impl dyn File {
     }
 
     /// Read all data from this file synchronously.
-    pub async fn read_all(&self) -> SysResult<Vec<u8>> {
+    pub fn read_all(&self) -> SysResult<Vec<u8>> {
         log::info!("[File::read_all] file size {}", self.size());
         let mut buf = Vec::with_capacity(self.size());
-        self.read_at(0, &mut buf).await?;
+        self.read_at(0, &mut buf)?;
         Ok(buf)
     }
 }
+
+impl_downcast!(sync File);
