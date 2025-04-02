@@ -83,6 +83,33 @@ RUN rustup target add riscv64gc-unknown-none-elf && \
 
 RUN apt-get update && apt-get upgrade -y
 RUN apt-get install -y libc6
+RUN apt-get install -y cmake
+
+
+RUN mkdir -p /tmp/toolchain && \
+    cd /tmp/toolchain && \
+    wget https://gitlab.educg.net/wangmingjian/os-contest-2024-image/-/raw/master/riscv64-linux-musl-cross.tgz?inline=false -O riscv-toolchain.tgz && \
+    tar -zxvf riscv-toolchain.tgz -C /opt && \
+    rm -rf /tmp/toolchain
+
+ENV PATH="/opt/riscv64-linux-musl-cross/bin:${PATH}" \
+    CC=riscv64-linux-musl-gcc \
+    CXX=riscv64-linux-musl-g++ \
+    LD=riscv64-linux-musl-ld
+
+RUN riscv64-linux-musl-gcc --version && \
+    riscv64-linux-musl-objdump --version
+
+RUN git config --global --add safe.directory /mnt
+
+RUN apt-get install -y \
+    libssl-dev \
+    pkg-config
+
+# Final cleanup
+RUN apt-get autoremove -y && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Ready to go
 WORKDIR ${HOME}

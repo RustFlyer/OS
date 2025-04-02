@@ -1,9 +1,9 @@
 extern crate alloc;
 use alloc::ffi::CString;
 use core::mem::MaybeUninit;
-use log::error;
+use log::{error, warn};
 use lwext4_rust::bindings::{
-    ext4_fclose, ext4_file, ext4_fopen2, ext4_fread, ext4_fseek, ext4_fwrite,
+    ext4_fclose, ext4_file, ext4_fopen2, ext4_fread, ext4_fseek, ext4_fsize, ext4_fwrite,
 };
 
 pub struct ExtFile(ext4_file);
@@ -11,12 +11,16 @@ pub struct ExtFile(ext4_file);
 impl Drop for ExtFile {
     fn drop(&mut self) {
         unsafe {
-            ext4_fclose(&self.0);
+            ext4_fclose(&mut self.0);
         }
     }
 }
 
 impl ExtFile {
+    pub fn size(&mut self) -> u64 {
+        unsafe { ext4_fsize(&mut self.0) }
+    }
+
     pub fn open(path: &str, flags: i32) -> Result<Self, i32> {
         let c_path = CString::new(path).expect("CString::new failed");
         let mut file = MaybeUninit::uninit();

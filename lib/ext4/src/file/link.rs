@@ -1,7 +1,8 @@
 extern crate alloc;
-use alloc::ffi::CString;
+use alloc::{ffi::CString, sync::Arc};
 
 use lwext4_rust::bindings::ext4_readlink;
+use systype::SysResult;
 use vfs::file::{File, FileMeta};
 
 use crate::{dentry::ExtDentry, inode::link::ExtLinkInode};
@@ -20,25 +21,24 @@ impl ExtLinkFile {
     }
 }
 
-#[async_trait]
 impl File for ExtLinkFile {
     fn get_meta(&self) -> &FileMeta {
         &self.meta
     }
 
-    async fn readlink(&self, buf: &mut [u8]) -> SysResult<usize> {
+    fn base_read_link(&self, buf: &mut [u8]) -> SysResult<usize> {
         let path = self.dentry().path();
-        let mut path_buf = buf;
+        let path_buf = buf;
         let c_path = CString::new(path).expect("CString::new failed");
         let mut r_cnt = 0;
         let len = unsafe {
             ext4_readlink(
                 c_path.as_ptr(),
-                buf.as_mut_ptr() as _,
-                buf.len(),
+                path_buf.as_mut_ptr() as _,
+                path_buf.len(),
                 &mut r_cnt,
             )
-        }?;
-        len
+        } as usize;
+        Ok(len)
     }
 }

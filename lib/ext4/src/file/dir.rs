@@ -1,16 +1,18 @@
 extern crate alloc;
-use alloc::ffi::CString;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use alloc::{ffi::CString, vec};
 use config::vfs::OpenFlags;
 use lwext4_rust::{InodeTypes, bindings::ext4_readlink};
 use mutex::ShareMutex;
+use systype::SysError;
 use vfs::{
     direntry,
     file::{File, FileMeta},
     inode::Inode,
 };
 
+use crate::inode::link::ExtLinkInode;
 use crate::{
     dentry::ExtDentry,
     ext::{dir::ExtDir, file::ExtFile},
@@ -34,7 +36,6 @@ impl ExtDirFile {
     }
 }
 
-#[async_trait]
 impl File for ExtDirFile {
     fn get_meta(&self) -> &FileMeta {
         &self.meta
@@ -48,14 +49,15 @@ impl File for ExtDirFile {
         dir.next();
 
         while let Some(dentry) = dir.next() {
-            let name = CString::new(dentry.name)?;
+            let name = CString::new(dentry.name).expect("cstring convert fail");
             let sub_dentry = self.dentry().get_child_or_create(name.to_str().unwrap());
             let new_inode: Arc<dyn Inode> =
                 if InodeTypes::from(dentry.type_ as usize) == InodeTypes::EXT4_DE_REG_FILE {
-                    let ext_file = ExtFile::open(&sub_dentry.path(), OpenFlags::O_RDWR.bits())?;
+                    let ext_file = ExtFile::open(&sub_dentry.path(), OpenFlags::O_RDWR.bits())
+                        .map_err(SysError::from_i32)?;
                     ExtFileInode::new(self.super_block(), ext_file).clone()
                 } else if InodeTypes::from(dentry.type_ as usize) == InodeTypes::EXT4_DE_DIR {
-                    let ext_dir = ExtDir::open(&sub_dentry.path())?;
+                    let ext_dir = ExtDir::open(&sub_dentry.path()).map_err(SysError::from_i32)?;
                     ExtDirInode::new(self.super_block(), ext_dir).clone()
                 } else {
                     let path = sub_dentry.path();
@@ -65,13 +67,14 @@ impl File for ExtDirFile {
                     let len = unsafe {
                         ext4_readlink(
                             c_path.as_ptr(),
-                            buf.as_mut_ptr() as _,
-                            buf.len(),
+                            path_buf.as_mut_ptr() as _,
+                            path_buf.len(),
                             &mut r_cnt,
                         )
-                    }?;
+                    } as usize;
                     path_buf.truncate(len + 1);
-                    let target = CString::from_vec_with_nul(path_buf)?;
+                    let target =
+                        CString::from_vec_with_nul(path_buf).expect("cstring vec convert fail");
                     ExtLinkInode::new(target.to_str().unwrap(), self.super_block()).clone()
                 };
             if sub_dentry.is_negetive() {

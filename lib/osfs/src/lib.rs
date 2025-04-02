@@ -1,12 +1,9 @@
 #![no_main]
 #![no_std]
 
-use core::slice::SliceIndex;
-
 use alloc::{collections::btree_map::BTreeMap, string::String, sync::Arc};
-use config::{board::BLOCK_SIZE, vfs::MountFlags};
+use config::vfs::MountFlags;
 use driver::BLOCK_DEVICE;
-use ext4::disk::Disk;
 use mutex::SpinNoIrqLock;
 use spin::Once;
 use vfs::{dentry::Dentry, fstype::FileSystemType};
@@ -34,12 +31,14 @@ pub fn init() {
 
     let diskfs = FS_MANAGER.lock().get(DISK_FS_NAME).unwrap().clone();
 
-    let diskfs_root = diskfs.mount(
-        "/",
-        None,
-        MountFlags::empty(),
-        Some(BLOCK_DEVICE.get().unwrap().clone()),
-    );
+    let diskfs_root = diskfs
+        .mount(
+            "/",
+            None,
+            MountFlags::empty(),
+            Some(BLOCK_DEVICE.get().unwrap().clone()),
+        )
+        .unwrap();
 
     SYS_ROOT_DENTRY.call_once(|| diskfs_root);
 

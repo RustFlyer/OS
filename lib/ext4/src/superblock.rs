@@ -18,7 +18,7 @@ unsafe impl Send for ExtSuperBlock {}
 
 impl ExtSuperBlock {
     pub fn new(meta: SuperBlockMeta) -> Arc<Self> {
-        let disk = Disk::new(meta.device.as_ref().unwrap());
+        let disk = Disk::new(meta.device.as_ref().unwrap().clone());
         Arc::new(Self {
             meta: meta,
             inner: Ext4BlockWrapper::<Disk>::new(disk).unwrap(),

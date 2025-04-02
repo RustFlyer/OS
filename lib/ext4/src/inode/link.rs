@@ -1,8 +1,13 @@
 extern crate alloc;
 use alloc::sync::Arc;
-use config::inode::{InodeMode, InodeType};
+use config::{
+    device::BLOCK_SIZE,
+    inode::{InodeMode, InodeType},
+    vfs::Stat,
+};
+use systype::SysResult;
 use vfs::{
-    inode::InodeMeta,
+    inode::{Inode, InodeMeta},
     superblock::{self, SuperBlock},
 };
 pub struct ExtLinkInode {
@@ -10,10 +15,10 @@ pub struct ExtLinkInode {
 }
 
 impl ExtLinkInode {
-    pub fn new(target: &str, superblock: Arc<dyn SuperBlock>) -> Self {
-        Self {
-            meta: InodeMeta::new(InodeMode::from_type(InodeType::SymLink), superblock.clone()),
-        }
+    pub fn new(target: &str, superblock: Arc<dyn SuperBlock>) -> Arc<Self> {
+        Arc::new(Self {
+            meta: InodeMeta::new(0, Arc::downgrade(&superblock)),
+        })
     }
 }
 
@@ -25,20 +30,20 @@ impl Inode for ExtLinkInode {
     fn get_attr(&self) -> SysResult<Stat> {
         Ok(Stat {
             st_dev: 0,
-            st_ino: self.meta.ino,
-            st_mode: self.meta.mode,
+            st_ino: self.meta.ino as u64,
+            st_mode: self.meta.inner.lock().mode.bits(),
             st_nlink: 0,
             st_uid: 0,
             st_gid: 0,
             st_rdev: 0,
             __pad: 0,
-            st_size: self.meta.size.load(Ordering::Relaxed),
-            st_blksize: BLOCK_SIZE,
+            st_size: self.meta.inner.lock().size as u64,
+            st_blksize: BLOCK_SIZE as u32,
             __pad2: 0,
-            st_blocks: (self.meta.size.load(Ordering::Relaxed) / BLOCK_SIZE),
-            st_atime: self.meta.time[0],
-            st_mtime: self.meta.time[1],
-            st_ctime: self.meta.time[2],
+            st_blocks: (self.meta.inner.lock().size / BLOCK_SIZE) as u64,
+            st_atime: self.meta.inner.lock().atime,
+            st_mtime: self.meta.inner.lock().mtime,
+            st_ctime: self.meta.inner.lock().ctime,
             unused: 0,
         })
     }

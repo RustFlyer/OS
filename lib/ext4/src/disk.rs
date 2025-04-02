@@ -17,7 +17,7 @@ pub struct Disk {
 
 impl Disk {
     pub fn new(dev: Arc<dyn BlockDevice>) -> Self {
-        assert!(dev.size(), BLOCK_SIZE);
+        assert_eq!(dev.size(), BLOCK_SIZE);
         Self {
             block_id: 0,
             offset: 0,
@@ -33,9 +33,9 @@ impl Disk {
         self.block_id * BLOCK_SIZE + self.offset
     }
 
-    pub fn set_pos(&mut self, buf: u64) {
-        self.block_id = buf / BLOCK_SIZE as usize;
-        self.offset = buf % BLOCK_SIZE as usize;
+    pub fn set_pos(&mut self, buf: usize) {
+        self.block_id = buf / BLOCK_SIZE;
+        self.offset = buf % BLOCK_SIZE;
     }
 
     /// Reads one block (whole or partial)
@@ -62,18 +62,18 @@ impl Disk {
     /// Writes one block (whole or partial)
     pub fn write_one(&mut self, buf: &[u8]) -> SysResult<usize> {
         let write_size = if self.offset == 0 && buf.len() >= BLOCK_SIZE {
-            self.dev.write(self.block_id, &mut buf[..BLOCK_SIZE]);
+            self.dev.write(self.block_id, &buf[..BLOCK_SIZE]);
             self.block_id += 1;
             BLOCK_SIZE
         } else if buf.len() >= BLOCK_SIZE - self.offset {
             let length = BLOCK_SIZE - self.offset;
-            self.dev.write(self.block_id, &mut buf[..length]);
+            self.dev.write(self.block_id, &buf[..length]);
             self.block_id += 1;
             self.offset = 0;
             length
         } else {
             let length = buf.len();
-            self.dev.write(self.block_id, &mut buf[..length]);
+            self.dev.write(self.block_id, &buf[..length]);
             self.offset += length;
             length
         };
@@ -117,7 +117,7 @@ impl KernelDevOp for Disk {
                     buf = &mut buf;
                     write_size += n;
                 }
-                Err(_) => return -1,
+                Err(_) => return Err(-1),
             }
         }
         Ok(write_size)
@@ -125,22 +125,26 @@ impl KernelDevOp for Disk {
 
     #[allow(non_snake_case)]
     fn seek(dev: &mut Self::DevType, off: i64, whence: i32) -> Result<i64, i32> {
+        let whence = whence as u32;
         let new_pos = match whence {
             SEEK_SET => Some(off),
-            SEEK_CUR => dev.pos().checked_add_signed(off).map(|v| v as u64),
-            SEEK_END => dev.size().checked_add_signed(off).map(|v| v as i64),
+            SEEK_CUR => dev.pos().checked_add_signed(off as isize).map(|v| v as i64),
+            SEEK_END => dev
+                .size()
+                .checked_add_signed(off as isize)
+                .map(|v| v as i64),
             _ => {
                 log::error!("invalid whence {}", whence);
                 Some(off)
             }
         }
-        .ok_or(-1);
+        .ok_or(-1)?;
 
-        if new_pos > dev.size() {
+        if new_pos > dev.size() as i64 {
             log::warn!("pos > dev.size!!");
         }
 
-        dev.set_pos(new_pos);
+        dev.set_pos(new_pos as usize);
         Ok(new_pos)
     }
 }
