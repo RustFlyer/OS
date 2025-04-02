@@ -110,7 +110,8 @@ pub async fn task_executor_unit(task: Arc<Task>) {
             _ => {}
         }
 
-        // signal_handle_
+        // param "intr" always false for now
+        sig_check(task.clone(), false);
     }
 
     task.exit();

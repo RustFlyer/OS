@@ -2,6 +2,7 @@ mod consts;
 mod fs;
 mod process;
 mod time;
+mod signal;
 
 use consts::SyscallNo::{self, *};
 use fs::*;

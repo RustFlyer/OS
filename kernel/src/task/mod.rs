@@ -5,6 +5,8 @@ pub mod task;
 pub mod taskf;
 pub mod threadgroup;
 pub mod tid;
+pub mod signal;
+pub mod sig_members;
 
 pub use future::yield_now;
 
