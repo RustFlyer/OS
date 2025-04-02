@@ -224,6 +224,10 @@ impl Task {
         unsafe { &mut *self.sig_mask.get() }
     }
 
+    pub fn with_thread_group<T>(&self, f: impl FnOnce(&mut ThreadGroup) -> T) -> T {
+        f(&mut self.threadgroup.lock())
+    }
+
     pub fn get_waker(&self) -> Waker {
         self.waker_mut().as_ref().unwrap().clone()
     }

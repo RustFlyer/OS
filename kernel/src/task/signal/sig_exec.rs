@@ -1,5 +1,7 @@
-use crate::task::Task;
-use crate::task::sig_members::SigContext;
+use crate::task::TaskState;
+use crate::task::sig_members::{SigActionFlag, SigContext};
+use crate::task::signal::sig_info::SigSet;
+use crate::task::{Task, sig_members::ActionType};
 use crate::vm::user_ptr::UserWritePtr;
 use alloc::sync::Arc;
 use systype::SysResult;
@@ -10,15 +12,18 @@ pub fn sig_check(task: Arc<Task>, mut intr: bool) -> SysResult<()> {
     let old_mask = task.get_sig_mask();
 
     while let Some(si) = task.sig_manager_mut().dequeue_signal(&old_mask) {
-        sig_exec(task.clone(), si);
-        //TODO: should break when
+        // if sig_exec turns to user handler, it will return true to break the loop and run user handler.
+        if sig_exec(task.clone(), si) {
+            break;
+        }
     }
     Ok(())
 }
 
-fn sig_exec(task: Arc<Task>, si: SigInfo) {
+fn sig_exec(task: Arc<Task>, si: SigInfo) -> bool {
     let action = task.sig_handlers_mut().lock().get(si.sig);
     let cx = task.trap_context_mut();
+    let old_mask = task.get_sig_mask();
 
     log::info!("[do signal] Handling signal: {:?} {:?}", si, action);
     if action.flags.contains(SigActionFlag::SA_RESTART) {
@@ -27,10 +32,19 @@ fn sig_exec(task: Arc<Task>, si: SigInfo) {
         log::info!("[do_signal] restart syscall");
     }
     match action.atype {
-        ActionType::Ignore => {}
-        ActionType::Kill => kill(&task, si.sig),
-        ActionType::Stop => stop(&task, si.sig),
-        ActionType::Cont => cont(&task, si.sig),
+        ActionType::Ignore => false,
+        ActionType::Kill => {
+            kill(&task, si.sig);
+            false
+        }
+        ActionType::Stop => {
+            stop(&task, si.sig);
+            false
+        }
+        ActionType::Cont => {
+            cont(&task, si.sig);
+            false
+        }
         ActionType::User { entry } => {
             // The signal being delivered is also added to the signal mask, unless
             // SA_NODEFER was specified when registering the handler.
@@ -113,7 +127,7 @@ fn sig_exec(task: Arc<Task>, si: SigInfo) {
             cx.user_reg[4] = sig_cx.mcontext.user_x[4];
             cx.user_reg[3] = sig_cx.mcontext.user_x[3];
             // log::error!("{:#x}", new_sp);
-            break;
+            true
         }
     }
 }
@@ -123,7 +137,7 @@ fn kill(task: &Arc<Task>, sig: Sig) {
     // exit all the memers of a thread group
     task.with_thread_group(|tg| {
         for t in tg.iter() {
-            t.set_terminated();
+            t.exit();
         }
     });
     // 将信号放入低7位 (第8位是core dump标志,在gdb调试崩溃程序中用到)
@@ -132,9 +146,9 @@ fn kill(task: &Arc<Task>, sig: Sig) {
 
 fn stop(task: &Arc<Task>, sig: Sig) {
     log::warn!("[do_signal] task stopped!");
-    task.with_mut_thread_group(|tg| {
+    task.with_thread_group(|tg| {
         for t in tg.iter() {
-            t.set_stopped();
+            t.set_state(TaskState::Waiting);
             t.set_wake_up_signal(SigSet::SIGCONT);
         }
     });
@@ -144,9 +158,9 @@ fn stop(task: &Arc<Task>, sig: Sig) {
 /// continue the process if it is currently stopped
 fn cont(task: &Arc<Task>, sig: Sig) {
     log::warn!("[do_signal] task continue");
-    task.with_mut_thread_group(|tg| {
+    task.with_thread_group(|tg| {
         for t in tg.iter() {
-            t.set_running();
+            t.set_state(TaskState::Running);
             t.wake();
         }
     });

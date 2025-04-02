@@ -166,6 +166,11 @@ impl Task {
         new
     }
 
+    pub fn wake(&self) {
+        let waker = self.waker_mut();
+        waker.as_ref().unwrap().wake_by_ref();
+    }
+
     pub fn exit(&self) {
         self.set_state(TaskState::Zombie);
     }

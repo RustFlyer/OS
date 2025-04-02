@@ -55,3 +55,5 @@ pub fn sys_clone(
     spawn_user_task(new_task);
     Ok(new_tid)
 }
+
+pub fn sys_wait4(pid: i32, status: i32) {}
