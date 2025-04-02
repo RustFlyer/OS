@@ -38,7 +38,7 @@ pub trait SuperBlock: Send + Sync {
 
     fn stat_fs(&self) -> SysResult<StatFs>;
 
-    fn sync_fs_by_write_dirty(&self, wait: isize) -> SysResult<()>;
+    fn sync_fs(&self, wait: isize) -> SysResult<()>;
 
     fn set_root_dentry(&self, root_dentry: Arc<dyn Dentry>) {
         self.meta().root_dentry.call_once(|| root_dentry);

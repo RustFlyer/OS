@@ -1,11 +1,11 @@
+use crate::processor::current_hart;
 use crate::syscall::syscall;
 use crate::task::{Task, TaskState, yield_now};
 use crate::trap::load_trap_handler;
-use crate::vm::mem_perm::MemPerm;
 use crate::vm::user_ptr::UserReadPtr;
-use alloc::sync::Arc;
 use arch::riscv64::time::{get_time_duration, set_nx_timer_irq};
 use mm::address::VirtAddr;
+use mm::vm::mem_perm::MemPerm;
 use riscv::{ExceptionNumber, InterruptNumber};
 use riscv::{
     interrupt::{Exception, Interrupt, Trap},
@@ -19,27 +19,14 @@ use timer::TIMER_MANAGER;
 /// task_executor_unit(), which calls this trap_handler() function.
 #[allow(unused)]
 #[unsafe(no_mangle)]
-pub async fn trap_handler(task: &Arc<Task>) -> bool {
+pub async fn trap_handler(task: &Task) -> bool {
     let stval = register::stval::read();
     let cause = register::scause::read().cause();
-
-    simdebug::when_debug!({
-        log::trace!(
-            "[trap_handler] user task trap into kernel, type: {:?}, stval: {:#x}",
-            cause,
-            stval
-        );
-    });
 
     unsafe { load_trap_handler() };
 
     let current = get_time_duration();
     TIMER_MANAGER.check(current);
-    set_nx_timer_irq();
-
-    if task.timer_mut().schedule_time_out() && executor::has_waiting_task() {
-        yield_now().await;
-    }
 
     match cause {
         Trap::Exception(e) => {
@@ -52,7 +39,7 @@ pub async fn trap_handler(task: &Arc<Task>) -> bool {
     true
 }
 
-pub async fn user_exception_handler(task: &Arc<Task>, e: Exception, stval: usize) {
+pub async fn user_exception_handler(task: &Task, e: Exception, stval: usize) {
     let mut cx = task.trap_context_mut();
     match e {
         // 系统调用
@@ -117,17 +104,15 @@ pub async fn user_exception_handler(task: &Arc<Task>, e: Exception, stval: usize
     }
 }
 
-pub async fn user_interrupt_handler(_task: &Arc<Task>, i: Interrupt) {
+pub async fn user_interrupt_handler(task: &Task, i: Interrupt) {
     match i {
         // 时钟中断
         Interrupt::SupervisorTimer => {
-            // note: 用户若频繁陷入内核，则可能是因为时钟中断未触发，
-            // 而是 supervisor 模式下触发了，导致用户程序在 CPU 上运行了很长时间。
             log::trace!("[trap_handler] timer interrupt");
             let current = get_time_duration();
             TIMER_MANAGER.check(current);
             set_nx_timer_irq();
-            if executor::has_waiting_task() {
+            if task.timer_mut().schedule_time_out() && executor::has_waiting_task() {
                 yield_now().await;
             }
         }

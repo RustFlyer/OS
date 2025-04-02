@@ -1,5 +1,5 @@
 [workspace]
-members = ["kernel", "lib/*", "user"]
+members = [ "kernel", "lib/*", "user"]
 resolver = "2"
 
 [workspace.dependencies]
@@ -21,3 +21,6 @@ strum = { version = "0.27", default-features = false, features = ["derive"] }
 virtio-drivers = { version = "0.7" }
 uart_16550 = "0.3"
 downcast-rs = { version = "1.2", default-features = false }
+hashbrown = "0.14"
+async-trait = "0.1"
+lwext4_rust = { git = "https://github.com/EchudeT/lwext4_rust.git", rev = "e7f0" }

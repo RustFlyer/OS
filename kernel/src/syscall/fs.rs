@@ -7,6 +7,7 @@ use mutex::SleepLock;
 static WRITE_LOCK: SleepLock<()> = SleepLock::new(());
 
 pub fn sys_write(fd: usize, addr: usize, len: usize) -> SyscallResult {
+    // log::info!("try to write!");
     if fd == 1 {
         let task = current_task();
         let mut addr_space_lock = task.addr_space_mut().lock();

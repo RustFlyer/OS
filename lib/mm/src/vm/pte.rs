@@ -8,7 +8,8 @@ use core::fmt::{self, Debug, Formatter};
 use bitflags::bitflags;
 
 use config::mm::PPN_WIDTH_SV39;
-use mm::address::PhysPageNum;
+
+use crate::address::PhysPageNum;
 
 /// Offset of the physical page number in a page table entry. A physical page
 /// number located at bits 10-53 in a page table entry.
@@ -37,7 +38,7 @@ bitflags! {
     /// the current implementation.
     ///
     /// Do not set any unknown bits.
-    #[derive(Debug, Clone, Copy)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct PteFlags: u8 {
         const V = 1 << 0;
         const R = 1 << 1;

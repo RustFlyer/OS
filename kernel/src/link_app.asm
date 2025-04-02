@@ -34,7 +34,7 @@ app_0_end:
     .global app_1_end
     .align 3
 app_1_start:
-    .incbin "./target/riscv64gc-unknown-none-elf/debug/time_test"
+    .incbin "./target/riscv64gc-unknown-none-elf/debug/hello_world"
 app_1_end:
 
     .section .data
@@ -42,7 +42,7 @@ app_1_end:
     .global app_2_end
     .align 3
 app_2_start:
-    .incbin "./target/riscv64gc-unknown-none-elf/debug/add"
+    .incbin "./target/riscv64gc-unknown-none-elf/debug/time_test"
 app_2_end:
 
     .section .data
@@ -50,7 +50,7 @@ app_2_end:
     .global app_3_end
     .align 3
 app_3_start:
-    .incbin "./target/riscv64gc-unknown-none-elf/debug/add1"
+    .incbin "./target/riscv64gc-unknown-none-elf/debug/add"
 app_3_end:
 
     .section .data
@@ -58,7 +58,7 @@ app_3_end:
     .global app_4_end
     .align 3
 app_4_start:
-    .incbin "./target/riscv64gc-unknown-none-elf/debug/add2"
+    .incbin "./target/riscv64gc-unknown-none-elf/debug/add1"
 app_4_end:
 
     .section .data
@@ -66,5 +66,5 @@ app_4_end:
     .global app_5_end
     .align 3
 app_5_start:
-    .incbin "./target/riscv64gc-unknown-none-elf/debug/hello_world"
+    .incbin "./target/riscv64gc-unknown-none-elf/debug/add2"
 app_5_end:

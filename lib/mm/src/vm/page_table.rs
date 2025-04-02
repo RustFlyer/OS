@@ -4,24 +4,27 @@
 //! and tracking allocated pages.
 
 use alloc::vec::Vec;
-use riscv::register::satp::{self, Satp};
 
 use lazy_static::lazy_static;
+use riscv::register::satp::{self, Satp};
 
+use arch::riscv64::mm::{fence, sfence_vma_addr, sfence_vma_all_except_global, tlb_shootdown};
 use config::mm::{
     PTE_PER_TABLE, VIRT_END, bss_end, bss_start, data_end, data_start, kernel_end, kernel_start,
     rodata_end, rodata_start, text_end, text_start,
 };
-use mm::address::{PhysPageNum, VirtAddr, VirtPageNum};
 use simdebug::when_debug;
 use systype::SysResult;
 
+use super::{
+    page_cache::page::Page,
+    pte::{PageTableEntry, PteFlags},
+};
 use crate::{
+    address::{PhysPageNum, VirtAddr, VirtPageNum},
     frame::FrameTracker,
     vm::vm_area::{KernelArea, VmArea},
 };
-
-use super::pte::{PageTableEntry, PteFlags};
 
 /// A data structure for manipulating page tables and manage memory mappings.
 ///
@@ -58,10 +61,10 @@ impl PageTable {
         let root_frame = FrameTracker::build()?;
         // SAFETY: the frame is newly allocated for the root page table.
         unsafe {
-            PageTableMem::new(root_frame.as_ppn()).clear();
+            PageTableMem::new(root_frame.ppn()).clear();
         }
         Ok(PageTable {
-            root: root_frame.as_ppn(),
+            root: root_frame.ppn(),
             frames: vec![root_frame],
         })
     }
@@ -134,8 +137,11 @@ impl PageTable {
     /// Returns a mutable reference to the leaf page table entry, and a boolean
     /// indicating whether any non-leaf entry is created. If any non-leaf entry is
     /// created, `sfence.vma` on a specific address is not enough to ensure the
-    /// non-leaf entry is visible to the hart. Returns an [`ENOMEM`] error if the
-    /// method needs to allocate a frame but fails to do so.
+    /// non-leaf entry is visible to the hart; use `sfence_vma(0, 0)` if that is
+    /// the case.
+    ///
+    /// Returns an [`ENOMEM`] error if the method needs to allocate a frame but fails
+    /// to do so.
     pub fn find_entry_force(
         &mut self,
         vpn: VirtPageNum,
@@ -151,11 +157,18 @@ impl PageTable {
                 return Ok((entry, inner_created));
             }
             if !entry.is_valid() {
+                // Returning an error immediately is safe even when a non-leaf entry
+                // is created and a sub-table is allocated. An error happening here
+                // means that at least one page table on the path is not allocated.
+                // Therefore, the next time the kernel tries to find a leaf entry under
+                // the former allocated sub-table, it must allocate a frame for missing
+                // page tables, which will cause a `sfence_vma` later, which ensures
+                // the visibility of the former allocated sub-table.
                 let frame = FrameTracker::build()?;
                 unsafe {
-                    PageTableMem::new(frame.as_ppn()).clear();
+                    PageTableMem::new(frame.ppn()).clear();
                 }
-                *entry = PageTableEntry::new(frame.as_ppn(), inner_flags);
+                *entry = PageTableEntry::new(frame.ppn(), inner_flags);
                 self.track_frame(frame);
                 inner_created = true;
             }
@@ -188,13 +201,17 @@ impl PageTable {
     /// Maps a leaf page by specifying VPN and page table entry flags, to a newly
     /// allocated frame.
     ///
-    /// This method allocates a frame for the leaf page, sets the mapping in the
-    /// page table, and returns the [`FrameTracker`] of the allocated frame. If the
-    /// page is already mapped, this method does nothing and returns `None`.
+    /// This method allocates a frame for the leaf page and sets the mapping in the
+    /// page table
     ///
     /// Returns a [`SysResult`] indicating whether the operation is successful.
     /// Returns an [`ENOMEM`] error if the method needs to allocate a frame but fails
     /// to do so.
+    ///
+    /// In the successful case, if the VPN is already mapped, the function returns
+    /// a mutable reference to the existing page table entry wrapped as
+    /// `SysResult::Ok(Err(entry))`. Otherwise, the function allocates a new frame
+    /// for it and returns the new page wrapped as `SysResult::Ok(Ok(page))`.
     ///
     /// # Note
     /// This function takes `flags` as the flags for the leaf page table entry, and
@@ -205,19 +222,19 @@ impl PageTable {
         &mut self,
         vpn: VirtPageNum,
         flags: PteFlags,
-    ) -> SysResult<Option<FrameTracker>> {
+    ) -> SysResult<Result<Page, &mut PageTableEntry>> {
         let (entry, non_leaf_created) = self.find_entry_force(vpn, flags)?;
         if entry.is_valid() {
-            return Ok(None);
+            return Ok(Err(entry));
         }
-        let frame = FrameTracker::build()?;
-        *entry = PageTableEntry::new(frame.as_ppn(), flags);
+        let page = Page::build()?;
+        *entry = PageTableEntry::new(page.ppn(), flags);
         if non_leaf_created {
-            riscv::asm::sfence_vma_all();
+            sfence_vma_all_except_global();
         } else {
-            riscv::asm::sfence_vma(0, vpn.address().to_usize());
+            sfence_vma_addr(vpn.address().to_usize());
         }
-        Ok(Some(frame))
+        Ok(Ok(page))
     }
 
     /// Maps a leaf page by specifying VPN, PPN, and page table entry flags.
@@ -245,9 +262,9 @@ impl PageTable {
         let (entry, non_leaf_created) = self.find_entry_force(vpn, flags)?;
         *entry = PageTableEntry::new(ppn, flags);
         if non_leaf_created {
-            riscv::asm::sfence_vma_all();
+            sfence_vma_all_except_global();
         } else {
-            riscv::asm::sfence_vma(0, vpn.address().to_usize());
+            sfence_vma_addr(vpn.address().to_usize());
         }
         Ok(())
     }
@@ -261,7 +278,11 @@ impl PageTable {
     pub fn unmap_page(&mut self, vpn: VirtPageNum) {
         if let Some(entry) = self.find_entry(vpn) {
             *entry = PageTableEntry::default();
-            riscv::asm::sfence_vma(0, vpn.address().to_usize());
+            // Flush TLB entries for the page for all harts.
+            // Later, we can optimize this by only flushing the TLB for harts that
+            // execute the current process.
+            fence();
+            tlb_shootdown(vpn.address().to_usize(), 1);
         }
     }
 
@@ -301,7 +322,8 @@ impl PageTable {
             };
             *entry = PageTableEntry::new(ppn, flags);
         }
-        riscv::asm::sfence_vma_all();
+        // Simply flush all TLB entries, as the range may be large.
+        sfence_vma_all_except_global();
         Ok(())
     }
 
@@ -318,7 +340,11 @@ impl PageTable {
             let vpn = VirtPageNum::new(start_vpn.to_usize() + i);
             self.unmap_page(vpn);
         }
-        riscv::asm::sfence_vma_all();
+        // Flush all TLB entries for all harts.
+        // Later, we can optimize this by only flushing the TLB for harts that
+        // execute the current process.
+        fence();
+        tlb_shootdown(start_vpn.address().to_usize(), count);
     }
 
     /// Maps the kernel part of the address space into this page table.
@@ -396,16 +422,15 @@ impl PageTableMem {
     }
 }
 
-/// Enables the kernel page table.
+/// Switch to the kernel page table.
 ///
 /// # Safety
-/// This function must be called only once, after the kernel page table is set up.
-pub unsafe fn enable_kernel_page_table() {
+/// This function must be called after the kernel page table is set up.
+pub unsafe fn switch_to_kernel_page_table() {
     // SAFETY: the boot page table never gets dropped.
     unsafe {
         switch_page_table(&KERNEL_PAGE_TABLE);
     }
-    riscv::asm::sfence_vma_all();
 }
 
 /// Switches to the specified page table.
@@ -420,7 +445,7 @@ pub unsafe fn switch_page_table(page_table: &PageTable) {
     unsafe {
         satp::write(satp);
     }
-    riscv::asm::sfence_vma_all();
+    sfence_vma_all_except_global();
     when_debug!({
         log::trace!(
             "Switched to page table at {:#x}, satp: {:#x}",

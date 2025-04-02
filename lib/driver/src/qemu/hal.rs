@@ -26,7 +26,7 @@ unsafe impl virtio_drivers::Hal for VirtHalImpl {
         for frame_id in 0..pages {
             let frame = frame_batch.pop().unwrap();
             if frame_id == pages - 1 {
-                base = frame.as_ppn();
+                base = frame.ppn();
             }
             frame_space.push(frame);
         }

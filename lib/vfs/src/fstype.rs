@@ -26,7 +26,7 @@ impl FileSystemTypeMeta {
 }
 
 pub trait FileSystemType: Send + Sync {
-    fn get_meta(&self) -> FileSystemTypeMeta;
+    fn get_meta(&self) -> &FileSystemTypeMeta;
 
     fn base_mount(
         self: Arc<Self>,

@@ -2,16 +2,17 @@ extern crate alloc;
 use alloc::collections::btree_map::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
+use mm::vm::addr_space::{AddrSpace, switch_to};
+use riscv::asm::sfence_vma_all;
 use time::TaskTimeStat;
 
 use super::future::{self};
 use super::manager::TASK_MANAGER;
-use super::process_manager::PROCESS_GROUP_MANAGER;
-use super::task::*;
+use super::process_manager::{PROCESS_GROUP_MANAGER, ProcessGroupManager};
+use super::threadgroup::ThreadGroup;
 use super::tid::tid_alloc;
+use super::{task::*, threadgroup};
 
-use crate::vm::addr_space::AddrSpace;
-use crate::vm::addr_space::switch_to;
 use arch::riscv64::time::get_time_duration;
 use config::process::CloneFlags;
 use core::cell::SyncUnsafeCell;
@@ -21,7 +22,7 @@ use mutex::new_share_mutex;
 use timer::{TIMER_MANAGER, Timer};
 
 impl Task {
-    /// Switchse Task to User
+    /// Switches Task to User
     pub fn enter_user_mode(&mut self) {
         self.timer_mut().switch_to_user();
     }
@@ -51,6 +52,7 @@ impl Task {
         let mut addrspace = AddrSpace::build_user().unwrap();
         let entry_point = addrspace.load_elf(elf_data).unwrap();
         let stack = addrspace.map_stack().unwrap();
+        addrspace.map_heap().unwrap();
         let task = Arc::new(Task::new(
             entry_point.to_usize(),
             stack.to_usize(),
@@ -58,6 +60,7 @@ impl Task {
             name.to_string(),
         ));
 
+        PROCESS_GROUP_MANAGER.add_group(&task);
         TASK_MANAGER.add_task(&task);
         future::spawn_user_task(task);
     }
@@ -77,27 +80,31 @@ impl Task {
     ///
     /// - todo1: Memory Copy / Cow
     /// - todo2: Control of relevant Thread Group
-    pub fn fork(self: &Arc<Self>, clonefalgs: CloneFlags) -> Arc<Self> {
+    pub fn fork(self: &Arc<Self>, cloneflags: CloneFlags) -> Arc<Self> {
         let tid = tid_alloc();
         let trap_context = SyncUnsafeCell::new(*self.trap_context_mut());
         let state = SpinNoIrqLock::new(self.get_state());
 
         let process;
         let is_process;
+        let threadgroup;
+
         let parent;
         let children;
 
         let pgid;
 
-        if clonefalgs.contains(CloneFlags::THREAD) {
+        if cloneflags.contains(CloneFlags::THREAD) {
             is_process = false;
             process = Some(Arc::downgrade(self));
+            threadgroup = new_share_mutex(ThreadGroup::new());
             parent = self.parent_mut().clone();
             children = self.children_mut().clone();
             pgid = self.pgid_mut().clone();
         } else {
             is_process = true;
             process = None;
+            threadgroup = new_share_mutex(ThreadGroup::new());
             parent = new_share_mutex(Some(Arc::downgrade(self)));
             children = new_share_mutex(BTreeMap::new());
 
@@ -105,17 +112,23 @@ impl Task {
         }
 
         let addr_space;
-        if clonefalgs.contains(CloneFlags::VM) {
+        if cloneflags.contains(CloneFlags::VM) {
             addr_space = (*self.addr_space_mut()).clone();
         } else {
-            // TODO: Cow Fork
-            addr_space = (*self.addr_space_mut()).clone();
+            let cow_address_space = self.addr_space_mut().lock().clone_cow().unwrap();
+            addr_space = Arc::new(SpinNoIrqLock::new(cow_address_space));
+            unsafe {
+                sfence_vma_all();
+            }
         }
+
+        let name = self.get_name() + "(fork)";
 
         let new = Arc::new(Self::new_fork_clone(
             tid,
             process,
             is_process,
+            threadgroup,
             trap_context,
             SyncUnsafeCell::new(TaskTimeStat::new()),
             SyncUnsafeCell::new(None),
@@ -125,10 +138,10 @@ impl Task {
             children,
             pgid,
             SpinNoIrqLock::new(0),
-            self.get_name(),
+            name,
         ));
 
-        if !clonefalgs.contains(CloneFlags::THREAD) {
+        if !cloneflags.contains(CloneFlags::THREAD) {
             self.add_child(new.clone());
         }
 

@@ -2,6 +2,8 @@
 
 use bitflags::bitflags;
 
+use super::pte::PteFlags;
+
 bitflags! {
     /// Memory permission corresponding to R, W, X, and U bits in a page table entry.
     ///
@@ -16,5 +18,12 @@ bitflags! {
         const W = 1 << 2;
         const X = 1 << 3;
         const U = 1 << 4;
+    }
+}
+
+impl MemPerm {
+    /// Create a new `MemPerm` from a set of `PteFlags`.
+    pub fn from(flags: PteFlags) -> Self {
+        Self::from_bits_truncate(flags.bits())
     }
 }

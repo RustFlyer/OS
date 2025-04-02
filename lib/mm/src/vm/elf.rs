@@ -2,11 +2,10 @@
 
 use config::mm::{USER_STACK_LOWER, USER_STACK_UPPER};
 use elf::{self, ElfBytes, endian::LittleEndian, file::FileHeader};
-use mm::address::VirtAddr;
 use systype::{SysError, SysResult};
 
-use super::addr_space::AddrSpace;
-use crate::vm::{pte::PteFlags, vm_area::VmArea};
+use super::{addr_space::AddrSpace, pte::PteFlags, vm_area::VmArea};
+use crate::address::VirtAddr;
 
 impl AddrSpace {
     /// Loads an ELF executable into given address space.
@@ -73,9 +72,6 @@ impl AddrSpace {
 
     /// Maps a stack into the address space.
     ///
-    /// This function maps a stack into the address space. Each address space should have exactly
-    /// one stack.
-    ///
     /// Returns the address of the stack bottom, i.e., one byte exceeding the highest address of
     /// the stack.
     ///
@@ -88,5 +84,16 @@ impl AddrSpace {
         let stack_bottom = stack.end_va();
         self.add_area(stack)?;
         Ok(stack_bottom)
+    }
+
+    /// Maps a heap into the address space.
+    pub fn map_heap(&mut self) -> SysResult<()> {
+        let length = 1 << 20; // 1 MiB
+        let start = self
+            .find_vacant_memory(VirtAddr::new(0), length)
+            .ok_or(SysError::ENOMEM)?;
+        let heap = VmArea::new_heap(start, VirtAddr::new(start.to_usize() + length));
+        self.add_area(heap).unwrap();
+        Ok(())
     }
 }

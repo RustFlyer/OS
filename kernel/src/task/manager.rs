@@ -10,9 +10,9 @@ use crate::task::tid::Tid;
 use lazy_static::lazy_static;
 
 lazy_static! {
-    /// 任务管理器
+    /// Task Manager
     ///
-    /// 管理所有任务，包括添加、删除和获取任务
+    /// Task Control of All the Tasks including Processes and Threads.
     pub static ref TASK_MANAGER: TaskManager = TaskManager::new();
 }
 

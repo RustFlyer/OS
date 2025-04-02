@@ -154,12 +154,12 @@ impl FrameTracker {
     }
 
     /// Gets the physical page number of the frame.
-    pub fn as_ppn(&self) -> PhysPageNum {
+    pub fn ppn(&self) -> PhysPageNum {
         self.ppn
     }
 
     /// Gets the virtual page number of the frame in the kernel space.
-    pub fn as_vpn(&self) -> VirtPageNum {
+    pub fn vpn(&self) -> VirtPageNum {
         self.ppn.to_vpn_kernel()
     }
 
@@ -167,14 +167,14 @@ impl FrameTracker {
     pub fn as_slice(&self) -> &[u8; PAGE_SIZE] {
         // SAFETY: The frame is allocated, and the returned slice does not outlive
         // the `FrameTracker` which lives as long as the frame.
-        unsafe { self.as_vpn().as_slice() }
+        unsafe { self.vpn().as_slice() }
     }
 
     /// Gets a mutable slice pointing to the frame.
-    pub fn as_slice_mut(&mut self) -> &mut [u8; PAGE_SIZE] {
+    pub fn as_mut_slice(&mut self) -> &mut [u8; PAGE_SIZE] {
         // SAFETY: The frame is allocated, and the returned slice does not outlive
         // the `FrameTracker` which lives as long as the frame.
-        unsafe { self.as_vpn().as_slice_mut() }
+        unsafe { self.vpn().as_slice_mut() }
     }
 }
 
@@ -238,11 +238,11 @@ pub fn frame_alloc_test() {
         let f2 = FrameTracker::build().expect("frame_alloc_test: failed to allocate frame");
         log::debug!(
             "frame_alloc_test: frame 1: {:#x}",
-            f1.as_ppn().address().to_usize()
+            f1.ppn().address().to_usize()
         );
         log::debug!(
             "frame_alloc_test: frame 2: {:#x}",
-            f2.as_ppn().address().to_usize()
+            f2.ppn().address().to_usize()
         );
     }
     {
@@ -250,7 +250,7 @@ pub fn frame_alloc_test() {
         let f3 = FrameTracker::build().expect("frame_alloc_test: failed to allocate frame");
         log::debug!(
             "frame_alloc_test: frame 3: {:#x}",
-            f3.as_ppn().address().to_usize()
+            f3.ppn().address().to_usize()
         );
         log::debug!("frame_alloc_test: frame 3 is dropped");
     }
@@ -262,7 +262,7 @@ pub fn frame_alloc_test() {
             log::debug!(
                 "frame_alloc_test: frame {}: {:#x}",
                 i,
-                f.as_ppn().address().to_usize()
+                f.ppn().address().to_usize()
             );
         }
         FrameDropper::drop(frames);
@@ -270,7 +270,7 @@ pub fn frame_alloc_test() {
         log::debug!("frame_alloc_test: allocate 5 frames in a batch");
         let frames = FrameTracker::build_batch(5).expect("failed to allocate frames");
         for (i, f) in frames.iter().enumerate() {
-            log::debug!("frame {}: {:#x}", i, f.as_ppn().address().to_usize());
+            log::debug!("frame {}: {:#x}", i, f.ppn().address().to_usize());
         }
         log::debug!("frame_alloc_test: frames are dropped");
     }
@@ -282,7 +282,7 @@ pub fn frame_alloc_test() {
             log::debug!(
                 "frame_alloc_test: frame {}: {:#x}",
                 i,
-                f.as_ppn().address().to_usize()
+                f.ppn().address().to_usize()
             );
         }
         FrameDropper::drop(frames);

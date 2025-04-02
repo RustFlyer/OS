@@ -12,3 +12,6 @@ driver = { path = "../driver" }
 
 spin = { workspace = true } 
 downcast-rs = { workspace = true }
+hashbrown = { workspace = true }
+log = { workspace = true }
+async-trait = { workspace = true }

@@ -35,10 +35,12 @@ use core::{fmt::Debug, marker::PhantomData, ops::ControlFlow, slice};
 
 use alloc::vec::Vec;
 use config::mm::PAGE_SIZE;
-use mm::address::VirtAddr;
+use mm::{
+    address::VirtAddr,
+    vm::{addr_space::AddrSpace, mem_perm::MemPerm},
+};
 use systype::{SysError, SysResult};
 
-use super::{addr_space::AddrSpace, mem_perm::MemPerm};
 use crate::{
     processor::current_hart,
     trap::trap_env::{set_kernel_stvec, set_kernel_stvec_user_rw},
@@ -158,8 +160,12 @@ where
     /// # Safety
     /// See the module-level documentation for safety information.
     pub unsafe fn read(&mut self) -> SysResult<T> {
-        self.addr_space
-            .check_user_access(self.ptr as usize, size_of::<T>(), MemPerm::R)?;
+        check_user_access(
+            self.addr_space,
+            self.ptr as usize,
+            size_of::<T>(),
+            MemPerm::R,
+        )?;
         Ok(unsafe { self.ptr.read() })
     }
 
@@ -189,8 +195,12 @@ where
     /// # Safety
     /// See the module-level documentation for safety information.
     pub unsafe fn read_array(&mut self, len: usize) -> SysResult<Vec<T>> {
-        self.addr_space
-            .check_user_access(self.ptr as usize, len * size_of::<T>(), MemPerm::R)?;
+        check_user_access(
+            self.addr_space,
+            self.ptr as usize,
+            len * size_of::<T>(),
+            MemPerm::R,
+        )?;
         let mut vec: Vec<T> = Vec::with_capacity(len);
         unsafe {
             vec.as_mut_ptr().copy_from_nonoverlapping(self.ptr, len);
@@ -210,8 +220,12 @@ where
     /// # Safety
     /// See the module-level documentation for safety information.
     pub unsafe fn try_into_ref(&mut self) -> SysResult<&T> {
-        self.addr_space
-            .check_user_access(self.ptr as usize, size_of::<T>(), MemPerm::R)?;
+        check_user_access(
+            self.addr_space,
+            self.ptr as usize,
+            size_of::<T>(),
+            MemPerm::R,
+        )?;
         Ok(unsafe { &*self.ptr })
     }
 
@@ -232,8 +246,12 @@ where
     /// # Safety
     /// See the module-level documentation for safety information.
     pub unsafe fn try_into_slice(&mut self, len: usize) -> SysResult<&[T]> {
-        self.addr_space
-            .check_user_access(self.ptr as usize, len * size_of::<T>(), MemPerm::R)?;
+        check_user_access(
+            self.addr_space,
+            self.ptr as usize,
+            len * size_of::<T>(),
+            MemPerm::R,
+        )?;
         Ok(unsafe { slice::from_raw_parts(self.ptr, len) })
     }
 }
@@ -270,7 +288,8 @@ where
         };
         // SAFETY: every `*const T` is valid.
         unsafe {
-            self.addr_space.check_user_access_with(
+            check_user_access_with(
+                self.addr_space,
                 self.ptr as usize,
                 len * size_of::<*const T>(),
                 MemPerm::R,
@@ -315,7 +334,8 @@ where
         };
         // SAFETY: every `u8` is valid.
         unsafe {
-            self.addr_space.check_user_access_with(
+            check_user_access_with(
+                self.addr_space,
                 self.ptr as usize,
                 len - 1,
                 MemPerm::R,
@@ -343,8 +363,12 @@ where
     /// # Safety
     /// See the module-level documentation for safety information.
     pub unsafe fn write(&mut self, value: T) -> SysResult<()> {
-        self.addr_space
-            .check_user_access(self.ptr as usize, size_of::<T>(), MemPerm::W)?;
+        check_user_access(
+            self.addr_space,
+            self.ptr as usize,
+            size_of::<T>(),
+            MemPerm::W,
+        )?;
         unsafe { self.ptr.write(value) };
         Ok(())
     }
@@ -377,8 +401,12 @@ where
     /// # Safety
     /// See the module-level documentation for safety information.
     pub unsafe fn write_array(&mut self, values: &[T]) -> SysResult<()> {
-        self.addr_space
-            .check_user_access(self.ptr as usize, size_of_val(values), MemPerm::W)?;
+        check_user_access(
+            self.addr_space,
+            self.ptr as usize,
+            size_of_val(values),
+            MemPerm::W,
+        )?;
         unsafe {
             self.ptr
                 .copy_from_nonoverlapping(values.as_ptr(), values.len());
@@ -397,8 +425,12 @@ where
     /// # Safety
     /// See the module-level documentation for safety information.
     pub unsafe fn try_into_mut_ref(&mut self) -> SysResult<&mut T> {
-        self.addr_space
-            .check_user_access(self.ptr as usize, size_of::<T>(), MemPerm::W)?;
+        check_user_access(
+            self.addr_space,
+            self.ptr as usize,
+            size_of::<T>(),
+            MemPerm::W,
+        )?;
         Ok(unsafe { &mut *self.ptr })
     }
 
@@ -420,142 +452,155 @@ where
     /// # Safety
     /// See the module-level documentation for safety information.
     pub unsafe fn try_into_mut_slice(&mut self, len: usize) -> SysResult<&mut [T]> {
-        self.addr_space
-            .check_user_access(self.ptr as usize, len * size_of::<T>(), MemPerm::W)?;
+        check_user_access(
+            self.addr_space,
+            self.ptr as usize,
+            len * size_of::<T>(),
+            MemPerm::W,
+        )?;
         Ok(unsafe { slice::from_raw_parts_mut(self.ptr, len) })
     }
 }
 
-impl AddrSpace {
-    /// Checks if certain user memory access is allowed, given the starting address
-    /// and length.
-    ///
-    /// `perm` must be `R`, `W`, or `RW`. `W` is equivalent to `RW`.
-    ///
-    /// `len` is the length in bytes of the memory region to be accessed.
-    ///
-    /// Returns `Ok(())` if the access is allowed, otherwise returns an `EFAULT` error.
-    fn check_user_access(&mut self, mut addr: usize, len: usize, perm: MemPerm) -> SysResult<()> {
-        if len == 0 {
-            return Ok(());
-        }
-        if addr == 0 {
-            return Err(SysError::EFAULT);
-        }
-
-        let end_addr = addr + len - 1;
-        if !VirtAddr::check_validity(addr) || !VirtAddr::check_validity(end_addr) {
-            return Err(SysError::EFAULT);
-        }
-
-        set_kernel_stvec_user_rw();
-
-        let checker = if perm.contains(MemPerm::W) {
-            try_write
-        } else {
-            try_read
-        };
-
-        while addr < end_addr {
-            if unsafe { !checker(addr) } {
-                // If the access failed, manually call the original page fault handler
-                // to try mapping the page. If this also fails, then we know the access
-                // is not allowed.
-                if let Err(e) = self.handle_page_fault(VirtAddr::new(addr), perm) {
-                    set_kernel_stvec();
-                    return Err(e);
-                }
-            }
-            addr += PAGE_SIZE;
-        }
-
-        set_kernel_stvec();
-        Ok(())
+/// Checks if certain user memory access is allowed, given the starting address
+/// and length.
+///
+/// `perm` must be `R`, `W`, or `RW`. `W` is equivalent to `RW`.
+///
+/// `len` is the length in bytes of the memory region to be accessed.
+///
+/// Returns `Ok(())` if the access is allowed, otherwise returns an `EFAULT` error.
+fn check_user_access(
+    addr_space: &mut AddrSpace,
+    mut addr: usize,
+    len: usize,
+    perm: MemPerm,
+) -> SysResult<()> {
+    if len == 0 {
+        return Ok(());
+    }
+    if addr == 0 {
+        return Err(SysError::EFAULT);
     }
 
-    /// Checks if certain user memory access is allowed, given the starting address,
-    /// the length, and a closure which performs additional actions on primitive
-    /// integer or pointer values along with the check and controls whether to stop
-    /// the process early.
-    ///
-    /// `perm` must be `MemPerm::R`, `MemPerm::W`, or `MemPerm::R` | `MemPerm::W`.
-    ///
-    /// `len` is the max length in bytes of the memory region to be accessed. However,
-    /// the closure may stop the process early, so the actual length may be less than
-    /// `len`.
-    ///
-    /// `T` must be a primitive integer or pointer type, and `addr` must be aligned
-    /// to the size of `T`. `len` must be a multiple of the size of `T`.
-    ///
-    /// The closure takes a shared reference to a `T` value on the memory region, and
-    /// it should return a [`ControlFlow<()>`] value to indicate whether to stop the
-    /// process early.
-    ///
-    /// Returns `Ok(())` if the access is allowed, otherwise returns an `EFAULT` error.
-    ///
-    /// # Safety
-    /// The values that the closure operates on must be valid and properly aligned.
-    unsafe fn check_user_access_with<F, T>(
-        &mut self,
-        mut addr: usize,
-        len: usize,
-        perm: MemPerm,
-        f: &mut F,
-    ) -> SysResult<()>
-    where
-        F: FnMut(T) -> ControlFlow<()>,
-        T: Copy,
+    let end_addr = addr + len;
+    if !VirtAddr::check_validity(addr)
+        || !VirtAddr::check_validity(end_addr - 1)
+        || !VirtAddr::new(end_addr - 1).in_user_space()
     {
-        if len == 0 {
-            return Ok(());
-        }
-        if addr == 0 {
-            return Err(SysError::EFAULT);
-        }
-
-        debug_assert!(addr % size_of::<T>() == 0);
-        debug_assert!(len % size_of::<T>() == 0);
-
-        let end_addr = addr + len; // exclusive
-        if !VirtAddr::check_validity(addr) || !VirtAddr::check_validity(end_addr - 1) {
-            return Err(SysError::EFAULT);
-        }
-
-        set_kernel_stvec_user_rw();
-
-        let checker = if perm.contains(MemPerm::W) {
-            try_write
-        } else {
-            try_read
-        };
-
-        while addr < end_addr {
-            if unsafe { !checker(addr) } {
-                // If the access failed, manually call the original page fault handler
-                // to try mapping the page. If this also fails, then we know the access
-                // is not allowed.
-                if let Err(e) = self.handle_page_fault(VirtAddr::new(addr), perm) {
-                    set_kernel_stvec();
-                    return Err(e);
-                }
-            }
-            let end_in_page = usize::min(VirtAddr::new(addr + 1).round_up().to_usize(), end_addr);
-            for item_addr in (addr..end_in_page).step_by(size_of::<T>()) {
-                let item = unsafe { *(item_addr as *const T) };
-                match f(item) {
-                    ControlFlow::Continue(()) => {}
-                    ControlFlow::Break(()) => {
-                        set_kernel_stvec();
-                        return Ok(());
-                    }
-                }
-            }
-            addr = end_in_page;
-        }
-
-        set_kernel_stvec();
-        Ok(())
+        return Err(SysError::EFAULT);
     }
+
+    set_kernel_stvec_user_rw();
+
+    let checker = if perm.contains(MemPerm::W) {
+        try_write
+    } else {
+        try_read
+    };
+
+    while addr < end_addr {
+        if unsafe { !checker(addr) } {
+            // If the access failed, manually call the original page fault handler
+            // to try mapping the page. If this also fails, then we know the access
+            // is not allowed.
+            if let Err(e) = addr_space.handle_page_fault(VirtAddr::new(addr), perm) {
+                set_kernel_stvec();
+                return Err(e);
+            }
+        }
+        addr += PAGE_SIZE;
+    }
+
+    set_kernel_stvec();
+    Ok(())
+}
+
+/// Checks if certain user memory access is allowed, given the starting address,
+/// the length, and a closure which performs additional actions on primitive
+/// integer or pointer values along with the check and controls whether to stop
+/// the process early.
+///
+/// `perm` must be `MemPerm::R`, `MemPerm::W`, or `MemPerm::R` | `MemPerm::W`.
+///
+/// `len` is the max length in bytes of the memory region to be accessed. However,
+/// the closure may stop the process early, so the actual length may be less than
+/// `len`.
+///
+/// `T` must be a primitive integer or pointer type, and `addr` must be aligned
+/// to the size of `T`. `len` must be a multiple of the size of `T`.
+///
+/// The closure takes a shared reference to a `T` value on the memory region, and
+/// it should return a [`ControlFlow<()>`] value to indicate whether to stop the
+/// process early.
+///
+/// Returns `Ok(())` if the access is allowed, otherwise returns an `EFAULT` error.
+///
+/// # Safety
+/// The values that the closure operates on must be valid and properly aligned.
+unsafe fn check_user_access_with<F, T>(
+    addr_space: &mut AddrSpace,
+    mut addr: usize,
+    len: usize,
+    perm: MemPerm,
+    f: &mut F,
+) -> SysResult<()>
+where
+    F: FnMut(T) -> ControlFlow<()>,
+    T: Copy,
+{
+    if len == 0 {
+        return Ok(());
+    }
+    if addr == 0 {
+        return Err(SysError::EFAULT);
+    }
+
+    debug_assert!(addr % size_of::<T>() == 0);
+    debug_assert!(len % size_of::<T>() == 0);
+
+    let end_addr = addr + len;
+    if !VirtAddr::check_validity(addr)
+        || !VirtAddr::check_validity(end_addr - 1)
+        || !VirtAddr::new(end_addr - 1).in_user_space()
+    {
+        return Err(SysError::EFAULT);
+    }
+
+    set_kernel_stvec_user_rw();
+
+    let checker = if perm.contains(MemPerm::W) {
+        try_write
+    } else {
+        try_read
+    };
+
+    while addr < end_addr {
+        if unsafe { !checker(addr) } {
+            // If the access failed, manually call the original page fault handler
+            // to try mapping the page. If this also fails, then we know the access
+            // is not allowed.
+            if let Err(e) = addr_space.handle_page_fault(VirtAddr::new(addr), perm) {
+                set_kernel_stvec();
+                return Err(e);
+            }
+        }
+        let end_in_page = usize::min(VirtAddr::new(addr + 1).round_up().to_usize(), end_addr);
+        for item_addr in (addr..end_in_page).step_by(size_of::<T>()) {
+            let item = unsafe { *(item_addr as *const T) };
+            match f(item) {
+                ControlFlow::Continue(()) => {}
+                ControlFlow::Break(()) => {
+                    set_kernel_stvec();
+                    return Ok(());
+                }
+            }
+        }
+        addr = end_in_page;
+    }
+
+    set_kernel_stvec();
+    Ok(())
 }
 
 /// Tries to read from a user memory region.

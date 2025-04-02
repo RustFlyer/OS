@@ -69,7 +69,7 @@ PHONY := all
 # ======================
 
 # Build both kernel ELF and disassembly file
-all: $(KERNEL_ELF) $(KERNEL_ASM)
+all: $(KERNEL_ELF) $(KERNEL_ASM) $(USER_APPS)
 
 # ======================
 # File Dependency Rules
@@ -170,7 +170,6 @@ PHONY += user
 user:
 	@echo "building user..."
 	@cd user && make build
-	@$(foreach elf, $(USER_ELFS), $(OBJCOPY) $(elf) --strip-all -O binary $(patsubst $(TARGET_DIR)/%, $(TARGET_DIR)/%.bin, $(elf));)
 	@echo "building user finished"
 
 # ======================

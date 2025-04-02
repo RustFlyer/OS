@@ -7,7 +7,8 @@
 use core::fmt::{self, Debug, Formatter};
 
 use config::mm::{
-    KERNEL_MAP_OFFSET, PA_WIDTH_SV39, PAGE_SIZE, PPN_WIDTH_SV39, VA_WIDTH_SV39, VPN_WIDTH_SV39,
+    KERNEL_MAP_OFFSET, PA_WIDTH_SV39, PAGE_SIZE, PPN_WIDTH_SV39, USER_END, VA_WIDTH_SV39,
+    VPN_WIDTH_SV39,
 };
 
 /// An address in physical memory defined in Sv39.
@@ -117,6 +118,10 @@ impl VirtAddr {
     pub fn check_validity(addr: usize) -> bool {
         let tmp = addr as isize >> VA_WIDTH_SV39;
         tmp == 0 || tmp == -1
+    }
+
+    pub fn in_user_space(self) -> bool {
+        self.addr < USER_END
     }
 
     /// Gets the inner `usize` address.

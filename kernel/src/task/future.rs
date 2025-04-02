@@ -38,6 +38,7 @@ impl<F: Future + Send + 'static> Future for UserFuture<F> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let future = unsafe { Pin::get_unchecked_mut(self) };
         let hart = current_hart();
+        log::debug!("switch to task [{}]!", future.task.get_name());
         hart.user_switch_in(&mut future.task, &mut future.pps);
         let ret = unsafe { Pin::new_unchecked(&mut future.future).poll(cx) };
         hart.user_switch_out(&mut future.pps);
@@ -95,9 +96,9 @@ pub async fn task_executor_unit(task: Arc<Task>) {
 
         trap::trap_handler(&task).await;
 
-        // TODO: if handler was interrupted, restart the handler
-
-        if task.timer_mut().schedule_time_out() && executor::has_waiting_task() {
+        let id = current_hart().id;
+        if task.timer_mut().schedule_time_out() && executor::has_waiting_task_alone(id) {
+            // log::debug!("yield to another!");
             yield_now().await;
         }
 
@@ -120,6 +121,7 @@ pub async fn task_executor_unit(task: Arc<Task>) {
 ///
 /// Wrap the user task as a UserFuture and submit it to the scheduler
 pub fn spawn_user_task(task: Arc<Task>) {
+    log::info!("New Task [{}] spawns!", task.get_name());
     let future = UserFuture::new(task.clone(), task_executor_unit(task));
     let (task, handle) = executor::spawn(future);
     task.schedule();

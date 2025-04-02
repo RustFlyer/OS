@@ -1,6 +1,7 @@
-use crate::processor::current_task;
 use crate::task::TaskState;
-use systype::SyscallResult;
+use crate::{processor::current_task, task::future::spawn_user_task};
+use config::process::CloneFlags;
+use systype::{SysError, SyscallResult};
 
 use crate::task::future::yield_now;
 
@@ -20,7 +21,7 @@ pub fn sys_exit(exit_code: i32) -> SyscallResult {
     let task = current_task();
     task.set_state(TaskState::Zombie);
     // non-leader thread are detached (see CLONE_THREAD flag in manual page clone.2)
-    log::info!("success exit with {}", exit_code);
+    log::info!("task [{}] exit with {}", task.get_name(), exit_code);
     if task.is_process() {
         task.set_exit_code((exit_code & 0xFF) << 8);
     }
@@ -34,4 +35,23 @@ pub async fn sys_sched_yield() -> SyscallResult {
 
 pub async fn sys_waitpid() -> SyscallResult {
     Ok(0)
+}
+
+pub fn sys_clone(
+    flags: usize,
+    stack: usize,
+    _parent_tid_ptr: usize,
+    _tls_ptr: usize,
+    chilren_tid_ptr: usize,
+) -> SyscallResult {
+    let _exit_signal = flags & 0xff;
+    let flags = CloneFlags::from_bits(flags as u64 & !0xff).ok_or(SysError::EINVAL)?;
+    log::info!("[sys_clone] flags {flags:?}");
+
+    let new_task = current_task().fork(flags);
+    new_task.trap_context_mut().set_user_a0(0);
+    let new_tid = new_task.tid();
+    log::info!("[sys_clone] clone a new thread, tid {new_tid}, clone flags {flags:?}",);
+    spawn_user_task(new_task);
+    Ok(new_tid)
 }

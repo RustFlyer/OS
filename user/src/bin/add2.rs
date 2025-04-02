@@ -14,5 +14,6 @@ fn main() {
         println!("thread orange: {}", i);
     }
 
-    exit(a)
+    println!("orange complete");
+    exit(77248)
 }

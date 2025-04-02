@@ -3,6 +3,7 @@
 #![feature(btree_cursors)]
 #![feature(naked_functions)]
 #![feature(sync_unsafe_cell)]
+#![allow(clippy::module_inception)]
 #![allow(dead_code)]
 
 mod boot;
@@ -20,6 +21,8 @@ mod trap;
 mod vm;
 mod signal;
 
+use core::ptr;
+
 use mm::{self, frame, heap};
 use processor::hart;
 use simdebug::when_debug;
@@ -31,6 +34,8 @@ static mut INITIALIZED: bool = false;
 
 #[unsafe(no_mangle)]
 pub fn rust_main(hart_id: usize) -> ! {
+    executor::init(hart_id);
+
     // SAFETY: Only the first hart will run this code block.
     if unsafe { !INITIALIZED } {
         /* Initialize logger */
@@ -43,9 +48,10 @@ pub fn rust_main(hart_id: usize) -> ! {
             log::info!("hart {}: initialized heap allocator", hart_id);
             frame::init_frame_allocator();
             log::info!("hart {}: initialized frame allocator", hart_id);
-            vm::enable_kernel_page_table();
+            mm::vm::switch_to_kernel_page_table();
             log::info!("hart {}: switched to kernel page table", hart_id);
-            INITIALIZED = true;
+            riscv::asm::fence();
+            ptr::write_volatile(&raw mut INITIALIZED, true);
         }
 
         unsafe {HART_START_ADDR {:#x} - {:#x}",
@@ -84,7 +90,7 @@ pub fn rust_main(hart_id: usize) -> ! {
         );
         log::info!("====== kernel memory layout end ======");
 
-        // boot::start_harts(hart_id);
+        boot::start_harts(hart_id);
 
         when_debug!({
             simdebug::backtrace_test();
@@ -97,7 +103,7 @@ pub fn rust_main(hart_id: usize) -> ! {
         // SAFETY: Only after the first hart has initialized the heap allocator and page table,
         // do the other harts enable the kernel page table.
         unsafe {
-            vm::enable_kernel_page_table();
+            mm::vm::switch_to_kernel_page_table();
         }
     }
 
@@ -106,7 +112,7 @@ pub fn rust_main(hart_id: usize) -> ! {
     log::info!("hart {}: running", hart_id);
 
     loop {
-        executor::task_run_always();
+        executor::task_run_always_alone(hart_id);
     }
     #[allow(unused)]
     sbi::shutdown(false);
