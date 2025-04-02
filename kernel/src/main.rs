@@ -18,6 +18,7 @@ mod syscall;
 mod task;
 mod trap;
 mod vm;
+mod signal;
 
 use mm::{self, frame, heap};
 use processor::hart;
@@ -47,13 +48,7 @@ pub fn rust_main(hart_id: usize) -> ! {
             INITIALIZED = true;
         }
 
-        unsafe {
-            trap::load_trap_handler();
-        }
-
-        log::info!("======== kernel memory layout ========");
-        log::info!(
-            "RAM: {:#x} - {:#x}",
+        unsafe {HART_START_ADDR {:#x} - {:#x}",
             config::mm::RAM_START,
             config::mm::RAM_END
         );

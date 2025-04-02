@@ -95,6 +95,8 @@ pub async fn task_executor_unit(task: Arc<Task>) {
 
         trap::trap_handler(&task).await;
 
+        // TODO: if handler was interrupted, restart the handler
+
         if task.timer_mut().schedule_time_out() && executor::has_waiting_task() {
             yield_now().await;
         }
@@ -107,7 +109,8 @@ pub async fn task_executor_unit(task: Arc<Task>) {
             _ => {}
         }
 
-        // signal_handle_
+        // param "intr" always false for now
+        sig_check(task.clone(), false);
     }
 
     task.exit();
