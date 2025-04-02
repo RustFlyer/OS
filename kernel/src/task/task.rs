@@ -1,6 +1,6 @@
+use crate::task::sig_members::*;
+use crate::task::signal::sig_info::*;
 use crate::task::tid::{Tid, TidHandle, tid_alloc};
-use sig_member::*;
-use signal::sig_info::*;
 
 extern crate alloc;
 use alloc::{
@@ -69,7 +69,7 @@ pub struct Task {
 
     sig_mask: SyncUnsafeCell<SigSet>,
     sig_handlers: ShareMutex<SigHandlers>,
-    sig_manager: SpinNoIrqLock<SigManager>,
+    sig_manager: SyncUnsafeCell<SigManager>,
     sig_stack: SyncUnsafeCell<Option<SignalStack>>,
 
     name: String,
@@ -94,9 +94,9 @@ impl Task {
             children: new_share_mutex(BTreeMap::new()),
             pgid: new_share_mutex(pgid),
             exit_code: SpinNoIrqLock::new(0),
-            sig_manager: SpinNoIrqLock::new(SigManager::new()),
+            sig_manager: SyncUnsafeCell::new(SigManager::new()),
             sig_mask: SyncUnsafeCell::new(SigSet::empty()),
-            sig_handlers: new_shared(SigHandlers::new()),
+            sig_handlers: new_share_mutex(SigHandlers::new()),
             sig_stack: SyncUnsafeCell::new(None),
             name,
         }
@@ -120,6 +120,12 @@ impl Task {
 
         pgid: ShareMutex<PGid>,
         exit_code: SpinNoIrqLock<i32>,
+
+        sig_mask: SyncUnsafeCell<SigSet>,
+        sig_handlers: ShareMutex<SigHandlers>,
+        sig_manager: SyncUnsafeCell<SigManager>,
+        sig_stack: SyncUnsafeCell<Option<SignalStack>>,
+
         name: String,
     ) -> Self {
         Task {
@@ -136,6 +142,10 @@ impl Task {
             children,
             pgid,
             exit_code,
+            sig_mask,
+            sig_handlers,
+            sig_manager,
+            sig_stack,
             name,
         }
     }
@@ -181,12 +191,12 @@ impl Task {
 
     #[allow(clippy::mut_from_ref)]
     pub fn sig_manager_mut(&self) -> &mut SigManager {
-        unsafe { &mut self.sig_manager.lock() }
+        unsafe { &mut *self.sig_manager.get() }
     }
 
     #[allow(clippy::mut_from_ref)]
-    pub fn sig_handlers_mut(&self) -> &mut SigHandlers {
-        unsafe { &mut self.sig_handlers.lock() }
+    pub fn sig_handlers_mut(&self) -> &ShareMutex<SigHandlers> {
+        &self.sig_handlers
     }
 
     #[allow(clippy::mut_from_ref)]
@@ -210,6 +220,10 @@ impl Task {
         &self.pgid
     }
 
+    pub fn sig_mask_mut(&self) -> &mut SigSet {
+        unsafe { &mut *self.sig_mask.get() }
+    }
+
     pub fn get_waker(&self) -> Waker {
         self.waker_mut().as_ref().unwrap().clone()
     }
@@ -227,7 +241,7 @@ impl Task {
     }
 
     pub fn get_sig_mask(&self) -> SigSet {
-        self.sig_mask.lock().clone()
+        unsafe { *self.sig_mask.get() }
     }
     // ========== This Part You Can Check the State of Task  ===========
     pub fn is_process(&self) -> bool {

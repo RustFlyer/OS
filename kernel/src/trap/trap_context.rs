@@ -50,6 +50,8 @@ pub struct TrapContext {
     // 当处理信号时，如果浮点状态为脏，
     // 这个标志位会被设置，以确保正确保存和恢复浮点状态。
     pub is_signal_dirty: u8,
+
+    pub last_a0: usize,
 }
 
 impl TrapContext {
@@ -79,6 +81,7 @@ impl TrapContext {
             is_dirty: 0,
             is_need_restore: 0,
             is_signal_dirty: 0,
+            last_a0: 0,
         };
 
         context.set_user_sp(sp);
@@ -213,5 +216,13 @@ impl TrapContext {
                 inout(reg) _t
             );
         };
+    }
+
+    pub fn save_last_user_a0(&mut self) {
+        self.last_a0 = self.user_reg[10];
+    }
+
+    pub fn restore_last_user_a0(&mut self) {
+        self.user_reg[10] = self.last_a0;
     }
 }
