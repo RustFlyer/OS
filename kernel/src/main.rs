@@ -22,6 +22,7 @@ mod vm;
 
 use core::ptr;
 
+use config::mm::{DTB_END, DTB_START};
 use mm::{self, frame, heap};
 use processor::hart;
 use simdebug::when_debug;
@@ -32,7 +33,7 @@ extern crate alloc;
 static mut INITIALIZED: bool = false;
 
 #[unsafe(no_mangle)]
-pub fn rust_main(hart_id: usize) -> ! {
+pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
     executor::init(hart_id);
 
     // SAFETY: Only the first hart will run this code block.
@@ -43,6 +44,7 @@ pub fn rust_main(hart_id: usize) -> ! {
 
         /* Initialize heap allocator and page table */
         unsafe {
+            config::mm::DTB_ADDR = dtb_addr;
             heap::init_heap_allocator();
             log::info!("hart {}: initialized heap allocator", hart_id);
             frame::init_frame_allocator();
@@ -93,13 +95,15 @@ pub fn rust_main(hart_id: usize) -> ! {
             config::mm::bss_start(),
             config::mm::bss_end()
         );
+        log::info!("device tree blob {:#x} - {:#x}", DTB_START, DTB_END,);
+        log::info!("device tree blob PA start: {:#x}", dtb_addr);
         log::info!("====== kernel memory layout end ======");
 
         driver::init();
-        log::info!("hart {}: initializing driver", hart_id);
+        log::info!("hart {}: initialized driver", hart_id);
 
         osfs::init();
-        log::info!("hart {}: initializing FS", hart_id);
+        log::info!("hart {}: initialized FS", hart_id);
 
         boot::start_harts(hart_id);
 

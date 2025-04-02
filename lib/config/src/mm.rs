@@ -107,6 +107,15 @@ pub const USER_STACK_LOWER: usize = USER_STACK_UPPER - USER_STACK_SIZE;
 /// boot hart start address
 pub const HART_START_ADDR: usize = 0x80200000;
 
+// /// Address of the device tree blob
+// pub static mut DTB_ADDR: usize = 0;
+// /// Maximum size of the device tree blob
+// pub const MAX_DTB_SIZE: usize = 0x100_0000;
+// /// Starting virtual address of the device tree blob
+// pub const DTB_START: usize = DTB_END - MAX_DTB_SIZE;
+// /// Ending virtual address of the device tree blob
+// pub const DTB_END: usize = 0xffff_ffff_f000_0000;
+
 /* Symbols defined in the linker script */
 unsafe extern "C" {
     fn _skernel();

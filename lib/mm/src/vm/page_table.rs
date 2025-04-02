@@ -10,8 +10,8 @@ use riscv::register::satp::{self, Satp};
 
 use arch::riscv64::mm::{fence, sfence_vma_addr, sfence_vma_all_except_global, tlb_shootdown};
 use config::mm::{
-    PTE_PER_TABLE, VIRT_END, bss_end, bss_start, data_end, data_start, kernel_end, kernel_start,
-    rodata_end, rodata_start, text_end, text_start,
+    KERNEL_MAP_OFFSET, PTE_PER_TABLE, VIRT_END, bss_end, bss_start, data_end, data_start,
+    kernel_end, kernel_start, rodata_end, rodata_start, text_end, text_start,
 };
 use simdebug::when_debug;
 use systype::SysResult;
@@ -23,7 +23,7 @@ use super::{
 use crate::{
     address::{PhysPageNum, VirtAddr, VirtPageNum},
     frame::FrameTracker,
-    vm::vm_area::{KernelArea, VmArea},
+    vm::vm_area::{OffsetArea, VmArea},
 };
 
 /// A data structure for manipulating page tables and manage memory mappings.
@@ -89,32 +89,48 @@ impl PageTable {
         let text_end_va = VirtAddr::new(text_end());
         let text_flags = PteFlags::R | PteFlags::X;
         let text_vma = VmArea::new_kernel(text_start_va, text_end_va, text_flags);
-        KernelArea::map(&text_vma, &mut page_table);
+        OffsetArea::map(&text_vma, &mut page_table);
 
         let rodata_start_va = VirtAddr::new(rodata_start());
         let rodata_end_va = VirtAddr::new(rodata_end());
         let rodata_flags = PteFlags::R;
         let rodata_vma = VmArea::new_kernel(rodata_start_va, rodata_end_va, rodata_flags);
-        KernelArea::map(&rodata_vma, &mut page_table);
+        OffsetArea::map(&rodata_vma, &mut page_table);
 
         let data_start_va = VirtAddr::new(data_start());
         let data_end_va = VirtAddr::new(data_end());
         let data_flags = PteFlags::R | PteFlags::W;
         let data_vma = VmArea::new_kernel(data_start_va, data_end_va, data_flags);
-        KernelArea::map(&data_vma, &mut page_table);
+        OffsetArea::map(&data_vma, &mut page_table);
 
         let bss_start_va = VirtAddr::new(bss_start());
         let bss_end_va = VirtAddr::new(bss_end());
         let bss_flags = PteFlags::R | PteFlags::W;
         let bss_vma = VmArea::new_kernel(bss_start_va, bss_end_va, bss_flags);
-        KernelArea::map(&bss_vma, &mut page_table);
+        OffsetArea::map(&bss_vma, &mut page_table);
 
         /* Map the allocatable frames */
         let alloc_start_va = VirtAddr::new(kernel_end());
         let alloc_end_va = VirtAddr::new(VIRT_END);
         let alloc_flags = PteFlags::R | PteFlags::W;
         let alloc_vma = VmArea::new_kernel(alloc_start_va, alloc_end_va, alloc_flags);
-        KernelArea::map(&alloc_vma, &mut page_table);
+        OffsetArea::map(&alloc_vma, &mut page_table);
+
+        /* Map memory-mapped I/O */
+        // let mmio_start_va = VirtAddr::new(DTB_START);
+        // let mmio_end_va = VirtAddr::new(DTB_END);
+        // let mmio_flags = PteFlags::R | PteFlags::W;
+        // let mmio_vma = VmArea::new_fixed_offset(
+        // mmio_start_va,
+        // mmio_end_va,
+        // mmio_flags,
+        // DTB_START - unsafe { DTB_ADDR },
+        // );
+        let mmio_start_va = VirtAddr::new(0x0200_0000 + KERNEL_MAP_OFFSET);
+        let mmio_end_va = VirtAddr::new(0x2000_0000 + KERNEL_MAP_OFFSET);
+        let mmio_flags = PteFlags::R | PteFlags::W;
+        let mmio_vma = VmArea::new_kernel(mmio_start_va, mmio_end_va, mmio_flags);
+        OffsetArea::map(&mmio_vma, &mut page_table);
 
         page_table
     }
