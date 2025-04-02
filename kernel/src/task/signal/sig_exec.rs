@@ -28,13 +28,13 @@ pub fn sig_check(task: Arc<Task>, mut intr: bool) -> SysResult<()> {
 fn sig_exec(task: Arc<Task>, si: SigInfo) {
     let action = task.sig_handlers_mut().get(si.sig);
     let cx = task.trap_context_mut();
+    let old_mask = task.get_sig_mask();
 
     log::info!("[do signal] Handling signal: {:?} {:?}", si, action);
-    if intr && action.flags.contains(SigActionFlag::SA_RESTART) {
+    if action.flags.contains(SigActionFlag::SA_RESTART) {
         cx.sepc -= 4;
         cx.restore_last_user_a0();
         log::info!("[do_signal] restart syscall");
-        intr = false;
     }
     match action.atype {
         ActionType::Ignore => false,
@@ -129,8 +129,8 @@ fn sig_exec(task: Arc<Task>, si: SigInfo) {
             cx.user_x[1] = _sigreturn_trampoline as usize;
             // sp (it will be used later by sys_sigreturn to restore sig_cx)
             cx.user_x[2] = new_sp;
-            cx.user_x[4] = sig_cx.mcontext.user_x[4];
-            cx.user_x[3] = sig_cx.mcontext.user_x[3];
+            cx.user_x[4] = sig_cx.user_x[4];
+            cx.user_x[3] = sig_cx.user_x[3];
             // log::error!("{:#x}", new_sp);
             true
         }

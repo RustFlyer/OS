@@ -40,3 +40,9 @@ pub fn sys_kill(sig_code: i32, pid: isize) -> SyscallResult{
     }
     Ok(0)
 }
+
+pub fn sys_sigaction() {
+    
+}
+
+pub fn sys_sigprocmask
