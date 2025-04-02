@@ -170,6 +170,59 @@ impl SigHandlers {
     }
 }
 
+pub enum ActionType {
+    Ignore,
+    Kill,
+    Stop,
+    Cont,
+    User { entry: usize },
+}
+
+impl ActionType {
+    pub fn default(sig: Sig) -> Self {
+        match sig {
+            Sig::SIGCHLD | Sig::SIGURG | Sig::SIGWINCH => ActionType::Ignore,
+            Sig::SIGSTOP | Sig::SIGTSTP | Sig::SIGTTIN | Sig::SIGTTOU => ActionType::Stop,
+            Sig::SIGCONT => ActionType::Cont,
+            _ => ActionType::Kill,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct Action {
+    pub atype: ActionType,
+    // 一个位掩码，每个比特位对应于系统中的一个信号。它用于在处理程序例程执行期间阻塞其他信号。
+    // 在例程结束后，内核会重置其值，回复到信号处理之前的原值
+    pub flags: SigActionFlag,
+    pub mask: SigSet,
+}
+
+bitflags! {
+    #[derive(Default, Copy, Clone, Debug)]
+    pub struct SigActionFlag : usize {
+        const SA_NOCLDSTOP = 1;
+        const SA_NOCLDWAIT = 2;
+        const SA_SIGINFO = 4;
+        const SA_ONSTACK = 0x08000000;
+        const SA_RESTART = 0x10000000;
+        const SA_NODEFER = 0x40000000;
+        const SA_RESETHAND = 0x80000000;
+        const SA_RESTORER = 0x04000000;
+    }
+}
+
+impl Action {
+    pub fn new(sig: Sig) -> Self {
+        let atype = ActionType::default(sig);
+        Self {
+            atype,
+            flags: Default::default(),
+            mask: SigSet::empty(),
+        }
+    }
+}
+
 /// 信号栈是为信号处理程序执行提供的专用栈空间.它通常包含以下内容:
 /// 1.信号上下文：这是信号处理程序运行时的上下文信息，包括所有寄存器的值、
 /// 程序计数器（PC）、栈指针等。它使得信号处理程序可以访问到被中断的程序的状态，

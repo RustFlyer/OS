@@ -17,8 +17,10 @@ pub fn sig_check(task: Arc<Task>, mut intr: bool) -> SysResult<()> {
     let old_mask = task.get_sig_mask();
 
     while let Some(si) = task.sig_manager_mut().dequeue_signal(&old_mask) {
-        sig_exec(task, si);
-        //TODO: should break when
+        // if sig_exec turns to user handler, it will return true to break the loop and run user handler.
+        if sig_exec(task.clone(), si) {
+            break;
+        }
     }
     Ok(())
 }
@@ -35,10 +37,19 @@ fn sig_exec(task: Arc<Task>, si: SigInfo) {
         intr = false;
     }
     match action.atype {
-        ActionType::Ignore => {}
-        ActionType::Kill => kill(task, si.sig),
-        ActionType::Stop => stop(task, si.sig),
-        ActionType::Cont => cont(task, si.sig),
+        ActionType::Ignore => false,
+        ActionType::Kill => {
+            kill(task, si.sig);
+            false
+        }
+        ActionType::Stop => {
+            stop(task, si.sig);
+            false
+        }
+        ActionType::Cont => {
+            cont(task, si.sig);
+            false
+        }
         ActionType::User { entry } => {
             // The signal being delivered is also added to the signal mask, unless
             // SA_NODEFER was specified when registering the handler.
@@ -121,7 +132,7 @@ fn sig_exec(task: Arc<Task>, si: SigInfo) {
             cx.user_x[4] = sig_cx.mcontext.user_x[4];
             cx.user_x[3] = sig_cx.mcontext.user_x[3];
             // log::error!("{:#x}", new_sp);
-            break;
+            true
         }
     }
 }
