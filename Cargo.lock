@@ -326,6 +326,7 @@ dependencies = [
  "logger",
  "mm",
  "mutex",
+ "osfs",
  "pps",
  "riscv",
  "riscv-rt",
@@ -390,7 +391,7 @@ dependencies = [
 [[package]]
 name = "lwext4_rust"
 version = "0.2.0"
-source = "git+https://github.com/EchudeT/lwext4_rust.git?rev=e7f0#e7f0305485ab948540cbe2109deae965536c0946"
+source = "git+https://github.com/EchudeT/lwext4_rust.git?rev=c115#c11526ea5c995406788e78443627415ab4ec345b"
 dependencies = [
  "bindgen",
  "log",
@@ -452,6 +453,20 @@ name = "once_cell"
 version = "1.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d75b0bedcc4fe52caa0e03d9f1151a323e4aa5e2d78ba3580400cd3c9e2bc4bc"
+
+[[package]]
+name = "osfs"
+version = "0.1.0"
+dependencies = [
+ "bitflags 2.9.0",
+ "config",
+ "driver",
+ "ext4",
+ "mutex",
+ "spin",
+ "systype",
+ "vfs",
+]
 
 [[package]]
 name = "paste"
@@ -697,6 +712,9 @@ dependencies = [
 [[package]]
 name = "systype"
 version = "0.1.0"
+dependencies = [
+ "strum",
+]
 
 [[package]]
 name = "time"

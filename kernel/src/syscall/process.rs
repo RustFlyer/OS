@@ -56,7 +56,4 @@ pub fn sys_clone(
     Ok(new_tid)
 }
 
-pub fn sys_wait4 (
-    pid: i32;
-    status: 
-)
+pub fn sys_wait4(pid: i32, status: i32) {}

@@ -5,10 +5,7 @@ use config::inode::InodeType;
 use lwext4_rust::bindings::SEEK_SET;
 use mutex::ShareMutex;
 use systype::{SysError, SyscallResult};
-use vfs::{
-    dentry,
-    file::{File, FileMeta},
-};
+use vfs::file::{File, FileMeta};
 
 use crate::{dentry::ExtDentry, ext::file::ExtFile, inode::file::ExtFileInode};
 
@@ -29,29 +26,30 @@ impl ExtFileFile {
     }
 }
 
-#[async_trait]
 impl File for ExtFileFile {
     fn get_meta(&self) -> &FileMeta {
         &self.meta
     }
 
-    async fn base_read_at(&self, offset: usize, buf: &mut [u8]) -> SyscallResult {
+    fn base_read_at(&self, offset: usize, buf: &mut [u8]) -> SyscallResult {
         match self.itype() {
             InodeType::File => {
                 let mut file = self.file.lock();
-                file.seek(offset, SEEK_SET)?;
-                file.read(buf)?;
+                file.seek(offset as i64, SEEK_SET)
+                    .map_err(SysError::from_i32)?;
+                file.read(buf).map_err(SysError::from_i32)
             }
             _ => todo!(),
         }
     }
 
-    async fn base_write_at(&self, offset: usize, buf: &[u8]) -> SyscallResult {
+    fn base_write_at(&self, offset: usize, buf: &[u8]) -> SyscallResult {
         match self.itype() {
             InodeType::File => {
                 let mut file = self.file.lock();
-                file.seek(offset, SEEK_SET)?;
-                file.write(buf)?;
+                file.seek(offset as i64, SEEK_SET)
+                    .map_err(SysError::from_i32)?;
+                file.write(buf).map_err(SysError::from_i32)
             }
             _ => todo!(),
         }

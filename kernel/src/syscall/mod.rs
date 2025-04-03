@@ -1,8 +1,8 @@
 mod consts;
 mod fs;
 mod process;
-mod time;
 mod signal;
+mod time;
 
 use consts::SyscallNo::{self, *};
 use fs::*;

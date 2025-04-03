@@ -1,2 +1,2 @@
-mod sig_info;
-mod sig_exec;
+pub mod sig_exec;
+pub mod sig_info;

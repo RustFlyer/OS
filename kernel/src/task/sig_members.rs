@@ -1,22 +1,29 @@
-use signal::sig_info::*;
+use core::fmt::{Debug, write};
 
+use alloc::collections::vec_deque::VecDeque;
+use bitflags::bitflags;
+
+use crate::task::{TaskState, signal::sig_info::*};
+
+use super::Task;
 
 impl Task {
     ///BODGE: regardless of threads in a group for now.
     pub fn receive_siginfo(&self, si: SigInfo) {
-            self.recv(si)
-        }
+        self.recv(si)
+    }
 
     fn recv(&self, si: SigInfo) {
         log::info!(
             "[Task::recv] tid {} recv {si:?} {:?}",
             self.tid(),
-            self.get_sig_handlers().get(si.sig)
+            self.sig_handlers_mut().lock().get(si.sig)
         );
-        
-        let manager = self.sig_manager_mut().lock();
+
+        let manager = self.sig_manager_mut();
         manager.add(si);
-        if manager.should_wake.contain_signal(si.sig) && self.is_interruptable() {
+        if manager.should_wake.contain_signal(si.sig) && self.is_in_state(TaskState::Interruptable)
+        {
             log::info!("[Task::recv] tid {} has been woken", self.tid());
             self.wake();
         } else {
@@ -24,13 +31,13 @@ impl Task {
                 "[Task::recv] tid {} hasn't been woken, should_wake {:?}, state {:?}",
                 self.tid(),
                 manager.should_wake,
-                self.state()
+                self.get_state()
             );
         }
     }
 }
 
-pub struct SigManager{
+pub struct SigManager {
     /// 接收到的所有信号
     pub queue: VecDeque<SigInfo>,
     /// 比特位的内容代表是否收到信号，主要用来防止queue收到重复信号
@@ -38,6 +45,12 @@ pub struct SigManager{
     /// 如果在receive_siginfo的时候收到的信号位于should_wake信号集合中，
     /// 且task的wake存在，那么唤醒task
     pub should_wake: SigSet,
+}
+
+impl Debug for SigManager {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "sigmanager: {}", self.bitmap.bits())
+    }
 }
 
 impl SigManager {
@@ -130,6 +143,12 @@ pub struct SigHandlers {
     bitmap: SigSet,
 }
 
+impl Debug for SigHandlers {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}", self.bitmap.bits())
+    }
+}
+
 impl SigHandlers {
     pub fn new() -> Self {
         Self {
@@ -170,6 +189,7 @@ impl SigHandlers {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
 pub enum ActionType {
     Ignore,
     Kill,
@@ -273,6 +293,6 @@ pub struct SigContext {
     pub sig: [usize; 16],
     // common register
     pub user_x: [usize; 32],
-    // 
+    //
     pub fpstate: [usize; 66],
 }

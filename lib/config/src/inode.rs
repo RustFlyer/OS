@@ -2,16 +2,16 @@ use bitflags::bitflags;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum InodeState {
-    /// Init state, indicates that this inode is not loaded from disk yet.
-    Init = 0x1,
-    /// inode dirty, data which is pointed to by inode is not dirty
-    DirtyInode = 0x2,
-    /// data already changed but not yet sync (inode not change)
-    DirtyData = 0x3,
-    /// inode and date changed together
-    DirtyAll = 0x4,
-    /// already sync
-    Synced = 0x5,
+    /// Uninitialized, not yet constructed completely.
+    Uninit,
+    /// Metadata changed but not yet sync (data not change)
+    DirtyInode,
+    /// Data changed but not yet sync (metadata not change)
+    DirtyData,
+    /// Data and metadata changed but not yet sync
+    DirtyAll,
+    /// Data and metadata changed and synchronized to disk
+    Synced,
 }
 
 bitflags! {

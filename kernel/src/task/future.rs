@@ -6,6 +6,7 @@ use core::task::{Context, Poll};
 
 use super::Task;
 use crate::processor::hart::current_hart;
+use crate::task::signal::sig_exec::sig_check;
 use crate::task::task::TaskState;
 use crate::trap;
 use core::task::Waker;

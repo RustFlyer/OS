@@ -19,7 +19,6 @@ mod syscall;
 mod task;
 mod trap;
 mod vm;
-mod signal;
 
 use core::ptr;
 
@@ -54,10 +53,6 @@ pub fn rust_main(hart_id: usize) -> ! {
             ptr::write_volatile(&raw mut INITIALIZED, true);
         }
 
-        unsafe {HART_START_ADDR {:#x} - {:#x}",
-            config::mm::RAM_START,
-            config::mm::RAM_END
-        );
         log::info!(
             "kernel physical memory: {:#x} - {:#x}",
             config::mm::KERNEL_START_PHYS,
@@ -89,6 +84,12 @@ pub fn rust_main(hart_id: usize) -> ! {
             config::mm::bss_end()
         );
         log::info!("====== kernel memory layout end ======");
+
+        // driver::init();
+        // log::info!("hart {}: initializing driver", hart_id);
+
+        // osfs::init();
+        // log::info!("hart {}: initializing FS", hart_id);
 
         boot::start_harts(hart_id);
 

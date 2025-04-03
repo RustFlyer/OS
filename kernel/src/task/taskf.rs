@@ -1,6 +1,6 @@
 extern crate alloc;
 use alloc::collections::btree_map::BTreeMap;
-use alloc::string::{String, ToString};
+use alloc::string::ToString;
 use alloc::sync::Arc;
 use mm::vm::addr_space::{AddrSpace, switch_to};
 use riscv::asm::sfence_vma_all;
@@ -8,7 +8,8 @@ use time::TaskTimeStat;
 
 use super::future::{self};
 use super::manager::TASK_MANAGER;
-use super::process_manager::{PROCESS_GROUP_MANAGER, ProcessGroupManager};
+use super::process_manager::PROCESS_GROUP_MANAGER;
+use super::sig_members::SigManager;
 use super::threadgroup::ThreadGroup;
 use super::tid::tid_alloc;
 use super::{task::*, threadgroup};
@@ -94,6 +95,11 @@ impl Task {
 
         let pgid;
 
+        let sig_mask;
+        let sig_handlers;
+        let sig_manager;
+        let sig_stack;
+
         if cloneflags.contains(CloneFlags::THREAD) {
             is_process = false;
             process = Some(Arc::downgrade(self));
@@ -111,15 +117,18 @@ impl Task {
             pgid = new_share_mutex(self.get_pgid());
         }
 
+        sig_mask = SyncUnsafeCell::new(self.get_sig_mask());
+        sig_handlers = (*self.sig_handlers_mut()).clone();
+        sig_manager = SyncUnsafeCell::new(SigManager::new());
+        sig_stack = SyncUnsafeCell::new(self.sig_stack_mut().clone());
+
         let addr_space;
         if cloneflags.contains(CloneFlags::VM) {
             addr_space = (*self.addr_space_mut()).clone();
         } else {
             let cow_address_space = self.addr_space_mut().lock().clone_cow().unwrap();
             addr_space = Arc::new(SpinNoIrqLock::new(cow_address_space));
-            unsafe {
-                sfence_vma_all();
-            }
+            sfence_vma_all();
         }
 
         let name = self.get_name() + "(fork)";
@@ -138,6 +147,10 @@ impl Task {
             children,
             pgid,
             SpinNoIrqLock::new(0),
+            sig_mask,
+            sig_handlers,
+            sig_manager,
+            sig_stack,
             name,
         ));
 
@@ -151,6 +164,11 @@ impl Task {
 
         TASK_MANAGER.add_task(&new);
         new
+    }
+
+    pub fn wake(&self) {
+        let waker = self.waker_mut();
+        waker.as_ref().unwrap().wake_by_ref();
     }
 
     pub fn exit(&self) {
