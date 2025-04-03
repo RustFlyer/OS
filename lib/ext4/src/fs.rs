@@ -36,16 +36,12 @@ impl FileSystemType for ExtFsType {
         flags: config::vfs::MountFlags,
         dev: Option<Arc<dyn driver::BlockDevice>>,
     ) -> systype::SysResult<Arc<dyn vfs::dentry::Dentry>> {
-        log::debug!("t");
         let meta = SuperBlockMeta::new(dev, self.clone());
-        log::debug!("t1");
         let superblock = ExtSuperBlock::new(meta);
-        log::debug!("t12");
         let root_dir = ExtDir::open("/").map_err(SysError::from_i32)?;
         let root_inode = ExtDirInode::new(superblock.clone(), root_dir);
         let root_dentry = ExtDentry::new(name, superblock.clone(), parent.clone());
         root_dentry.set_inode(root_inode);
-        log::debug!("t123");
 
         if let Some(parent) = parent {
             parent.insert(root_dentry.clone());

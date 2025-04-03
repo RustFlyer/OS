@@ -23,6 +23,7 @@ mod vm;
 use core::ptr;
 
 use config::mm::{DTB_END, DTB_START};
+use driver::block_device_test;
 use mm::{self, frame, heap};
 use processor::hart;
 use simdebug::when_debug;
@@ -101,6 +102,8 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
 
         driver::init();
         log::info!("hart {}: initialized driver", hart_id);
+
+        // block_device_test();
 
         osfs::init();
         log::info!("hart {}: initialized FS", hart_id);

@@ -1,7 +1,7 @@
 extern crate alloc;
 
 use alloc::sync::Arc;
-use config::board::BLOCK_SIZE;
+use config::device::BLOCK_SIZE;
 use driver::BlockDevice;
 use lwext4_rust::{
     KernelDevOp,
@@ -40,7 +40,7 @@ impl Disk {
 
     /// Reads one block (whole or partial)
     pub fn read_one(&mut self, buf: &mut [u8]) -> SysResult<usize> {
-        log::info!("read one tick");
+        log::info!("read one in offset {}", self.pos());
         let read_size = if self.offset == 0 && buf.len() >= BLOCK_SIZE {
             self.dev.read(self.block_id, &mut buf[..BLOCK_SIZE]);
             self.block_id += 1;
@@ -57,6 +57,7 @@ impl Disk {
             self.offset += length;
             length
         };
+        log::info!("out: {} - buflen {}", read_size, buf.len());
         Ok(read_size)
     }
 
@@ -141,6 +142,8 @@ impl KernelDevOp for Disk {
             }
         }
         .ok_or(-1)?;
+
+        log::info!("seek new pos: {}", new_pos);
 
         if new_pos > dev.size() as i64 {
             log::warn!("pos > dev.size!!");

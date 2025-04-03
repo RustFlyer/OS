@@ -3,4 +3,4 @@ profile = "default"
 channel = "nightly-2025-03-05"
 components = ["rust-src", "llvm-tools"]
 targets = ["riscv64gc-unknown-none-elf"]
- 
+

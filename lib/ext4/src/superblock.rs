@@ -23,10 +23,10 @@ impl ExtSuperBlock {
     pub fn new(meta: SuperBlockMeta) -> Arc<Self> {
         let dev = meta.device.as_ref().unwrap().clone();
         let disk = Disk::new(dev);
-        log::debug!("b12");
+        log::debug!("try to initialize EXT4 filesystem");
         let inner =
             Ext4BlockWrapper::<Disk>::new(disk).expect("failed to initialize EXT4 filesystem");
-        log::debug!("b123");
+        log::debug!("initialize EXT4 filesystem");
         Arc::new(Self { meta: meta, inner })
     }
 }
