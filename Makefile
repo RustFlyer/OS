@@ -30,7 +30,7 @@ OBJDUMP = rust-objdump --arch-name=riscv64
 OBJCOPY = rust-objcopy --binary-architecture=riscv64
 PAGER = less
 
-DISASM_ARGS = -d
+DISASM_ARGS = -d -s
 
 TARGET_DIR := target/$(TARGET)/$(MODE)
 KERNEL_ELF := $(TARGET_DIR)/$(PACKAGE_NAME)
