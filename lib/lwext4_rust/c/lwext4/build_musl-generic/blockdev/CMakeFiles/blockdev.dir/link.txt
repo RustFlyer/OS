@@ -1,0 +1,2 @@
+/opt/riscv/riscv64-linux-musl-cross/bin/riscv64-linux-musl-ar qc libblockdev.a CMakeFiles/blockdev.dir/linux/file_dev.c.o CMakeFiles/blockdev.dir/blockdev.c.o
+/opt/riscv/riscv64-linux-musl-cross/bin/riscv64-linux-musl-ranlib libblockdev.a

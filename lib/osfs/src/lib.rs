@@ -30,15 +30,15 @@ pub fn init() {
     FS_MANAGER.lock().insert(diskfs.name(), diskfs);
 
     let diskfs = FS_MANAGER.lock().get(DISK_FS_NAME).unwrap().clone();
+    log::debug!("get ext4 diskfs");
+
+    let block_device = Some(BLOCK_DEVICE.get().unwrap().clone());
+    log::debug!("get BLOCK_DEVICE");
 
     let diskfs_root = diskfs
-        .mount(
-            "/",
-            None,
-            MountFlags::empty(),
-            Some(BLOCK_DEVICE.get().unwrap().clone()),
-        )
+        .mount("/", None, MountFlags::empty(), block_device)
         .unwrap();
+    log::debug!("success mount diskfs");
 
     SYS_ROOT_DENTRY.call_once(|| diskfs_root);
 

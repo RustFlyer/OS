@@ -40,6 +40,7 @@ impl Disk {
 
     /// Reads one block (whole or partial)
     pub fn read_one(&mut self, buf: &mut [u8]) -> SysResult<usize> {
+        log::info!("read one tick");
         let read_size = if self.offset == 0 && buf.len() >= BLOCK_SIZE {
             self.dev.read(self.block_id, &mut buf[..BLOCK_SIZE]);
             self.block_id += 1;
@@ -61,6 +62,7 @@ impl Disk {
 
     /// Writes one block (whole or partial)
     pub fn write_one(&mut self, buf: &[u8]) -> SysResult<usize> {
+        log::info!("write one tick");
         let write_size = if self.offset == 0 && buf.len() >= BLOCK_SIZE {
             self.dev.write(self.block_id, &buf[..BLOCK_SIZE]);
             self.block_id += 1;

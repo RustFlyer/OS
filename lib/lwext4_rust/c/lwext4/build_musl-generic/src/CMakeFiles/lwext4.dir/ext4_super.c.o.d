@@ -1,0 +1,23 @@
+src/CMakeFiles/lwext4.dir/ext4_super.c.o: \
+ /home/unix/file/OSkernel/myOS/rfos/lib/lwext4_rust/c/lwext4/src/ext4_super.c \
+ /home/unix/file/OSkernel/myOS/rfos/lib/lwext4_rust/c/lwext4/include/ext4_config.h \
+ /home/unix/file/OSkernel/myOS/rfos/lib/lwext4_rust/c/lwext4/build_musl-generic/include/generated/ext4_config.h \
+ /home/unix/file/OSkernel/myOS/rfos/lib/lwext4_rust/c/lwext4/include/ext4_types.h \
+ /home/unix/file/OSkernel/myOS/rfos/lib/lwext4_rust/c/lwext4/include/ext4_blockdev.h \
+ /home/unix/file/OSkernel/myOS/rfos/lib/lwext4_rust/c/lwext4/include/ext4_bcache.h \
+ /opt/riscv/riscv64-linux-musl-cross/riscv64-linux-musl/include/stdint.h \
+ /opt/riscv/riscv64-linux-musl-cross/riscv64-linux-musl/include/bits/alltypes.h \
+ /opt/riscv/riscv64-linux-musl-cross/riscv64-linux-musl/include/bits/stdint.h \
+ /opt/riscv/riscv64-linux-musl-cross/riscv64-linux-musl/include/stdbool.h \
+ /home/unix/file/OSkernel/myOS/rfos/lib/lwext4_rust/c/lwext4/include/misc/tree.h \
+ /home/unix/file/OSkernel/myOS/rfos/lib/lwext4_rust/c/lwext4/include/misc/../ext4_config.h \
+ /home/unix/file/OSkernel/myOS/rfos/lib/lwext4_rust/c/lwext4/include/misc/queue.h \
+ /opt/riscv/riscv64-linux-musl-cross/riscv64-linux-musl/include/stddef.h \
+ /home/unix/file/OSkernel/myOS/rfos/lib/lwext4_rust/c/lwext4/include/ext4_misc.h \
+ /home/unix/file/OSkernel/myOS/rfos/lib/lwext4_rust/c/lwext4/include/ext4_errno.h \
+ /home/unix/file/OSkernel/myOS/rfos/lib/lwext4_rust/c/lwext4/include/ext4_debug.h \
+ /opt/riscv/riscv64-linux-musl-cross/riscv64-linux-musl/include/inttypes.h \
+ /opt/riscv/riscv64-linux-musl-cross/riscv64-linux-musl/include/features.h \
+ /opt/riscv/riscv64-linux-musl-cross/riscv64-linux-musl/include/stdio.h \
+ /home/unix/file/OSkernel/myOS/rfos/lib/lwext4_rust/c/lwext4/include/ext4_super.h \
+ /home/unix/file/OSkernel/myOS/rfos/lib/lwext4_rust/c/lwext4/include/ext4_crc32.h

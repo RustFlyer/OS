@@ -1,0 +1,1 @@
+/opt/riscv/riscv64-linux-musl-cross/bin/riscv64-linux-musl-cc -fPIC -fno-builtin -ffreestanding -std=gnu99 -fdata-sections -ffunction-sections -O2 -g -ggdb3 -Wl,--gc-sections "CMakeFiles/lwext4-mbr.dir/lwext4_mbr.c.o" -o lwext4-mbr  ../blockdev/libblockdev.a ../src/liblwext4.a

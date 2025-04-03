@@ -1,0 +1,256 @@
+
+---
+events:
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/usr/share/cmake-3.30/Modules/CMakeDetermineSystem.cmake:200 (message)"
+      - "CMakeLists.txt:1 (project)"
+    message: |
+      The target system is: Linux -  - riscv64
+      The host system is: Linux - 5.15.133.1-microsoft-standard-WSL2 - x86_64
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/usr/share/cmake-3.30/Modules/CMakeDetermineCompilerId.cmake:17 (message)"
+      - "/usr/share/cmake-3.30/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/usr/share/cmake-3.30/Modules/CMakeDetermineCCompiler.cmake:123 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:1 (project)"
+    message: |
+      Compiling the C compiler identification source file "CMakeCCompilerId.c" succeeded.
+      Compiler: /opt/riscv/riscv64-linux-musl-cross/bin/riscv64-linux-musl-cc 
+      Build flags: -fPIC;-fno-builtin;-ffreestanding;-std=gnu99;-fdata-sections;-ffunction-sections
+      Id flags:  
+      
+      The output was:
+      0
+      
+      
+      Compilation of the C compiler identification source "CMakeCCompilerId.c" produced "a.out"
+      
+      The C compiler identification is GNU, found in:
+        /home/unix/file/OSkernel/myOS/rfos/lib/lwext4_rust/c/lwext4/build_musl-generic/CMakeFiles/3.30.2/CompilerIdC/a.out
+      
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/usr/share/cmake-3.30/Modules/CMakeDetermineCompilerABI.cmake:74 (try_compile)"
+      - "/usr/share/cmake-3.30/Modules/CMakeTestCCompiler.cmake:26 (CMAKE_DETERMINE_COMPILER_ABI)"
+      - "CMakeLists.txt:1 (project)"
+    checks:
+      - "Detecting C compiler ABI info"
+    directories:
+      source: "/home/unix/file/OSkernel/myOS/rfos/lib/lwext4_rust/c/lwext4/build_musl-generic/CMakeFiles/CMakeScratch/TryCompile-wGETEj"
+      binary: "/home/unix/file/OSkernel/myOS/rfos/lib/lwext4_rust/c/lwext4/build_musl-generic/CMakeFiles/CMakeScratch/TryCompile-wGETEj"
+    cmakeVariables:
+      CMAKE_C_FLAGS: "-fPIC -fno-builtin -ffreestanding -std=gnu99 -fdata-sections -ffunction-sections"
+    buildResult:
+      variable: "CMAKE_C_ABI_COMPILED"
+      cached: true
+      stdout: |
+        Change Dir: '/home/unix/file/OSkernel/myOS/rfos/lib/lwext4_rust/c/lwext4/build_musl-generic/CMakeFiles/CMakeScratch/TryCompile-wGETEj'
+        
+        Run Build Command(s): /usr/bin/cmake -E env VERBOSE=1 /bin/make -f Makefile cmTC_cdf39/fast
+        make[1]: Entering directory '/home/unix/file/OSkernel/myOS/rfos/lib/lwext4_rust/c/lwext4/build_musl-generic/CMakeFiles/CMakeScratch/TryCompile-wGETEj'
+        /bin/make  -f CMakeFiles/cmTC_cdf39.dir/build.make CMakeFiles/cmTC_cdf39.dir/build
+        make[2]: Entering directory '/home/unix/file/OSkernel/myOS/rfos/lib/lwext4_rust/c/lwext4/build_musl-generic/CMakeFiles/CMakeScratch/TryCompile-wGETEj'
+        Building C object CMakeFiles/cmTC_cdf39.dir/CMakeCCompilerABI.c.o
+        /opt/riscv/riscv64-linux-musl-cross/bin/riscv64-linux-musl-cc   -fPIC -fno-builtin -ffreestanding -std=gnu99 -fdata-sections -ffunction-sections    -v -o CMakeFiles/cmTC_cdf39.dir/CMakeCCompilerABI.c.o -c /usr/share/cmake-3.30/Modules/CMakeCCompilerABI.c
+        Using built-in specs.
+        COLLECT_GCC=/opt/riscv/riscv64-linux-musl-cross/bin/riscv64-linux-musl-cc
+        Target: riscv64-linux-musl
+        Configured with: ../src_gcc/configure --enable-languages=c,c++,fortran CC='gcc -static --static' CXX='g++ -static --static' FC='gfortran -static --static' CFLAGS='-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error' CXXFLAGS='-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error' FFLAGS='-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error' LDFLAGS='-s -static --static' --enable-default-pie --enable-static-pie --disable-cet --disable-bootstrap --disable-assembly --disable-werror --target=riscv64-linux-musl --prefix= --libdir=/lib --disable-multilib --with-sysroot=/riscv64-linux-musl --enable-tls --disable-libmudflap --disable-libsanitizer --disable-gnu-indirect-function --disable-libmpx --enable-initfini-array --enable-libstdcxx-time=rt --enable-deterministic-archives --enable-libstdcxx-time --enable-libquadmath --enable-libquadmath-support --disable-decimal-float --with-build-sysroot=/tmp/m1132/build/local/riscv64-linux-musl/obj_sysroot AR_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/binutils/ar AS_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/gas/as-new LD_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/ld/ld-new NM_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/binutils/nm-new OBJCOPY_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/binutils/objcopy OBJDUMP_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/binutils/objdump RANLIB_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/binutils/ranlib READELF_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/binutils/readelf STRIP_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/binutils/strip-new --build=x86_64-pc-linux-muslx32 --host=x86_64-pc-linux-muslx32
+        Thread model: posix
+        Supported LTO compression algorithms: zlib
+        gcc version 11.2.1 20211120 (GCC) 
+        COLLECT_GCC_OPTIONS='-fPIC' '-fno-builtin' '-ffreestanding' '-std=gnu99' '-fdata-sections' '-ffunction-sections' '-v' '-o' 'CMakeFiles/cmTC_cdf39.dir/CMakeCCompilerABI.c.o' '-c' '-march=rv64gc' '-mabi=lp64d' '-march=rv64imafdc' '-dumpdir' 'CMakeFiles/cmTC_cdf39.dir/'
+         /opt/riscv/riscv64-linux-musl-cross/bin/../libexec/gcc/riscv64-linux-musl/11.2.1/cc1 -quiet -v -iprefix /opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/ -isysroot /opt/riscv/riscv64-linux-musl-cross/bin/../riscv64-linux-musl /usr/share/cmake-3.30/Modules/CMakeCCompilerABI.c -quiet -dumpdir CMakeFiles/cmTC_cdf39.dir/ -dumpbase CMakeCCompilerABI.c.c -dumpbase-ext .c -march=rv64gc -mabi=lp64d -march=rv64imafdc -std=gnu99 -version -fPIC -fno-builtin -ffreestanding -fdata-sections -ffunction-sections -o /tmp/ccinJoim.s
+        GNU C99 (GCC) version 11.2.1 20211120 (riscv64-linux-musl)
+        	compiled by GNU C version 11.2.0, GMP version 6.2.1, MPFR version 4.1.0, MPC version 1.2.1, isl version none
+        GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
+        ignoring nonexistent directory "/opt/riscv/riscv64-linux-musl-cross/bin/../riscv64-linux-musl/usr/local/include"
+        ignoring duplicate directory "/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/../../lib/gcc/riscv64-linux-musl/11.2.1/../../../../riscv64-linux-musl/include"
+        ignoring nonexistent directory "/opt/riscv/riscv64-linux-musl-cross/bin/../riscv64-linux-musl/usr/include"
+        ignoring duplicate directory "/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/../../lib/gcc/riscv64-linux-musl/11.2.1/include"
+        #include "..." search starts here:
+        #include <...> search starts here:
+         /opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/../../../../riscv64-linux-musl/include
+         /opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/include
+        End of search list.
+        GNU C99 (GCC) version 11.2.1 20211120 (riscv64-linux-musl)
+        	compiled by GNU C version 11.2.0, GMP version 6.2.1, MPFR version 4.1.0, MPC version 1.2.1, isl version none
+        GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
+        Compiler executable checksum: 3146a49ff056b11657a77db0bbeba530
+        COLLECT_GCC_OPTIONS='-fPIC' '-fno-builtin' '-ffreestanding' '-std=gnu99' '-fdata-sections' '-ffunction-sections' '-v' '-o' 'CMakeFiles/cmTC_cdf39.dir/CMakeCCompilerABI.c.o' '-c' '-march=rv64gc' '-mabi=lp64d' '-march=rv64imafdc' '-dumpdir' 'CMakeFiles/cmTC_cdf39.dir/'
+         /opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/../../../../riscv64-linux-musl/bin/as -v --traditional-format -fpic -march=rv64gc -march=rv64imafdc -mabi=lp64d -o CMakeFiles/cmTC_cdf39.dir/CMakeCCompilerABI.c.o /tmp/ccinJoim.s
+        GNU assembler version 2.37 (riscv64-linux-musl) using BFD version (GNU Binutils) 2.37
+        COMPILER_PATH=/opt/riscv/riscv64-linux-musl-cross/bin/../libexec/gcc/riscv64-linux-musl/11.2.1/:/opt/riscv/riscv64-linux-musl-cross/bin/../libexec/gcc/:/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/../../../../riscv64-linux-musl/bin/
+        LIBRARY_PATH=/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/:/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/:/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/../../../../riscv64-linux-musl/lib/:/opt/riscv/riscv64-linux-musl-cross/bin/../riscv64-linux-musl/lib/
+        COLLECT_GCC_OPTIONS='-fPIC' '-fno-builtin' '-ffreestanding' '-std=gnu99' '-fdata-sections' '-ffunction-sections' '-v' '-o' 'CMakeFiles/cmTC_cdf39.dir/CMakeCCompilerABI.c.o' '-c' '-march=rv64gc' '-mabi=lp64d' '-march=rv64imafdc' '-dumpdir' 'CMakeFiles/cmTC_cdf39.dir/CMakeCCompilerABI.c.'
+        Linking C executable cmTC_cdf39
+        /usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_cdf39.dir/link.txt --verbose=1
+        /opt/riscv/riscv64-linux-musl-cross/bin/riscv64-linux-musl-cc -fPIC -fno-builtin -ffreestanding -std=gnu99 -fdata-sections -ffunction-sections  -Wl,--gc-sections -v -Wl,-v -rdynamic CMakeFiles/cmTC_cdf39.dir/CMakeCCompilerABI.c.o -o cmTC_cdf39
+        Using built-in specs.
+        COLLECT_GCC=/opt/riscv/riscv64-linux-musl-cross/bin/riscv64-linux-musl-cc
+        COLLECT_LTO_WRAPPER=/opt/riscv/riscv64-linux-musl-cross/bin/../libexec/gcc/riscv64-linux-musl/11.2.1/lto-wrapper
+        Target: riscv64-linux-musl
+        Configured with: ../src_gcc/configure --enable-languages=c,c++,fortran CC='gcc -static --static' CXX='g++ -static --static' FC='gfortran -static --static' CFLAGS='-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error' CXXFLAGS='-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error' FFLAGS='-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error' LDFLAGS='-s -static --static' --enable-default-pie --enable-static-pie --disable-cet --disable-bootstrap --disable-assembly --disable-werror --target=riscv64-linux-musl --prefix= --libdir=/lib --disable-multilib --with-sysroot=/riscv64-linux-musl --enable-tls --disable-libmudflap --disable-libsanitizer --disable-gnu-indirect-function --disable-libmpx --enable-initfini-array --enable-libstdcxx-time=rt --enable-deterministic-archives --enable-libstdcxx-time --enable-libquadmath --enable-libquadmath-support --disable-decimal-float --with-build-sysroot=/tmp/m1132/build/local/riscv64-linux-musl/obj_sysroot AR_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/binutils/ar AS_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/gas/as-new LD_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/ld/ld-new NM_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/binutils/nm-new OBJCOPY_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/binutils/objcopy OBJDUMP_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/binutils/objdump RANLIB_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/binutils/ranlib READELF_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/binutils/readelf STRIP_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/binutils/strip-new --build=x86_64-pc-linux-muslx32 --host=x86_64-pc-linux-muslx32
+        Thread model: posix
+        Supported LTO compression algorithms: zlib
+        gcc version 11.2.1 20211120 (GCC) 
+        COMPILER_PATH=/opt/riscv/riscv64-linux-musl-cross/bin/../libexec/gcc/riscv64-linux-musl/11.2.1/:/opt/riscv/riscv64-linux-musl-cross/bin/../libexec/gcc/:/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/../../../../riscv64-linux-musl/bin/
+        LIBRARY_PATH=/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/:/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/:/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/../../../../riscv64-linux-musl/lib/:/opt/riscv/riscv64-linux-musl-cross/bin/../riscv64-linux-musl/lib/
+        COLLECT_GCC_OPTIONS='-fPIC' '-fno-builtin' '-ffreestanding' '-std=gnu99' '-fdata-sections' '-ffunction-sections' '-v' '-rdynamic' '-o' 'cmTC_cdf39' '-march=rv64gc' '-mabi=lp64d' '-march=rv64imafdc' '-dumpdir' 'cmTC_cdf39.'
+         /opt/riscv/riscv64-linux-musl-cross/bin/../libexec/gcc/riscv64-linux-musl/11.2.1/collect2 --sysroot=/opt/riscv/riscv64-linux-musl-cross/bin/../riscv64-linux-musl --eh-frame-hdr -melf64lriscv -export-dynamic -dynamic-linker /lib/ld-musl-riscv64.so.1 -pie -o cmTC_cdf39 /opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/../../../../riscv64-linux-musl/lib/Scrt1.o /opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/crti.o /opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/crtbeginS.o -L/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1 -L/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc -L/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/../../../../riscv64-linux-musl/lib -L/opt/riscv/riscv64-linux-musl-cross/bin/../riscv64-linux-musl/lib --gc-sections -v CMakeFiles/cmTC_cdf39.dir/CMakeCCompilerABI.c.o -lgcc --push-state --as-needed -lgcc_s --pop-state -lc -lgcc --push-state --as-needed -lgcc_s --pop-state /opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/crtendS.o /opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/crtn.o
+        collect2 version 11.2.1 20211120
+        /opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/../../../../riscv64-linux-musl/bin/ld --sysroot=/opt/riscv/riscv64-linux-musl-cross/bin/../riscv64-linux-musl --eh-frame-hdr -melf64lriscv -export-dynamic -dynamic-linker /lib/ld-musl-riscv64.so.1 -pie -o cmTC_cdf39 /opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/../../../../riscv64-linux-musl/lib/Scrt1.o /opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/crti.o /opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/crtbeginS.o -L/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1 -L/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc -L/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/../../../../riscv64-linux-musl/lib -L/opt/riscv/riscv64-linux-musl-cross/bin/../riscv64-linux-musl/lib --gc-sections -v CMakeFiles/cmTC_cdf39.dir/CMakeCCompilerABI.c.o -lgcc --push-state --as-needed -lgcc_s --pop-state -lc -lgcc --push-state --as-needed -lgcc_s --pop-state /opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/crtendS.o /opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/crtn.o
+        GNU ld (GNU Binutils) 2.37
+        COLLECT_GCC_OPTIONS='-fPIC' '-fno-builtin' '-ffreestanding' '-std=gnu99' '-fdata-sections' '-ffunction-sections' '-v' '-rdynamic' '-o' 'cmTC_cdf39' '-march=rv64gc' '-mabi=lp64d' '-march=rv64imafdc' '-dumpdir' 'cmTC_cdf39.'
+        make[2]: Leaving directory '/home/unix/file/OSkernel/myOS/rfos/lib/lwext4_rust/c/lwext4/build_musl-generic/CMakeFiles/CMakeScratch/TryCompile-wGETEj'
+        make[1]: Leaving directory '/home/unix/file/OSkernel/myOS/rfos/lib/lwext4_rust/c/lwext4/build_musl-generic/CMakeFiles/CMakeScratch/TryCompile-wGETEj'
+        
+      exitCode: 0
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/usr/share/cmake-3.30/Modules/CMakeDetermineCompilerABI.cmake:182 (message)"
+      - "/usr/share/cmake-3.30/Modules/CMakeTestCCompiler.cmake:26 (CMAKE_DETERMINE_COMPILER_ABI)"
+      - "CMakeLists.txt:1 (project)"
+    message: |
+      Parsed C implicit include dir info: rv=done
+        found start of include info
+        found start of implicit include info
+          add: [/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/../../../../riscv64-linux-musl/include]
+          add: [/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/include]
+        end of search list found
+        collapse include dir [/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/../../../../riscv64-linux-musl/include] ==> [/opt/riscv/riscv64-linux-musl-cross/riscv64-linux-musl/include]
+        collapse include dir [/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/include] ==> [/opt/riscv/riscv64-linux-musl-cross/lib/gcc/riscv64-linux-musl/11.2.1/include]
+        implicit include dirs: [/opt/riscv/riscv64-linux-musl-cross/riscv64-linux-musl/include;/opt/riscv/riscv64-linux-musl-cross/lib/gcc/riscv64-linux-musl/11.2.1/include]
+      
+      
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/usr/share/cmake-3.30/Modules/CMakeDetermineCompilerABI.cmake:218 (message)"
+      - "/usr/share/cmake-3.30/Modules/CMakeTestCCompiler.cmake:26 (CMAKE_DETERMINE_COMPILER_ABI)"
+      - "CMakeLists.txt:1 (project)"
+    message: |
+      Parsed C implicit link information:
+        link line regex: [^( *|.*[/\\])(ld[0-9]*(\\.[a-z]+)?|CMAKE_LINK_STARTFILE-NOTFOUND|([^/\\]+-)?ld|collect2)[^/\\]*( |$)]
+        linker tool regex: [^[ 	]*(->|")?[ 	]*(([^"]*[/\\])?(ld[0-9]*(\\.[a-z]+)?))("|,| |$)]
+        ignore line: [Change Dir: '/home/unix/file/OSkernel/myOS/rfos/lib/lwext4_rust/c/lwext4/build_musl-generic/CMakeFiles/CMakeScratch/TryCompile-wGETEj']
+        ignore line: []
+        ignore line: [Run Build Command(s): /usr/bin/cmake -E env VERBOSE=1 /bin/make -f Makefile cmTC_cdf39/fast]
+        ignore line: [make[1]: Entering directory '/home/unix/file/OSkernel/myOS/rfos/lib/lwext4_rust/c/lwext4/build_musl-generic/CMakeFiles/CMakeScratch/TryCompile-wGETEj']
+        ignore line: [/bin/make  -f CMakeFiles/cmTC_cdf39.dir/build.make CMakeFiles/cmTC_cdf39.dir/build]
+        ignore line: [make[2]: Entering directory '/home/unix/file/OSkernel/myOS/rfos/lib/lwext4_rust/c/lwext4/build_musl-generic/CMakeFiles/CMakeScratch/TryCompile-wGETEj']
+        ignore line: [Building C object CMakeFiles/cmTC_cdf39.dir/CMakeCCompilerABI.c.o]
+        ignore line: [/opt/riscv/riscv64-linux-musl-cross/bin/riscv64-linux-musl-cc   -fPIC -fno-builtin -ffreestanding -std=gnu99 -fdata-sections -ffunction-sections    -v -o CMakeFiles/cmTC_cdf39.dir/CMakeCCompilerABI.c.o -c /usr/share/cmake-3.30/Modules/CMakeCCompilerABI.c]
+        ignore line: [Using built-in specs.]
+        ignore line: [COLLECT_GCC=/opt/riscv/riscv64-linux-musl-cross/bin/riscv64-linux-musl-cc]
+        ignore line: [Target: riscv64-linux-musl]
+        ignore line: [Configured with: ../src_gcc/configure --enable-languages=c,c++,fortran CC='gcc -static --static' CXX='g++ -static --static' FC='gfortran -static --static' CFLAGS='-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error' CXXFLAGS='-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error' FFLAGS='-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error' LDFLAGS='-s -static --static' --enable-default-pie --enable-static-pie --disable-cet --disable-bootstrap --disable-assembly --disable-werror --target=riscv64-linux-musl --prefix= --libdir=/lib --disable-multilib --with-sysroot=/riscv64-linux-musl --enable-tls --disable-libmudflap --disable-libsanitizer --disable-gnu-indirect-function --disable-libmpx --enable-initfini-array --enable-libstdcxx-time=rt --enable-deterministic-archives --enable-libstdcxx-time --enable-libquadmath --enable-libquadmath-support --disable-decimal-float --with-build-sysroot=/tmp/m1132/build/local/riscv64-linux-musl/obj_sysroot AR_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/binutils/ar AS_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/gas/as-new LD_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/ld/ld-new NM_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/binutils/nm-new OBJCOPY_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/binutils/objcopy OBJDUMP_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/binutils/objdump RANLIB_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/binutils/ranlib READELF_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/binutils/readelf STRIP_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/binutils/strip-new --build=x86_64-pc-linux-muslx32 --host=x86_64-pc-linux-muslx32]
+        ignore line: [Thread model: posix]
+        ignore line: [Supported LTO compression algorithms: zlib]
+        ignore line: [gcc version 11.2.1 20211120 (GCC) ]
+        ignore line: [COLLECT_GCC_OPTIONS='-fPIC' '-fno-builtin' '-ffreestanding' '-std=gnu99' '-fdata-sections' '-ffunction-sections' '-v' '-o' 'CMakeFiles/cmTC_cdf39.dir/CMakeCCompilerABI.c.o' '-c' '-march=rv64gc' '-mabi=lp64d' '-march=rv64imafdc' '-dumpdir' 'CMakeFiles/cmTC_cdf39.dir/']
+        ignore line: [ /opt/riscv/riscv64-linux-musl-cross/bin/../libexec/gcc/riscv64-linux-musl/11.2.1/cc1 -quiet -v -iprefix /opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/ -isysroot /opt/riscv/riscv64-linux-musl-cross/bin/../riscv64-linux-musl /usr/share/cmake-3.30/Modules/CMakeCCompilerABI.c -quiet -dumpdir CMakeFiles/cmTC_cdf39.dir/ -dumpbase CMakeCCompilerABI.c.c -dumpbase-ext .c -march=rv64gc -mabi=lp64d -march=rv64imafdc -std=gnu99 -version -fPIC -fno-builtin -ffreestanding -fdata-sections -ffunction-sections -o /tmp/ccinJoim.s]
+        ignore line: [GNU C99 (GCC) version 11.2.1 20211120 (riscv64-linux-musl)]
+        ignore line: [	compiled by GNU C version 11.2.0  GMP version 6.2.1  MPFR version 4.1.0  MPC version 1.2.1  isl version none]
+        ignore line: [GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072]
+        ignore line: [ignoring nonexistent directory "/opt/riscv/riscv64-linux-musl-cross/bin/../riscv64-linux-musl/usr/local/include"]
+        ignore line: [ignoring duplicate directory "/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/../../lib/gcc/riscv64-linux-musl/11.2.1/../../../../riscv64-linux-musl/include"]
+        ignore line: [ignoring nonexistent directory "/opt/riscv/riscv64-linux-musl-cross/bin/../riscv64-linux-musl/usr/include"]
+        ignore line: [ignoring duplicate directory "/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/../../lib/gcc/riscv64-linux-musl/11.2.1/include"]
+        ignore line: [#include "..." search starts here:]
+        ignore line: [#include <...> search starts here:]
+        ignore line: [ /opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/../../../../riscv64-linux-musl/include]
+        ignore line: [ /opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/include]
+        ignore line: [End of search list.]
+        ignore line: [GNU C99 (GCC) version 11.2.1 20211120 (riscv64-linux-musl)]
+        ignore line: [	compiled by GNU C version 11.2.0  GMP version 6.2.1  MPFR version 4.1.0  MPC version 1.2.1  isl version none]
+        ignore line: [GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072]
+        ignore line: [Compiler executable checksum: 3146a49ff056b11657a77db0bbeba530]
+        ignore line: [COLLECT_GCC_OPTIONS='-fPIC' '-fno-builtin' '-ffreestanding' '-std=gnu99' '-fdata-sections' '-ffunction-sections' '-v' '-o' 'CMakeFiles/cmTC_cdf39.dir/CMakeCCompilerABI.c.o' '-c' '-march=rv64gc' '-mabi=lp64d' '-march=rv64imafdc' '-dumpdir' 'CMakeFiles/cmTC_cdf39.dir/']
+        ignore line: [ /opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/../../../../riscv64-linux-musl/bin/as -v --traditional-format -fpic -march=rv64gc -march=rv64imafdc -mabi=lp64d -o CMakeFiles/cmTC_cdf39.dir/CMakeCCompilerABI.c.o /tmp/ccinJoim.s]
+        ignore line: [GNU assembler version 2.37 (riscv64-linux-musl) using BFD version (GNU Binutils) 2.37]
+        ignore line: [COMPILER_PATH=/opt/riscv/riscv64-linux-musl-cross/bin/../libexec/gcc/riscv64-linux-musl/11.2.1/:/opt/riscv/riscv64-linux-musl-cross/bin/../libexec/gcc/:/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/../../../../riscv64-linux-musl/bin/]
+        ignore line: [LIBRARY_PATH=/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/:/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/:/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/../../../../riscv64-linux-musl/lib/:/opt/riscv/riscv64-linux-musl-cross/bin/../riscv64-linux-musl/lib/]
+        ignore line: [COLLECT_GCC_OPTIONS='-fPIC' '-fno-builtin' '-ffreestanding' '-std=gnu99' '-fdata-sections' '-ffunction-sections' '-v' '-o' 'CMakeFiles/cmTC_cdf39.dir/CMakeCCompilerABI.c.o' '-c' '-march=rv64gc' '-mabi=lp64d' '-march=rv64imafdc' '-dumpdir' 'CMakeFiles/cmTC_cdf39.dir/CMakeCCompilerABI.c.']
+        ignore line: [Linking C executable cmTC_cdf39]
+        ignore line: [/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_cdf39.dir/link.txt --verbose=1]
+        ignore line: [/opt/riscv/riscv64-linux-musl-cross/bin/riscv64-linux-musl-cc -fPIC -fno-builtin -ffreestanding -std=gnu99 -fdata-sections -ffunction-sections  -Wl --gc-sections -v -Wl -v -rdynamic CMakeFiles/cmTC_cdf39.dir/CMakeCCompilerABI.c.o -o cmTC_cdf39]
+        ignore line: [Using built-in specs.]
+        ignore line: [COLLECT_GCC=/opt/riscv/riscv64-linux-musl-cross/bin/riscv64-linux-musl-cc]
+        ignore line: [COLLECT_LTO_WRAPPER=/opt/riscv/riscv64-linux-musl-cross/bin/../libexec/gcc/riscv64-linux-musl/11.2.1/lto-wrapper]
+        ignore line: [Target: riscv64-linux-musl]
+        ignore line: [Configured with: ../src_gcc/configure --enable-languages=c,c++,fortran CC='gcc -static --static' CXX='g++ -static --static' FC='gfortran -static --static' CFLAGS='-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error' CXXFLAGS='-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error' FFLAGS='-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error' LDFLAGS='-s -static --static' --enable-default-pie --enable-static-pie --disable-cet --disable-bootstrap --disable-assembly --disable-werror --target=riscv64-linux-musl --prefix= --libdir=/lib --disable-multilib --with-sysroot=/riscv64-linux-musl --enable-tls --disable-libmudflap --disable-libsanitizer --disable-gnu-indirect-function --disable-libmpx --enable-initfini-array --enable-libstdcxx-time=rt --enable-deterministic-archives --enable-libstdcxx-time --enable-libquadmath --enable-libquadmath-support --disable-decimal-float --with-build-sysroot=/tmp/m1132/build/local/riscv64-linux-musl/obj_sysroot AR_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/binutils/ar AS_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/gas/as-new LD_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/ld/ld-new NM_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/binutils/nm-new OBJCOPY_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/binutils/objcopy OBJDUMP_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/binutils/objdump RANLIB_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/binutils/ranlib READELF_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/binutils/readelf STRIP_FOR_TARGET=/tmp/m1132/build/local/riscv64-linux-musl/obj_binutils/binutils/strip-new --build=x86_64-pc-linux-muslx32 --host=x86_64-pc-linux-muslx32]
+        ignore line: [Thread model: posix]
+        ignore line: [Supported LTO compression algorithms: zlib]
+        ignore line: [gcc version 11.2.1 20211120 (GCC) ]
+        ignore line: [COMPILER_PATH=/opt/riscv/riscv64-linux-musl-cross/bin/../libexec/gcc/riscv64-linux-musl/11.2.1/:/opt/riscv/riscv64-linux-musl-cross/bin/../libexec/gcc/:/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/../../../../riscv64-linux-musl/bin/]
+        ignore line: [LIBRARY_PATH=/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/:/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/:/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/../../../../riscv64-linux-musl/lib/:/opt/riscv/riscv64-linux-musl-cross/bin/../riscv64-linux-musl/lib/]
+        ignore line: [COLLECT_GCC_OPTIONS='-fPIC' '-fno-builtin' '-ffreestanding' '-std=gnu99' '-fdata-sections' '-ffunction-sections' '-v' '-rdynamic' '-o' 'cmTC_cdf39' '-march=rv64gc' '-mabi=lp64d' '-march=rv64imafdc' '-dumpdir' 'cmTC_cdf39.']
+        link line: [ /opt/riscv/riscv64-linux-musl-cross/bin/../libexec/gcc/riscv64-linux-musl/11.2.1/collect2 --sysroot=/opt/riscv/riscv64-linux-musl-cross/bin/../riscv64-linux-musl --eh-frame-hdr -melf64lriscv -export-dynamic -dynamic-linker /lib/ld-musl-riscv64.so.1 -pie -o cmTC_cdf39 /opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/../../../../riscv64-linux-musl/lib/Scrt1.o /opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/crti.o /opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/crtbeginS.o -L/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1 -L/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc -L/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/../../../../riscv64-linux-musl/lib -L/opt/riscv/riscv64-linux-musl-cross/bin/../riscv64-linux-musl/lib --gc-sections -v CMakeFiles/cmTC_cdf39.dir/CMakeCCompilerABI.c.o -lgcc --push-state --as-needed -lgcc_s --pop-state -lc -lgcc --push-state --as-needed -lgcc_s --pop-state /opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/crtendS.o /opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/crtn.o]
+          arg [/opt/riscv/riscv64-linux-musl-cross/bin/../libexec/gcc/riscv64-linux-musl/11.2.1/collect2] ==> ignore
+          arg [--sysroot=/opt/riscv/riscv64-linux-musl-cross/bin/../riscv64-linux-musl] ==> ignore
+          arg [--eh-frame-hdr] ==> ignore
+          arg [-melf64lriscv] ==> ignore
+          arg [-export-dynamic] ==> ignore
+          arg [-dynamic-linker] ==> ignore
+          arg [/lib/ld-musl-riscv64.so.1] ==> ignore
+          arg [-pie] ==> ignore
+          arg [-o] ==> ignore
+          arg [cmTC_cdf39] ==> ignore
+          arg [/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/../../../../riscv64-linux-musl/lib/Scrt1.o] ==> obj [/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/../../../../riscv64-linux-musl/lib/Scrt1.o]
+          arg [/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/crti.o] ==> obj [/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/crti.o]
+          arg [/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/crtbeginS.o] ==> obj [/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/crtbeginS.o]
+          arg [-L/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1] ==> dir [/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1]
+          arg [-L/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc] ==> dir [/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc]
+          arg [-L/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/../../../../riscv64-linux-musl/lib] ==> dir [/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/../../../../riscv64-linux-musl/lib]
+          arg [-L/opt/riscv/riscv64-linux-musl-cross/bin/../riscv64-linux-musl/lib] ==> dir [/opt/riscv/riscv64-linux-musl-cross/bin/../riscv64-linux-musl/lib]
+          arg [--gc-sections] ==> ignore
+          arg [-v] ==> ignore
+          arg [CMakeFiles/cmTC_cdf39.dir/CMakeCCompilerABI.c.o] ==> ignore
+          arg [-lgcc] ==> lib [gcc]
+          arg [--push-state] ==> ignore
+          arg [--as-needed] ==> ignore
+          arg [-lgcc_s] ==> lib [gcc_s]
+          arg [--pop-state] ==> ignore
+          arg [-lc] ==> lib [c]
+          arg [-lgcc] ==> lib [gcc]
+          arg [--push-state] ==> ignore
+          arg [--as-needed] ==> ignore
+          arg [-lgcc_s] ==> lib [gcc_s]
+          arg [--pop-state] ==> ignore
+          arg [/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/crtendS.o] ==> obj [/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/crtendS.o]
+          arg [/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/crtn.o] ==> obj [/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/crtn.o]
+        ignore line: [collect2 version 11.2.1 20211120]
+        ignore line: [/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/../../../../riscv64-linux-musl/bin/ld --sysroot=/opt/riscv/riscv64-linux-musl-cross/bin/../riscv64-linux-musl --eh-frame-hdr -melf64lriscv -export-dynamic -dynamic-linker /lib/ld-musl-riscv64.so.1 -pie -o cmTC_cdf39 /opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/../../../../riscv64-linux-musl/lib/Scrt1.o /opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/crti.o /opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/crtbeginS.o -L/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1 -L/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc -L/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/../../../../riscv64-linux-musl/lib -L/opt/riscv/riscv64-linux-musl-cross/bin/../riscv64-linux-musl/lib --gc-sections -v CMakeFiles/cmTC_cdf39.dir/CMakeCCompilerABI.c.o -lgcc --push-state --as-needed -lgcc_s --pop-state -lc -lgcc --push-state --as-needed -lgcc_s --pop-state /opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/crtendS.o /opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/crtn.o]
+        linker tool for 'C': /opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/../../../../riscv64-linux-musl/bin/ld
+        collapse obj [/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/../../../../riscv64-linux-musl/lib/Scrt1.o] ==> [/opt/riscv/riscv64-linux-musl-cross/riscv64-linux-musl/lib/Scrt1.o]
+        collapse obj [/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/crti.o] ==> [/opt/riscv/riscv64-linux-musl-cross/lib/gcc/riscv64-linux-musl/11.2.1/crti.o]
+        collapse obj [/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/crtbeginS.o] ==> [/opt/riscv/riscv64-linux-musl-cross/lib/gcc/riscv64-linux-musl/11.2.1/crtbeginS.o]
+        collapse obj [/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/crtendS.o] ==> [/opt/riscv/riscv64-linux-musl-cross/lib/gcc/riscv64-linux-musl/11.2.1/crtendS.o]
+        collapse obj [/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/crtn.o] ==> [/opt/riscv/riscv64-linux-musl-cross/lib/gcc/riscv64-linux-musl/11.2.1/crtn.o]
+        collapse library dir [/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1] ==> [/opt/riscv/riscv64-linux-musl-cross/lib/gcc/riscv64-linux-musl/11.2.1]
+        collapse library dir [/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc] ==> [/opt/riscv/riscv64-linux-musl-cross/lib/gcc]
+        collapse library dir [/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/../../../../riscv64-linux-musl/lib] ==> [/opt/riscv/riscv64-linux-musl-cross/riscv64-linux-musl/lib]
+        collapse library dir [/opt/riscv/riscv64-linux-musl-cross/bin/../riscv64-linux-musl/lib] ==> [/opt/riscv/riscv64-linux-musl-cross/riscv64-linux-musl/lib]
+        implicit libs: [gcc;gcc_s;c;gcc;gcc_s]
+        implicit objs: [/opt/riscv/riscv64-linux-musl-cross/riscv64-linux-musl/lib/Scrt1.o;/opt/riscv/riscv64-linux-musl-cross/lib/gcc/riscv64-linux-musl/11.2.1/crti.o;/opt/riscv/riscv64-linux-musl-cross/lib/gcc/riscv64-linux-musl/11.2.1/crtbeginS.o;/opt/riscv/riscv64-linux-musl-cross/lib/gcc/riscv64-linux-musl/11.2.1/crtendS.o;/opt/riscv/riscv64-linux-musl-cross/lib/gcc/riscv64-linux-musl/11.2.1/crtn.o]
+        implicit dirs: [/opt/riscv/riscv64-linux-musl-cross/lib/gcc/riscv64-linux-musl/11.2.1;/opt/riscv/riscv64-linux-musl-cross/lib/gcc;/opt/riscv/riscv64-linux-musl-cross/riscv64-linux-musl/lib]
+        implicit fwks: []
+      
+      
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/usr/share/cmake-3.30/Modules/Internal/CMakeDetermineLinkerId.cmake:40 (message)"
+      - "/usr/share/cmake-3.30/Modules/CMakeDetermineCompilerABI.cmake:255 (cmake_determine_linker_id)"
+      - "/usr/share/cmake-3.30/Modules/CMakeTestCCompiler.cmake:26 (CMAKE_DETERMINE_COMPILER_ABI)"
+      - "CMakeLists.txt:1 (project)"
+    message: |
+      Running the C compiler's linker: "/opt/riscv/riscv64-linux-musl-cross/bin/../lib/gcc/riscv64-linux-musl/11.2.1/../../../../riscv64-linux-musl/bin/ld" "-v"
+      GNU ld (GNU Binutils) 2.37
+...

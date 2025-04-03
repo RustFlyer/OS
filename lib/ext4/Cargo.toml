@@ -10,8 +10,7 @@ config = { path = "../config/" }
 systype = { path = "../systype/" }
 mutex = { path = "../mutex/" }
 
-
-lwext4_rust = { workspace = true }
+lwext4_rust = { path = "../lwext4_rust/" }
 log = { workspace = true }
 async-trait = { workspace = true }
 downcast-rs = { workspace = true }

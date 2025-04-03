@@ -105,7 +105,7 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         osfs::init();
         log::info!("hart {}: initialized FS", hart_id);
 
-        boot::start_harts(hart_id);
+        // boot::start_harts(hart_id);
 
         when_debug!({
             simdebug::backtrace_test();
