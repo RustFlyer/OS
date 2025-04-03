@@ -137,6 +137,10 @@ impl Task {
             pgid,
             exit_code,
             name,
+            sig_mask,
+            sig_handlers,
+            sig_manager,
+            sig_stack,
         }
     }
 

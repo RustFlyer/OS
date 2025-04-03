@@ -45,4 +45,6 @@ pub fn sys_sigaction() {
     
 }
 
-pub fn sys_sigprocmask
+pub fn sys_sigprocmask() {
+    
+}
