@@ -42,7 +42,13 @@ impl Disk {
 
     /// Reads one block (whole or partial)
     pub fn read_one(&mut self, buf: &mut [u8]) -> SysResult<usize> {
-        log::info!("read one in offset {}", self.pos());
+        log::info!(
+            "read one in pos [{}] at block id [{}] offset [{}] with buf len [{}]",
+            self.pos(),
+            self.block_id,
+            self.offset,
+            buf.len()
+        );
         let read_size = if self.offset == 0 && buf.len() >= DISK_BLOCK_SIZE {
             self.dev.read(self.block_id, &mut buf[..DISK_BLOCK_SIZE]);
             self.block_id += 1;

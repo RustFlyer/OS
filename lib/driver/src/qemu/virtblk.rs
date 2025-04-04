@@ -20,6 +20,7 @@ impl BlockDevice for VirtBlkDevice {
     ///
     /// Data from Block to Buf
     fn read(&self, block_id: usize, buf: &mut [u8]) {
+        log::info!("read block id [{}]", block_id);
         let res = self.0.lock().read_blocks(block_id, buf);
         if res.is_err() {
             panic!(
@@ -36,7 +37,7 @@ impl BlockDevice for VirtBlkDevice {
     ///
     /// Data from Buf to Block
     fn write(&self, block_id: usize, buf: &[u8]) {
-        log::info!("write tick {} with {:?}", block_id, buf);
+        // log::info!("write tick {} with {:?}", block_id, buf);
         let res = self.0.lock().write_blocks(block_id, buf);
         if res.is_err() {
             panic!(

@@ -1,7 +1,12 @@
 use crate::{print, processor::current_task, vm::user_ptr::UserReadPtr};
 use alloc::string::ToString;
 use config::{inode::InodeMode, vfs::OpenFlags};
-use log::{debug, error};
+use driver::BLOCK_DEVICE;
+use log::{debug, error, info};
+use mm::{
+    address::{PhysAddr, VirtAddr},
+    vm::trace_page_table_lookup,
+};
 use osfs::sys_root_dentry;
 use systype::{SysError, SyscallResult};
 
@@ -75,6 +80,7 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
         return Err(SysError::ENOTDIR);
     }
 
+    log::info!("try to open dentry");
     let file = dentry.open()?;
     file.set_flags(flags);
 

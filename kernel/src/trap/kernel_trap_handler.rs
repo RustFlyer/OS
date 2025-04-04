@@ -18,6 +18,7 @@ pub fn kernel_trap_handler() {
 }
 
 pub fn kernel_exception_handler(e: Exception, stval: usize) {
+    simdebug::stop();
     log::error!(
         "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}",
         e,

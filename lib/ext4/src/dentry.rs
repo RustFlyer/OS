@@ -68,12 +68,16 @@ impl Dentry for ExtDentry {
                 let flags = (OpenFlags::O_RDWR | OpenFlags::O_CREAT | OpenFlags::O_TRUNC).bits();
                 let file = ExtFile::open(&path, flags).map_err(SysError::from_i32)?;
                 warn!("create a new file inode");
-                ExtFileInode::new(superblock, file)
+                let inode = ExtFileInode::new(superblock, file);
+                inode.set_inotype(InodeType::File);
+                inode
             }
             InodeType::Dir => {
                 let dir = ExtDir::create(&path).map_err(SysError::from_i32)?;
                 warn!("create a new dir inode");
-                ExtDirInode::new(superblock, dir)
+                let inode = ExtDirInode::new(superblock, dir);
+                inode.set_inotype(InodeType::Dir);
+                inode
             }
             _ => todo!(),
         };
@@ -100,7 +104,9 @@ impl Dentry for ExtDentry {
             log::debug!("try to create a new file");
             let new_file =
                 ExtFile::open(&path, OpenFlags::empty().bits()).map_err(SysError::from_i32)?;
-            sub_dentry.set_inode(ExtFileInode::new(superblock, new_file))
+            let inode = ExtFileInode::new(superblock, new_file);
+            inode.set_inotype(InodeType::File);
+            sub_dentry.set_inode(inode)
         } else if unsafe { ext4_inode_exist(c_path.as_ptr(), InodeTypes::EXT4_DE_SYMLINK as i32) }
             == EOK as i32
         {
