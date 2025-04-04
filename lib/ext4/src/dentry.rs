@@ -1,5 +1,6 @@
 use alloc::{ffi::CString, sync::Arc, vec};
 use config::{inode::InodeType, vfs::OpenFlags};
+use log::debug;
 use lwext4_rust::{
     InodeTypes,
     bindings::{EOK, ext4_dir_rm, ext4_flink, ext4_fremove, ext4_inode_exist, ext4_readlink},
@@ -122,6 +123,7 @@ impl Dentry for ExtDentry {
     }
 
     fn base_open(self: Arc<Self>) -> SysResult<Arc<dyn File>> {
+        debug!("base open {:?}", self.inode()?.inotype());
         match self.inode()?.inotype() {
             InodeType::File => {
                 let inode = self

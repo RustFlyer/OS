@@ -1,6 +1,6 @@
 extern crate alloc;
 
-use core::{ffi::c_void, ptr::null_mut};
+use core::{ffi::c_void, fmt::Debug, ptr::null_mut};
 
 use alloc::{boxed::Box, ffi::CString, sync::Arc};
 use config::vfs::StatFs;
