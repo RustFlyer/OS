@@ -9,6 +9,7 @@ use alloc::{
 use driver::println;
 use mm::vm::addr_space::AddrSpace;
 use mutex::{ShareMutex, SpinNoIrqLock, new_share_mutex};
+use osfs::fd_table::FdTable;
 
 use core::cell::SyncUnsafeCell;
 use core::task::Waker;

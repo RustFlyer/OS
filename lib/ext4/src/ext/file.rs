@@ -3,7 +3,9 @@ use alloc::ffi::CString;
 use core::mem::MaybeUninit;
 use log::{error, warn};
 use lwext4_rust::bindings::{
-    ext4_fclose, ext4_file, ext4_fopen2, ext4_fread, ext4_fseek, ext4_fsize, ext4_fwrite,
+    EOK, ext4_block, ext4_fclose, ext4_file, ext4_fopen2, ext4_fread, ext4_fs_get_inode_dblk_idx,
+    ext4_fs_get_inode_ref, ext4_fs_put_inode_ref, ext4_fseek, ext4_fsize, ext4_ftell,
+    ext4_ftruncate, ext4_fwrite, ext4_inode_ref, ext4_lblk_t,
 };
 
 pub struct ExtFile(ext4_file);
@@ -76,5 +78,59 @@ impl ExtFile {
                 Err(e)
             }
         }
+    }
+
+    pub fn tell(&mut self) -> u64 {
+        let r = unsafe { ext4_ftell(&mut self.0) };
+        r
+    }
+
+    pub fn truncate(&mut self, size: u64) -> Result<(), i32> {
+        let r = unsafe { ext4_ftruncate(&mut self.0, size) };
+        match r {
+            0 => Ok(()),
+            e => {
+                error!("ext4_ftruncate: rc = {}", r);
+                Err(e)
+            }
+        }
+    }
+
+    pub fn file_get_blk_idx(&mut self) -> Result<u64, i32> {
+        let block_idx;
+        unsafe {
+            let mut inode_ref = ext4_inode_ref {
+                block: ext4_block {
+                    lb_id: 0,
+                    buf: core::ptr::null_mut(),
+                    data: core::ptr::null_mut(),
+                },
+                inode: core::ptr::null_mut(),
+                fs: core::ptr::null_mut(),
+                index: 0,
+                dirty: false,
+            };
+            let r = ext4_fs_get_inode_ref(&mut (*self.0.mp).fs, self.0.inode, &mut inode_ref);
+            if r != EOK as i32 {
+                error!("ext4_fs_get_inode_ref: rc = {}", r);
+                return Err(r);
+            }
+            let sb = (*self.0.mp).fs.sb;
+            let block_size = 1024 << sb.log_block_size.to_le();
+            let iblock_idx: ext4_lblk_t = ((self.0.fpos) / block_size).try_into().unwrap();
+            let mut fblock = 0;
+            let r = ext4_fs_get_inode_dblk_idx(&mut inode_ref, iblock_idx, &mut fblock, true);
+            if r != EOK as i32 {
+                error!("ext4_fs_get_inode_dblk_idx: rc = {}", r);
+                return Err(r);
+            }
+            ext4_fs_put_inode_ref(&mut inode_ref);
+
+            let unalg = (self.0.fpos) % block_size;
+            let bdev = *(*self.0.mp).fs.bdev;
+            let off = fblock * block_size + unalg;
+            block_idx = (off + bdev.part_offset) / ((*(bdev.bdif)).ph_bsize as u64);
+        }
+        Ok(block_idx)
     }
 }
