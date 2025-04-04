@@ -1,6 +1,6 @@
 use super::hal::VirtHalImpl;
 use crate::BlockDevice;
-use config::device::{BLOCK_SIZE, VIRTIO0};
+use config::device::{BLOCK_SIZE, DEV_SIZE, VIRTIO0};
 use mutex::SpinNoIrqLock;
 use virtio_drivers::{
     device::blk::VirtIOBlk,
@@ -36,6 +36,7 @@ impl BlockDevice for VirtBlkDevice {
     ///
     /// Data from Buf to Block
     fn write(&self, block_id: usize, buf: &[u8]) {
+        log::info!("write tick {} with {:?}", block_id, buf);
         let res = self.0.lock().write_blocks(block_id, buf);
         if res.is_err() {
             panic!(
@@ -45,22 +46,23 @@ impl BlockDevice for VirtBlkDevice {
         }
     }
 
-    /// Get Block Size
-    fn size(&self) -> usize {
+    fn block_size(&self) -> usize {
         BLOCK_SIZE
+    }
+
+    /// Get Block Size
+    fn size(&self) -> u64 {
+        DEV_SIZE
     }
 }
 
 impl VirtBlkDevice {
     pub fn new() -> Self {
         unsafe {
-            log::info!("rrr1");
             let header = &mut *(VIRTIO0 as *mut VirtIOHeader);
-            log::info!("rrr2");
             let blk = VirtIOBlk::<VirtHalImpl, MmioTransport>::new(
                 MmioTransport::new(header.into()).unwrap(),
             );
-            log::info!("rrr3");
             Self(SpinNoIrqLock::new(blk.unwrap()))
         }
     }

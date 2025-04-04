@@ -1,7 +1,7 @@
 extern crate alloc;
 
 use alloc::sync::Arc;
-use config::board::BLOCK_SIZE;
+use config::device::BLOCK_SIZE;
 use driver::BlockDevice;
 use lwext4_rust::{
     KernelDevOp,
@@ -15,9 +15,11 @@ pub struct Disk {
     dev: Arc<dyn BlockDevice>,
 }
 
+pub const DISK_BLOCK_SIZE: usize = 512;
+
 impl Disk {
     pub fn new(dev: Arc<dyn BlockDevice>) -> Self {
-        assert_eq!(dev.size(), BLOCK_SIZE);
+        assert_eq!(dev.block_size(), BLOCK_SIZE);
         Self {
             block_id: 0,
             offset: 0,
@@ -25,27 +27,28 @@ impl Disk {
         }
     }
 
-    pub fn size(&self) -> usize {
+    pub fn size(&self) -> u64 {
         self.dev.size()
     }
 
     pub fn pos(&self) -> usize {
-        self.block_id * BLOCK_SIZE + self.offset
+        self.block_id * DISK_BLOCK_SIZE + self.offset
     }
 
     pub fn set_pos(&mut self, buf: usize) {
-        self.block_id = buf / BLOCK_SIZE;
-        self.offset = buf % BLOCK_SIZE;
+        self.block_id = buf / DISK_BLOCK_SIZE;
+        self.offset = buf % DISK_BLOCK_SIZE;
     }
 
     /// Reads one block (whole or partial)
     pub fn read_one(&mut self, buf: &mut [u8]) -> SysResult<usize> {
-        let read_size = if self.offset == 0 && buf.len() >= BLOCK_SIZE {
-            self.dev.read(self.block_id, &mut buf[..BLOCK_SIZE]);
+        log::info!("read one in offset {}", self.pos());
+        let read_size = if self.offset == 0 && buf.len() >= DISK_BLOCK_SIZE {
+            self.dev.read(self.block_id, &mut buf[..DISK_BLOCK_SIZE]);
             self.block_id += 1;
-            BLOCK_SIZE
-        } else if buf.len() >= BLOCK_SIZE - self.offset {
-            let length = BLOCK_SIZE - self.offset;
+            DISK_BLOCK_SIZE
+        } else if buf.len() >= DISK_BLOCK_SIZE - self.offset {
+            let length = DISK_BLOCK_SIZE - self.offset;
             self.dev.read(self.block_id, &mut buf[..length]);
             self.block_id += 1;
             self.offset = 0;
@@ -56,17 +59,19 @@ impl Disk {
             self.offset += length;
             length
         };
+        log::info!("out: {} - buflen {}", read_size, buf.len());
         Ok(read_size)
     }
 
     /// Writes one block (whole or partial)
     pub fn write_one(&mut self, buf: &[u8]) -> SysResult<usize> {
-        let write_size = if self.offset == 0 && buf.len() >= BLOCK_SIZE {
-            self.dev.write(self.block_id, &buf[..BLOCK_SIZE]);
+        // log::info!("write one tick");
+        let write_size = if self.offset == 0 && buf.len() >= DISK_BLOCK_SIZE {
+            self.dev.write(self.block_id, &buf[..DISK_BLOCK_SIZE]);
             self.block_id += 1;
-            BLOCK_SIZE
-        } else if buf.len() >= BLOCK_SIZE - self.offset {
-            let length = BLOCK_SIZE - self.offset;
+            DISK_BLOCK_SIZE
+        } else if buf.len() >= DISK_BLOCK_SIZE - self.offset {
+            let length = DISK_BLOCK_SIZE - self.offset;
             self.dev.write(self.block_id, &buf[..length]);
             self.block_id += 1;
             self.offset = 0;
@@ -114,7 +119,7 @@ impl KernelDevOp for Disk {
             match dev.write_one(buf) {
                 Ok(0) => break,
                 Ok(n) => {
-                    buf = &mut buf;
+                    buf = &buf[n..];
                     write_size += n;
                 }
                 Err(_) => return Err(-1),
@@ -129,16 +134,15 @@ impl KernelDevOp for Disk {
         let new_pos = match whence {
             SEEK_SET => Some(off),
             SEEK_CUR => dev.pos().checked_add_signed(off as isize).map(|v| v as i64),
-            SEEK_END => dev
-                .size()
-                .checked_add_signed(off as isize)
-                .map(|v| v as i64),
+            SEEK_END => dev.size().checked_add_signed(off as i64).map(|v| v as i64),
             _ => {
                 log::error!("invalid whence {}", whence);
                 Some(off)
             }
         }
         .ok_or(-1)?;
+
+        log::info!("seek new pos: {}", new_pos);
 
         if new_pos > dev.size() as i64 {
             log::warn!("pos > dev.size!!");

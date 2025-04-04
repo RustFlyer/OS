@@ -4,7 +4,7 @@ use core::sync::atomic::Ordering;
 use alloc::sync::Arc;
 
 use config::{
-    board::BLOCK_SIZE,
+    device::BLOCK_SIZE,
     inode::{InodeMode, InodeType},
     vfs::Stat,
 };
@@ -42,22 +42,23 @@ impl Inode for ExtDirInode {
     }
 
     fn get_attr(&self) -> SysResult<Stat> {
+        let inner = self.meta.inner.lock();
         Ok(Stat {
             st_dev: 0,
             st_ino: self.meta.ino as u64,
-            st_mode: self.meta.inner.lock().mode.bits(),
+            st_mode: inner.mode.bits(),
             st_nlink: 0,
             st_uid: 0,
             st_gid: 0,
             st_rdev: 0,
             __pad: 0,
-            st_size: self.meta.inner.lock().size as u64,
+            st_size: inner.size as u64,
             st_blksize: BLOCK_SIZE as u32,
             __pad2: 0,
-            st_blocks: (self.meta.inner.lock().size / BLOCK_SIZE) as u64,
-            st_atime: self.meta.inner.lock().atime,
-            st_mtime: self.meta.inner.lock().mtime,
-            st_ctime: self.meta.inner.lock().ctime,
+            st_blocks: (inner.size / BLOCK_SIZE) as u64,
+            st_atime: inner.atime,
+            st_mtime: inner.mtime,
+            st_ctime: inner.ctime,
             unused: 0,
         })
     }

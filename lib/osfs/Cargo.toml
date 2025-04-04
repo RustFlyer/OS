@@ -14,3 +14,4 @@ driver = { path = "../driver" }
 
 bitflags = { workspace = true }
 spin = { workspace = true }
+log = { workspace = true }

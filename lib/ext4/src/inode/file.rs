@@ -4,7 +4,7 @@ use core::sync::atomic::Ordering;
 
 use alloc::sync::Arc;
 use config::{
-    board::BLOCK_SIZE,
+    device::BLOCK_SIZE,
     inode::{InodeMode, InodeType},
     vfs::Stat,
 };

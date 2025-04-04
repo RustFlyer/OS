@@ -1,10 +1,13 @@
 extern crate alloc;
 use alloc::sync::Arc;
 
+use config::inode::{self, InodeType};
+use log::debug;
 use systype::SysError;
 use vfs::{
     dentry::Dentry,
     fstype::{FileSystemType, FileSystemTypeMeta},
+    inode::Inode,
     superblock::{SuperBlock, SuperBlockMeta},
 };
 
@@ -36,9 +39,11 @@ impl FileSystemType for ExtFsType {
         flags: config::vfs::MountFlags,
         dev: Option<Arc<dyn driver::BlockDevice>>,
     ) -> systype::SysResult<Arc<dyn vfs::dentry::Dentry>> {
-        let superblock = ExtSuperBlock::new(SuperBlockMeta::new(dev, self.clone()));
+        let meta = SuperBlockMeta::new(dev, self.clone());
+        let superblock = ExtSuperBlock::new(meta);
         let root_dir = ExtDir::open("/").map_err(SysError::from_i32)?;
         let root_inode = ExtDirInode::new(superblock.clone(), root_dir);
+        root_inode.set_inotype(InodeType::Dir);
         let root_dentry = ExtDentry::new(name, superblock.clone(), parent.clone());
         root_dentry.set_inode(root_inode);
 

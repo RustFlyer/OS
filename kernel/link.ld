@@ -22,6 +22,7 @@ SECTIONS
         _sdata = .;
         *(.data .data.*)
         *(.sdata .sdata.*)
+        *(.got)
         _edata = .;
     } > VIRT AT> RAM
 

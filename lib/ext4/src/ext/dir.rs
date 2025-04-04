@@ -2,7 +2,7 @@ extern crate alloc;
 use alloc::ffi::CString;
 use alloc::vec::Vec;
 use core::mem::MaybeUninit;
-use log::error;
+use log::{debug, error};
 use lwext4_rust::{
     InodeTypes,
     bindings::{ext4_dir, ext4_dir_close, ext4_dir_entry_next, ext4_dir_mk, ext4_dir_open},
@@ -29,6 +29,7 @@ impl ExtDir {
         let c_path = CString::new(path).expect("CString::new failed");
         let mut dir = MaybeUninit::uninit();
         let r = unsafe { ext4_dir_open(dir.as_mut_ptr(), c_path.as_ptr()) };
+
         match r {
             0 => unsafe { Ok(Self(dir.assume_init())) },
             e => {

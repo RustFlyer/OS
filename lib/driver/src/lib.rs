@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 #![allow(non_upper_case_globals)]
+#![feature(format_args_nl)]
 
 use core::task::Waker;
 extern crate alloc;
@@ -19,7 +20,8 @@ pub static CHAR_DEVICE: Once<Arc<dyn CharDevice>> = Once::new();
 pub trait BlockDevice: Send + Sync {
     fn read(&self, block_id: usize, buf: &mut [u8]);
     fn write(&self, block_id: usize, buf: &[u8]);
-    fn size(&self) -> usize;
+    fn size(&self) -> u64;
+    fn block_size(&self) -> usize;
 }
 
 pub trait CharDevice: Send + Sync {
@@ -35,6 +37,7 @@ pub trait CharDevice: Send + Sync {
 pub fn init() {
     init_block_device();
     init_char_device();
+    log::info!("success init driver");
 }
 
 pub fn init_block_device() {
@@ -57,6 +60,21 @@ pub fn set_timer(timer: usize) {
 
 pub fn print(args: fmt::Arguments<'_>) {
     sbi_print(args);
+}
+
+pub fn block_device_test() {
+    let block_device = BLOCK_DEVICE.get().unwrap();
+    let mut write_buffer = [0u8; 512];
+    let mut read_buffer = [0u8; 512];
+    for i in 0..512 {
+        for byte in write_buffer.iter_mut() {
+            *byte = i as u8;
+        }
+        block_device.write(i as usize, &write_buffer);
+        block_device.read(i as usize, &mut read_buffer);
+        assert_eq!(write_buffer, read_buffer);
+    }
+    println!("block device test passed!");
 }
 
 #[macro_export]

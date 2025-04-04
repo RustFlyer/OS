@@ -30,7 +30,7 @@ OBJDUMP = rust-objdump --arch-name=riscv64
 OBJCOPY = rust-objcopy --binary-architecture=riscv64
 PAGER = less
 
-DISASM_ARGS = -d
+DISASM_ARGS = -d -s
 
 TARGET_DIR := target/$(TARGET)/$(MODE)
 KERNEL_ELF := $(TARGET_DIR)/$(PACKAGE_NAME)
@@ -42,11 +42,11 @@ USER_ELFS := $(patsubst $(USER_APPS_DIR)/%.rs, $(TARGET_DIR)/%, $(USER_APPS))
 USER_BINS := $(patsubst $(USER_APPS_DIR)/%.rs, $(TARGET_DIR)/%.bin, $(USER_APPS))
 
 
-FS_IMG_DIR := ./fsimg
+FS_IMG_DIR := fsimg
 FS_IMG := $(FS_IMG_DIR)/sdcard.img
 
 
-QEMU_ARGS :=
+QEMU_ARGS := -m 128
 QEMU_ARGS += -machine virt 
 QEMU_ARGS += -nographic 
 QEMU_ARGS += -bios $(BOOTLOADER) 
@@ -145,14 +145,14 @@ fs-img:
 	@echo $(FS_IMG)
 	@rm -rf $(FS_IMG)
 	@mkdir -p $(FS_IMG_DIR)
-	@dd if=/dev/zero of=$(FS_IMG) bs=1M count=1400 status=progress
+	@dd if=/dev/zero of=$(FS_IMG) bs=1K count=133148 status=progress
 	@mkfs.ext4 -F $(FS_IMG)
-	@mkdir -p mnt
-	@sudo mount -t ext4 -o loop,rw,user,exec,noatime $(FS_IMG) mnt
-	@sudo cp -r $(USER_ELFS) mnt/
-	@sudo chmod -R 755 mnt/
-	@sudo umount mnt
-	@rm -rf mnt
+	@mkdir -p emnt
+	@sudo mount -t ext4 -o loop $(FS_IMG) emnt
+	@sudo cp -r $(USER_ELFS) emnt/
+	@sudo chmod -R 755 emnt/
+	@sudo umount emnt
+	@rm -rf emnt
 	@echo "building fs-img finished"
 
 

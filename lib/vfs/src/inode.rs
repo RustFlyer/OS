@@ -107,6 +107,10 @@ pub trait Inode: Send + Sync + DowncastSync {
         self.get_meta().inner.lock().state = state;
     }
 
+    fn set_inotype(&self, inotype: InodeType) {
+        self.get_meta().inner.lock().mode = InodeMode::from_type(inotype);
+    }
+
     fn page_cache(&self) -> &PageCache {
         &self.get_meta().page_cache
     }
