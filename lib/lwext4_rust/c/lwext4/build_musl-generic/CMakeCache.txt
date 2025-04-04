@@ -211,7 +211,7 @@ CPACK_BINARY_TZ:BOOL=ON
 LWEXT4_BUILD_SHARED_LIB:BOOL=OFF
 
 //No help, variable specified on the command line.
-VERSION:UNINITIALIZED=1.0.0-742028b
+VERSION:UNINITIALIZED=1.0.0-7c80141
 
 //No help, variable specified on the command line.
 VERSION_MAJOR:UNINITIALIZED=1

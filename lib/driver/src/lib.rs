@@ -20,7 +20,8 @@ pub static CHAR_DEVICE: Once<Arc<dyn CharDevice>> = Once::new();
 pub trait BlockDevice: Send + Sync {
     fn read(&self, block_id: usize, buf: &mut [u8]);
     fn write(&self, block_id: usize, buf: &[u8]);
-    fn size(&self) -> usize;
+    fn size(&self) -> u64;
+    fn block_size(&self) -> usize;
 }
 
 pub trait CharDevice: Send + Sync {

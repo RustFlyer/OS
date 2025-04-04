@@ -11,6 +11,7 @@ set(BLOCKDEV_TYPE  none)
 
 add_definitions(-DCONFIG_USE_DEFAULT_CONFIG=0)
 add_definitions(-DVERSION="${VERSION}")
+add_definitions(-DCONFIG_JOURNALING_ENABLE=0)
 
 #Examples
 if    (CMAKE_SYSTEM_PROCESSOR STREQUAL  cortex-m0)

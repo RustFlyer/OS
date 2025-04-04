@@ -1,6 +1,6 @@
 use super::hal::VirtHalImpl;
 use crate::BlockDevice;
-use config::device::{BLOCK_SIZE, VIRTIO0};
+use config::device::{BLOCK_SIZE, DEV_SIZE, VIRTIO0};
 use mutex::SpinNoIrqLock;
 use virtio_drivers::{
     device::blk::VirtIOBlk,
@@ -20,7 +20,7 @@ impl BlockDevice for VirtBlkDevice {
     ///
     /// Data from Block to Buf
     fn read(&self, block_id: usize, buf: &mut [u8]) {
-        let res = self.0.lock().read_blocks(block_id + 2, buf);
+        let res = self.0.lock().read_blocks(block_id, buf);
         if res.is_err() {
             panic!(
                 "Error when reading VirtIOBlk, block_id {} ,err {:?} ",
@@ -36,6 +36,7 @@ impl BlockDevice for VirtBlkDevice {
     ///
     /// Data from Buf to Block
     fn write(&self, block_id: usize, buf: &[u8]) {
+        log::info!("write tick {} with {:?}", block_id, buf);
         let res = self.0.lock().write_blocks(block_id, buf);
         if res.is_err() {
             panic!(
@@ -45,9 +46,13 @@ impl BlockDevice for VirtBlkDevice {
         }
     }
 
-    /// Get Block Size
-    fn size(&self) -> usize {
+    fn block_size(&self) -> usize {
         BLOCK_SIZE
+    }
+
+    /// Get Block Size
+    fn size(&self) -> u64 {
+        DEV_SIZE
     }
 }
 

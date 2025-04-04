@@ -108,8 +108,11 @@ impl<K: KernelDevOp> Ext4BlockWrapper<K> {
         info!("mount success");
 
         ext4bd.lwext4_dir_ls();
+        info!("lwext4_dir_ls success");
         ext4bd.print_lwext4_mp_stats();
+        info!("print_lwext4_mp_stats success");
         ext4bd.print_lwext4_block_stats();
+        info!("print_lwext4_block_stats success");
 
         Ok(ext4bd)
     }

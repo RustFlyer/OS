@@ -36,32 +36,7 @@ __attribute__((weak)) char *__stpcpy(char *restrict d, const char *restrict s)
         return d;
 }
 
-__attribute__((weak)) char *strcpy(char *restrict d, const char *restrict s)
-{
-#ifdef __GNUC__
-        typedef size_t __attribute__((__may_alias__)) word;
-        word *wd;
-        const word *ws;
-        if ((uintptr_t)s % ALIGN == (uintptr_t)d % ALIGN)
-        {
-                for (; (uintptr_t)s % ALIGN; s++, d++)
-                        if (!(*d = *s))
-                                return d;
-                wd = (void *)d;
-                ws = (const void *)s;
-                for (; !HASZERO(*ws); *wd++ = *ws++)
-                        ;
-                d = (void *)wd;
-                s = (const void *)ws;
-        }
-#endif
-        for (; (*d = *s); s++, d++)
-                ;
-
-        return d;
-}
-
-__attribute__((weak)) char *strcpy2(char *restrict dest, const char *restrict src)
+__attribute__((weak)) char *strcpy(char *restrict dest, const char *restrict src)
 {
         __stpcpy(dest, src);
         return dest;
