@@ -77,7 +77,7 @@ impl File for ExtDirFile {
                         CString::from_vec_with_nul(path_buf).expect("cstring vec convert fail");
                     ExtLinkInode::new(target.to_str().unwrap(), self.super_block()).clone()
                 };
-            if sub_dentry.is_negetive() {
+            if sub_dentry.is_negative() {
                 sub_dentry.set_inode(new_inode);
             }
         }

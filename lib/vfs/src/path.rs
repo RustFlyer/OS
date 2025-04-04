@@ -49,10 +49,7 @@ impl Path {
                 ".." => {
                     dentry = dentry.parent().ok_or(SysError::ENOENT)?;
                 }
-                name => match dentry.lookup(name) {
-                    Ok(child_dentry) => dentry = child_dentry,
-                    Err(e) => return Err(e),
-                },
+                name => dentry = dentry.lookup(name),
             }
         }
         Ok(dentry)

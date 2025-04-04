@@ -29,7 +29,7 @@ unsafe impl Sync for ExtFileInode {}
 impl ExtFileInode {
     pub fn new(superblock: Arc<dyn SuperBlock>, file: ExtFile) -> Arc<Self> {
         Arc::new(Self {
-            meta: InodeMeta::new(0, Arc::downgrade(&superblock)),
+            meta: InodeMeta::new(0, superblock),
             file: new_share_mutex(file),
         })
     }

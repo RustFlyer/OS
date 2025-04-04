@@ -6,9 +6,9 @@ use core::{
 };
 
 use crate::{dentry::Dentry, direntry::DirEntry, inode::Inode, superblock::SuperBlock};
-use alloc::sync::Arc;
 use alloc::vec::Vec;
 use alloc::{boxed::Box, sync};
+use alloc::{string::ToString, sync::Arc};
 use async_trait::async_trait;
 use config::{
     inode::{InodeState, InodeType},
@@ -137,7 +137,7 @@ pub trait File: Send + Sync + DowncastSync {
     }
 
     fn super_block(&self) -> Arc<dyn SuperBlock> {
-        self.get_meta().dentry.super_block()
+        self.get_meta().dentry.super_block().expect("fix me")
     }
 
     fn size(&self) -> usize {
@@ -151,7 +151,7 @@ pub trait File: Send + Sync + DowncastSync {
 
 impl dyn File {
     pub fn flags(&self) -> OpenFlags {
-        self.get_meta().flags.lock().clone()
+        *self.get_meta().flags.lock()
     }
 
     pub fn set_flags(&self, flags: OpenFlags) {
@@ -172,7 +172,7 @@ impl dyn File {
         let mut count = 0;
         let mut offset = offset;
         let inode = self.inode();
-        if !(inode.inotype().is_file() || inode.inotype().is_block_device()) {
+        if !(inode.inotype().is_reg() || inode.inotype().is_block_device()) {
             log::debug!("[File::read] read without pages");
             let count = self.base_read_at(offset, buf)?;
             return Ok(count);
@@ -248,18 +248,20 @@ impl dyn File {
         self.load_dir()?;
         if let Some(sub_dentry) = self
             .dentry()
-            .children()
+            .get_meta()
+            .children
+            .lock()
             .values()
-            .filter(|c| !c.is_negetive())
+            .filter(|c| !c.is_negative())
             .nth(self.pos())
         {
             self.seek(SeekFrom::Current(1))?;
-            let inode = sub_dentry.inode()?;
+            let inode = sub_dentry.inode().expect("check me");
             let dirent = DirEntry {
                 ino: inode.ino() as u64,
                 off: self.pos() as u64,
                 itype: inode.inotype(),
-                name: sub_dentry.name(),
+                name: sub_dentry.name().to_string(),
             };
             Ok(Some(dirent))
         } else {

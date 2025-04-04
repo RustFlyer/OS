@@ -1,5 +1,12 @@
-use alloc::{ffi::CString, sync::Arc, vec};
-use config::{inode::InodeType, vfs::OpenFlags};
+use alloc::{
+    ffi::CString,
+    sync::{Arc, Weak},
+    vec,
+};
+use config::{
+    inode::{InodeMode, InodeType},
+    vfs::OpenFlags,
+};
 use lwext4_rust::{
     InodeTypes,
     bindings::{EOK, ext4_dir_rm, ext4_flink, ext4_fremove, ext4_inode_exist, ext4_readlink},
@@ -8,7 +15,6 @@ use vfs::{
     dentry::{Dentry, DentryMeta},
     file::File,
     inode::Inode,
-    superblock::SuperBlock,
 };
 
 use systype::{SysError, SysResult, SyscallResult};
@@ -26,16 +32,12 @@ pub struct ExtDentry {
 impl ExtDentry {
     pub fn new(
         name: &str,
-        superblock: Arc<dyn SuperBlock>,
-        parentdentry: Option<Arc<dyn Dentry>>,
+        inode: Option<Arc<dyn Inode>>,
+        parent: Option<Weak<dyn Dentry>>,
     ) -> Arc<Self> {
         Arc::new(Self {
-            meta: DentryMeta::new(name, superblock, parentdentry),
+            meta: DentryMeta::new(name, inode, parent),
         })
-    }
-
-    pub fn into_dyn(self: Arc<Self>) -> Arc<dyn Dentry> {
-        self.clone()
     }
 }
 
@@ -44,33 +46,25 @@ impl Dentry for ExtDentry {
         &self.meta
     }
 
-    /// When Dentry acts as a Dir, it can create a sub-dentry with a specific mode
-    /// - InodeType::File -> ExtFileInode
-    /// - InodeType::Dir  -> ExtDirInode
-    ///
-    /// Returns a result of sub dentry
-    fn base_create(
-        self: Arc<Self>,
-        name: &str,
-        mode: config::inode::InodeMode,
-    ) -> SysResult<Arc<dyn Dentry>> {
-        let superblock = self.super_block();
+    fn base_create(&self, dentry: &dyn Dentry, mode: InodeMode) -> SysResult<()> {
         let inode = self
-            .inode()?
+            .inode()
+            .unwrap()
             .downcast_arc::<ExtDirInode>()
             .unwrap_or_else(|_| unreachable!());
-
-        let sub_dentry = self.into_dyn().get_child_or_create(name);
-        let path = sub_dentry.path();
+        let mut dir = inode.dir.lock();
         let new_inode: Arc<dyn Inode> = match mode.to_type() {
-            InodeType::File => {
-                let flags = (OpenFlags::O_RDWR | OpenFlags::O_CREAT | OpenFlags::O_TRUNC).bits();
-                let file = ExtFile::open(&path, flags).map_err(SysError::from_i32)?;
-                ExtFileInode::new(superblock, file)
-            }
             InodeType::Dir => {
-                let dir = ExtDir::create(&path).map_err(SysError::from_i32)?;
-                ExtDirInode::new(superblock, dir)
+                let new_dir = LwExt4Dir::create(&path).map_err(SysError::from_i32)?;
+                ExtDirInode::new(sb, new_dir)
+            }
+            InodeType::File => {
+                let new_file = LwExt4File::open(
+                    &path,
+                    (OpenFlags::O_RDWR | OpenFlags::O_CREAT | OpenFlags::O_TRUNC).bits(),
+                )
+                .map_err(SysError::from_i32)?;
+                Ext4FileInode::new(sb, new_file)
             }
             _ => todo!(),
         };
@@ -117,7 +111,7 @@ impl Dentry for ExtDentry {
         Ok(sub_dentry)
     }
 
-    fn base_new_child(self: Arc<Self>, name: &str) -> Arc<dyn Dentry> {
+    fn base_new_neg_child(self: Arc<Self>, name: &str) -> Arc<dyn Dentry> {
         Self::new(name, self.super_block(), Some(self))
     }
 

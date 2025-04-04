@@ -1,4 +1,4 @@
-use alloc::sync::Weak;
+use alloc::sync::Arc;
 
 use downcast_rs::{DowncastSync, impl_downcast};
 
@@ -17,7 +17,7 @@ pub struct InodeMeta {
     /// Inode number of the inode in its filesystem.
     pub ino: usize,
     /// Reference to the superblock of the filesystem this inode belongs to.
-    pub superblock: Weak<dyn SuperBlock>,
+    pub superblock: Arc<dyn SuperBlock>,
     /// Page cache for the inode. If the inode is not a regular file or a block
     /// device, this field is not used.
     pub page_cache: PageCache,
@@ -47,7 +47,7 @@ pub struct InodeMetaInner {
 
 impl InodeMeta {
     /// Creates a default inode metadata. The caller should fill each field after this call.
-    pub fn new(ino: usize, superblock: Weak<dyn SuperBlock>) -> Self {
+    pub fn new(ino: usize, superblock: Arc<dyn SuperBlock>) -> Self {
         Self {
             ino,
             superblock,

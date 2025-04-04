@@ -17,7 +17,7 @@ pub struct ExtLinkInode {
 impl ExtLinkInode {
     pub fn new(target: &str, superblock: Arc<dyn SuperBlock>) -> Arc<Self> {
         Arc::new(Self {
-            meta: InodeMeta::new(0, Arc::downgrade(&superblock)),
+            meta: InodeMeta::new(0, superblock),
         })
     }
 }

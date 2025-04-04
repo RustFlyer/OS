@@ -43,7 +43,7 @@ impl FileSystemType for ExtFsType {
         root_dentry.set_inode(root_inode);
 
         if let Some(parent) = parent {
-            parent.insert(root_dentry.clone());
+            parent.add_child(root_dentry.clone());
         }
 
         superblock.set_root_dentry(root_dentry.clone());
