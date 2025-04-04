@@ -107,6 +107,15 @@ pub const USER_STACK_LOWER: usize = USER_STACK_UPPER - USER_STACK_SIZE;
 /// boot hart start address
 pub const HART_START_ADDR: usize = 0x80200000;
 
+/// Start of MMIO space in physical memory
+pub const MMIO_START_PHYS: usize = 0x0200_0000;
+/// End of MMIO space in physical memory
+pub const MMIO_END_PHYS: usize = 0x2000_0000;
+/// Start of MMIO space in virtual memory
+pub const MMIO_START: usize = MMIO_START_PHYS + KERNEL_MAP_OFFSET;
+/// End of MMIO space in virtual memory
+pub const MMIO_END: usize = MMIO_END_PHYS + KERNEL_MAP_OFFSET;
+
 // /// Address of the device tree blob
 pub static mut DTB_ADDR: usize = 0;
 // /// Maximum size of the device tree blob
