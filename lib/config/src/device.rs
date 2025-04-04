@@ -8,4 +8,4 @@ pub const VIRTIO0: usize = 0x10001000 + KERNEL_MAP_OFFSET;
 
 pub const BLOCK_SIZE: usize = 512;
 
-pub const DEV_SIZE: u64 = 512 * 1024;
+pub const DEV_SIZE: u64 = 512 * 1024 * 1024;

@@ -8,7 +8,7 @@ use user_lib::{exit, fork, open, println, sleep, yield_};
 
 #[unsafe(no_mangle)]
 fn main() {
-    let _: isize = open(0, "aaa", OpenFlags::O_CREAT, InodeMode::empty());
+    let _: isize = open(0, "aaaaaaaa", OpenFlags::O_CREAT, InodeMode::empty());
 
     exit(9)
 }
