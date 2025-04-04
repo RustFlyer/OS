@@ -73,4 +73,40 @@ impl ExtDir {
             type_: self.0.de.inode_type,
         })
     }
+
+    pub fn lwext4_dir_entries(&self, path: &str) -> Result<(Vec<Vec<u8>>, Vec<InodeTypes>), i32> {
+        let c_path = CString::new(path).unwrap();
+        let mut d: ext4_dir = unsafe { core::mem::zeroed() };
+
+        let mut name: Vec<Vec<u8>> = Vec::new();
+        let mut inode_type: Vec<InodeTypes> = Vec::new();
+
+        // info!("ls {}", str::from_utf8(path).unwrap());
+        unsafe {
+            ext4_dir_open(&mut d, c_path.as_ptr());
+
+            let mut de = ext4_dir_entry_next(&mut d);
+            while !de.is_null() {
+                let dentry = &(*de);
+                let len = dentry.name_length as usize;
+
+                let mut sss: [u8; 255] = [0; 255];
+                sss[..len].copy_from_slice(&dentry.name[..len]);
+                sss[len] = 0;
+
+                debug!(
+                    "  {} {}",
+                    dentry.inode_type,
+                    core::str::from_utf8(&sss).unwrap()
+                );
+                name.push(sss[..(len + 1)].to_vec());
+                inode_type.push((dentry.inode_type as usize).into());
+
+                de = ext4_dir_entry_next(&mut d);
+            }
+            ext4_dir_close(&mut d);
+        }
+
+        Ok((name, inode_type))
+    }
 }
