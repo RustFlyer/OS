@@ -18,6 +18,7 @@ pub struct DentryMeta {
 
     pub inode: SpinNoIrqLock<Option<Arc<dyn Inode>>>,
     pub children: SpinNoIrqLock<BTreeMap<String, Arc<dyn Dentry>>>,
+    pub state: SpinNoIrqLock<DentryState>,
 }
 
 impl DentryMeta {
@@ -42,8 +43,17 @@ impl DentryMeta {
             pdentry,
             inode,
             children,
+            state: SpinNoIrqLock::new(DentryState::UnInit),
         }
     }
+}
+
+#[derive(Default, Debug, PartialEq, Eq, Clone, Copy)]
+pub enum DentryState {
+    #[default]
+    UnInit,
+    Sync,
+    Dirty,
 }
 
 pub trait Dentry: Send + Sync {
@@ -91,12 +101,20 @@ pub trait Dentry: Send + Sync {
         self.get_meta().children.lock().clone()
     }
 
+    fn state(&self) -> DentryState {
+        self.get_meta().state.lock().clone()
+    }
+
     fn get_child(&self, name: &str) -> Option<Arc<dyn Dentry>> {
         self.get_meta().children.lock().get(name).cloned()
     }
 
     fn set_inode(&self, inode: Arc<dyn Inode>) {
         *self.get_meta().inode.lock() = Some(inode);
+    }
+
+    fn set_state(&self, state: DentryState) {
+        *self.get_meta().state.lock() = state;
     }
 
     fn insert(&self, child: Arc<dyn Dentry>) -> Option<Arc<dyn Dentry>> {
@@ -144,19 +162,20 @@ impl dyn Dentry {
     }
 
     pub fn lookup(self: &Arc<Self>, name: &str) -> SysResult<Arc<dyn Dentry>> {
-        let child = self.get_child(name);
-        if child.is_some() {
+        if !self.inode()?.inotype().is_dir() {
+            return Err(SysError::ENOTDIR);
+        }
+        let child = self.get_child_or_create(name);
+        if child.state() == DentryState::UnInit {
             log::trace!(
-                "[Dentry::lookup] lookup {name} in cache in path {}",
+                "[Dentry::lookup] lookup {name} not in cache in path {}",
                 self.path()
             );
-            return Ok(child.unwrap());
+            self.clone().base_lookup(name)?;
+            child.set_state(DentryState::Sync);
+            return Ok(child);
         }
-        log::trace!(
-            "[Dentry::lookup] lookup {name} not in cache in path {}",
-            self.path()
-        );
-        self.clone().base_lookup(name)
+        Ok(child)
     }
 
     pub fn create(self: &Arc<Self>, name: &str, mode: InodeMode) -> SysResult<Arc<dyn Dentry>> {
@@ -176,7 +195,7 @@ impl dyn Dentry {
         child
     }
 
-    pub fn get_child_or_create(self: Arc<Self>, name: &str) -> Arc<dyn Dentry> {
+    pub fn get_child_or_create(self: &Arc<Self>, name: &str) -> Arc<dyn Dentry> {
         self.get_child(name).unwrap_or_else(|| {
             let new_dentry = self.clone().new_child(name);
             self.insert(new_dentry.clone());

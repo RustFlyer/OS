@@ -1,6 +1,7 @@
 use crate::{print, processor::current_task, vm::user_ptr::UserReadPtr};
 use alloc::string::ToString;
 use config::{inode::InodeMode, vfs::OpenFlags};
+use log::{debug, error};
 use osfs::sys_root_dentry;
 use systype::{SysError, SyscallResult};
 
@@ -47,7 +48,7 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
     let pathname = {
         let mut addr_space_lock = task.addr_space_mut().lock();
         let mut data_ptr = UserReadPtr::<u8>::new(pathname, &mut *addr_space_lock);
-        match data_ptr.read_c_string(100) {
+        match unsafe { data_ptr.read_array(8) } {
             Ok(data) => match core::str::from_utf8(&data) {
                 Ok(utf8_str) => utf8_str.to_string(),
                 Err(_) => unimplemented!(),
@@ -56,11 +57,14 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
         }
     };
 
+    debug!("path name = {}", pathname);
+
     let dentry = {
         let path = Path::new(sys_root_dentry(), sys_root_dentry(), &pathname);
         path.walk().expect("sys_openat: fail to find dentry")
     };
 
+    debug!("flags = {:?}", flags);
     if flags.contains(OpenFlags::O_CREAT) {
         let parent = dentry.parent().expect("can not create with root entry");
         parent.create(&pathname, InodeMode::FILE | mode)?;

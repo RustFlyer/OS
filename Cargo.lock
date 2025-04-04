@@ -761,6 +761,7 @@ version = "0.1.0"
 dependencies = [
  "bitflags 2.9.0",
  "buddy_system_allocator",
+ "config",
  "time",
 ]
 

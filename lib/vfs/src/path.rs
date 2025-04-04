@@ -40,6 +40,7 @@ impl Path {
         } else {
             self.start.clone()
         };
+        log::debug!("[Path::walk] {:?}", split_path(path));
         let nodes: Vec<&str> = path
             .split("/")
             .filter(|name| !name.is_empty() && *name != ".")
@@ -57,4 +58,10 @@ impl Path {
         }
         Ok(dentry)
     }
+}
+
+pub fn split_path(path: &str) -> Vec<&str> {
+    path.split('/')
+        .filter(|name| !name.is_empty() && *name != ".")
+        .collect()
 }

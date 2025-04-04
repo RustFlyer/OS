@@ -1,6 +1,6 @@
 use alloc::{ffi::CString, sync::Arc, vec};
 use config::{inode::InodeType, vfs::OpenFlags};
-use log::debug;
+use log::{debug, warn};
 use lwext4_rust::{
     InodeTypes,
     bindings::{EOK, ext4_dir_rm, ext4_flink, ext4_fremove, ext4_inode_exist, ext4_readlink},
@@ -67,10 +67,12 @@ impl Dentry for ExtDentry {
             InodeType::File => {
                 let flags = (OpenFlags::O_RDWR | OpenFlags::O_CREAT | OpenFlags::O_TRUNC).bits();
                 let file = ExtFile::open(&path, flags).map_err(SysError::from_i32)?;
+                warn!("create a new file inode");
                 ExtFileInode::new(superblock, file)
             }
             InodeType::Dir => {
                 let dir = ExtDir::create(&path).map_err(SysError::from_i32)?;
+                warn!("create a new dir inode");
                 ExtDirInode::new(superblock, dir)
             }
             _ => todo!(),
@@ -80,24 +82,29 @@ impl Dentry for ExtDentry {
     }
 
     fn base_lookup(self: Arc<Self>, name: &str) -> SysResult<Arc<dyn Dentry>> {
+        log::debug!("[Ext4Dentry::base_lookup] name: {name}");
         let superblock = self.super_block();
         let sub_dentry = self.into_dyn().get_child(name).unwrap();
         let path = sub_dentry.path();
+        log::debug!("path = [{}]", path);
         let c_path = CString::new(path.clone()).expect("CString::new failed");
         if unsafe { ext4_inode_exist(c_path.as_ptr(), InodeTypes::EXT4_DE_DIR as i32) }
             == EOK as i32
         {
+            log::debug!("try to create a new dir");
             let new_file = ExtDir::open(&path).map_err(SysError::from_i32)?;
             sub_dentry.set_inode(ExtDirInode::new(superblock, new_file))
         } else if unsafe { ext4_inode_exist(c_path.as_ptr(), InodeTypes::EXT4_DE_REG_FILE as i32) }
             == EOK as i32
         {
+            log::debug!("try to create a new file");
             let new_file =
                 ExtFile::open(&path, OpenFlags::empty().bits()).map_err(SysError::from_i32)?;
             sub_dentry.set_inode(ExtFileInode::new(superblock, new_file))
         } else if unsafe { ext4_inode_exist(c_path.as_ptr(), InodeTypes::EXT4_DE_SYMLINK as i32) }
             == EOK as i32
         {
+            log::debug!("try to create a new link file");
             let path = sub_dentry.path();
             let mut path_buf = vec![0; 512];
             let c_path = CString::new(path).expect("CString::new failed");
@@ -114,6 +121,8 @@ impl Dentry for ExtDentry {
             let target = CString::from_vec_with_nul(path_buf).unwrap();
             let sub_inode = ExtLinkInode::new(target.to_str().unwrap(), superblock);
             sub_dentry.set_inode(sub_inode)
+        } else {
+            log::error!("no one match!");
         }
         Ok(sub_dentry)
     }
