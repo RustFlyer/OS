@@ -1,14 +1,10 @@
-extern crate alloc;
 use alloc::sync::Arc;
-use config::{
-    device::BLOCK_SIZE,
-    inode::{InodeMode, InodeType},
-    vfs::Stat,
-};
+
+use config::{device::BLOCK_SIZE, vfs::Stat};
 use systype::SysResult;
 use vfs::{
     inode::{Inode, InodeMeta},
-    superblock::{self, SuperBlock},
+    superblock::SuperBlock,
 };
 pub struct ExtLinkInode {
     meta: InodeMeta,

@@ -1,13 +1,11 @@
-extern crate alloc;
-
 use core::{
     cmp,
     sync::atomic::{AtomicUsize, Ordering},
 };
 
 use crate::{dentry::Dentry, direntry::DirEntry, inode::Inode, superblock::SuperBlock};
+use alloc::boxed::Box;
 use alloc::vec::Vec;
-use alloc::{boxed::Box, sync};
 use alloc::{string::ToString, sync::Arc};
 use async_trait::async_trait;
 use config::{
@@ -15,7 +13,7 @@ use config::{
     mm::PAGE_SIZE,
     vfs::{OpenFlags, PollEvents, SeekFrom},
 };
-use downcast_rs::{Downcast, DowncastSync, impl_downcast};
+use downcast_rs::{DowncastSync, impl_downcast};
 use mm::vm::page_cache::page::Page;
 use mutex::SpinNoIrqLock;
 use systype::{SysError, SysResult, SyscallResult};
@@ -137,7 +135,7 @@ pub trait File: Send + Sync + DowncastSync {
     }
 
     fn super_block(&self) -> Arc<dyn SuperBlock> {
-        self.get_meta().dentry.super_block().expect("fix me")
+        self.get_meta().dentry.superblock().expect("fix me")
     }
 
     fn size(&self) -> usize {

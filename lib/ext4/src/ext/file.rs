@@ -1,14 +1,22 @@
-extern crate alloc;
 use alloc::ffi::CString;
 use core::mem::MaybeUninit;
-use log::{error, warn};
+
 use lwext4_rust::bindings::{
-    EOK, ext4_block, ext4_fclose, ext4_file, ext4_fopen2, ext4_fread, ext4_fs_get_inode_dblk_idx,
-    ext4_fs_get_inode_ref, ext4_fs_put_inode_ref, ext4_fseek, ext4_fsize, ext4_ftell,
-    ext4_ftruncate, ext4_fwrite, ext4_inode_ref, ext4_lblk_t,
+    SEEK_CUR, SEEK_END, SEEK_SET, ext4_fclose, ext4_file, ext4_fopen2, ext4_fread, ext4_fseek,
+    ext4_fsize, ext4_ftell, ext4_ftruncate, ext4_fwrite,
 };
 
+/// Wrapper for C-interface `ext4_file` struct which represents a file.
 pub struct ExtFile(ext4_file);
+
+/// Enumeration for file seek types.
+/// This is used in [`ExtFile::seek`] to specify how to interpret the offset.
+#[repr(u32)]
+pub enum FileSeekType {
+    SeekSet = SEEK_SET,
+    SeekCur = SEEK_CUR,
+    SeekEnd = SEEK_END,
+}
 
 impl Drop for ExtFile {
     fn drop(&mut self) {
@@ -19,118 +27,97 @@ impl Drop for ExtFile {
 }
 
 impl ExtFile {
+    /// Opens a file at the given path with the specified flags and returns a handle to it.
+    pub fn open(path: &str, flags: i32) -> Result<Self, i32> {
+        let c_path = CString::new(path).unwrap();
+        let mut file: MaybeUninit<ext4_file> = MaybeUninit::uninit();
+        let err = unsafe { ext4_fopen2(file.as_mut_ptr(), c_path.as_ptr(), flags) };
+        match err {
+            0 => unsafe { Ok(Self(file.assume_init())) },
+            e => {
+                log::warn!("ext4_fopen failed: {}, error = {}", path, err);
+                Err(e)
+            }
+        }
+    }
+
+    /// Reads data from the file into the provided buffer. This function will try to
+    /// read `buf.len()` bytes into `buf`, but it may read fewer bytes if it reaches EOF.
+    /// This function will advance the file offset.
+    ///
+    /// Returns the number of bytes read. If it returns 0, it means it reached EOF.
+    pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, i32> {
+        let mut count = 0;
+        let err = unsafe { ext4_fread(&mut self.0, buf.as_mut_ptr() as _, buf.len(), &mut count) };
+
+        match err {
+            0 => Ok(count),
+            e => {
+                log::warn!("ext4_fread failed: error = {}", err);
+                Err(e)
+            }
+        }
+    }
+
+    /// Writes data from the provided buffer to the file. This function will try to
+    /// write `buf.len()` bytes from `buf` to the file, but it may write fewer bytes
+    /// if there is not enough space. This function will advance the file offset.
+    ///
+    /// Returns the number of bytes written.
+    pub fn write(&mut self, buf: &[u8]) -> Result<usize, i32> {
+        let mut count = 0;
+        let err = unsafe { ext4_fwrite(&mut self.0, buf.as_ptr() as _, buf.len(), &mut count) };
+
+        match err {
+            0 => Ok(count),
+            e => {
+                log::warn!("ext4_fwrite failed: error = {}", err);
+                Err(e)
+            }
+        }
+    }
+
+    /// Seeks to a specific position in the file.
+    ///
+    /// `offset` is the number of bytes to seek. `seek_type` specifies how to interpret the
+    /// offset:
+    /// - `SeekSet`: Seek from the beginning of the file.
+    /// - `SeekCur`: Seek from the current position in the file.
+    /// - `SeekEnd`: Seek from the end of the file.
+    pub fn seek(&mut self, offset: i64, seek_type: FileSeekType) -> Result<(), i32> {
+        let err = unsafe { ext4_fseek(&mut self.0, offset, seek_type as u32) };
+        match err {
+            0 => Ok(()),
+            _ => {
+                log::warn!("ext4_fseek failed: error = {}", err);
+                Err(err)
+            }
+        }
+    }
+
+    /// Returns the current position in the file.
+    pub fn tell(&mut self) -> u64 {
+        unsafe { ext4_ftell(&mut self.0) }
+    }
+
+    /// Returns the size of the file in bytes.
     pub fn size(&mut self) -> u64 {
         unsafe { ext4_fsize(&mut self.0) }
     }
 
-    pub fn open(path: &str, flags: i32) -> Result<Self, i32> {
-        let c_path = CString::new(path).expect("CString::new failed");
-        let mut file = MaybeUninit::uninit();
-        let r = unsafe { ext4_fopen2(file.as_mut_ptr(), c_path.as_ptr(), flags) };
-        match r {
-            0 => unsafe { Ok(Self(file.assume_init())) },
-            e => {
-                error!("ext4_fopen: {}, rc = {}", path, r);
-                Err(e)
-            }
-        }
-    }
-
-    pub fn seek(&mut self, offset: i64, seek_type: u32) -> Result<(), i32> {
-        let mut offset = offset;
-        let size = self.size() as i64;
-
-        if offset > size {
-            warn!("Seek beyond the end of the file");
-            offset = size;
-        }
-        let r = unsafe { ext4_fseek(&mut self.0, offset, seek_type) };
-        match r {
-            0 => Ok(()),
-            _ => {
-                error!("ext4_fseek error: rc = {}", r);
-                Err(r)
-            }
-        }
-    }
-
-    pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, i32> {
-        let mut r_cnt = 0;
-        let r = unsafe { ext4_fread(&mut self.0, buf.as_mut_ptr() as _, buf.len(), &mut r_cnt) };
-
-        match r {
-            0 => Ok(r_cnt),
-            e => {
-                error!("ext4_fread: rc = {}", r);
-                Err(e)
-            }
-        }
-    }
-
-    pub fn write(&mut self, buf: &[u8]) -> Result<usize, i32> {
-        let mut w_cnt = 0;
-        let r = unsafe { ext4_fwrite(&mut self.0, buf.as_ptr() as _, buf.len(), &mut w_cnt) };
-
-        match r {
-            0 => Ok(w_cnt),
-            e => {
-                error!("ext4_fwrite: rc = {}", r);
-                Err(e)
-            }
-        }
-    }
-
-    pub fn tell(&mut self) -> u64 {
-        let r = unsafe { ext4_ftell(&mut self.0) };
-        r
-    }
-
+    /// Truncates the file to the specified size.
+    ///
+    /// This function will change the size of the file to `size` bytes. If the file size
+    /// is larger than `size`, the extra data will be discarded. If the file size is
+    /// smaller than `size`, the file will be padded with zeros.
     pub fn truncate(&mut self, size: u64) -> Result<(), i32> {
-        let r = unsafe { ext4_ftruncate(&mut self.0, size) };
-        match r {
+        let err = unsafe { ext4_ftruncate(&mut self.0, size) };
+        match err {
             0 => Ok(()),
             e => {
-                error!("ext4_ftruncate: rc = {}", r);
+                log::warn!("ext4_ftruncate failed: error = {}", err);
                 Err(e)
             }
         }
-    }
-
-    pub fn file_get_blk_idx(&mut self) -> Result<u64, i32> {
-        let block_idx;
-        unsafe {
-            let mut inode_ref = ext4_inode_ref {
-                block: ext4_block {
-                    lb_id: 0,
-                    buf: core::ptr::null_mut(),
-                    data: core::ptr::null_mut(),
-                },
-                inode: core::ptr::null_mut(),
-                fs: core::ptr::null_mut(),
-                index: 0,
-                dirty: false,
-            };
-            let r = ext4_fs_get_inode_ref(&mut (*self.0.mp).fs, self.0.inode, &mut inode_ref);
-            if r != EOK as i32 {
-                error!("ext4_fs_get_inode_ref: rc = {}", r);
-                return Err(r);
-            }
-            let sb = (*self.0.mp).fs.sb;
-            let block_size = 1024 << sb.log_block_size.to_le();
-            let iblock_idx: ext4_lblk_t = ((self.0.fpos) / block_size).try_into().unwrap();
-            let mut fblock = 0;
-            let r = ext4_fs_get_inode_dblk_idx(&mut inode_ref, iblock_idx, &mut fblock, true);
-            if r != EOK as i32 {
-                error!("ext4_fs_get_inode_dblk_idx: rc = {}", r);
-                return Err(r);
-            }
-            ext4_fs_put_inode_ref(&mut inode_ref);
-
-            let unalg = (self.0.fpos) % block_size;
-            let bdev = *(*self.0.mp).fs.bdev;
-            let off = fblock * block_size + unalg;
-            block_idx = (off + bdev.part_offset) / ((*(bdev.bdif)).ph_bsize as u64);
-        }
-        Ok(block_idx)
     }
 }

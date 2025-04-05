@@ -1,9 +1,9 @@
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::sync::{Arc, Weak};
-use config::inode::{InodeMode, InodeState};
+use config::inode::InodeMode;
 use mutex::SpinNoIrqLock;
-use systype::{SysError, SysResult, SyscallResult};
+use systype::{SysError, SysResult};
 
 use crate::file::File;
 use crate::inode::Inode;
@@ -43,7 +43,7 @@ pub trait Dentry: Send + Sync {
     /// Returns the metadata of this dentry.
     fn get_meta(&self) -> &DentryMeta;
 
-    fn base_open(self: Arc<Self>) -> Arc<dyn File>;
+    fn base_open(self: Arc<Self>) -> SysResult<Arc<dyn File>>;
 
     /// Creates a file in directory `self` with the name given in `dentry` and the mode
     /// given in `mode`.
@@ -52,11 +52,12 @@ pub trait Dentry: Send + Sync {
     /// After this call, `dentry` will become valid.
     fn base_create(&self, dentry: &dyn Dentry, mode: InodeMode) -> SysResult<()>;
 
-    /// Looks up on the disk for the dentry with the given name in directory `self`.
-    /// Returns `None` if the dentry does not exist.
+    /// Looks up on the disk for the dentry with the name given in `dentry` in directory `self`.
     ///
-    /// `self` must be a valid directory.
-    fn base_lookup(self: Arc<Self>, name: &str) -> Option<Arc<dyn Dentry>>;
+    /// `self` must be a valid directory. `dentry` must be a negative dentry and a child of `self`.
+    /// After this call, `dentry` will become valid if the dentry exists. Otherwise, `dentry`
+    /// will remain negative.
+    fn base_lookup(&self, dentry: &dyn Dentry) -> SysResult<()>;
 
     /// Creates a hard link in directory `self` with the name given in `dentry` to the file
     /// `inode`.
@@ -65,7 +66,7 @@ pub trait Dentry: Send + Sync {
     /// and a child of `self`. After this call, `dentry` will become valid.
     /// The file type of `inode` must not be a directory, and `inode` and `dentry`
     /// must be in the same filesystem.
-    fn base_link(&self, dentry: &dyn Dentry, inode: Arc<dyn Inode>) -> SysResult<()>;
+    fn base_link(&self, dentry: &dyn Dentry, old_dentry: &dyn Dentry) -> SysResult<()>;
 
     /// Removes the child dentry from directory `self`.
     ///
@@ -76,10 +77,7 @@ pub trait Dentry: Send + Sync {
     /// Removes the child directory `dentry` from directory `self`.
     ///
     /// `self` must be a valid directory. `dentry` must be a valid dentry and a child of
-    /// `self`. After this call, `dentry` will become invalid. `dentry` must be a directory.
-    ///
-    /// # Errors
-    /// Returns `ENOTEMPTY` if the directory is not empty.
+    /// `self`. After this call, `dentry` will become invalid. `dentry` must be a empty directory.
     fn base_rmdir(&self, dentry: &dyn Dentry) -> SysResult<()>;
 
     /// Constructs a new negative child dentry with the given name in directory `self`.
@@ -106,7 +104,7 @@ pub trait Dentry: Send + Sync {
     ///
     /// Returns `None` if this dentry is a negative dentry, in which case getting the
     /// superblock seems to be meaningless.
-    fn super_block(&self) -> Option<Arc<dyn SuperBlock>> {
+    fn superblock(&self) -> Option<Arc<dyn SuperBlock>> {
         Some(self.inode()?.get_meta().superblock.clone())
     }
 
@@ -152,9 +150,9 @@ pub trait Dentry: Send + Sync {
 
         let parent_path = parent.path();
         if parent_path == "/" {
-            return parent_path + self.name();
+            parent_path + self.name()
         } else {
-            return parent_path + "/" + self.name();
+            parent_path + "/" + self.name()
         }
     }
 }
@@ -167,7 +165,7 @@ impl dyn Dentry {
         if self.is_negative() {
             return Err(SysError::ENOENT);
         }
-        Ok(self.clone().base_open())
+        Arc::clone(&self).base_open()
     }
 
     /// Creates a regular file in directory `self` with the name given in `dentry` and the mode
@@ -197,11 +195,7 @@ impl dyn Dentry {
         self.base_create(dentry, mode)
     }
 
-    pub fn symlink(
-        &self,
-        _dentry: &dyn Dentry,
-        _target: &str,
-    ) -> SysResult<()> {
+    pub fn symlink(&self, _dentry: &dyn Dentry, _target: &str) -> SysResult<()> {
         unimplemented!("`symlink` is not implemented yet")
     }
 
@@ -213,14 +207,17 @@ impl dyn Dentry {
     /// The returned dentry may be a negative dentry.
     ///
     /// `self` must be a valid directory.
-    pub fn lookup(self: &Arc<Self>, name: &str) -> Arc<dyn Dentry> {
+    pub fn lookup(self: &Arc<Self>, name: &str) -> SysResult<Arc<dyn Dentry>> {
         debug_assert!(!self.is_negative());
         debug_assert!(self.inode().unwrap().inotype().is_dir());
-        self.get_child(name).unwrap_or_else(|| {
-            Arc::clone(&self)
-                .base_lookup(name)
-                .unwrap_or_else(|| self.new_neg_child(name))
-        })
+        match self.get_child(name) {
+            Some(dentry) => Ok(dentry),
+            None => {
+                let dentry = self.new_neg_child(name);
+                self.base_lookup(dentry.as_ref())?;
+                Ok(dentry)
+            }
+        }
     }
 
     /// Creates a hard link in directory `self` with the name given in `new_dentry` to the file
@@ -239,8 +236,7 @@ impl dyn Dentry {
             &old_dentry.inode().unwrap().get_meta().superblock,
             &new_dentry.inode().unwrap().get_meta().superblock
         ));
-        let inode = old_dentry.inode().unwrap();
-        self.base_link(new_dentry, inode)
+        self.base_link(new_dentry, old_dentry)
     }
 
     /// Removes the child dentry from directory `self`.

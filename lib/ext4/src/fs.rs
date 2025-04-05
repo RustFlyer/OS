@@ -1,9 +1,7 @@
-extern crate alloc;
 use alloc::sync::Arc;
 
-use config::inode::{self, InodeType};
-use log::debug;
-use systype::SysError;
+use config::{inode::InodeType, vfs::MountFlags};
+use systype::{SysError, SysResult};
 use vfs::{
     dentry::Dentry,
     fstype::{FileSystemType, FileSystemTypeMeta},
@@ -35,16 +33,20 @@ impl FileSystemType for ExtFsType {
     fn base_mount(
         self: Arc<Self>,
         name: &str,
-        parent: Option<Arc<dyn vfs::dentry::Dentry>>,
-        flags: config::vfs::MountFlags,
+        parent: Option<Arc<dyn Dentry>>,
+        _flags: MountFlags,
         dev: Option<Arc<dyn driver::BlockDevice>>,
-    ) -> systype::SysResult<Arc<dyn vfs::dentry::Dentry>> {
+    ) -> SysResult<Arc<dyn Dentry>> {
         let meta = SuperBlockMeta::new(dev, self.clone());
         let superblock = ExtSuperBlock::new(meta);
         let root_dir = ExtDir::open("/").map_err(SysError::from_i32)?;
         let root_inode = ExtDirInode::new(superblock.clone(), root_dir);
         root_inode.set_inotype(InodeType::Dir);
-        let root_dentry = ExtDentry::new(name, superblock.clone(), parent.clone());
+        let root_dentry = ExtDentry::new(
+            name,
+            Some(root_inode.clone()),
+            parent.as_ref().map(|p| Arc::downgrade(p)),
+        );
         root_dentry.set_inode(root_inode);
 
         if let Some(parent) = parent {
@@ -56,7 +58,7 @@ impl FileSystemType for ExtFsType {
         Ok(root_dentry)
     }
 
-    fn kill_sblk(&self, sblk: Arc<dyn SuperBlock>) -> systype::SysResult<()> {
+    fn kill_sblk(&self, _sblk: Arc<dyn SuperBlock>) -> systype::SysResult<()> {
         todo!()
     }
 }

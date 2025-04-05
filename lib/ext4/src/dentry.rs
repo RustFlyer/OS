@@ -3,22 +3,22 @@ use alloc::{
     sync::{Arc, Weak},
     vec,
 };
+
+use lwext4_rust::{
+    InodeTypes,
+    bindings::{ext4_dir_rm, ext4_flink, ext4_fremove, ext4_inode_exist, ext4_readlink},
+};
+
 use config::{
     inode::{InodeMode, InodeType},
     vfs::OpenFlags,
 };
-
-use lwext4_rust::{
-    InodeTypes,
-    bindings::{EOK, ext4_dir_rm, ext4_flink, ext4_fremove, ext4_inode_exist, ext4_readlink},
-};
+use systype::{SysError, SysResult, SyscallResult};
 use vfs::{
     dentry::{Dentry, DentryMeta},
     file::File,
     inode::Inode,
 };
-
-use systype::{SysError, SysResult, SyscallResult};
 
 use crate::{
     ext::{dir::ExtDir, file::ExtFile},
@@ -48,127 +48,131 @@ impl Dentry for ExtDentry {
     }
 
     fn base_create(&self, dentry: &dyn Dentry, mode: InodeMode) -> SysResult<()> {
-        let inode = self
-            .inode()
-            .unwrap()
-            .downcast_arc::<ExtDirInode>()
-            .unwrap_or_else(|_| unreachable!());
-        let mut dir = inode.dir.lock();
+        let path = dentry.path();
+        let superblock = self.superblock().unwrap();
         let new_inode: Arc<dyn Inode> = match mode.to_type() {
             InodeType::Dir => {
-                let new_dir = LwExt4Dir::create(&path).map_err(SysError::from_i32)?;
-                ExtDirInode::new(sb, new_dir)
+                let new_dir = ExtDir::create(&path).map_err(SysError::from_i32)?;
+                ExtDirInode::new(superblock, new_dir)
             }
             InodeType::File => {
-                let new_file = LwExt4File::open(
+                let new_file = ExtFile::open(
                     &path,
                     (OpenFlags::O_RDWR | OpenFlags::O_CREAT | OpenFlags::O_TRUNC).bits(),
                 )
                 .map_err(SysError::from_i32)?;
-                Ext4FileInode::new(sb, new_file)
+                ExtFileInode::new(superblock, new_file)
             }
-            _ => todo!(),
+            _ => unimplemented!("Unsupported file type"),
         };
-        sub_dentry.set_inode(new_inode);
-        Ok(sub_dentry)
+        dentry.set_inode(new_inode);
+        Ok(())
     }
 
-    fn base_lookup(self: Arc<Self>, name: &str) -> SysResult<Arc<dyn Dentry>> {
-        let superblock = self.super_block();
-        let sub_dentry = self.into_dyn().get_child(name).unwrap();
-        let path = sub_dentry.path();
-        let c_path = CString::new(path.clone()).expect("CString::new failed");
-        if unsafe { ext4_inode_exist(c_path.as_ptr(), InodeTypes::EXT4_DE_DIR as i32) }
-            == EOK as i32
-        {
+    fn base_lookup(&self, dentry: &dyn Dentry) -> SysResult<()> {
+        let superblock = self.superblock().unwrap();
+        let path = dentry.path();
+        let c_path = CString::new(path.clone()).unwrap();
+        if unsafe { ext4_inode_exist(c_path.as_ptr(), InodeTypes::EXT4_DE_DIR as i32) == 0 } {
             let new_file = ExtDir::open(&path).map_err(SysError::from_i32)?;
-            sub_dentry.set_inode(ExtDirInode::new(superblock, new_file))
-        } else if unsafe { ext4_inode_exist(c_path.as_ptr(), InodeTypes::EXT4_DE_REG_FILE as i32) }
-            == EOK as i32
-        {
+            dentry.set_inode(ExtDirInode::new(superblock, new_file));
+            Ok(())
+        } else if unsafe {
+            ext4_inode_exist(c_path.as_ptr(), InodeTypes::EXT4_DE_REG_FILE as i32) == 0
+        } {
             let new_file =
                 ExtFile::open(&path, OpenFlags::empty().bits()).map_err(SysError::from_i32)?;
-            sub_dentry.set_inode(ExtFileInode::new(superblock, new_file))
-        } else if unsafe { ext4_inode_exist(c_path.as_ptr(), InodeTypes::EXT4_DE_SYMLINK as i32) }
-            == EOK as i32
-        {
-            let path = sub_dentry.path();
-            let mut path_buf = vec![0; 512];
-            let c_path = CString::new(path).expect("CString::new failed");
-            let mut r_cnt = 0;
-            let len = unsafe {
-                ext4_readlink(
+            dentry.set_inode(ExtFileInode::new(superblock, new_file));
+            Ok(())
+        } else if unsafe {
+            ext4_inode_exist(c_path.as_ptr(), InodeTypes::EXT4_DE_SYMLINK as i32) == 0
+        } {
+            let mut target = vec![0; 512];
+            let mut bytes_read = 0;
+            unsafe {
+                let err = ext4_readlink(
                     c_path.as_ptr(),
-                    path_buf.as_mut_ptr() as _,
-                    path_buf.len(),
-                    &mut r_cnt,
-                ) as usize
+                    target.as_mut_ptr(),
+                    target.len() - 1,
+                    &mut bytes_read,
+                );
+                if err != 0 {
+                    return Err(SysError::from_i32(err));
+                }
             };
-            path_buf.truncate(len + 1);
-            let target = CString::from_vec_with_nul(path_buf).unwrap();
+            target.truncate(bytes_read + 1);
+            let target = unsafe { CString::from_vec_with_nul_unchecked(target) };
             let sub_inode = ExtLinkInode::new(target.to_str().unwrap(), superblock);
-            sub_dentry.set_inode(sub_inode)
+            dentry.set_inode(sub_inode);
+            Ok(())
+        } else {
+            Err(SysError::ENOENT)
         }
-        Ok(sub_dentry)
     }
 
     fn base_new_neg_child(self: Arc<Self>, name: &str) -> Arc<dyn Dentry> {
-        Self::new(name, self.super_block(), Some(self))
+        let this = self as Arc<dyn Dentry>;
+        let dentry = ExtDentry::new(name, None, Some(Arc::downgrade(&(Arc::clone(&this)))))
+            as Arc<dyn Dentry>;
+        this.add_child(Arc::clone(&dentry));
+        dentry as Arc<dyn Dentry>
     }
 
     fn base_open(self: Arc<Self>) -> SysResult<Arc<dyn File>> {
-        match self.inode()?.inotype() {
+        let inode = self.inode().unwrap();
+        match inode.inotype() {
             InodeType::File => {
-                let inode = self
-                    .inode()?
+                let inode = inode
                     .downcast_arc::<ExtFileInode>()
                     .unwrap_or_else(|_| unreachable!());
                 Ok(ExtFileFile::new(self, inode))
             }
             InodeType::Dir => {
-                let inode = self
-                    .inode()?
+                let inode = inode
                     .downcast_arc::<ExtDirInode>()
                     .unwrap_or_else(|_| unreachable!());
                 Ok(ExtDirFile::new(self, inode))
             }
             InodeType::SymLink => {
-                let inode = self
-                    .inode()?
+                let inode = inode
                     .downcast_arc::<ExtLinkInode>()
                     .unwrap_or_else(|_| unreachable!());
                 Ok(ExtLinkFile::new(self, inode))
             }
-            _ => todo!(),
+            _ => unimplemented!("Unsupported file type"),
         }
     }
 
-    fn base_link(self: Arc<Self>, new: &Arc<dyn Dentry>) -> SysResult<()> {
-        let oldpath = self.path();
-        let newpath = new.path();
-        let c_oldpath = CString::new(oldpath).expect("CString::new failed");
-        let c_newpath = CString::new(newpath).expect("CString::new failed");
+    fn base_link(&self, dentry: &dyn Dentry, old_dentry: &dyn Dentry) -> SysResult<()> {
+        let oldpath = old_dentry.path();
+        let newpath = dentry.path();
+        let c_oldpath = CString::new(oldpath).unwrap();
+        let c_newpath = CString::new(newpath).unwrap();
 
         unsafe {
             ext4_flink(c_oldpath.as_ptr(), c_newpath.as_ptr());
         }
-        new.set_inode(self.inode()?);
+        dentry.set_inode(self.inode().unwrap());
         Ok(())
     }
 
-    fn base_unlink(self: Arc<Self>, name: &str) -> SyscallResult {
-        let sub_dentry = self.get_child(name).unwrap();
-        let path = sub_dentry.path();
-        let c_path = CString::new(path).expect("CString::new failed");
-        let ret = match sub_dentry.inode()?.inotype() {
-            InodeType::Dir => unsafe { ext4_dir_rm(c_path.as_ptr()) },
-            InodeType::File | InodeType::SymLink => unsafe { ext4_fremove(c_path.as_ptr()) },
-            _ => todo!(),
-        };
-        Ok(ret as usize)
+    fn base_unlink(&self, dentry: &dyn Dentry) -> SysResult<()> {
+        let path = dentry.path();
+        let c_path = CString::new(path).unwrap();
+        let err = unsafe { ext4_fremove(c_path.as_ptr()) };
+        if err != 0 {
+            return Err(SysError::from_i32(err));
+        }
+        Ok(())
     }
 
-    fn base_rmdir(self: Arc<Self>, name: &str) -> SyscallResult {
-        todo!()
+    fn base_rmdir(&self, dentry: &dyn Dentry) -> SysResult<()> {
+        let path = dentry.path();
+        let c_path = CString::new(path).unwrap();
+        let err = unsafe { ext4_dir_rm(c_path.as_ptr()) };
+        if err != 0 {
+            return Err(SysError::from_i32(err));
+        }
+        Ok(())
     }
 }

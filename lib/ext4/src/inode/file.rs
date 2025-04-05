@@ -1,19 +1,11 @@
-extern crate alloc;
-
-use core::sync::atomic::Ordering;
-
 use alloc::sync::Arc;
-use config::{
-    device::BLOCK_SIZE,
-    inode::{InodeMode, InodeType},
-    vfs::Stat,
-};
-use lwext4_rust::bindings::ext4_file;
+
+use config::{device::BLOCK_SIZE, vfs::Stat};
 use mutex::{ShareMutex, new_share_mutex};
 use systype::SysResult;
 use vfs::{
     inode::{Inode, InodeMeta},
-    superblock::{self, SuperBlock},
+    superblock::SuperBlock,
 };
 
 use crate::ext::file::ExtFile;

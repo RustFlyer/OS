@@ -1,23 +1,14 @@
-extern crate alloc;
-use core::sync::atomic::Ordering;
-
 use alloc::sync::Arc;
 
-use config::{
-    device::BLOCK_SIZE,
-    inode::{InodeMode, InodeType},
-    vfs::Stat,
-};
-use lwext4_rust::bindings::ext4_dir;
+use config::{device::BLOCK_SIZE, vfs::Stat};
 use mutex::{ShareMutex, new_share_mutex};
 use systype::SysResult;
 use vfs::{
-    file::FileMeta,
     inode::{Inode, InodeMeta},
-    superblock::{self, SuperBlock},
+    superblock::SuperBlock,
 };
 
-use crate::{dentry::ExtDentry, ext::dir::ExtDir};
+use crate::ext::dir::ExtDir;
 
 pub struct ExtDirInode {
     meta: InodeMeta,

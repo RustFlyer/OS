@@ -46,7 +46,7 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
 
     let pathname = {
         let mut addr_space_lock = task.addr_space_mut().lock();
-        let mut data_ptr = UserReadPtr::<u8>::new(pathname, &mut *addr_space_lock);
+        let mut data_ptr = UserReadPtr::<u8>::new(pathname, &mut addr_space_lock);
         match data_ptr.read_c_string(100) {
             Ok(data) => match core::str::from_utf8(&data) {
                 Ok(utf8_str) => utf8_str.to_string(),
@@ -63,10 +63,10 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
 
     if flags.contains(OpenFlags::O_CREAT) {
         let parent = dentry.parent().expect("can not create with root entry");
-        parent.create(&pathname, InodeMode::FILE | mode)?;
+        parent.create(dentry.as_ref(), InodeMode::REG | mode)?;
     }
 
-    let inode = dentry.inode()?;
+    let inode = dentry.inode().unwrap();
     if flags.contains(OpenFlags::O_DIRECTORY) && !inode.inotype().is_dir() {
         return Err(SysError::ENOTDIR);
     }
