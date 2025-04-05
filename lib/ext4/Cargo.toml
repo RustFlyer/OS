@@ -9,6 +9,8 @@ driver = { path = "../driver/" }
 config = { path = "../config/" }
 systype = { path = "../systype/" }
 mutex = { path = "../mutex/" }
+simdebug = { path = "../simdebug/" }
+ 
 
 lwext4_rust = { workspace = true }
 log = { workspace = true }

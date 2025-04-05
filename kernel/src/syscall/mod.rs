@@ -24,6 +24,8 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         WAIT4 => sys_waitpid().await,
         CLONE => sys_clone(args[0], args[1], args[2], args[3], args[4]),
         OPENAT => sys_openat(args[0], args[1], args[2] as i32, args[3] as u32).await,
+        READ => sys_read(args[0], args[1], args[2]),
+        LSEEK => sys_lseek(args[0], args[1] as isize, args[2]),
         _ => {
             log::error!("Syscall not implemented: {syscall_no}");
             unimplemented!()

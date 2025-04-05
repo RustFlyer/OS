@@ -3,6 +3,7 @@ extern crate alloc;
 use alloc::sync::Arc;
 use config::device::BLOCK_SIZE;
 use driver::BlockDevice;
+use log::warn;
 use lwext4_rust::{
     KernelDevOp,
     bindings::{SEEK_CUR, SEEK_END, SEEK_SET},
@@ -104,11 +105,13 @@ impl KernelDevOp for Disk {
     /// Reads blocks until buf is full
     fn read(dev: &mut Self::DevType, mut buf: &mut [u8]) -> Result<usize, i32> {
         let mut read_size = 0;
+
         while !buf.is_empty() {
             match dev.read_one(buf) {
                 Ok(0) => break,
                 Ok(n) => {
-                    buf = &mut buf[n..];
+                    let tmp = buf;
+                    buf = &mut tmp[n..];
                     read_size += n;
                 }
                 Err(_) => return Err(-1),

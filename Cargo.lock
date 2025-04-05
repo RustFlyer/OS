@@ -260,6 +260,7 @@ dependencies = [
  "log",
  "lwext4_rust",
  "mutex",
+ "simdebug",
  "systype",
  "vfs",
 ]

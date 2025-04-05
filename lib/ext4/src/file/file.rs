@@ -2,12 +2,15 @@ extern crate alloc;
 use alloc::sync::Arc;
 
 use config::inode::InodeType;
-use lwext4_rust::bindings::SEEK_SET;
 use mutex::ShareMutex;
 use systype::{SysError, SyscallResult};
 use vfs::file::{File, FileMeta};
 
-use crate::{dentry::ExtDentry, ext::file::ExtFile, inode::file::ExtFileInode};
+use crate::{
+    dentry::ExtDentry,
+    ext::file::{ExtFile, FileSeekType},
+    inode::file::ExtFileInode,
+};
 
 pub struct ExtFileFile {
     meta: FileMeta,
@@ -35,7 +38,7 @@ impl File for ExtFileFile {
         match self.itype() {
             InodeType::File => {
                 let mut file = self.file.lock();
-                file.seek(offset as i64, SEEK_SET)
+                file.seek(offset as i64, FileSeekType::SeekSet)
                     .map_err(SysError::from_i32)?;
                 file.read(buf).map_err(SysError::from_i32)
             }
@@ -47,7 +50,7 @@ impl File for ExtFileFile {
         match self.itype() {
             InodeType::File => {
                 let mut file = self.file.lock();
-                file.seek(offset as i64, SEEK_SET)
+                file.seek(offset as i64, FileSeekType::SeekSet)
                     .map_err(SysError::from_i32)?;
                 file.write(buf).map_err(SysError::from_i32)
             }

@@ -16,6 +16,7 @@ pub enum InodeState {
 
 bitflags! {
     #[derive(Debug, Clone, Copy, Eq, PartialEq)]
+    /// Mode of an inode, defining the type and permissions of the inode.
     pub struct InodeMode: u32 {
         /// Type.
         const TYPE_MASK = 0o170000;
@@ -28,7 +29,7 @@ bitflags! {
         /// Block device
         const BLOCK = 0o060000;
         /// Regular file.
-        const FILE  = 0o100000;
+        const REG  = 0o100000;
         /// Symbolic link.
         const LINK  = 0o120000;
         /// Socket
@@ -78,7 +79,7 @@ impl InodeMode {
         let perm_mode = InodeMode::OWNER_READ | InodeMode::OWNER_WRITE | InodeMode::OTHER_EXEC;
         let file_mode = match itype {
             InodeType::Dir => InodeMode::DIR,
-            InodeType::File => InodeMode::FILE,
+            InodeType::File => InodeMode::REG,
             InodeType::SymLink => InodeMode::LINK,
             InodeType::CharDevice => InodeMode::CHAR,
             InodeType::BlockDevice => InodeMode::BLOCK,
@@ -138,7 +139,7 @@ impl From<InodeMode> for InodeType {
     fn from(mode: InodeMode) -> Self {
         match mode.intersection(InodeMode::TYPE_MASK) {
             InodeMode::DIR => InodeType::Dir,
-            InodeMode::FILE => InodeType::File,
+            InodeMode::REG => InodeType::File,
             InodeMode::LINK => InodeType::SymLink,
             InodeMode::CHAR => InodeType::CharDevice,
             InodeMode::BLOCK => InodeType::BlockDevice,
@@ -151,7 +152,7 @@ impl From<InodeMode> for InodeType {
 
 impl InodeType {
     /// Tests whether this node type represents a regular file.
-    pub const fn is_file(self) -> bool {
+    pub const fn is_reg(self) -> bool {
         matches!(self, Self::File)
     }
 

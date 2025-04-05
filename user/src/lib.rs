@@ -129,6 +129,10 @@ pub fn open(dirfd: usize, pathname: &str, flags: OpenFlags, mode: InodeMode) -> 
     )
 }
 
+pub fn lseek(fd: usize, offset: isize, whence: usize) -> isize {
+    sys_lseek(fd, offset, whence)
+}
+
 //************ task ***************/
 pub fn exit(exit_code: i32) -> ! {
     sys_exit(exit_code);

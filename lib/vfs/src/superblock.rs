@@ -1,4 +1,3 @@
-extern crate alloc;
 use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
