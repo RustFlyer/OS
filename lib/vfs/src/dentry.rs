@@ -63,8 +63,12 @@ pub trait Dentry: Send + Sync {
     /// Looks up on the disk for the dentry with the name given in `dentry` in directory `self`.
     ///
     /// `self` must be a valid directory. `dentry` must be a negative dentry and a child of `self`.
-    /// After this call, `dentry` will become valid if the dentry exists. Otherwise, `dentry`
-    /// will remain negative.
+    /// After this call, `dentry` will become valid if the dentry exists (and the function returns
+    /// `Ok(())`), or invalid if the dentry does not exist (and the function returns `Err(ENOENT)`).
+    ///
+    /// # Errors
+    /// Returns `ENOENT` if the dentry does not exist. Other errors may be returned if the
+    /// filesystem encounters any error while looking up the dentry.
     fn base_lookup(&self, dentry: &dyn Dentry) -> SysResult<()>;
 
     /// Creates a hard link in directory `self` with the name given in `dentry` to the file
@@ -222,8 +226,13 @@ impl dyn Dentry {
             Some(dentry) => Ok(dentry),
             None => {
                 let dentry = self.new_neg_child(name);
-                self.base_lookup(dentry.as_ref())?;
-                Ok(dentry)
+                match self.base_lookup(dentry.as_ref()) {
+                    Ok(_) | Err(SysError::ENOENT) => Ok(dentry),
+                    Err(e) => {
+                        log::warn!("Failed to lookup dentry: {:?}", e);
+                        Err(e)
+                    }
+                }
             }
         }
     }
