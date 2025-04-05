@@ -2,6 +2,7 @@ use core::fmt::{Debug, write};
 
 use alloc::{sync::Arc, vec::Vec};
 use config::{fs::MAX_FDS, vfs::OpenFlags};
+use log::{debug, info};
 use systype::{SysError, SysResult};
 use vfs::file::File;
 
@@ -52,16 +53,23 @@ impl FdTable {
             .table
             .iter()
             .enumerate()
-            .find(|(_, e)| e.is_none())
+            .find(|(_i, e)| e.is_none())
             .map(|(i, _)| i);
-
-        inner_slot
+        if inner_slot.is_some() {
+            return inner_slot;
+        } else if inner_slot.is_none() && self.table.len() < MAX_FDS {
+            self.table.push(None);
+            return Some(self.table.len() - 1);
+        } else {
+            return None;
+        }
     }
 
     pub fn alloc(&mut self, file: Arc<dyn File>, flags: OpenFlags) -> SysResult<Fd> {
         let fdinfo = FdInfo::new(file, flags);
-
+        debug!("test alloc");
         if let Some(fd) = self.get_available_slot() {
+            info!("alloc fd [{}]", fd);
             self.table[fd] = Some(fdinfo);
             Ok(fd)
         } else {

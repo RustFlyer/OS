@@ -23,7 +23,7 @@ use user_lib::{exit, println};
 
 #[unsafe(no_mangle)]
 fn main() {
-    println!("test 0??????????");
+    println!("test 0");
     println!("hello world");
     exit(3)
 }

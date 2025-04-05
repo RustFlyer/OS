@@ -1,4 +1,5 @@
 extern crate alloc;
+use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use alloc::{ffi::CString, vec};
@@ -83,5 +84,9 @@ impl File for ExtDirFile {
         }
 
         Ok(())
+    }
+
+    fn base_ls(&self, path: String) {
+        self.dir.lock().lwext4_dir_entries(&path);
     }
 }

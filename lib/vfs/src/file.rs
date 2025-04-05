@@ -6,9 +6,9 @@ use core::{
 };
 
 use crate::{dentry::Dentry, direntry::DirEntry, inode::Inode, superblock::SuperBlock};
-use alloc::sync::Arc;
 use alloc::vec::Vec;
 use alloc::{boxed::Box, sync};
+use alloc::{string::String, sync::Arc};
 use async_trait::async_trait;
 use config::{
     inode::{InodeState, InodeType},
@@ -16,6 +16,7 @@ use config::{
     vfs::{OpenFlags, PollEvents, SeekFrom},
 };
 use downcast_rs::{Downcast, DowncastSync, impl_downcast};
+use log::debug;
 use mm::vm::page_cache::page::Page;
 use mutex::SpinNoIrqLock;
 use systype::{SysError, SysResult, SyscallResult};
@@ -147,6 +148,10 @@ pub trait File: Send + Sync + DowncastSync {
     async fn readlink(&self, buf: &mut [u8]) -> SyscallResult {
         self.base_read_link(buf)
     }
+
+    fn base_ls(&self, path: String) {
+        todo!()
+    }
 }
 
 impl dyn File {
@@ -230,6 +235,7 @@ impl dyn File {
 
     pub fn write(&self, buf: &[u8]) -> SyscallResult {
         let pos = self.pos();
+        debug!("write at pos [{}]", self.pos());
         let ret = self.write_at(pos, buf)?;
         self.set_pos(pos + ret);
         Ok(ret)
@@ -273,6 +279,10 @@ impl dyn File {
         let mut buf = Vec::with_capacity(self.size());
         self.read_at(0, &mut buf)?;
         Ok(buf)
+    }
+
+    pub fn ls(&self, path: String) {
+        self.base_ls(path);
     }
 }
 

@@ -9,7 +9,7 @@ use alloc::{
 use driver::println;
 use mm::vm::addr_space::AddrSpace;
 use mutex::{ShareMutex, SpinNoIrqLock, new_share_mutex};
-use osfs::fd_table::FdTable;
+use osfs::fd_table::{self, FdTable};
 
 use core::cell::SyncUnsafeCell;
 use core::task::Waker;
@@ -66,6 +66,8 @@ pub struct Task {
     pgid: ShareMutex<PGid>,
     exit_code: SpinNoIrqLock<i32>,
 
+    fd_table: SpinNoIrqLock<FdTable>,
+
     name: String,
 }
 
@@ -88,6 +90,7 @@ impl Task {
             children: new_share_mutex(BTreeMap::new()),
             pgid: new_share_mutex(pgid),
             exit_code: SpinNoIrqLock::new(0),
+            fd_table: SpinNoIrqLock::new(FdTable::new()),
             name,
         }
     }
@@ -110,6 +113,9 @@ impl Task {
 
         pgid: ShareMutex<PGid>,
         exit_code: SpinNoIrqLock<i32>,
+
+        fd_table: SpinNoIrqLock<FdTable>,
+
         name: String,
     ) -> Self {
         Task {
@@ -126,6 +132,7 @@ impl Task {
             children,
             pgid,
             exit_code,
+            fd_table,
             name,
         }
     }
@@ -183,6 +190,10 @@ impl Task {
 
     pub fn pgid_mut(&self) -> &ShareMutex<PGid> {
         &self.pgid
+    }
+
+    pub fn with_mut_fdtable<T>(&self, f: impl FnOnce(&mut FdTable) -> T) -> T {
+        f(&mut self.fd_table.lock())
     }
 
     pub fn get_waker(&self) -> Waker {

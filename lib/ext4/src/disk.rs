@@ -65,7 +65,7 @@ impl Disk {
             self.offset += length;
             length
         };
-        log::info!("out: {} - buflen {}", read_size, buf.len());
+        // log::info!("out: {} - buflen {}", read_size, buf.len());
         Ok(read_size)
     }
 
