@@ -39,6 +39,14 @@ impl DentryMeta {
     }
 }
 
+#[derive(Default, Debug, PartialEq, Eq, Clone, Copy)]
+pub enum DentryState {
+    #[default]
+    UnInit,
+    Sync,
+    Dirty,
+}
+
 pub trait Dentry: Send + Sync {
     /// Returns the metadata of this dentry.
     fn get_meta(&self) -> &DentryMeta;

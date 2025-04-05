@@ -3,14 +3,15 @@
     .section .data
     .global _num_app
 _num_app:
-    .quad 6
+    .quad 7
     .quad app_0_start
     .quad app_1_start
     .quad app_2_start
     .quad app_3_start
     .quad app_4_start
     .quad app_5_start
-    .quad app_5_end
+    .quad app_6_start
+    .quad app_6_end
 
     .global _app_names
 _app_names:
@@ -20,6 +21,7 @@ _app_names:
     .string "add"
     .string "add1"
     .string "add2"
+    .string "file_test"
 
     .section .data
     .global app_0_start
@@ -68,3 +70,11 @@ app_4_end:
 app_5_start:
     .incbin "./target/riscv64gc-unknown-none-elf/debug/add2"
 app_5_end:
+
+    .section .data
+    .global app_6_start
+    .global app_6_end
+    .align 3
+app_6_start:
+    .incbin "./target/riscv64gc-unknown-none-elf/debug/file_test"
+app_6_end:

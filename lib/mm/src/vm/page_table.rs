@@ -10,7 +10,7 @@ use riscv::register::satp::{self, Satp};
 
 use arch::riscv64::mm::{fence, sfence_vma_addr, sfence_vma_all_except_global, tlb_shootdown};
 use config::mm::{
-    KERNEL_MAP_OFFSET, PTE_PER_TABLE, VIRT_END, bss_end, bss_start, data_end, data_start,
+    MMIO_END, MMIO_START, PTE_PER_TABLE, VIRT_END, bss_end, bss_start, data_end, data_start,
     kernel_end, kernel_start, rodata_end, rodata_start, text_end, text_start,
 };
 use simdebug::when_debug;
@@ -117,17 +117,8 @@ impl PageTable {
         OffsetArea::map(&alloc_vma, &mut page_table);
 
         /* Map memory-mapped I/O */
-        // let mmio_start_va = VirtAddr::new(DTB_START);
-        // let mmio_end_va = VirtAddr::new(DTB_END);
-        // let mmio_flags = PteFlags::R | PteFlags::W;
-        // let mmio_vma = VmArea::new_fixed_offset(
-        // mmio_start_va,
-        // mmio_end_va,
-        // mmio_flags,
-        // DTB_START - unsafe { DTB_ADDR },
-        // );
-        let mmio_start_va = VirtAddr::new(0x0200_0000 + KERNEL_MAP_OFFSET);
-        let mmio_end_va = VirtAddr::new(0x2000_0000 + KERNEL_MAP_OFFSET);
+        let mmio_start_va = VirtAddr::new(MMIO_START);
+        let mmio_end_va = VirtAddr::new(MMIO_END);
         let mmio_flags = PteFlags::R | PteFlags::W;
         let mmio_vma = VmArea::new_kernel(mmio_start_va, mmio_end_va, mmio_flags);
         OffsetArea::map(&mmio_vma, &mut page_table);
@@ -368,14 +359,25 @@ impl PageTable {
     /// This method is used to map the kernel space into a new page table for a user process.
     /// This method does not allocate any frame or make this page table own any frame.
     pub fn map_kernel(&mut self) {
+        // Map the kernel areas.
         let kernel_vpn_start = VirtAddr::new(kernel_start()).page_number();
         let kernel_vpn_end = VirtAddr::new(kernel_end()).page_number();
-        // Range of the top-level PTEs that map the kernel space.
+        // Range of the top-level PTEs that covers the kernel space.
         let index_start = kernel_vpn_start.indices()[2];
         let index_end = kernel_vpn_end.indices()[2];
 
         let mut page_table = unsafe { PageTableMem::new(self.root) };
         let kernel_page_table = unsafe { PageTableMem::new(KERNEL_PAGE_TABLE.root) };
+        let src = &kernel_page_table.as_slice()[index_start..=index_end];
+        let dst = &mut page_table.as_slice_mut()[index_start..=index_end];
+        dst.copy_from_slice(src);
+
+        // Map the memory-mapped I/O space.
+        let mmio_vpn_start = VirtAddr::new(MMIO_START).page_number();
+        let mmio_vpn_end = VirtAddr::new(MMIO_END).page_number();
+        let index_start = mmio_vpn_start.indices()[2];
+        let index_end = mmio_vpn_end.indices()[2];
+
         let src = &kernel_page_table.as_slice()[index_start..=index_end];
         let dst = &mut page_table.as_slice_mut()[index_start..=index_end];
         dst.copy_from_slice(src);

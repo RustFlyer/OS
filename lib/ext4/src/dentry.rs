@@ -53,7 +53,9 @@ impl Dentry for ExtDentry {
         let new_inode: Arc<dyn Inode> = match mode.to_type() {
             InodeType::Dir => {
                 let new_dir = ExtDir::create(&path).map_err(SysError::from_i32)?;
-                ExtDirInode::new(superblock, new_dir)
+                let inode = ExtDirInode::new(superblock, new_dir);
+                inode.set_inotype(InodeType::Dir);
+                inode
             }
             InodeType::File => {
                 let new_file = ExtFile::open(
@@ -61,7 +63,9 @@ impl Dentry for ExtDentry {
                     (OpenFlags::O_RDWR | OpenFlags::O_CREAT | OpenFlags::O_TRUNC).bits(),
                 )
                 .map_err(SysError::from_i32)?;
-                ExtFileInode::new(superblock, new_file)
+                let inode = ExtFileInode::new(superblock, new_file);
+                inode.set_inotype(InodeType::File);
+                inode
             }
             _ => unimplemented!("Unsupported file type"),
         };
