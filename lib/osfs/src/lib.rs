@@ -6,7 +6,7 @@ use config::vfs::MountFlags;
 use driver::BLOCK_DEVICE;
 use mutex::SpinNoIrqLock;
 use spin::Once;
-use vfs::{dentry::Dentry, fstype::FileSystemType};
+use vfs::{dentry::Dentry, file::File, fstype::FileSystemType};
 
 extern crate alloc;
 
@@ -42,5 +42,5 @@ pub fn init() {
 
     SYS_ROOT_DENTRY.call_once(|| diskfs_root);
 
-    sys_root_dentry().open().unwrap().load_dir().unwrap();
+    <dyn File>::open(sys_root_dentry()).unwrap().load_dir().unwrap();
 }

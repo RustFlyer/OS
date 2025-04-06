@@ -1,4 +1,5 @@
-use alloc::{string::String, sync::Arc};
+use alloc::sync::Arc;
+
 use mutex::ShareMutex;
 use vfs::file::{File, FileMeta};
 
@@ -15,14 +16,14 @@ unsafe impl Sync for ExtDirFile {}
 impl ExtDirFile {
     pub fn new(dentry: Arc<ExtDentry>, inode: Arc<ExtDirInode>) -> Arc<Self> {
         Arc::new(Self {
-            meta: FileMeta::new(dentry.clone(), inode.clone()),
+            meta: FileMeta::new(dentry.clone()),
             dir: inode.dir.clone(),
         })
     }
 }
 
 impl File for ExtDirFile {
-    fn get_meta(&self) -> &FileMeta {
+    fn meta(&self) -> &FileMeta {
         &self.meta
     }
 
@@ -38,9 +39,5 @@ impl File for ExtDirFile {
         }
 
         Ok(())
-    }
-
-    fn base_ls(&self, path: String) {
-        let _ = self.dir.lock().lwext4_dir_entries(&path);
     }
 }

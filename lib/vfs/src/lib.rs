@@ -14,4 +14,5 @@ pub mod kstat;
 pub mod path;
 pub mod superblock;
 
+#[macro_use]
 extern crate alloc;
