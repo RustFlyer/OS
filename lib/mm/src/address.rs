@@ -10,6 +10,8 @@ use config::mm::{
     KERNEL_MAP_OFFSET, PA_WIDTH_SV39, PAGE_SIZE, PPN_WIDTH_SV39, USER_END, VA_WIDTH_SV39,
     VPN_WIDTH_SV39,
 };
+use log::{info, warn};
+use simdebug::stop;
 
 /// An address in physical memory defined in Sv39.
 ///
@@ -154,6 +156,8 @@ impl VirtAddr {
     /// Translates a virtual address into a physical address, if the VA is in the
     /// kernel space.
     pub fn to_pa_kernel(self) -> PhysAddr {
+        // stop();
+        info!("{:#x} - {:#x}", self.addr, KERNEL_MAP_OFFSET);
         let pa = self.addr - KERNEL_MAP_OFFSET;
         PhysAddr::new(pa)
     }

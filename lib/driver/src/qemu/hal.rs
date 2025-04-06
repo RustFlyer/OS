@@ -1,5 +1,7 @@
 use alloc::vec::Vec;
+use config::mm::KERNEL_MAP_OFFSET;
 use core::ptr::NonNull;
+use log::warn;
 use mm::address::{PhysAddr, PhysPageNum, VirtAddr};
 use mm::frame::FrameTracker;
 use mutex::SpinNoIrqLock;
@@ -87,6 +89,9 @@ unsafe impl virtio_drivers::Hal for VirtHalImpl {
     ) -> virtio_drivers::PhysAddr {
         let buffer = buffer.as_ptr() as *const usize as usize;
         let va = VirtAddr::new(buffer);
+        // if va.to_usize() < KERNEL_MAP_OFFSET {
+        //     return va.to_usize();
+        // }
         let pa = va.to_pa_kernel();
         pa.to_usize()
     }

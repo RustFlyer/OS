@@ -5,7 +5,7 @@ use crate::{
 };
 use alloc::string::{String, ToString};
 use config::{
-    inode::InodeMode,
+    inode::{InodeMode, InodeType},
     vfs::{OpenFlags, SeekFrom},
 };
 use driver::BLOCK_DEVICE;
@@ -32,7 +32,7 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
     let pathname = {
         let mut addr_space_lock = task.addr_space_mut().lock();
         let mut data_ptr = UserReadPtr::<u8>::new(pathname, &mut *addr_space_lock);
-        match unsafe { data_ptr.read_array(3) } {
+        match unsafe { data_ptr.read_array(9) } {
             Ok(data) => match core::str::from_utf8(&data) {
                 Ok(utf8_str) => utf8_str.to_string(),
                 Err(_) => unimplemented!(),
@@ -55,6 +55,7 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
     }
 
     let inode = dentry.inode().unwrap();
+    inode.set_inotype(InodeType::from(mode));
     if flags.contains(OpenFlags::O_DIRECTORY) && !inode.inotype().is_dir() {
         return Err(SysError::ENOTDIR);
     }
@@ -95,7 +96,7 @@ pub fn sys_read(fd: usize, buf: usize, count: usize) -> SyscallResult {
     let mut buf = UserWritePtr::<u8>::new(buf, &mut addrspace);
     let buf_ptr = unsafe { buf.try_into_mut_slice(count) }?;
 
-    debug!("begin to sys read");
+    debug!("begin to sys read {:#p}", buf_ptr);
     let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
     let ret = file.read(buf_ptr);
 

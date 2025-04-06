@@ -11,6 +11,7 @@ use vfs::{dentry::Dentry, fstype::FileSystemType};
 extern crate alloc;
 
 pub mod fd_table;
+pub mod simplefile;
 
 pub static FS_MANAGER: SpinNoIrqLock<BTreeMap<String, Arc<dyn FileSystemType>>> =
     SpinNoIrqLock::new(BTreeMap::new());
