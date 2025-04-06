@@ -143,6 +143,12 @@ pub trait Dentry: Send + Sync {
         self.get_meta().children.lock().get(name).cloned()
     }
 
+    /// Returns a clone of the map of child dentries of this dentry.
+    #[deprecated = "Legacy from Phoenix OS, called in `file.rs:read_dir`"]
+    fn children(&self) -> BTreeMap<String, Arc<dyn Dentry>> {
+        self.get_meta().children.lock().clone()
+    }
+
     /// Adds a child dentry to this dentry.
     fn add_child(&self, child: Arc<dyn Dentry>) {
         self.get_meta()
@@ -170,16 +176,6 @@ pub trait Dentry: Send + Sync {
 }
 
 impl dyn Dentry {
-    /// Creates a `File` object pointing to dentry `self` and returns it.
-    ///
-    /// Returns an `ENOENT` error if this dentry is a negative dentry.
-    pub fn open(self: Arc<Self>) -> SysResult<Arc<dyn File>> {
-        if self.is_negative() {
-            return Err(SysError::ENOENT);
-        }
-        Arc::clone(&self).base_open()
-    }
-
     /// Creates a regular file in directory `self` with the name given in `dentry` and the mode
     /// given in `mode`.
     ///

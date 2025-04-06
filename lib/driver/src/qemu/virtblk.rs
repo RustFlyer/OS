@@ -21,7 +21,7 @@ impl BlockDevice for VirtBlkDevice {
     /// Data from Block to Buf
     fn read(&self, block_id: usize, buf: &mut [u8]) {
         let res = self.0.lock().read_blocks(block_id, buf);
-        log::info!("read block id [{}]", block_id);
+        // log::info!("read block id [{}] buf [{:?}]", block_id, buf);
         if res.is_err() {
             panic!(
                 "Error when reading VirtIOBlk, block_id {} ,err {:?} ",

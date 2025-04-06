@@ -8,33 +8,37 @@ use user_lib::{exit, fork, lseek, open, println, read, sleep, write, yield_};
 
 #[unsafe(no_mangle)]
 fn main() {
-    let fd: isize = open(
-        0,
-        "tes",
-        OpenFlags::O_CREAT | OpenFlags::O_RDWR,
-        InodeMode::REG,
-    );
-    println!("file test: fd of tes is [{}]", fd);
+    {
+        let fd: isize = open(
+            0,
+            "tes",
+            OpenFlags::O_CREAT | OpenFlags::O_RDWR,
+            InodeMode::REG,
+        );
+        println!("file test: fd of tes is [{}]", fd);
 
-    let write_text = "Moon rises at night. Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night. Moon rises at night.Moon rises at night. Moon rises at night. Moon rises at night. Moon rises at night.Moonaa";
-    // let write_text = "Moon rises at night. Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night. Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night. Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.Moon rises at night.";
-    write(fd as usize, write_text.as_bytes());
-    println!("file test: finish write");
+        let write_text = "Moon rises at night.".repeat(16);
 
-    lseek(fd as usize, 0, 0);
-    println!("file test: lseek to origin");
+        println!("file test: try to write [{}]", write_text);
+        write(fd as usize, write_text.as_bytes());
+        println!("file test: finish write");
 
-    let mut read_buf: [u8; 1024] = [0; 1024];
-    read(fd as usize, &mut read_buf);
-    let utf2str = core::str::from_utf8(&read_buf).unwrap();
-    println!("file test: read text [{}]", utf2str);
+        lseek(fd as usize, 0, 0);
+        println!("file test: lseek to origin");
 
-    let fd2: isize = open(0, "hello_world", OpenFlags::O_RDWR, InodeMode::REG);
+        let mut read_buf: [u8; 1024] = [0; 1024];
+        read(fd as usize, &mut read_buf);
+        let utf2str = core::str::from_utf8(&read_buf).unwrap();
+        println!("file test: read text [{}]", utf2str);
+    }
 
-    let mut read_buf: [u8; 1024] = [0; 1024];
-    read(fd2 as usize, &mut read_buf);
-    let utf2str = core::str::from_utf8(&read_buf).unwrap();
-    println!("file test: read text [{}]", utf2str);
+    {
+        let fd2: isize = open(0, "red", OpenFlags::O_RDWR, InodeMode::REG);
+        let mut read_buf: [u8; 1024] = [0; 1024];
+        read(fd2 as usize, &mut read_buf);
+        let utf2str = core::str::from_utf8(&read_buf).unwrap();
+        println!("file test: read text [{}]", utf2str);
+    }
 
     exit(9)
 }

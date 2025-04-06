@@ -111,6 +111,10 @@ pub trait Inode: Send + Sync + DowncastSync {
         self.get_meta().inner.lock().mode = InodeMode::from_type(inotype);
     }
 
+    fn superblock(&self) -> Arc<dyn SuperBlock> {
+        Arc::clone(&self.get_meta().superblock)
+    }
+
     fn page_cache(&self) -> &PageCache {
         &self.get_meta().page_cache
     }

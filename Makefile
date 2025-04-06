@@ -150,6 +150,7 @@ fs-img:
 	@mkdir -p emnt
 	@sudo mount -t ext4 -o loop $(FS_IMG) emnt
 	@sudo cp -r $(USER_ELFS) emnt/
+	@sudo cp -r file/red emnt/
 	@sudo chmod -R 755 emnt/
 	@sudo umount emnt
 	@rm -rf emnt

@@ -157,7 +157,7 @@ impl VirtAddr {
     /// kernel space.
     pub fn to_pa_kernel(self) -> PhysAddr {
         // stop();
-        info!("{:#x} - {:#x}", self.addr, KERNEL_MAP_OFFSET);
+        // info!("{:#x} - {:#x}", self.addr, KERNEL_MAP_OFFSET);
         let pa = self.addr - KERNEL_MAP_OFFSET;
         PhysAddr::new(pa)
     }
