@@ -3,15 +3,17 @@
 
 extern crate user_lib;
 
+use core::{ffi::CStr, ptr};
+
 use config::{inode::InodeMode, vfs::OpenFlags};
-use user_lib::{exit, fork, lseek, open, println, read, sleep, write, yield_};
+use user_lib::{execve, exit, fork, lseek, open, println, read, sleep, write, yield_};
 
 #[unsafe(no_mangle)]
 fn main() {
     {
         let fd: isize = open(
             0,
-            "tes",
+            "tes\0",
             OpenFlags::O_CREAT | OpenFlags::O_RDWR,
             InodeMode::REG,
         );
@@ -33,11 +35,14 @@ fn main() {
     }
 
     {
-        let fd2: isize = open(0, "red", OpenFlags::O_RDWR, InodeMode::REG);
+        let fd2: isize = open(0, "add\0", OpenFlags::O_RDWR, InodeMode::REG);
         let mut read_buf: [u8; 1024] = [0; 1024];
         read(fd2 as usize, &mut read_buf);
-        let utf2str = core::str::from_utf8(&read_buf).unwrap();
-        println!("file test: read text [{}]", utf2str);
+        // println!("file test: read tbuf [{:?}]", read_buf);
+        // let utf2str = core::str::from_utf8(&read_buf).unwrap();
+        // println!("file test: read text [{}]", utf2str);
+        // lseek(fd2 as usize, 0, 0);
+        execve("add\0", &[], &[]);
     }
 
     exit(9)
