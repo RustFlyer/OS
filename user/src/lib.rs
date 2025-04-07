@@ -12,6 +12,8 @@ mod syscall;
 
 extern crate alloc;
 
+use core::ffi::CStr;
+
 use alloc::vec::Vec;
 
 use buddy_system_allocator::LockedHeap;
@@ -121,6 +123,7 @@ pub fn mmap(
 }
 
 pub fn open(dirfd: usize, pathname: &str, flags: OpenFlags, mode: InodeMode) -> isize {
+    let _cstr = unsafe { CStr::from_ptr(pathname.as_ptr()) };
     sys_openat(
         dirfd,
         pathname.as_ptr(),

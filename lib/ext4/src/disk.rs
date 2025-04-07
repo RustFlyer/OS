@@ -151,7 +151,7 @@ impl KernelDevOp for Disk {
         }
         .ok_or(-1)?;
 
-        log::info!("seek new pos: {}", new_pos);
+        // log::info!("seek new pos: {}", new_pos);
 
         if new_pos > dev.size() as i64 {
             log::warn!("pos > dev.size!!");

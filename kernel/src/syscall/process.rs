@@ -48,10 +48,10 @@ pub async fn sys_waitpid() -> SyscallResult {
 
 pub fn sys_clone(
     flags: usize,
-    stack: usize,
+    _stack: usize,
     _parent_tid_ptr: usize,
     _tls_ptr: usize,
-    chilren_tid_ptr: usize,
+    _chilren_tid_ptr: usize,
 ) -> SyscallResult {
     let _exit_signal = flags & 0xff;
     let flags = CloneFlags::from_bits(flags as u64 & !0xff).ok_or(SysError::EINVAL)?;
@@ -67,9 +67,10 @@ pub fn sys_clone(
 
 pub fn sys_execve(path: usize, _argv: usize, _envp: usize) -> SyscallResult {
     let task = current_task();
-    let path = {
+
+    let read_c_str = |addr| {
         let mut addr_space_lock = task.addr_space_mut().lock();
-        let mut data_ptr = UserReadPtr::<u8>::new(path, &mut *addr_space_lock);
+        let mut data_ptr = UserReadPtr::<u8>::new(addr, &mut *addr_space_lock);
         match data_ptr.read_c_string(30) {
             Ok(data) => match core::str::from_utf8(&data) {
                 Ok(utf8_str) => utf8_str.to_string(),
@@ -78,6 +79,8 @@ pub fn sys_execve(path: usize, _argv: usize, _envp: usize) -> SyscallResult {
             Err(_) => unimplemented!(),
         }
     };
+
+    let path = read_c_str(path);
 
     log::info!("[sys_execve]: path: {path:?}",);
     let dentry = {
@@ -90,15 +93,12 @@ pub fn sys_execve(path: usize, _argv: usize, _envp: usize) -> SyscallResult {
 
     let file = <dyn File>::open(dentry)?;
 
-    {
-        log::info!("file flags: {:?}", file.meta().dentry.path());
-    }
-
     let elf_data = Box::new(file.read_all()?);
     let elf_data_u8: &'static [u8] = Box::leak(elf_data);
 
     debug!("add len:{}", elf_data_u8.len());
 
-    Task::spawn_from_elf(elf_data_u8, "add-test");
+    let name = format!("{path:?}");
+    Task::spawn_from_elf(elf_data_u8, &name);
     Ok(0)
 }

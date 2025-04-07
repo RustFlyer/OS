@@ -419,7 +419,7 @@ impl dyn File {
         let size = self.size();
         let mut buf = vec![0; size];
 
-        let ulen = self.read(&mut buf)?;
+        let _ulen = self.read(&mut buf)?;
         Ok(buf)
     }
 
