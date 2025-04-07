@@ -2,10 +2,10 @@
 
 use config::mm::{USER_STACK_LOWER, USER_STACK_UPPER};
 use elf::{self, ElfBytes, endian::LittleEndian, file::FileHeader};
+use mm::address::VirtAddr;
 use systype::{SysError, SysResult};
 
 use super::{addr_space::AddrSpace, pte::PteFlags, vm_area::VmArea};
-use crate::address::VirtAddr;
 
 impl AddrSpace {
     /// Loads an ELF executable into given address space.

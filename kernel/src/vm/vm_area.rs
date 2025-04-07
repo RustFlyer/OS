@@ -24,20 +24,22 @@
 //! maintaining modularization and extensibility.
 
 use alloc::{collections::btree_map::BTreeMap, sync::Arc, vec::Vec};
-use config::mm::KERNEL_MAP_OFFSET;
 use core::{fmt::Debug, mem};
 
 use arch::riscv64::mm::sfence_vma_addr;
-
+use config::mm::KERNEL_MAP_OFFSET;
+use mm::{
+    address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum},
+    page_cache::page::Page,
+};
 use systype::{SysError, SysResult};
+use vfs::file::File;
 
 use super::{
     mem_perm::MemPerm,
-    page_cache::page::Page,
     page_table::PageTable,
     pte::{PageTableEntry, PteFlags},
 };
-use crate::address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum};
 
 /// A virtual memory area (VMA).
 ///
@@ -568,6 +570,7 @@ impl Debug for MemoryBackedArea {
 ///   see the documentation of `MAP_PRIVATE` flag in `mmap(2)`:
 ///   > It is unspecified whether changes made to the file after the mmap() call are
 ///   > visible in the mapped region.
+#[derive(Clone)]
 pub struct FileBackedArea {
     /// The file backing store.
     file: Arc<dyn File>,
@@ -575,6 +578,18 @@ pub struct FileBackedArea {
     ///
     /// It should be page-aligned.
     offset: usize,
+}
+
+impl Debug for FileBackedArea {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("FileBackedArea")
+            .field(
+                "file back store addr",
+                &format_args!("{:p}", self.file.as_ref()),
+            )
+            .field("file back store offset", &self.offset)
+            .finish()
+    }
 }
 
 /// An anonymous VMA which is not backed by a file or device, such as a user heap or stack.

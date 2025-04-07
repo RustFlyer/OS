@@ -26,13 +26,10 @@
 
 use core::cell::SyncUnsafeCell;
 
-use alloc::sync::Arc;
 use config::mm::PAGE_SIZE;
 use systype::SysResult;
 
 use crate::{address::PhysPageNum, frame::FrameTracker};
-
-use super::PageCache;
 
 /// A physical page in the system.
 ///

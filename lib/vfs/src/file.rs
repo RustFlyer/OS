@@ -3,7 +3,6 @@ use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicUsize, Ordering};
-use log::{debug, info, trace};
 
 use downcast_rs::{DowncastSync, impl_downcast};
 
@@ -12,7 +11,7 @@ use config::{
     mm::PAGE_SIZE,
     vfs::{OpenFlags, PollEvents, SeekFrom},
 };
-use mm::vm::page_cache::page::Page;
+use mm::page_cache::page::Page;
 use mutex::SpinNoIrqLock;
 use systype::{SysError, SysResult};
 
@@ -229,7 +228,7 @@ impl dyn File {
             _ => self.base_read(buf, position)?,
         };
 
-        trace!("read len = {}", bytes_read);
+        log::trace!("read len = {}", bytes_read);
         self.set_pos(position + bytes_read);
         Ok(bytes_read)
     }

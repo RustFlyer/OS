@@ -1,6 +1,5 @@
 pub mod page;
 
-extern crate alloc;
 use alloc::{collections::BTreeMap, sync::Arc};
 use config::mm::PAGE_SIZE;
 use mutex::SpinNoIrqLock;
