@@ -7,7 +7,7 @@
 
 extern crate alloc;
 use alloc::boxed::Box;
-use core::{future::Future, pin::Pin};
+use core::{future::Future, pin::Pin, str::Utf8Error};
 use strum::FromRepr;
 
 /// Type alias for syscall result. A syscall returns an `usize` if successful.
@@ -109,6 +109,8 @@ pub enum SysError {
     ENOTCONN = 107,
     /// Connection refused
     ECONNREFUSED = 111,
+    /// UTF-8 Convert Failed
+    EUTFFAIL = 188,
 }
 
 impl SysError {
@@ -157,6 +159,7 @@ impl SysError {
             ENOTEMPTY => "Directory not empty",
             ENOTCONN => "Transport endpoint is not connected",
             ECONNREFUSED => "Connection refused",
+            EUTFFAIL => "UTF-8 Convert Failed",
         }
     }
 
@@ -164,6 +167,9 @@ impl SysError {
         Self::from_repr(value).unwrap()
     }
 
+    pub fn from_utf8_err(_value: Utf8Error) -> Self {
+        Self::EUTFFAIL
+    }
     /// Returns the error code value in `i32`.
     pub const fn code(self) -> i32 {
         self as i32

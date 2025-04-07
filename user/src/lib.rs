@@ -15,6 +15,7 @@ extern crate alloc;
 use alloc::vec::Vec;
 
 use buddy_system_allocator::LockedHeap;
+use config::{inode::InodeMode, vfs::OpenFlags};
 pub use error::SyscallErr;
 use syscall::*;
 
@@ -117,6 +118,19 @@ pub fn mmap(
         fd,
         offset,
     )
+}
+
+pub fn open(dirfd: usize, pathname: &str, flags: OpenFlags, mode: InodeMode) -> isize {
+    sys_openat(
+        dirfd,
+        pathname.as_ptr(),
+        flags.bits() as usize,
+        mode.bits() as usize,
+    )
+}
+
+pub fn lseek(fd: usize, offset: isize, whence: usize) -> isize {
+    sys_lseek(fd, offset, whence)
 }
 
 //************ task ***************/

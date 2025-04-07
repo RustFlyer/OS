@@ -1,9 +1,16 @@
+[build]
+target = "riscv64gc-unknown-none-elf"
+
+[target.riscv64gc-unknown-none-elf]
+rustflags = ["-Cforce-frame-pointers=yes"]
+
+
 [source.crates-io]
 replace-with = "vendored-sources"
 
-[source."git+https://github.com/EchudeT/lwext4_rust.git?rev=c115"]
+[source."git+https://github.com/EchudeT/lwext4_rust.git?rev=719c"]
 git = "https://github.com/EchudeT/lwext4_rust.git"
-rev = "c115"
+rev = "719c"
 replace-with = "vendored-sources"
 
 [source.vendored-sources]

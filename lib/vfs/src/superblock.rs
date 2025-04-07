@@ -1,24 +1,16 @@
-extern crate alloc;
-use alloc::{
-    sync::{Arc, Weak},
-    vec::Vec,
-};
+use alloc::sync::Arc;
 
 use config::vfs::StatFs;
 use driver::BlockDevice;
-use mutex::SpinNoIrqLock;
 use spin::Once;
 use systype::SysResult;
 
-use crate::{dentry::Dentry, fstype::FileSystemType, inode::Inode};
+use crate::{dentry::Dentry, fstype::FileSystemType};
 
 pub struct SuperBlockMeta {
     pub device: Option<Arc<dyn BlockDevice>>,
-    pub fs_type: Weak<dyn FileSystemType>,
+    pub fs_type: Arc<dyn FileSystemType>,
     pub root_dentry: Once<Arc<dyn Dentry>>,
-
-    pub inodes: SpinNoIrqLock<Vec<Arc<dyn Inode>>>,
-    pub dirty_inodes: SpinNoIrqLock<Vec<Arc<dyn Inode>>>,
 }
 
 impl SuperBlockMeta {
@@ -26,9 +18,7 @@ impl SuperBlockMeta {
         Self {
             device,
             root_dentry: Once::new(),
-            fs_type: Arc::downgrade(&fs_type),
-            inodes: SpinNoIrqLock::new(Vec::new()),
-            dirty_inodes: SpinNoIrqLock::new(Vec::new()),
+            fs_type,
         }
     }
 }
@@ -46,15 +36,18 @@ pub trait SuperBlock: Send + Sync {
 }
 
 impl dyn SuperBlock {
+    /// Returns the file system type of this super block.
     pub fn fs_type(&self) -> Arc<dyn FileSystemType> {
-        self.meta().fs_type.upgrade().unwrap()
+        Arc::clone(&self.meta().fs_type)
     }
 
+    /// Returns the root dentry.
     pub fn root_dentry(&self) -> Arc<dyn Dentry> {
-        self.meta().root_dentry.get().unwrap().clone()
+        Arc::clone(self.meta().root_dentry.get().unwrap())
     }
 
-    pub fn push_inode(&self, inode: Arc<dyn Inode>) {
-        self.meta().inodes.lock().push(inode)
+    /// Returns the device associated with this super block.
+    pub fn device(&self) -> Option<Arc<dyn BlockDevice>> {
+        self.meta().device.as_ref().cloned()
     }
 }

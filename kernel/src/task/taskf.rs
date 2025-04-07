@@ -3,6 +3,7 @@ use alloc::collections::btree_map::BTreeMap;
 use alloc::string::ToString;
 use alloc::sync::Arc;
 use mm::vm::addr_space::{AddrSpace, switch_to};
+use osfs::fd_table::FdTable;
 use riscv::asm::sfence_vma_all;
 use time::TaskTimeStat;
 
@@ -99,6 +100,7 @@ impl Task {
         let sig_handlers;
         let sig_manager;
         let sig_stack;
+        let fd_table = SpinNoIrqLock::new(FdTable::new());
 
         if cloneflags.contains(CloneFlags::THREAD) {
             is_process = false;
@@ -151,6 +153,7 @@ impl Task {
             sig_handlers,
             sig_manager,
             sig_stack,
+            fd_table,
             name,
         ));
 

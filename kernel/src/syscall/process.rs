@@ -1,7 +1,16 @@
-use crate::task::TaskState;
+use crate::task::{Task, TaskState};
+use crate::vm::user_ptr::UserReadPtr;
 use crate::{processor::current_task, task::future::spawn_user_task};
+use alloc::boxed::Box;
+use alloc::string::ToString;
+use alloc::sync::Arc;
+use config::inode::{InodeMode, InodeType};
 use config::process::CloneFlags;
+use log::debug;
+use osfs::sys_root_dentry;
 use systype::{SysError, SyscallResult};
+use vfs::file::File;
+use vfs::path::Path;
 
 use crate::task::future::yield_now;
 
@@ -56,4 +65,40 @@ pub fn sys_clone(
     Ok(new_tid)
 }
 
-pub fn sys_wait4(pid: i32, status: i32) {}
+pub fn sys_execve(path: usize, _argv: usize, _envp: usize) -> SyscallResult {
+    let task = current_task();
+    let path = {
+        let mut addr_space_lock = task.addr_space_mut().lock();
+        let mut data_ptr = UserReadPtr::<u8>::new(path, &mut *addr_space_lock);
+        match data_ptr.read_c_string(30) {
+            Ok(data) => match core::str::from_utf8(&data) {
+                Ok(utf8_str) => utf8_str.to_string(),
+                Err(_) => unimplemented!(),
+            },
+            Err(_) => unimplemented!(),
+        }
+    };
+
+    log::info!("[sys_execve]: path: {path:?}",);
+    let dentry = {
+        let path = Path::new(sys_root_dentry(), sys_root_dentry(), &path);
+        path.walk().expect("sys_openat: fail to find dentry")
+    };
+
+    let inode = dentry.inode().unwrap();
+    inode.set_inotype(InodeType::from(InodeMode::REG));
+
+    let file = <dyn File>::open(dentry)?;
+
+    {
+        log::info!("file flags: {:?}", file.meta().dentry.path());
+    }
+
+    let elf_data = Box::new(file.read_all()?);
+    let elf_data_u8: &'static [u8] = Box::leak(elf_data);
+
+    debug!("add len:{}", elf_data_u8.len());
+
+    Task::spawn_from_elf(elf_data_u8, "add-test");
+    Ok(0)
+}

@@ -6,11 +6,12 @@ use config::vfs::MountFlags;
 use driver::BLOCK_DEVICE;
 use mutex::SpinNoIrqLock;
 use spin::Once;
-use vfs::{dentry::Dentry, fstype::FileSystemType};
+use vfs::{dentry::Dentry, file::File, fstype::FileSystemType};
 
 extern crate alloc;
 
 pub mod fd_table;
+pub mod simplefile;
 
 pub static FS_MANAGER: SpinNoIrqLock<BTreeMap<String, Arc<dyn FileSystemType>>> =
     SpinNoIrqLock::new(BTreeMap::new());
@@ -30,17 +31,17 @@ pub fn init() {
     FS_MANAGER.lock().insert(diskfs.name(), diskfs);
 
     let diskfs = FS_MANAGER.lock().get(DISK_FS_NAME).unwrap().clone();
+    log::debug!("get ext4 diskfs");
+
+    let block_device = Some(BLOCK_DEVICE.get().unwrap().clone());
+    log::debug!("get BLOCK_DEVICE");
 
     let diskfs_root = diskfs
-        .mount(
-            "/",
-            None,
-            MountFlags::empty(),
-            Some(BLOCK_DEVICE.get().unwrap().clone()),
-        )
+        .mount("/", None, MountFlags::empty(), block_device)
         .unwrap();
+    log::debug!("success mount diskfs");
 
     SYS_ROOT_DENTRY.call_once(|| diskfs_root);
 
-    sys_root_dentry().open().unwrap().load_dir().unwrap();
+    <dyn File>::open(sys_root_dentry()).unwrap().load_dir().unwrap();
 }

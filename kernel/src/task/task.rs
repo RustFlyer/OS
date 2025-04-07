@@ -11,6 +11,7 @@ use alloc::{
 use driver::println;
 use mm::vm::addr_space::AddrSpace;
 use mutex::{ShareMutex, SpinNoIrqLock, new_share_mutex};
+use osfs::fd_table::{self, FdTable};
 
 use core::cell::SyncUnsafeCell;
 use core::task::Waker;
@@ -71,6 +72,7 @@ pub struct Task {
     sig_handlers: ShareMutex<SigHandlers>,
     sig_manager: SyncUnsafeCell<SigManager>,
     sig_stack: SyncUnsafeCell<Option<SignalStack>>,
+    fd_table: SpinNoIrqLock<FdTable>,
 
     name: String,
 }
@@ -98,6 +100,7 @@ impl Task {
             sig_mask: SyncUnsafeCell::new(SigSet::empty()),
             sig_handlers: new_share_mutex(SigHandlers::new()),
             sig_stack: SyncUnsafeCell::new(None),
+            fd_table: SpinNoIrqLock::new(FdTable::new()),
             name,
         }
     }
@@ -125,6 +128,7 @@ impl Task {
         sig_handlers: ShareMutex<SigHandlers>,
         sig_manager: SyncUnsafeCell<SigManager>,
         sig_stack: SyncUnsafeCell<Option<SignalStack>>,
+        fd_table: SpinNoIrqLock<FdTable>,
 
         name: String,
     ) -> Self {
@@ -133,24 +137,26 @@ impl Task {
             process,
             is_process,
             threadgroup,
+
             trap_context,
             timer,
             waker,
             state,
             addr_space,
+
             parent,
             children,
+
             pgid,
             exit_code,
+
             sig_mask,
             sig_handlers,
             sig_manager,
             sig_stack,
+            fd_table,
+
             name,
-            sig_mask,
-            sig_handlers,
-            sig_manager,
-            sig_stack,
         }
     }
 
@@ -232,6 +238,10 @@ impl Task {
         f(&mut self.threadgroup.lock())
     }
 
+    pub fn with_mut_fdtable<T>(&self, f: impl FnOnce(&mut FdTable) -> T) -> T {
+        f(&mut self.fd_table.lock())
+    }
+
     pub fn get_waker(&self) -> Waker {
         self.waker_mut().as_ref().unwrap().clone()
     }
@@ -295,9 +305,9 @@ impl Task {
 impl Drop for Task {
     fn drop(&mut self) {
         let str = format!("Task [{}] is drop", self.get_name());
-        log::info!("{}", str);
-        log::error!("{}", str);
-        log::debug!("{}", str);
+        // log::info!("{}", str);
+        // log::error!("{}", str);
+        // log::debug!("{}", str);
         log::trace!("{}", str);
     }
 }

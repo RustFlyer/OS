@@ -260,6 +260,7 @@ dependencies = [
  "log",
  "lwext4_rust",
  "mutex",
+ "simdebug",
  "systype",
  "vfs",
 ]
@@ -391,7 +392,7 @@ dependencies = [
 [[package]]
 name = "lwext4_rust"
 version = "0.2.0"
-source = "git+https://github.com/EchudeT/lwext4_rust.git?rev=c115#c11526ea5c995406788e78443627415ab4ec345b"
+source = "git+https://github.com/EchudeT/lwext4_rust.git?rev=719c#719cc6f0b7106430901317fdbf3ef26a6866372f"
 dependencies = [
  "bindgen",
  "log",
@@ -450,9 +451,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.21.1"
+version = "1.21.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d75b0bedcc4fe52caa0e03d9f1151a323e4aa5e2d78ba3580400cd3c9e2bc4bc"
+checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
 
 [[package]]
 name = "osfs"
@@ -462,6 +463,7 @@ dependencies = [
  "config",
  "driver",
  "ext4",
+ "log",
  "mutex",
  "spin",
  "systype",
@@ -760,6 +762,7 @@ version = "0.1.0"
 dependencies = [
  "bitflags 2.9.0",
  "buddy_system_allocator",
+ "config",
  "time",
 ]
 

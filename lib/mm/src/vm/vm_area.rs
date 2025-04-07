@@ -24,6 +24,7 @@
 //! maintaining modularization and extensibility.
 
 use alloc::{collections::btree_map::BTreeMap, sync::Arc, vec::Vec};
+use config::mm::KERNEL_MAP_OFFSET;
 use core::{fmt::Debug, mem};
 
 use arch::riscv64::mm::sfence_vma_addr;
@@ -36,7 +37,7 @@ use super::{
     page_table::PageTable,
     pte::{PageTableEntry, PteFlags},
 };
-use crate::address::{PhysPageNum, VirtAddr, VirtPageNum};
+use crate::address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum};
 
 /// A virtual memory area (VMA).
 ///
@@ -64,8 +65,8 @@ pub struct VmArea {
 /// Unique data of a specific type of VMA. This enum is used in [`VmArea`].
 #[derive(Debug, Clone)]
 pub enum TypedArea {
-    /// A helper VMA representing one in the kernel space.
-    Kernel(KernelArea),
+    /// A fixed-offset VMA.
+    Offset(OffsetArea),
     /// A memory-backed VMA.
     MemoryBacked(MemoryBackedArea),
     /// An anonymous VMA.
@@ -106,20 +107,41 @@ pub struct PageFaultInfo<'a> {
 }
 
 impl VmArea {
-    /// Constructs a global [`VmArea`] whose specific type is [`KernelArea`].
+    /// Constructs a global [`VmArea`] whose specific type is [`OffsetArea`], representing
+    /// an area in the kernel space which is not a MMIO region.
     ///
     /// `start_va` must be page-aligned.
     ///
     /// `flags` needs to have `RWX` bits set properly; other bits must be zero.
     pub fn new_kernel(start_va: VirtAddr, end_va: VirtAddr, flags: PteFlags) -> Self {
+        Self::new_fixed_offset(
+            start_va,
+            end_va,
+            // Set bits A and D because kernel pages are never swapped out.
+            flags | PteFlags::A | PteFlags::D,
+            KERNEL_MAP_OFFSET,
+        )
+    }
+
+    /// Constructs a global [`VmArea`] whose specific type is [`OffsetArea`], representing
+    /// an area in the kernel space. This function is used to map a MMIO region.
+    ///
+    /// `start_va` must be page-aligned.
+    ///
+    /// `flags` needs to have `RWXAD` bits set properly; other bits must be zero.
+    pub fn new_fixed_offset(
+        start_va: VirtAddr,
+        end_va: VirtAddr,
+        flags: PteFlags,
+        offset: usize,
+    ) -> Self {
         Self {
             start: start_va,
             end: end_va.round_up(),
-            // Set bits A and D because kernel pages are never swapped out.
-            flags: flags | PteFlags::V | PteFlags::G | PteFlags::A | PteFlags::D,
+            flags: flags | PteFlags::V | PteFlags::G,
             perm: MemPerm::from(flags),
             pages: BTreeMap::new(),
-            map_type: TypedArea::Kernel(KernelArea),
+            map_type: TypedArea::Offset(OffsetArea { offset }),
             handler: None,
         }
     }
@@ -381,22 +403,26 @@ impl Debug for VmArea {
     }
 }
 
-/// A helper VMA representing one in the kernel space.
+/// A fixed-offset VMA.
 ///
 /// This struct is used to map an area in the kernel space to the kernel page table.
 /// It is of no use after the kernel page table is set up.
 ///
-/// A kernel area must be aligned to the size of a page.
+/// An `OffsetArea` must be aligned to the size of a page.
 #[derive(Debug, Clone)]
-pub struct KernelArea;
+pub struct OffsetArea {
+    /// The offset between the physical address and the virtual address of the area.
+    /// That is, PA + `offset` = VA.
+    offset: usize,
+}
 
-impl KernelArea {
-    /// Maps the kernel area to the kernel page table.
+impl OffsetArea {
+    /// Maps the area to the page table.
     pub fn map(area: &VmArea, page_table: &mut PageTable) {
-        match area.map_type {
-            TypedArea::Kernel(_) => {}
-            _ => panic!("KernelArea::map: not a kernel area"),
-        }
+        let offset = match area.map_type {
+            TypedArea::Offset(OffsetArea { offset }) => offset,
+            _ => panic!("OffsetArea::map: not a fixed-offset area"),
+        };
 
         let &VmArea {
             start: start_va,
@@ -406,9 +432,8 @@ impl KernelArea {
         } = area;
 
         let start_vpn = start_va.page_number();
-        let end_vpn = end_va.page_number();
-        let start_ppn = start_vpn.to_ppn_kernel().to_usize();
-        let end_ppn = end_vpn.to_ppn_kernel().to_usize();
+        let start_ppn = PhysAddr::new(start_va.to_usize() - offset).page_number().to_usize();
+        let end_ppn = PhysAddr::new(end_va.to_usize() - offset).page_number().to_usize();
         let ppns = (start_ppn..end_ppn)
             .map(PhysPageNum::new)
             .collect::<Vec<_>>();

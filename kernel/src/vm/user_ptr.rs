@@ -342,7 +342,7 @@ where
                 &mut push_and_check,
             )?;
         }
-        vec.push(0);
+        // vec.push(0);
         Ok(vec)
     }
 }

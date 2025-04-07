@@ -221,6 +221,7 @@ syscall!(
     usize
 );
 syscall!(sys_openat, SYSCALL_OPEN, usize, *const u8, usize, usize);
+syscall!(sys_lseek, SYSCALL_LSEEK, usize, isize, usize);
 
 // task
 syscall!(sys_getpid, SYSCALL_GETPID);

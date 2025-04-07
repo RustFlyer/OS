@@ -1,8 +1,11 @@
 extern crate alloc;
 
-use alloc::sync::Arc;
+use core::{ffi::c_void, fmt::Debug, ptr::null_mut};
+
+use alloc::{boxed::Box, ffi::CString, sync::Arc};
 use config::vfs::StatFs;
-use lwext4_rust::Ext4BlockWrapper;
+use log::info;
+use lwext4_rust::{Ext4BlockWrapper, KernelDevOp};
 use systype::SysResult;
 use vfs::superblock::{SuperBlock, SuperBlockMeta};
 
@@ -18,11 +21,13 @@ unsafe impl Send for ExtSuperBlock {}
 
 impl ExtSuperBlock {
     pub fn new(meta: SuperBlockMeta) -> Arc<Self> {
-        let disk = Disk::new(meta.device.as_ref().unwrap().clone());
-        Arc::new(Self {
-            meta: meta,
-            inner: Ext4BlockWrapper::<Disk>::new(disk).unwrap(),
-        })
+        let dev = meta.device.as_ref().unwrap().clone();
+        let disk = Disk::new(dev);
+        log::debug!("try to initialize EXT4 filesystem");
+        let inner =
+            Ext4BlockWrapper::<Disk>::new(disk).expect("failed to initialize EXT4 filesystem");
+        log::debug!("initialize EXT4 filesystem");
+        Arc::new(Self { meta: meta, inner })
     }
 }
 

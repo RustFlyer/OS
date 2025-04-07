@@ -57,3 +57,9 @@ pub fn backtrace_test() {
 
     c();
 }
+
+/// When you want to stop in functions, call it and make breakpoints in gdb.
+#[unsafe(no_mangle)]
+pub fn stop() {
+    let _a = 1 + 1;
+}

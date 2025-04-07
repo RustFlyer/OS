@@ -1,23 +1,14 @@
-extern crate alloc;
-use core::sync::atomic::Ordering;
-
 use alloc::sync::Arc;
 
-use config::{
-    board::BLOCK_SIZE,
-    inode::{InodeMode, InodeType},
-    vfs::Stat,
-};
-use lwext4_rust::bindings::ext4_dir;
+use config::{device::BLOCK_SIZE, vfs::Stat};
 use mutex::{ShareMutex, new_share_mutex};
 use systype::SysResult;
 use vfs::{
-    file::FileMeta,
     inode::{Inode, InodeMeta},
-    superblock::{self, SuperBlock},
+    superblock::SuperBlock,
 };
 
-use crate::{dentry::ExtDentry, ext::dir::ExtDir};
+use crate::ext::dir::ExtDir;
 
 pub struct ExtDirInode {
     meta: InodeMeta,
@@ -30,7 +21,7 @@ unsafe impl Sync for ExtDirInode {}
 impl ExtDirInode {
     pub fn new(superblock: Arc<dyn SuperBlock>, dir: ExtDir) -> Arc<Self> {
         Arc::new(Self {
-            meta: InodeMeta::new(0, Arc::downgrade(&superblock)),
+            meta: InodeMeta::new(0, superblock),
             dir: new_share_mutex(dir),
         })
     }
@@ -42,22 +33,23 @@ impl Inode for ExtDirInode {
     }
 
     fn get_attr(&self) -> SysResult<Stat> {
+        let inner = self.meta.inner.lock();
         Ok(Stat {
             st_dev: 0,
             st_ino: self.meta.ino as u64,
-            st_mode: self.meta.inner.lock().mode.bits(),
+            st_mode: inner.mode.bits(),
             st_nlink: 0,
             st_uid: 0,
             st_gid: 0,
             st_rdev: 0,
             __pad: 0,
-            st_size: self.meta.inner.lock().size as u64,
+            st_size: inner.size as u64,
             st_blksize: BLOCK_SIZE as u32,
             __pad2: 0,
-            st_blocks: (self.meta.inner.lock().size / BLOCK_SIZE) as u64,
-            st_atime: self.meta.inner.lock().atime,
-            st_mtime: self.meta.inner.lock().mtime,
-            st_ctime: self.meta.inner.lock().ctime,
+            st_blocks: (inner.size / BLOCK_SIZE) as u64,
+            st_atime: inner.atime,
+            st_mtime: inner.mtime,
+            st_ctime: inner.ctime,
             unused: 0,
         })
     }

@@ -31,9 +31,9 @@ impl PageCache {
     /// Inserts a page at the given offset.
     /// 
     /// `offset` must be aligned to the page size.
-    pub fn insert_page(&self, offset: usize, page: Page) {
+    pub fn insert_page(&self, offset: usize, page: Arc<Page>) {
         debug_assert!(offset % PAGE_SIZE == 0);
-        self.pages.lock().insert(offset, Arc::new(page));
+        self.pages.lock().insert(offset, page);
     }
 }
 

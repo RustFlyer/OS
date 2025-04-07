@@ -6,10 +6,6 @@ use core::mem::MaybeUninit;
 use user_lib::TimeVal;
 use user_lib::{gettimeofday, println};
 
-// extern crate user_lib;
-
-// extern crate alloc;
-
 #[unsafe(no_mangle)]
 fn main() -> i32 {
     println!("begin time test");

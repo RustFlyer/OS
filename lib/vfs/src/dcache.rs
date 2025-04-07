@@ -2,7 +2,7 @@ use hashbrown::HashMap;
 use mutex::SpinNoIrqLock;
 
 extern crate alloc;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use spin::Once;
@@ -22,7 +22,7 @@ impl DentryHashMap {
     }
 
     pub fn insert(&self, dentry: Arc<dyn Dentry>) {
-        let name = dentry.name();
+        let name = dentry.name().to_string();
         let mut map = self.0.lock();
 
         if let Some(bucket) = map.get_mut(&name) {
@@ -30,14 +30,14 @@ impl DentryHashMap {
         } else {
             let mut bucket = DentryBucket::new();
             bucket.insert(dentry);
-            map.insert(name, bucket);
+            map.insert(name.to_string(), bucket);
         }
     }
 
     pub fn remove(&self, dentry: Arc<dyn Dentry>) {
         let name = dentry.name();
         let mut map = self.0.lock();
-        if let Some(bucket) = map.get_mut(&name) {
+        if let Some(bucket) = map.get_mut(name) {
             bucket.remove(&dentry);
         } else {
             log::warn!("no dentry to remove!");

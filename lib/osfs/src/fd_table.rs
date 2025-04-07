@@ -1,7 +1,12 @@
+use core::fmt::{Debug, write};
+
 use alloc::{sync::Arc, vec::Vec};
 use config::{fs::MAX_FDS, vfs::OpenFlags};
+use log::{debug, info};
 use systype::{SysError, SysResult};
 use vfs::file::File;
+
+use crate::simplefile::SFile;
 
 pub type Fd = usize;
 
@@ -40,7 +45,16 @@ impl FdInfo {
 
 impl FdTable {
     pub fn new() -> Self {
-        let table: Vec<Option<FdInfo>> = Vec::with_capacity(MAX_FDS);
+        let mut table: Vec<Option<FdInfo>> = Vec::with_capacity(MAX_FDS);
+
+        let fdinfo = FdInfo::new(Arc::new(SFile::new()), OpenFlags::empty());
+        table.push(Some(fdinfo));
+
+        let fdinfo = FdInfo::new(Arc::new(SFile::new()), OpenFlags::empty());
+        table.push(Some(fdinfo));
+
+        let fdinfo = FdInfo::new(Arc::new(SFile::new()), OpenFlags::empty());
+        table.push(Some(fdinfo));
 
         Self { table }
     }
@@ -50,16 +64,23 @@ impl FdTable {
             .table
             .iter()
             .enumerate()
-            .find(|(_, e)| e.is_none())
+            .find(|(_i, e)| e.is_none())
             .map(|(i, _)| i);
-
-        inner_slot
+        if inner_slot.is_some() {
+            return inner_slot;
+        } else if inner_slot.is_none() && self.table.len() < MAX_FDS {
+            self.table.push(None);
+            return Some(self.table.len() - 1);
+        } else {
+            return None;
+        }
     }
 
     pub fn alloc(&mut self, file: Arc<dyn File>, flags: OpenFlags) -> SysResult<Fd> {
         let fdinfo = FdInfo::new(file, flags);
-
+        // debug!("test alloc");
         if let Some(fd) = self.get_available_slot() {
+            info!("alloc fd [{}]", fd);
             self.table[fd] = Some(fdinfo);
             Ok(fd)
         } else {
@@ -81,5 +102,28 @@ impl FdTable {
 
     pub fn get_file(&self, fd: Fd) -> SysResult<Arc<dyn File>> {
         Ok(self.get(fd)?.file())
+    }
+}
+
+impl Debug for FdInfo {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "File [{}] with flags [{:?}]",
+            self.file.dentry().get_meta().name,
+            self.flags
+        )
+    }
+}
+
+impl Debug for FdTable {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        self.table
+            .iter()
+            .enumerate()
+            .try_for_each(|(i, entry)| match entry {
+                Some(file) => write!(f, "{}: {:?}\n", i, file),
+                None => write!(f, "{}: <closed>\n", i),
+            })
     }
 }
