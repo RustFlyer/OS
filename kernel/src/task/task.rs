@@ -1,26 +1,23 @@
-use crate::task::tid::{Tid, TidHandle, tid_alloc};
-
-extern crate alloc;
 use alloc::{
     collections::BTreeMap,
-    string::{String, ToString},
+    string::String,
     sync::{Arc, Weak},
 };
-use driver::println;
-use mm::vm::addr_space::AddrSpace;
-use mutex::{ShareMutex, SpinNoIrqLock, new_share_mutex};
-use osfs::fd_table::{self, FdTable};
-
 use core::cell::SyncUnsafeCell;
 use core::task::Waker;
 
+use mutex::{ShareMutex, SpinNoIrqLock, new_share_mutex};
+use osfs::fd_table::FdTable;
 use time::TaskTimeStat;
-
-use crate::trap::trap_context::TrapContext;
 
 use super::{
     threadgroup::ThreadGroup,
     tid::{PGid, Pid},
+};
+use crate::{
+    task::tid::{Tid, TidHandle, tid_alloc},
+    trap::trap_context::TrapContext,
+    vm::addr_space::AddrSpace,
 };
 
 /// State of Task

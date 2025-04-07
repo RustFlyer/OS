@@ -1,8 +1,6 @@
 use alloc::string::ToString;
 
 use driver::sbi::getchar;
-use log::info;
-use mm::{address::VirtAddr, vm::trace_page_table_lookup};
 use strum::FromRepr;
 
 use config::{

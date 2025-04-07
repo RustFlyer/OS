@@ -3,7 +3,6 @@ use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicUsize, Ordering};
-use log::{debug, info, trace};
 
 use downcast_rs::{DowncastSync, impl_downcast};
 
@@ -12,7 +11,7 @@ use config::{
     mm::PAGE_SIZE,
     vfs::{OpenFlags, PollEvents, SeekFrom},
 };
-use mm::vm::page_cache::page::Page;
+use mm::page_cache::page::Page;
 use mutex::SpinNoIrqLock;
 use systype::{SysError, SysResult};
 
@@ -48,13 +47,11 @@ pub trait File: Send + Sync + DowncastSync {
     /// If the range of the position to read is partly or completely beyond the end
     /// of the file, the part that is beyond it is filled with zeroes.
     ///
-    /// This function should be implemented by an underlying file system for each file
-    /// type it supports. For example, a file system that supports regular files should
-    /// implement this function to read data from a regular file.
-    ///
-    /// This function should not be implemented for directory files, as they are not
-    /// readable in the same way as regular files. Instead, implement [`File::base_read_dir`]
-    /// for directory files.
+    /// This function should be implemented by an underlying file system for every file
+    /// type it supports to read from. For example, a file system that supports regular
+    /// files should implement this function to read data from a regular file, and a file
+    /// system that supports null files should implement this function to always indicate
+    /// an EOF (i.e., do nothing and returns 0 bytes read).
     fn base_read(&self, _buf: &mut [u8], _pos: usize) -> SysResult<usize> {
         panic!(
             "`base_read` is not supported for this file: {}",
@@ -62,6 +59,13 @@ pub trait File: Send + Sync + DowncastSync {
         );
     }
 
+    /// Writes data to this file from the provided buffer at the given offset.
+    ///
+    /// This function should be implemented by an underlying file system for every file
+    /// type it supports to write to. For example, a file system that supports regular
+    /// files should implement this function to write data to a regular file, and a file
+    /// system that supports null files should implement this function to always discard
+    /// the data in the buffer (i.e., do nothing).
     fn base_write(&self, _buf: &[u8], _offset: usize) -> SysResult<usize> {
         panic!(
             "`base_write` is not supported for this file: {}",
@@ -125,9 +129,9 @@ pub trait File: Send + Sync + DowncastSync {
         self.meta().dentry.inode().unwrap()
     }
 
-    /// Called when the VFS needs to move the file position index.
+    /// Seeks to the given position in the file.
     ///
-    /// Return the result offset.
+    /// Returns the result offset.
     ///
     /// lseek() allows the file offset to be set beyond the end of the file (but
     /// this does not change the size of the file). If data is later written at
@@ -143,7 +147,7 @@ pub trait File: Send + Sync + DowncastSync {
                     if res_pos as i64 - off.abs() < 0 {
                         return Err(SysError::EINVAL);
                     }
-                    res_pos -= off.abs() as usize;
+                    res_pos -= off.unsigned_abs() as usize;
                 } else {
                     res_pos += off as usize;
                 }
@@ -154,7 +158,7 @@ pub trait File: Send + Sync + DowncastSync {
             SeekFrom::End(off) => {
                 let size = self.size();
                 if off < 0 {
-                    res_pos = size - off.abs() as usize;
+                    res_pos = size - off.unsigned_abs() as usize;
                 } else {
                     res_pos = size + off as usize;
                 }
@@ -185,7 +189,7 @@ pub trait File: Send + Sync + DowncastSync {
     }
 
     fn flags(&self) -> OpenFlags {
-        self.meta().flags.lock().clone()
+        *self.meta().flags.lock()
     }
 
     fn set_flags(&self, flags: OpenFlags) {
@@ -224,9 +228,9 @@ impl dyn File {
             _ => self.base_read(buf, position)?,
         };
 
-        trace!("read len = {}", bytes_read);
+        log::trace!("read len = {}", bytes_read);
         self.set_pos(position + bytes_read);
-        return Ok(bytes_read);
+        Ok(bytes_read)
     }
 
     /// A helper function which reads data starting from the given position from a file that
@@ -348,6 +352,7 @@ impl dyn File {
         self.base_poll(events)
     }
 
+    #[deprecated = "Legacy function from Phoenix OS."]
     pub fn load_dir(&self) -> SysResult<()> {
         let inode = self.inode();
         if inode.state() == InodeState::Uninit {
@@ -357,6 +362,7 @@ impl dyn File {
         Ok(())
     }
 
+    #[deprecated = "Legacy function from Phoenix OS."]
     pub fn read_dir(&self, buf: &mut [u8]) -> SysResult<usize> {
         self.load_dir()?;
 

@@ -24,20 +24,22 @@
 //! maintaining modularization and extensibility.
 
 use alloc::{collections::btree_map::BTreeMap, sync::Arc, vec::Vec};
-use config::mm::KERNEL_MAP_OFFSET;
 use core::{fmt::Debug, mem};
 
 use arch::riscv64::mm::sfence_vma_addr;
-
+use config::mm::KERNEL_MAP_OFFSET;
+use mm::{
+    address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum},
+    page_cache::page::Page,
+};
 use systype::{SysError, SysResult};
+use vfs::file::File;
 
 use super::{
     mem_perm::MemPerm,
-    page_cache::page::Page,
     page_table::PageTable,
     pte::{PageTableEntry, PteFlags},
 };
-use crate::address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum};
 
 /// A virtual memory area (VMA).
 ///
@@ -66,21 +68,30 @@ pub struct VmArea {
 #[derive(Debug, Clone)]
 pub enum TypedArea {
     /// A fixed-offset VMA.
+    ///
+    /// A fixed-offset VMA is used to map physical addresses to virtual addresses
+    /// by adding a fixed offset. This is used for kernel space and MMIO regions.
+    /// This kind of VMAs do not have a page fault handler, and a page fault will
+    /// never occur in this kind of VMAs.
     Offset(OffsetArea),
     /// A memory-backed VMA.
+    ///
+    /// A memory-backed VMA is backed by a memory region. This is a temporary VMA
+    /// used as an analogy to a file-backed VMA.
     MemoryBacked(MemoryBackedArea),
+    /// A file-backed VMA.
+    ///
+    /// A file-backed VMA is backed by a file. It is created when loading an executable
+    /// file or `mmap`ing a file.
+    FileBacked(FileBackedArea),
     /// An anonymous VMA.
     ///
-    /// An anonymous VMA is not backed by any file or memory. A user heap or stack,
-    /// or an area created by `mmap` with `MAP_ANONYMOUS` flag, is an anonymous VMA.
+    /// An anonymous VMA is not backed by any file or memory. A user stack or an area
+    /// created by `mmap` with `MAP_ANONYMOUS` flag, is an anonymous VMA.
     Anonymous(AnonymousArea),
     /// A heap VMA representing a user heap. This is just a special case of an
     /// anonymous area.
     Heap(AnonymousArea),
-    /// A file-backed VMA.
-    ///
-    /// A file-backed VMA is backed by a file. It is used for memory-mapped files.
-    FileBacked,
 }
 
 /// Page fault handler function type.
@@ -108,7 +119,8 @@ pub struct PageFaultInfo<'a> {
 
 impl VmArea {
     /// Constructs a global [`VmArea`] whose specific type is [`OffsetArea`], representing
-    /// an area in the kernel space which is not a MMIO region.
+    /// an area in the kernel space, which has an offset of `KERNEL_MAP_OFFSET` from the
+    /// physical address.
     ///
     /// `start_va` must be page-aligned.
     ///
@@ -217,6 +229,10 @@ impl VmArea {
     /// the range covers the starting or ending part of the original VMA, which
     /// leaves only a single VMA. If both are `None`, it means the range covers
     /// the whole VMA, so the original VMA is totally removed.
+    ///
+    /// # Note
+    /// This function is buggy because it does not update fields in specific
+    /// [`TypedArea`] structs in the [`VmArea`] struct.
     pub fn unmap_range(
         mut self,
         page_table: &mut PageTable,
@@ -432,8 +448,12 @@ impl OffsetArea {
         } = area;
 
         let start_vpn = start_va.page_number();
-        let start_ppn = PhysAddr::new(start_va.to_usize() - offset).page_number().to_usize();
-        let end_ppn = PhysAddr::new(end_va.to_usize() - offset).page_number().to_usize();
+        let start_ppn = PhysAddr::new(start_va.to_usize() - offset)
+            .page_number()
+            .to_usize();
+        let end_ppn = PhysAddr::new(end_va.to_usize() - offset)
+            .page_number()
+            .to_usize();
         let ppns = (start_ppn..end_ppn)
             .map(PhysPageNum::new)
             .collect::<Vec<_>>();
@@ -522,6 +542,52 @@ impl Debug for MemoryBackedArea {
                 "memory back store len",
                 &format_args!("{:#x}", self.memory.len()),
             )
+            .finish()
+    }
+}
+
+/// A file-backed VMA.
+///
+/// This kind of VMA is backed by a file, i.e., when a page in this kind of VMA is
+/// accessed for the first time, the page is read from the file.
+///
+/// There are some different types of file-backed VMAs based on the permissions, and
+/// the differences in their implementations are noted below.
+/// - Private, read-only: A page in this kind of VMA is mapped to a page in the page
+///   cache of the file. Any write to the same page in the file in another private,
+///   writable VMA does not affect the data on this page.
+/// - Private, writable: A page in this kind of VMA may or may not be mapped to a page
+///   in the page cache of the file, depending on whether the page is written to for
+///   the first time. Assuming the page is first read from and then written to, the
+///   behavior is as follows:
+///   - When the page is first read from, it is mapped to a page in the page cache of
+///     the file, and is marked as copy-on-write.
+///   - When the page is first written to, a copy-on-write page fault occurs, and a new
+///     page is allocated exclusively for this VMA. The data in the original page is
+///     copied to the new page.
+/// - Shared, read-only or writable: A page in this kind of VMA is mapped to a page in
+///   the page cache of the file, as if it is a private, read-only VMA. This is OK;
+///   see the documentation of `MAP_PRIVATE` flag in `mmap(2)`:
+///   > It is unspecified whether changes made to the file after the mmap() call are
+///   > visible in the mapped region.
+#[derive(Clone)]
+pub struct FileBackedArea {
+    /// The file backing store.
+    file: Arc<dyn File>,
+    /// The offset in the file from which the VMA is mapped.
+    ///
+    /// It should be page-aligned.
+    offset: usize,
+}
+
+impl Debug for FileBackedArea {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("FileBackedArea")
+            .field(
+                "file back store addr",
+                &format_args!("{:p}", self.file.as_ref()),
+            )
+            .field("file back store offset", &self.offset)
             .finish()
     }
 }

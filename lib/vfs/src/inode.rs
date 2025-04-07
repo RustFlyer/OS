@@ -6,7 +6,7 @@ use config::{
     inode::{InodeMode, InodeState, InodeType},
     vfs::{Stat, TimeSpec},
 };
-use mm::vm::page_cache::PageCache;
+use mm::page_cache::PageCache;
 use mutex::SpinNoIrqLock;
 use systype::SysResult;
 

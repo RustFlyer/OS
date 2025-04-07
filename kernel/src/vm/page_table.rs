@@ -13,15 +13,15 @@ use config::mm::{
     MMIO_END, MMIO_START, PTE_PER_TABLE, VIRT_END, bss_end, bss_start, data_end, data_start,
     kernel_end, kernel_start, rodata_end, rodata_start, text_end, text_start,
 };
+use mm::{
+    address::{PhysPageNum, VirtAddr, VirtPageNum},
+    page_cache::page::Page,
+};
 use simdebug::when_debug;
 use systype::SysResult;
 
-use super::{
-    page_cache::page::Page,
-    pte::{PageTableEntry, PteFlags},
-};
+use super::pte::{PageTableEntry, PteFlags};
 use crate::{
-    address::{PhysPageNum, VirtAddr, VirtPageNum},
     frame::FrameTracker,
     vm::vm_area::{OffsetArea, VmArea},
 };

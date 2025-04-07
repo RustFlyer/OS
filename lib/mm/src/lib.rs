@@ -7,7 +7,6 @@
 pub mod address;
 pub mod frame;
 pub mod heap;
-pub mod vm;
+pub mod page_cache;
 
-#[macro_use]
 extern crate alloc;
