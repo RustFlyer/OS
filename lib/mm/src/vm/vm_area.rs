@@ -108,7 +108,8 @@ pub struct PageFaultInfo<'a> {
 
 impl VmArea {
     /// Constructs a global [`VmArea`] whose specific type is [`OffsetArea`], representing
-    /// an area in the kernel space which is not a MMIO region.
+    /// an area in the kernel space, which has an offset of `KERNEL_MAP_OFFSET` from the
+    /// physical address.
     ///
     /// `start_va` must be page-aligned.
     ///
@@ -217,6 +218,10 @@ impl VmArea {
     /// the range covers the starting or ending part of the original VMA, which
     /// leaves only a single VMA. If both are `None`, it means the range covers
     /// the whole VMA, so the original VMA is totally removed.
+    ///
+    /// # Note
+    /// This function is buggy because it does not update fields in specific
+    /// [`TypedArea`] structs in the [`VmArea`] struct.
     pub fn unmap_range(
         mut self,
         page_table: &mut PageTable,
@@ -432,8 +437,12 @@ impl OffsetArea {
         } = area;
 
         let start_vpn = start_va.page_number();
-        let start_ppn = PhysAddr::new(start_va.to_usize() - offset).page_number().to_usize();
-        let end_ppn = PhysAddr::new(end_va.to_usize() - offset).page_number().to_usize();
+        let start_ppn = PhysAddr::new(start_va.to_usize() - offset)
+            .page_number()
+            .to_usize();
+        let end_ppn = PhysAddr::new(end_va.to_usize() - offset)
+            .page_number()
+            .to_usize();
         let ppns = (start_ppn..end_ppn)
             .map(PhysPageNum::new)
             .collect::<Vec<_>>();
