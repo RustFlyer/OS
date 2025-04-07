@@ -251,7 +251,7 @@ syscall!(
 );
 syscall!(sys_sigreturn, SYSCALL_RT_SIGRETURN);
 syscall!(
-    sys_sigprocmask,
+    sys_sigmask,
     SYSCALL_RT_SIGPROCMASK,
     usize,
     usize,

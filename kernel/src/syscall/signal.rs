@@ -1,4 +1,4 @@
-use crate::task::{TASK_MANAGER, signal::sig_info::*};
+use crate::{task::{signal::sig_info::*, TASK_MANAGER}, vm::user_ptr::UserReadPtr};
 use alloc::task;
 use systype::{SysError, SyscallResult};
 
@@ -36,10 +36,13 @@ pub fn sys_kill(sig_code: i32, pid: isize) -> SyscallResult {
     Ok(0)
 }
 
-pub fn sys_sigaction() {
+pub fn sys_sigaction(sig_code: i32, new_sa: UserReadPtr<SigAction>) {
     
 }
 
-pub fn sys_sigprocmask() {
+pub fn sys_sigmask() {
     
+}
+
+pub fn sys_sigreturn() -> SyscallResult {
 }
