@@ -19,9 +19,12 @@ unsafe impl Send for ExtFileInode {}
 unsafe impl Sync for ExtFileInode {}
 
 impl ExtFileInode {
-    pub fn new(superblock: Arc<dyn SuperBlock>, file: ExtFile) -> Arc<Self> {
+    pub fn new(superblock: Arc<dyn SuperBlock>, mut file: ExtFile) -> Arc<Self> {
+        let fsize = file.size();
+        let meta = InodeMeta::new(0, superblock);
+        meta.inner.lock().size = fsize as usize;
         Arc::new(Self {
-            meta: InodeMeta::new(0, superblock),
+            meta,
             file: new_share_mutex(file),
         })
     }

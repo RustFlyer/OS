@@ -1,7 +1,16 @@
-use crate::task::TaskState;
+use crate::task::{Task, TaskState};
+use crate::vm::user_ptr::UserReadPtr;
 use crate::{processor::current_task, task::future::spawn_user_task};
+use alloc::boxed::Box;
+use alloc::string::ToString;
+use alloc::sync::Arc;
+use config::inode::{InodeMode, InodeType};
 use config::process::CloneFlags;
+use log::debug;
+use osfs::sys_root_dentry;
 use systype::{SysError, SyscallResult};
+use vfs::file::File;
+use vfs::path::Path;
 
 use crate::task::future::yield_now;
 
@@ -39,10 +48,10 @@ pub async fn sys_waitpid() -> SyscallResult {
 
 pub fn sys_clone(
     flags: usize,
-    stack: usize,
+    _stack: usize,
     _parent_tid_ptr: usize,
     _tls_ptr: usize,
-    chilren_tid_ptr: usize,
+    _chilren_tid_ptr: usize,
 ) -> SyscallResult {
     let _exit_signal = flags & 0xff;
     let flags = CloneFlags::from_bits(flags as u64 & !0xff).ok_or(SysError::EINVAL)?;
@@ -54,4 +63,42 @@ pub fn sys_clone(
     log::info!("[sys_clone] clone a new thread, tid {new_tid}, clone flags {flags:?}",);
     spawn_user_task(new_task);
     Ok(new_tid)
+}
+
+pub fn sys_execve(path: usize, _argv: usize, _envp: usize) -> SyscallResult {
+    let task = current_task();
+
+    let read_c_str = |addr| {
+        let mut addr_space_lock = task.addr_space_mut().lock();
+        let mut data_ptr = UserReadPtr::<u8>::new(addr, &mut *addr_space_lock);
+        match data_ptr.read_c_string(30) {
+            Ok(data) => match core::str::from_utf8(&data) {
+                Ok(utf8_str) => utf8_str.to_string(),
+                Err(_) => unimplemented!(),
+            },
+            Err(_) => unimplemented!(),
+        }
+    };
+
+    let path = read_c_str(path);
+
+    log::info!("[sys_execve]: path: {path:?}",);
+    let dentry = {
+        let path = Path::new(sys_root_dentry(), sys_root_dentry(), &path);
+        path.walk().expect("sys_openat: fail to find dentry")
+    };
+
+    let inode = dentry.inode().unwrap();
+    inode.set_inotype(InodeType::from(InodeMode::REG));
+
+    let file = <dyn File>::open(dentry)?;
+
+    let elf_data = Box::new(file.read_all()?);
+    let elf_data_u8: &'static [u8] = Box::leak(elf_data);
+
+    debug!("add len:{}", elf_data_u8.len());
+
+    let name = format!("{path:?}");
+    Task::spawn_from_elf(elf_data_u8, &name);
+    Ok(0)
 }

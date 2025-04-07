@@ -1,9 +1,12 @@
 use alloc::string::ToString;
 
+use driver::sbi::getchar;
+use log::info;
+use mm::{address::VirtAddr, vm::trace_page_table_lookup};
 use strum::FromRepr;
 
 use config::{
-    inode::InodeMode,
+    inode::{InodeMode, InodeType},
     vfs::{OpenFlags, SeekFrom},
 };
 use mutex::SleepLock;
@@ -28,7 +31,7 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
     let pathname = {
         let mut addr_space_lock = task.addr_space_mut().lock();
         let mut data_ptr = UserReadPtr::<u8>::new(pathname, &mut *addr_space_lock);
-        match unsafe { data_ptr.read_array(3) } {
+        match data_ptr.read_c_string(30) {
             Ok(data) => match core::str::from_utf8(&data) {
                 Ok(utf8_str) => utf8_str.to_string(),
                 Err(_) => unimplemented!(),
@@ -38,7 +41,6 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
     };
 
     log::debug!("path name = {}", pathname);
-
     let dentry = {
         let path = Path::new(sys_root_dentry(), sys_root_dentry(), &pathname);
         path.walk().expect("sys_openat: fail to find dentry")
@@ -51,6 +53,7 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
     }
 
     let inode = dentry.inode().unwrap();
+    inode.set_inotype(InodeType::from(mode));
     if flags.contains(OpenFlags::O_DIRECTORY) && !inode.inotype().is_dir() {
         return Err(SysError::ENOTDIR);
     }
@@ -88,12 +91,25 @@ pub fn sys_write(fd: usize, addr: usize, len: usize) -> SyscallResult {
 pub fn sys_read(fd: usize, buf: usize, count: usize) -> SyscallResult {
     let task = current_task();
     let mut addrspace = task.addr_space_mut().lock();
-    let mut buf = UserWritePtr::<u8>::new(buf, &mut addrspace);
-    let buf_ptr = unsafe { buf.try_into_mut_slice(count) }?;
 
-    log::debug!("begin to sys read");
-    let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
-    let ret = file.read(buf_ptr);
+    // log::debug!("begin to sys read");
+
+    let ret = if fd == 0 {
+        // info!("begin to getchar");
+        let mut buf = UserWritePtr::<u8>::new(buf, &mut addrspace);
+        let data = getchar();
+        unsafe {
+            buf.write(data)?;
+        };
+        // info!("finish getchar {}", data);
+        // info!("finish getchar {} buf: {:?}, count: {}", data, buf, count);
+        Ok(1)
+    } else {
+        let mut buf = UserWritePtr::<u8>::new(buf, &mut addrspace);
+        let buf_ptr = unsafe { buf.try_into_mut_slice(count) }?;
+        let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
+        file.read(buf_ptr)
+    };
 
     // info!("sys read => {:?}", buf_ptr);
 

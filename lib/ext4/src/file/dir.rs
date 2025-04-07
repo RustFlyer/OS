@@ -1,4 +1,4 @@
-use alloc::sync::Arc;
+use alloc::{string::String, sync::Arc};
 
 use mutex::ShareMutex;
 use vfs::file::{File, FileMeta};
@@ -27,7 +27,6 @@ impl File for ExtDirFile {
         &self.meta
     }
 
-    /// # Here We should implement a function to load all dentry and inodes in a directory.
     fn base_load_dir(&self) -> systype::SysResult<()> {
         let mut dir = self.dir.lock();
 
@@ -39,5 +38,9 @@ impl File for ExtDirFile {
         }
 
         Ok(())
+    }
+
+    fn base_ls(&self, path: String) {
+        self.dir.lock().lwext4_dir_entries(&path).unwrap();
     }
 }

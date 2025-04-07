@@ -50,9 +50,9 @@ impl ExtFile {
     /// Returns the number of bytes read. If it returns 0, it means it reached EOF.
     pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, i32> {
         let mut count = 0;
-        stop();
+        // stop();
         let err = unsafe { ext4_fread(&mut self.0, buf.as_mut_ptr() as _, buf.len(), &mut count) };
-        debug!("{:?}", buf);
+        // debug!("{:?}", buf);
 
         match err {
             0 => Ok(count),

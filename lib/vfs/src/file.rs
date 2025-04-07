@@ -3,6 +3,7 @@ use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicUsize, Ordering};
+use log::{debug, info, trace};
 
 use downcast_rs::{DowncastSync, impl_downcast};
 
@@ -227,6 +228,8 @@ impl dyn File {
             InodeType::File => self.read_through_page_cache(buf, position)?,
             _ => self.base_read(buf, position)?,
         };
+
+        trace!("read len = {}", bytes_read);
         self.set_pos(position + bytes_read);
         Ok(bytes_read)
     }
@@ -369,6 +372,7 @@ impl dyn File {
         struct LinuxDirent64 {
             d_ino: u64,
             d_off: u64,
+
             d_reclen: u16,
             d_type: u8,
             // d_name follows here, which will be written later
@@ -420,8 +424,9 @@ impl dyn File {
     #[deprecated = "Legacy function from Phoenix OS."]
     pub fn read_all(&self) -> SysResult<Vec<u8>> {
         let size = self.size();
-        let mut buf = Vec::with_capacity(size);
-        self.read(&mut buf)?;
+        let mut buf = vec![0; size];
+
+        let _ulen = self.read(&mut buf)?;
         Ok(buf)
     }
 

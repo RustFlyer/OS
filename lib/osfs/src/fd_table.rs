@@ -6,6 +6,8 @@ use log::{debug, info};
 use systype::{SysError, SysResult};
 use vfs::file::File;
 
+use crate::simplefile::SFile;
+
 pub type Fd = usize;
 
 #[derive(Clone)]
@@ -43,7 +45,16 @@ impl FdInfo {
 
 impl FdTable {
     pub fn new() -> Self {
-        let table: Vec<Option<FdInfo>> = Vec::with_capacity(MAX_FDS);
+        let mut table: Vec<Option<FdInfo>> = Vec::with_capacity(MAX_FDS);
+
+        let fdinfo = FdInfo::new(Arc::new(SFile::new()), OpenFlags::empty());
+        table.push(Some(fdinfo));
+
+        let fdinfo = FdInfo::new(Arc::new(SFile::new()), OpenFlags::empty());
+        table.push(Some(fdinfo));
+
+        let fdinfo = FdInfo::new(Arc::new(SFile::new()), OpenFlags::empty());
+        table.push(Some(fdinfo));
 
         Self { table }
     }
@@ -67,7 +78,7 @@ impl FdTable {
 
     pub fn alloc(&mut self, file: Arc<dyn File>, flags: OpenFlags) -> SysResult<Fd> {
         let fdinfo = FdInfo::new(file, flags);
-        debug!("test alloc");
+        // debug!("test alloc");
         if let Some(fd) = self.get_available_slot() {
             info!("alloc fd [{}]", fd);
             self.table[fd] = Some(fdinfo);

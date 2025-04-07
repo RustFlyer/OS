@@ -255,9 +255,9 @@ impl Task {
 impl Drop for Task {
     fn drop(&mut self) {
         let str = format!("Task [{}] is drop", self.get_name());
-        log::info!("{}", str);
-        log::error!("{}", str);
-        log::debug!("{}", str);
+        // log::info!("{}", str);
+        // log::error!("{}", str);
+        // log::debug!("{}", str);
         log::trace!("{}", str);
     }
 }
