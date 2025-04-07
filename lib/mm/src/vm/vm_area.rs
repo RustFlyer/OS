@@ -66,21 +66,30 @@ pub struct VmArea {
 #[derive(Debug, Clone)]
 pub enum TypedArea {
     /// A fixed-offset VMA.
+    ///
+    /// A fixed-offset VMA is used to map physical addresses to virtual addresses
+    /// by adding a fixed offset. This is used for kernel space and MMIO regions.
+    /// This kind of VMAs do not have a page fault handler, and a page fault will
+    /// never occur in this kind of VMAs.
     Offset(OffsetArea),
     /// A memory-backed VMA.
+    ///
+    /// A memory-backed VMA is backed by a memory region. This is a temporary VMA
+    /// used as an analogy to a file-backed VMA.
     MemoryBacked(MemoryBackedArea),
+    /// A file-backed VMA.
+    ///
+    /// A file-backed VMA is backed by a file. It is created when loading an executable
+    /// file or `mmap`ing a file.
+    FileBacked(FileBackedArea),
     /// An anonymous VMA.
     ///
-    /// An anonymous VMA is not backed by any file or memory. A user heap or stack,
-    /// or an area created by `mmap` with `MAP_ANONYMOUS` flag, is an anonymous VMA.
+    /// An anonymous VMA is not backed by any file or memory. A user stack or an area
+    /// created by `mmap` with `MAP_ANONYMOUS` flag, is an anonymous VMA.
     Anonymous(AnonymousArea),
     /// A heap VMA representing a user heap. This is just a special case of an
     /// anonymous area.
     Heap(AnonymousArea),
-    /// A file-backed VMA.
-    ///
-    /// A file-backed VMA is backed by a file. It is used for memory-mapped files.
-    FileBacked,
 }
 
 /// Page fault handler function type.
@@ -533,6 +542,39 @@ impl Debug for MemoryBackedArea {
             )
             .finish()
     }
+}
+
+/// A file-backed VMA.
+///
+/// This kind of VMA is backed by a file, i.e., when a page in this kind of VMA is
+/// accessed for the first time, the page is read from the file.
+///
+/// There are some different types of file-backed VMAs based on the permissions, and
+/// the differences in their implementations are noted below.
+/// - Private, read-only: A page in this kind of VMA is mapped to a page in the page
+///   cache of the file. Any write to the same page in the file in another private,
+///   writable VMA does not affect the data on this page.
+/// - Private, writable: A page in this kind of VMA may or may not be mapped to a page
+///   in the page cache of the file, depending on whether the page is written to for
+///   the first time. Assuming the page is first read from and then written to, the
+///   behavior is as follows:
+///   - When the page is first read from, it is mapped to a page in the page cache of
+///     the file, and is marked as copy-on-write.
+///   - When the page is first written to, a copy-on-write page fault occurs, and a new
+///     page is allocated exclusively for this VMA. The data in the original page is
+///     copied to the new page.
+/// - Shared, read-only or writable: A page in this kind of VMA is mapped to a page in
+///   the page cache of the file, as if it is a private, read-only VMA. This is OK;
+///   see the documentation of `MAP_PRIVATE` flag in `mmap(2)`:
+///   > It is unspecified whether changes made to the file after the mmap() call are
+///   > visible in the mapped region.
+pub struct FileBackedArea {
+    /// The file backing store.
+    file: Arc<dyn File>,
+    /// The offset in the file from which the VMA is mapped.
+    ///
+    /// It should be page-aligned.
+    offset: usize,
 }
 
 /// An anonymous VMA which is not backed by a file or device, such as a user heap or stack.
