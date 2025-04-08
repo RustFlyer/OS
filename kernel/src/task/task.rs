@@ -14,6 +14,7 @@ use mutex::{ShareMutex, SpinNoIrqLock, new_share_mutex};
 use osfs::fd_table::{self, FdTable};
 
 use core::cell::SyncUnsafeCell;
+use core::sync::atomic::{AtomicUsize, Ordering};
 use core::task::Waker;
 
 use time::TaskTimeStat;
@@ -72,6 +73,7 @@ pub struct Task {
     sig_handlers: ShareMutex<SigHandlers>,
     sig_manager: SyncUnsafeCell<SigManager>,
     sig_stack: SyncUnsafeCell<Option<SignalStack>>,
+    sig_cx_ptr: AtomicUsize,
     fd_table: SpinNoIrqLock<FdTable>,
 
     name: String,
@@ -100,6 +102,7 @@ impl Task {
             sig_mask: SyncUnsafeCell::new(SigSet::empty()),
             sig_handlers: new_share_mutex(SigHandlers::new()),
             sig_stack: SyncUnsafeCell::new(None),
+            sig_cx_ptr: AtomicUsize::new(0),
             fd_table: SpinNoIrqLock::new(FdTable::new()),
             name,
         }
@@ -128,6 +131,7 @@ impl Task {
         sig_handlers: ShareMutex<SigHandlers>,
         sig_manager: SyncUnsafeCell<SigManager>,
         sig_stack: SyncUnsafeCell<Option<SignalStack>>,
+        sig_cx_ptr: AtomicUsize,
         fd_table: SpinNoIrqLock<FdTable>,
 
         name: String,
@@ -154,6 +158,7 @@ impl Task {
             sig_handlers,
             sig_manager,
             sig_stack,
+            sig_cx_ptr,
             fd_table,
 
             name,
@@ -261,6 +266,10 @@ impl Task {
     pub fn get_sig_mask(&self) -> SigSet {
         unsafe { *self.sig_mask.get() }
     }
+
+    pub fn get_sig_cx_ptr(&self) -> usize {
+        self.sig_cx_ptr.load(Ordering::Relaxed)
+    }
     // ========== This Part You Can Check the State of Task  ===========
     pub fn is_process(&self) -> bool {
         self.is_process
@@ -289,6 +298,10 @@ impl Task {
 
     pub fn set_pgid(&self, pgid: PGid) {
         *self.pgid_mut().lock() = pgid;
+    }
+
+    pub fn set_sig_cx_ptr(&self, new_ptr: usize) {
+        self.sig_cx_ptr.store(new_ptr, Ordering::Relaxed);
     }
     // ========== This Part You Can Change the Member of Task  ===========
     pub fn add_child(&self, child: Arc<Task>) {

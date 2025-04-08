@@ -82,10 +82,10 @@ fn sig_exec(task: Arc<Task>, si: SigInfo) -> bool {
                 stack: sig_stack.unwrap_or_default(),
                 mask: old_mask,
                 sig: [0; 16],
-                user_x: cx.user_reg,
+                user_reg: cx.user_reg,
                 fpstate: [0; 66],
             };
-            sig_cx.user_x[0] = cx.sepc;
+            sig_cx.user_reg[0] = cx.sepc;
             log::trace!("[save_context_into_sigstack] sig_cx_ptr: {sig_cx_ptr:?}");
             unsafe { sig_cx_ptr.write(sig_cx)? };
             task.set_sig_cx_ptr(new_sp);
@@ -124,12 +124,16 @@ fn sig_exec(task: Arc<Task>, si: SigInfo) -> bool {
             cx.user_reg[1] = _sigreturn_trampoline as usize;
             // sp (it will be used later by sys_sigreturn to restore sig_cx)
             cx.user_reg[2] = new_sp;
-            cx.user_reg[4] = sig_cx.mcontext.user_x[4];
-            cx.user_reg[3] = sig_cx.mcontext.user_x[3];
+            cx.user_reg[4] = sig_cx.mcontext.user_reg[4];
+            cx.user_reg[3] = sig_cx.mcontext.user_reg[3];
             // log::error!("{:#x}", new_sp);
             true
         }
     }
+}
+
+extern "C" {
+    fn _sigreturn_trampoline();
 }
 
 /// kill the process

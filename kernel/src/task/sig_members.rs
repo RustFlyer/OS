@@ -162,6 +162,7 @@ impl SigHandlers {
         self.actions[sig.index()]
     }
 
+    /// update actions and bitmap in actions in sig_handlers
     pub fn update(&mut self, sig: Sig, new: Action) {
         debug_assert!(!sig.is_kill_or_stop());
         self.actions[sig.index()] = new;
@@ -292,7 +293,7 @@ pub struct SigContext {
     // don't know why, struct need to be exact the same with musl libc
     pub sig: [usize; 16],
     // common register
-    pub user_x: [usize; 32],
+    pub user_reg: [usize; 32],
     //
     pub fpstate: [usize; 66],
 }

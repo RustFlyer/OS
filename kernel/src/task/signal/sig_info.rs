@@ -117,10 +117,6 @@ impl Sig {
     pub fn index(&self) -> usize {
         (self.0 - 1) as usize
     }
-
-    pub fn is_kill_or_stop(&self) -> bool {
-        matches!(*self, Sig::SIGKILL | Sig::SIGSTOP)
-    }
 }
 
 impl fmt::Display for Sig {
