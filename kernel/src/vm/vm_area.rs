@@ -203,7 +203,8 @@ impl VmArea {
     ///
     /// `start_va` is the virtual address from which the file is mapped, not the starting
     /// virtual address of the VMA. `offset` is the offset in the file from which the
-    /// mapping starts.
+    /// mapping starts. `len` is the length of the region to be mapped in the file, not
+    /// the length of the VMA.
     ///
     /// `flags` needs to have `RWX` bits set properly; other bits must be zero.
     pub fn new_file_backed(
@@ -213,6 +214,7 @@ impl VmArea {
         pte_flags: PteFlags,
         file: Arc<dyn File>,
         offset: usize,
+        len: usize,
     ) -> Self {
         Self {
             start: start_va.round_down(),
@@ -224,6 +226,7 @@ impl VmArea {
             map_type: TypedArea::FileBacked(FileBackedArea::new(
                 file,
                 offset / PAGE_SIZE * PAGE_SIZE,
+                len,
             )),
             handler: Some(FileBackedArea::fault_handler),
         }
@@ -542,6 +545,7 @@ impl OffsetArea {
 /// `start_va` and after `VmArea::start` is not mapped. The region after
 /// `start_va + memory.len()` and before `VmArea::end` is filled with zeros, which is
 /// like the `.bss` section in an executable file.
+#[deprecated]
 #[derive(Clone)]
 pub struct MemoryBackedArea {
     /// The memory backing store.
@@ -656,28 +660,39 @@ pub struct FileBackedArea {
     ///
     /// This must be page-aligned.
     offset: usize,
+    /// The length of the mapped region in the file.
+    ///
+    /// This is not the same as the length of the VMA (`area.end - area.start`).
+    /// The length of VMA can be larger than this length; the region after this
+    /// length is filled with zeros.
+    len: usize,
 }
 
 impl FileBackedArea {
     /// Creates a new file-backed VMA.
-    pub fn new(file: Arc<dyn File>, offset: usize) -> Self {
-        Self { file, offset }
+    ///
+    /// `file` is the file backing store.
+    /// `offset` is the starting offset in the file.
+    /// `len` is the length of the mapped region in the file.
+    pub fn new(file: Arc<dyn File>, offset: usize, len: usize) -> Self {
+        Self { file, offset, len }
     }
 
     /// Handles a page fault.
     pub fn fault_handler(area: &mut VmArea, info: PageFaultInfo) -> SysResult<()> {
-        log::warn!(
-            "FileBackedArea::fault_handler: {:#x}",
-            info.fault_addr.to_usize()
-        );
-        let &FileBackedArea { ref file, offset } = match &area.map_type {
+        let &FileBackedArea {
+            ref file,
+            offset,
+            len,
+        } = match &area.map_type {
             TypedArea::FileBacked(file_backed) => file_backed,
             _ => panic!("FileBackedArea::fault_handler: not a file-backed area"),
         };
         let &mut VmArea {
             start: start_va,
             flags,
-            pte_flags,
+            prot,
+            mut pte_flags,
             ..
         } = area;
         let PageFaultInfo {
@@ -686,42 +701,75 @@ impl FileBackedArea {
             access,
         } = info;
 
-        // // Get the page in the page cache of the file.
-        // let file_offset = offset + fault_addr.to_usize() - start_va.to_usize();
-        // let file_offset_aligned = file_offset / PAGE_SIZE * PAGE_SIZE;
-        // let page_in_cache = match file.inode().page_cache().get_page(file_offset_aligned) {
-        //     Some(page) => page,
-        //     None => {
-        //         // The page is not in the page cache, so we need to read it from the file
-        //         // and insert it into the page cache.
-        //         // Note: Consider extracting this to a function of `PageCache` or `Inode`.
-        //         let page = Arc::new(Page::build()?);
-        //         file.base_read(page.as_mut_slice(), file_offset_aligned)?;
-        //         file.inode()
-        //             .page_cache()
-        //             .insert_page(file_offset_aligned, Arc::clone(&page));
-        //         page
-        //     }
-        // };
+        // Starting address of the faulting page.
+        let page_addr = fault_addr.round_down().to_usize();
+        // Offset from the start of the VMA to the faulting page.
+        let area_offset = page_addr - start_va.to_usize();
+        // Length of the file region, calculating from the position of the first page
+        // which contains the starting position of the file region.
+        let file_area_len = offset % PAGE_SIZE + len;
+        if area_offset >= file_area_len {
+            // The whole page is after the file region, so we allocate a new page
+            // and fill it with zeros. This is inherently private to this process,
+            // so we need not worry about copy-on-write.
+            let page = Page::build()?;
+            page.as_mut_slice().fill(0);
+            page_table.map_page_to(fault_addr.page_number(), page.ppn(), pte_flags)?;
+            area.pages.insert(fault_addr.page_number(), Arc::new(page));
+            return Ok(());
+        }
 
-        // // The page to be mapped to the faulting address.
-        // let page = if flags.contains(VmaFlags::PRIVATE) && access.contains(MemPerm::W) {
-        //     // Write a private VMA: Mannually do copy-on-write.
-        //     let page = Page::build()?;
-        //     page.copy_from_page(&page_in_cache);
-        //     Arc::new(page)
-        // } else {
-        //     // Other conditions: Just use the page in the page cache.
-        //     page_in_cache
-        // };
-        let page = Arc::new(Page::build()?);
-        let file_offset = offset + fault_addr.to_usize() - start_va.to_usize();
-        let file_offset_aligned = file_offset / PAGE_SIZE * PAGE_SIZE;
-        file.base_read(page.as_mut_slice(), file_offset_aligned)?;
+        // Offset from the start of the file to the start of the page to be mapped.
+        let file_offset = offset / PAGE_SIZE * PAGE_SIZE + area_offset;
+        let cached_page = match file.inode().page_cache().get_page(file_offset) {
+            Some(page) => page,
+            None => {
+                // The page is not in the page cache, so we need to read it from the file
+                // and insert it into the page cache.
+                // Note: Consider extracting this to a function of `PageCache` or `Inode`.
+                let page = Arc::new(Page::build()?);
+                file.base_read(page.as_mut_slice(), file_offset)?;
+                file.inode()
+                    .page_cache()
+                    .insert_page(file_offset, Arc::clone(&page));
+                page
+            }
+        };
+
+        if area_offset + PAGE_SIZE > file_area_len {
+            // Part of the page is in the file region, and part of the page is not.
+            // Similar to the case where the whole page is not in the file region,
+            // we allocate a new page and copy the first part of the page from the
+            // file region, and fill the rest with zeros. This is also private to
+            // this process.
+            let page = Page::build()?;
+            let copy_len = file_area_len - area_offset;
+            let page_copy_from = &cached_page.as_slice()[..copy_len];
+            let (page_copy_to, page_fill_zero) = page.as_mut_slice().split_at_mut(copy_len);
+            page_copy_to.copy_from_slice(page_copy_from);
+            page_fill_zero.fill(0);
+            page_table.map_page_to(fault_addr.page_number(), page.ppn(), pte_flags)?;
+            area.pages.insert(fault_addr.page_number(), Arc::new(page));
+            return Ok(());
+        }
+
+        // The page to be mapped to the faulting address.
+        let page = if flags.contains(VmaFlags::PRIVATE) && access == MemPerm::W {
+            // Write to a private VMA: Mannually do copy-on-write.
+            let page = Page::build()?;
+            page.copy_from_page(&cached_page);
+            Arc::new(page)
+        } else {
+            // Other conditions: Just use the page in the page cache.
+            cached_page
+        };
+        if flags.contains(VmaFlags::PRIVATE) && prot.contains(MemPerm::W) && access != MemPerm::W {
+            // Read from or execute a private, writable VMA: Set the page as copy-on-write.
+            pte_flags = pte_flags.difference(PteFlags::W);
+        }
 
         page_table.map_page_to(fault_addr.page_number(), page.ppn(), pte_flags)?;
         area.pages.insert(fault_addr.page_number(), page);
-
         Ok(())
     }
 }

@@ -70,7 +70,7 @@ pub fn sys_execve(path: usize, _argv: usize, _envp: usize) -> SyscallResult {
 
     let read_c_str = |addr| {
         let mut addr_space_lock = task.addr_space_mut().lock();
-        let mut data_ptr = UserReadPtr::<u8>::new(addr, &mut *addr_space_lock);
+        let mut data_ptr = UserReadPtr::<u8>::new(addr, &mut addr_space_lock);
         match data_ptr.read_c_string(30) {
             Ok(data) => match core::str::from_utf8(&data) {
                 Ok(utf8_str) => utf8_str.to_string(),
@@ -85,15 +85,11 @@ pub fn sys_execve(path: usize, _argv: usize, _envp: usize) -> SyscallResult {
     log::info!("[sys_execve]: path: {path:?}",);
     let dentry = {
         let path = Path::new(sys_root_dentry(), sys_root_dentry(), &path);
-        path.walk().expect("sys_openat: fail to find dentry")
+        path.walk()?
     };
 
     let file = <dyn File>::open(dentry)?;
-
-    let elf_data = Box::new(file.read_all()?);
-    let elf_data_u8: &'static [u8] = Box::leak(elf_data);
-
     let name = format!("{path:?}");
-    Task::spawn_from_elf(elf_data_u8, &name);
+    Task::spawn_from_elf(file, &name);
     Ok(0)
 }
