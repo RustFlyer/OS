@@ -51,7 +51,6 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
     }
 
     let inode = dentry.inode().unwrap();
-    inode.set_inotype(InodeType::from(mode));
     if flags.contains(OpenFlags::O_DIRECTORY) && !inode.inotype().is_dir() {
         return Err(SysError::ENOTDIR);
     }

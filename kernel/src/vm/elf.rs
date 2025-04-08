@@ -5,7 +5,7 @@ use elf::{self, ElfBytes, endian::LittleEndian, file::FileHeader};
 use mm::address::VirtAddr;
 use systype::{SysError, SysResult};
 
-use super::{addr_space::AddrSpace, pte::PteFlags, vm_area::VmArea};
+use super::{addr_space::AddrSpace, pte::PteFlags, vm_area::{VmArea, VmaFlags}};
 
 impl AddrSpace {
     /// Loads an ELF executable into given address space.
@@ -63,7 +63,7 @@ impl AddrSpace {
                 pte_flags |= PteFlags::R;
             }
 
-            let area = VmArea::new_memory_backed(va_start, va_end, pte_flags, memory_slice);
+            let area = VmArea::new_memory_backed(va_start, va_end, VmaFlags::PRIVATE, pte_flags, memory_slice);
             self.add_area(area)?;
         }
 

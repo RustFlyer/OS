@@ -61,7 +61,7 @@ pub async fn user_exception_handler(task: &Task, e: Exception, stval: usize) {
             let access = match e {
                 Exception::InstructionPageFault => MemPerm::X,
                 Exception::LoadPageFault => MemPerm::R,
-                Exception::StorePageFault => MemPerm::W | MemPerm::R,
+                Exception::StorePageFault => MemPerm::W,
                 _ => unreachable!(),
             };
             let fault_addr = VirtAddr::new(stval);

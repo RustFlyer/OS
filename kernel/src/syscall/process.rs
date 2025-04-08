@@ -88,15 +88,10 @@ pub fn sys_execve(path: usize, _argv: usize, _envp: usize) -> SyscallResult {
         path.walk().expect("sys_openat: fail to find dentry")
     };
 
-    let inode = dentry.inode().unwrap();
-    inode.set_inotype(InodeType::from(InodeMode::REG));
-
     let file = <dyn File>::open(dentry)?;
 
     let elf_data = Box::new(file.read_all()?);
     let elf_data_u8: &'static [u8] = Box::leak(elf_data);
-
-    debug!("add len:{}", elf_data_u8.len());
 
     let name = format!("{path:?}");
     Task::spawn_from_elf(elf_data_u8, &name);
