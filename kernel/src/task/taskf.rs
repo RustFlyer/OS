@@ -1,6 +1,7 @@
 use alloc::collections::btree_map::BTreeMap;
 use alloc::string::ToString;
 use alloc::sync::Arc;
+use vfs::file::File;
 use core::cell::SyncUnsafeCell;
 use core::time::Duration;
 
@@ -49,9 +50,9 @@ impl Task {
     }
 
     /// Spawns from Elf
-    pub fn spawn_from_elf(elf_data: &'static [u8], name: &str) {
+    pub fn spawn_from_elf(elf_file: Arc<dyn File>, name: &str) {
         let mut addrspace = AddrSpace::build_user().unwrap();
-        let entry_point = addrspace.load_elf(elf_data).unwrap();
+        let entry_point = addrspace.load_elf(elf_file).unwrap();
         let stack = addrspace.map_stack().unwrap();
         addrspace.map_heap().unwrap();
         let task = Arc::new(Task::new(

@@ -1,11 +1,18 @@
 //! Module for loading ELF files.
 
+use alloc::sync::Arc;
+
 use config::mm::{USER_STACK_LOWER, USER_STACK_UPPER};
 use elf::{self, ElfBytes, endian::LittleEndian, file::FileHeader};
 use mm::address::VirtAddr;
 use systype::{SysError, SysResult};
+use vfs::file::File;
 
-use super::{addr_space::AddrSpace, pte::PteFlags, vm_area::VmArea};
+use super::{
+    addr_space::AddrSpace,
+    pte::PteFlags,
+    vm_area::{VmArea, VmaFlags},
+};
 
 impl AddrSpace {
     /// Loads an ELF executable into given address space.
@@ -20,25 +27,30 @@ impl AddrSpace {
     /// requires the whole ELF file to be loaded into memory before calling this function.
     /// This is because we have not implemented the file system yet. In the future, this
     /// function should take a file descriptor as input.
-    pub fn load_elf(&mut self, elf_data: &'static [u8]) -> SysResult<VirtAddr> {
+    pub fn load_elf(&mut self, elf_file: Arc<dyn File>) -> SysResult<VirtAddr> {
+        let elf_data = elf_file.read_all()?;
         let elf =
-            ElfBytes::<LittleEndian>::minimal_parse(elf_data).map_err(|_| SysError::ENOEXEC)?;
+            ElfBytes::<LittleEndian>::minimal_parse(&elf_data).map_err(|_| SysError::ENOEXEC)?;
 
-        // Check if the ELF file is valid.
+        // Do minimal checks on the ELF file header.
         let FileHeader {
             class,
             e_entry,
             e_type,
             ..
         } = elf.ehdr;
-        if class != elf::file::Class::ELF64 || e_type != elf::abi::ET_EXEC {
+        if class != elf::file::Class::ELF64 {
+            return Err(SysError::ENOEXEC);
+        }
+        // Note: Dynamic executables are not actually supported yet.
+        if !(e_type == elf::abi::ET_EXEC || e_type == elf::abi::ET_DYN) {
             return Err(SysError::ENOEXEC);
         }
         if e_entry == 0 {
             return Err(SysError::ENOEXEC);
         }
 
-        // Adds memory-backed VMAs for each loadable segment.
+        // Map VMAs for each loadable segment.
         for segment in elf
             .segments()
             .ok_or(SysError::ENOEXEC)?
@@ -49,7 +61,6 @@ impl AddrSpace {
             let va_end = VirtAddr::new((segment.p_vaddr + segment.p_memsz) as usize);
 
             let offset = segment.p_offset as usize;
-            let memory_slice = &elf_data[offset..offset + segment.p_filesz as usize];
 
             let flags = segment.p_flags;
             let mut pte_flags = PteFlags::empty();
@@ -63,7 +74,15 @@ impl AddrSpace {
                 pte_flags |= PteFlags::R;
             }
 
-            let area = VmArea::new_memory_backed(va_start, va_end, pte_flags, memory_slice);
+            let area = VmArea::new_file_backed(
+                va_start,
+                va_end,
+                VmaFlags::PRIVATE,
+                pte_flags,
+                Arc::clone(&elf_file),
+                offset,
+                segment.p_filesz as usize,
+            );
             self.add_area(area)?;
         }
 

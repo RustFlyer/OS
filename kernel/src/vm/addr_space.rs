@@ -25,8 +25,13 @@ use config::mm::{USER_END, USER_START};
 use mm::address::VirtAddr;
 use systype::{SysError, SysResult};
 
+use crate::vm::vm_area::VmaFlags;
+
 use super::{
-    mem_perm::MemPerm, page_table::{self, PageTable}, pte::PteFlags, vm_area::{PageFaultInfo, VmArea}
+    mem_perm::MemPerm,
+    page_table::{self, PageTable},
+    pte::PteFlags,
+    vm_area::{PageFaultInfo, VmArea},
 };
 
 /// A virtual address space.
@@ -340,18 +345,21 @@ pub fn test_find_vacant_memory() {
     let area1 = VmArea::new_memory_backed(
         VirtAddr::new(0x1000),
         VirtAddr::new(0x3000),
+        VmaFlags::PRIVATE,
         PteFlags::R | PteFlags::W,
         MEMORY_1,
     );
     let area2 = VmArea::new_memory_backed(
         VirtAddr::new(0x4000),
         VirtAddr::new(0x7000),
+        VmaFlags::PRIVATE,
         PteFlags::R | PteFlags::W,
         MEMORY_2,
     );
     let area3 = VmArea::new_memory_backed(
         VirtAddr::new(0xa000),
         VirtAddr::new(0xe000),
+        VmaFlags::PRIVATE,
         PteFlags::R | PteFlags::W,
         MEMORY_3,
     );
@@ -375,6 +383,7 @@ pub fn test_find_vacant_memory() {
         let area4 = VmArea::new_memory_backed(
             addr,
             VirtAddr::new(addr.to_usize() + 0x2000),
+            VmaFlags::PRIVATE,
             PteFlags::R | PteFlags::W,
             MEMORY_4,
         );
@@ -393,12 +402,14 @@ pub fn test_clone_cow() {
     let area1 = VmArea::new_memory_backed(
         VirtAddr::new(0x1000),
         VirtAddr::new(0x3000),
+        VmaFlags::PRIVATE,
         PteFlags::R | PteFlags::W,
         MEMORY_1,
     );
     let area2 = VmArea::new_memory_backed(
         VirtAddr::new(0x4000),
         VirtAddr::new(0x7000),
+        VmaFlags::PRIVATE,
         PteFlags::R | PteFlags::W,
         MEMORY_2,
     );
