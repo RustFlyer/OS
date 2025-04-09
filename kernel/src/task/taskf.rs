@@ -2,13 +2,14 @@ use alloc::collections::btree_map::BTreeMap;
 use alloc::string::String;
 use alloc::string::ToString;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 use config::vfs::AtFd;
 use core::cell::SyncUnsafeCell;
 use core::time::Duration;
-use elf::abi::ELFCLASSNONE;
 use osfs::sys_root_dentry;
 use systype::SysResult;
 use vfs::dentry::Dentry;
+use vfs::file::File;
 use vfs::path::Path;
 
 use riscv::asm::sfence_vma_all;
@@ -55,16 +56,42 @@ impl Task {
         }
     }
 
-    /// Spawns from Elf
-    pub fn spawn_from_elf(elf_data: &'static [u8], name: &str) {
+    pub fn execve(
+        &self,
+        elf_file: Arc<dyn File>,
+        argv: Vec<String>,
+        envp: Vec<String>,
+        name: &str,
+    ) {
         let mut addrspace = AddrSpace::build_user().unwrap();
-        let entry_point = addrspace.load_elf(elf_data).unwrap();
+        let entry_point = addrspace.load_elf(elf_file.clone()).unwrap();
+        let stack = addrspace.map_stack().unwrap();
+        addrspace.map_heap().unwrap();
+
+        *self.addr_space_mut().lock() = addrspace;
+
+        let argc = argv.len();
+        self.trap_context_mut()
+            .init_user(stack.to_usize(), entry_point.to_usize(), argc, 0, 0);
+
+        *self.elf_mut() = elf_file;
+        *self.args_mut() = argv.clone();
+
+        self.with_mut_fdtable(|table| table.close());
+    }
+
+    /// Spawns from Elf
+    pub fn spawn_from_elf(elf_file: Arc<dyn File>, name: &str) {
+        let mut addrspace = AddrSpace::build_user().unwrap();
+        let entry_point = addrspace.load_elf(elf_file.clone()).unwrap();
         let stack = addrspace.map_stack().unwrap();
         addrspace.map_heap().unwrap();
         let task = Arc::new(Task::new(
             entry_point.to_usize(),
             stack.to_usize(),
             addrspace,
+            elf_file,
+            Vec::new(),
             name.to_string(),
         ));
 
@@ -86,8 +113,8 @@ impl Task {
 
     /// fork a application
     ///
-    /// - todo1: Memory Copy / Cow
-    /// - todo2: Control of relevant Thread Group
+    /// - todo1: Thread Control
+    /// - todo2: Sig Clone?
     pub fn fork(self: &Arc<Self>, cloneflags: CloneFlags) -> Arc<Self> {
         let tid = tid_alloc();
         let trap_context = SyncUnsafeCell::new(*self.trap_context_mut());
@@ -104,6 +131,9 @@ impl Task {
 
         let fd_table = SpinNoIrqLock::new(FdTable::new());
         let cwd = new_share_mutex(self.cwd_mut());
+
+        let elf = SyncUnsafeCell::new((*self.elf_mut()).clone());
+        let args = SyncUnsafeCell::new((*self.args_mut()).clone());
 
         if cloneflags.contains(CloneFlags::THREAD) {
             is_process = false;
@@ -148,6 +178,8 @@ impl Task {
             SpinNoIrqLock::new(0),
             fd_table,
             cwd,
+            elf,
+            args,
             name,
         ));
 

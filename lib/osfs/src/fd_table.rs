@@ -103,6 +103,16 @@ impl FdTable {
     pub fn get_file(&self, fd: Fd) -> SysResult<Arc<dyn File>> {
         Ok(self.get(fd)?.file())
     }
+
+    pub fn close(&mut self) {
+        for slot in self.table.iter_mut() {
+            if let Some(fd_info) = slot {
+                if fd_info.flags().contains(OpenFlags::O_CLOEXEC) {
+                    *slot = None;
+                }
+            }
+        }
+    }
 }
 
 impl Debug for FdInfo {

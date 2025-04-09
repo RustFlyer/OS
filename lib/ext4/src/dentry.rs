@@ -79,14 +79,18 @@ impl Dentry for ExtDentry {
         let c_path = CString::new(path.clone()).unwrap();
         if unsafe { ext4_inode_exist(c_path.as_ptr(), InodeTypes::EXT4_DE_DIR as i32) == 0 } {
             let new_file = ExtDir::open(&path).map_err(SysError::from_i32)?;
-            dentry.set_inode(ExtDirInode::new(superblock, new_file));
+            let inode = ExtDirInode::new(superblock, new_file);
+            inode.set_inotype(InodeType::Dir);
+            dentry.set_inode(inode);
             Ok(())
         } else if unsafe {
             ext4_inode_exist(c_path.as_ptr(), InodeTypes::EXT4_DE_REG_FILE as i32) == 0
         } {
             let new_file =
                 ExtFile::open(&path, OpenFlags::empty().bits()).map_err(SysError::from_i32)?;
-            dentry.set_inode(ExtFileInode::new(superblock, new_file));
+            let inode = ExtFileInode::new(superblock, new_file);
+            inode.set_inotype(InodeType::File);
+            dentry.set_inode(inode);
             Ok(())
         } else if unsafe {
             ext4_inode_exist(c_path.as_ptr(), InodeTypes::EXT4_DE_SYMLINK as i32) == 0
@@ -106,8 +110,9 @@ impl Dentry for ExtDentry {
             };
             target.truncate(bytes_read + 1);
             let target = unsafe { CString::from_vec_with_nul_unchecked(target) };
-            let sub_inode = ExtLinkInode::new(target.to_str().unwrap(), superblock);
-            dentry.set_inode(sub_inode);
+            let inode = ExtLinkInode::new(target.to_str().unwrap(), superblock);
+            inode.set_inotype(InodeType::SymLink);
+            dentry.set_inode(inode);
             Ok(())
         } else {
             Err(SysError::ENOENT)

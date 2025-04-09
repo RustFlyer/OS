@@ -45,7 +45,7 @@ pub trait File: Send + Sync + DowncastSync {
 
     /// Reads data from this file from the given position into the provided buffer.
     /// If the range of the position to read is partly or completely beyond the end
-    /// of the file, the part that is beyond it is filled with zeroes.
+    /// of the file, the part that is beyond it is filled with zeros.
     ///
     /// This function should be implemented by an underlying file system for every file
     /// type it supports to read from. For example, a file system that supports regular

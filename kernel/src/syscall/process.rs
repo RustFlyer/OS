@@ -7,7 +7,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use config::inode::{InodeMode, InodeType};
 use config::process::CloneFlags;
-use driver::println;
+use driver::{print, println};
 use log::debug;
 use osfs::sys_root_dentry;
 use systype::{SysError, SyscallResult};
@@ -67,16 +67,12 @@ pub fn sys_clone(
     Ok(new_tid)
 }
 
-pub fn sys_execve(path: usize, _argv: usize, _envp: usize) -> SyscallResult {
+pub fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult {
     let task = current_task();
-
-    debug!("path: {:#x},argv: {:#x},envp: {:#x}", path, _argv, _envp);
-    debug!("path: {:#x},argv: {:#x},envp: {:#x}", path, _argv, _envp);
-    debug!("path: {:#x},argv: {:#x},envp: {:#x}", path, _argv, _envp);
 
     let read_c_str = |addr| {
         let mut addr_space_lock = task.addr_space_mut().lock();
-        let mut data_ptr = UserReadPtr::<u8>::new(addr, &mut *addr_space_lock);
+        let mut data_ptr = UserReadPtr::<u8>::new(addr, &mut addr_space_lock);
         match data_ptr.read_c_string(30) {
             Ok(data) => match core::str::from_utf8(&data) {
                 Ok(utf8_str) => utf8_str.to_string(),
@@ -87,55 +83,37 @@ pub fn sys_execve(path: usize, _argv: usize, _envp: usize) -> SyscallResult {
     };
 
     let read_c_ptrs = |addr| {
+        let mut ret = Vec::new();
         let mut addr_space_lock = task.addr_space_mut().lock();
-        let mut data_ptr = UserReadPtr::<*const u8>::new(addr, &mut *addr_space_lock);
-        // debug!("data_ptr: {:?}, {:?}", data_ptr, data_ptr);
-        match unsafe { data_ptr.read_ptr_array(2) } {
-            Ok(ptrs) => {
-                let mut c_vec: Vec<String> = Vec::new();
-                for ptr in ptrs {
-                    debug!("ptr: {:?}, {:?}", ptr, ptr.addr());
-                    // let mut p = UserReadPtr::<u8>::new(ptr, &mut addr_space_lock);
-                    // let pstr = match p.read_c_string(30) {
-                    //     Ok(p_data) => match core::str::from_utf8(&p_data) {
-                    //         Ok(utf8_str) => utf8_str.to_string(),
-                    //         Err(_) => "".to_string(),
-                    //     },
-                    //     Err(_) => "".to_string(),
-                    // };
-                    c_vec.push("".to_string());
+        let mut data_ptr = UserReadPtr::<usize>::new(addr, &mut *addr_space_lock);
+        if let Ok(ptrs) = data_ptr.read_ptr_array(20) {
+            for ptr in ptrs {
+                let mut str_ptr = UserReadPtr::<u8>::new(ptr, &mut *addr_space_lock);
+                let r = str_ptr.read_c_string(20);
+                if let Ok(y) = r {
+                    let tstr = core::str::from_utf8(&y).unwrap();
+                    ret.push(tstr.to_string());
                 }
-                return c_vec;
             }
-            Err(_) => unimplemented!(),
         }
+        ret
     };
 
     let path = read_c_str(path);
-    // let _argv = read_c_ptrs(_argv);
-    // let _envp = read_c_ptrs(_envp);
+    let argv = read_c_ptrs(argv);
+    let envp = read_c_ptrs(envp);
 
-    // for t in _argv {
-    //     println!("argv: {}", t);
-    // }
-
+    println!("argv: {:?}", argv);
+    println!("envp: {:?}", envp);
     log::info!("[sys_execve]: path: {path:?}",);
     let dentry = {
         let path = Path::new(sys_root_dentry(), sys_root_dentry(), &path);
-        path.walk().expect("sys_openat: fail to find dentry")
+        path.walk()?
     };
 
-    let inode = dentry.inode().unwrap();
-    inode.set_inotype(InodeType::from(InodeMode::REG));
-
     let file = <dyn File>::open(dentry)?;
-
-    let elf_data = Box::new(file.read_all()?);
-    let elf_data_u8: &'static [u8] = Box::leak(elf_data);
-
-    debug!("add len:{}", elf_data_u8.len());
-
     let name = format!("{path:?}");
-    Task::spawn_from_elf(elf_data_u8, &name);
+    task.execve(file, argv, envp, &name);
+    // Task::spawn_from_elf(file, &name);
     Ok(0)
 }

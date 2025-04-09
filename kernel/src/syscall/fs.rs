@@ -40,11 +40,6 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
     };
 
     log::debug!("path name = {}", pathname);
-    // let dentry = {
-    //     let path = Path::new(sys_root_dentry(), sys_root_dentry(), &pathname);
-    //     path.walk().expect("sys_openat: fail to find dentry")
-    // };
-
     let dentry = task.resolve_path(AtFd::from(dirfd), pathname)?;
 
     log::debug!("flags = {:?}", flags);
@@ -54,7 +49,6 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
     }
 
     let inode = dentry.inode().unwrap();
-    inode.set_inotype(InodeType::from(mode));
     if flags.contains(OpenFlags::O_DIRECTORY) && !inode.inotype().is_dir() {
         return Err(SysError::ENOTDIR);
     }
@@ -70,7 +64,6 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
 }
 
 pub fn sys_write(fd: usize, addr: usize, len: usize) -> SyscallResult {
-    // log::info!("try to write!");
     let task = current_task();
     let mut addr_space_lock = task.addr_space_mut().lock();
     let mut data_ptr = UserReadPtr::<u8>::new(addr, &mut *addr_space_lock);
@@ -93,17 +86,12 @@ pub fn sys_read(fd: usize, buf: usize, count: usize) -> SyscallResult {
     let task = current_task();
     let mut addrspace = task.addr_space_mut().lock();
 
-    // log::debug!("begin to sys read");
-
     let ret = if fd == 0 {
-        // info!("begin to getchar");
         let mut buf = UserWritePtr::<u8>::new(buf, &mut addrspace);
         let data = getchar();
         unsafe {
             buf.write(data)?;
         };
-        // info!("finish getchar {}", data);
-        // info!("finish getchar {} buf: {:?}, count: {}", data, buf, count);
         Ok(1)
     } else {
         let mut buf = UserWritePtr::<u8>::new(buf, &mut addrspace);
@@ -111,8 +99,6 @@ pub fn sys_read(fd: usize, buf: usize, count: usize) -> SyscallResult {
         let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
         file.read(buf_ptr)
     };
-
-    // info!("sys read => {:?}", buf_ptr);
 
     ret
 }

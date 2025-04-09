@@ -3,7 +3,7 @@
 
 extern crate user_lib;
 
-use user_lib::{console::getchar, execve, print, println, waitpid};
+use user_lib::{console::getchar, execve, fork, print, println, waitpid};
 
 #[unsafe(no_mangle)]
 fn main() {
@@ -27,6 +27,8 @@ fn main() {
         let apppath = core::str::from_utf8(&buf).unwrap();
         println!("app path is [{}]", apppath);
 
-        execve(apppath, &[], &[]);
+        if fork() == 0 {
+            execve(apppath, &[], &[]);
+        }
     }
 }

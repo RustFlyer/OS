@@ -298,6 +298,47 @@ where
     }
 }
 
+impl<A> UserPtr<'_, usize, A>
+where
+    A: ReadAccess,
+{
+    /// Reads an array of pointers as usize, null-terminated, from the memory location.
+    ///
+    /// This function will check if the memory location is accessible and read
+    /// the pointers. It will read pointers until a null pointer(0 as usize) is encountered
+    /// or the maximum length `len` is reached.
+    ///
+    /// `len` is the maximum number of pointers to read.
+    ///
+    /// # Error
+    /// Returns an `EFAULT` error if the memory location is not accessible.
+    ///
+    /// # Safety
+    /// This function is safe, but it does not grantee that the pointers it reads
+    /// are valid. The responsibility of checking the validity of the pointers lies
+    /// with the caller.
+    pub fn read_ptr_array(&mut self, len: usize) -> SysResult<Vec<usize>> {
+        let mut vec: Vec<usize> = Vec::new();
+        let mut push_and_check = |ptr: usize| {
+            if ptr == 0 {
+                return ControlFlow::Break(());
+            }
+            vec.push(ptr);
+            ControlFlow::Continue(())
+        };
+        unsafe {
+            check_user_access_with(
+                self.addr_space,
+                self.ptr as usize,
+                len * size_of::<usize>(),
+                MemPerm::R,
+                &mut push_and_check,
+            )?;
+        }
+        Ok(vec)
+    }
+}
+
 impl<A> UserPtr<'_, u8, A>
 where
     A: ReadAccess,

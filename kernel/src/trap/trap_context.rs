@@ -99,7 +99,8 @@ impl TrapContext {
         self.user_reg[11] = argv;
         self.user_reg[12] = envp;
         self.sepc = sepc;
-        self.sstatus = sstatus::read();
+
+        // self.sstatus = sstatus::read();
     }
 
     pub fn syscall_no(&self) -> usize {

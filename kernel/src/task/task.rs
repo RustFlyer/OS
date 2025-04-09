@@ -2,10 +2,11 @@ use alloc::{
     collections::BTreeMap,
     string::String,
     sync::{Arc, Weak},
+    vec::Vec,
 };
 use core::cell::SyncUnsafeCell;
 use core::task::Waker;
-use vfs::dentry::Dentry;
+use vfs::{dentry::Dentry, file::File};
 
 use mutex::{ShareMutex, SpinNoIrqLock, new_share_mutex};
 use osfs::{fd_table::FdTable, sys_root_dentry};
@@ -66,12 +67,22 @@ pub struct Task {
     fd_table: SpinNoIrqLock<FdTable>,
     cwd: ShareMutex<Arc<dyn Dentry>>,
 
+    elf: SyncUnsafeCell<Arc<dyn File>>,
+    args: SyncUnsafeCell<Vec<String>>,
+
     name: String,
 }
 
 /// This Impl is mainly for getting and setting the property of Task
 impl Task {
-    pub fn new(entry: usize, sp: usize, addrspace: AddrSpace, name: String) -> Self {
+    pub fn new(
+        entry: usize,
+        sp: usize,
+        addrspace: AddrSpace,
+        elf_file: Arc<dyn File>,
+        args: Vec<String>,
+        name: String,
+    ) -> Self {
         let tid = tid_alloc();
         let pgid = tid.0;
         Task {
@@ -90,6 +101,8 @@ impl Task {
             exit_code: SpinNoIrqLock::new(0),
             fd_table: SpinNoIrqLock::new(FdTable::new()),
             cwd: new_share_mutex(sys_root_dentry()),
+            elf: SyncUnsafeCell::new(elf_file),
+            args: SyncUnsafeCell::new(args),
             name,
         }
     }
@@ -116,6 +129,9 @@ impl Task {
         fd_table: SpinNoIrqLock<FdTable>,
         cwd: ShareMutex<Arc<dyn Dentry>>,
 
+        elf: SyncUnsafeCell<Arc<dyn File>>,
+        args: SyncUnsafeCell<Vec<String>>,
+
         name: String,
     ) -> Self {
         Task {
@@ -134,6 +150,8 @@ impl Task {
             exit_code,
             fd_table,
             cwd,
+            elf,
+            args,
             name,
         }
     }
@@ -175,6 +193,16 @@ impl Task {
     #[allow(clippy::mut_from_ref)]
     pub fn waker_mut(&self) -> &mut Option<Waker> {
         unsafe { &mut *self.waker.get() }
+    }
+
+    #[allow(clippy::mut_from_ref)]
+    pub fn elf_mut(&self) -> &mut Arc<dyn File> {
+        unsafe { &mut *self.elf.get() }
+    }
+
+    #[allow(clippy::mut_from_ref)]
+    pub fn args_mut(&self) -> &mut Vec<String> {
+        unsafe { &mut *self.args.get() }
     }
 
     pub fn addr_space_mut(&self) -> &ShareMutex<AddrSpace> {

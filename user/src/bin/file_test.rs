@@ -3,7 +3,10 @@
 
 extern crate user_lib;
 
-use core::{ffi::CStr, ptr};
+use core::{
+    ffi::CStr,
+    ptr::{self, null},
+};
 
 use config::{
     inode::InodeMode,
@@ -38,15 +41,20 @@ fn main() {
     }
 
     {
-        let fd2: isize = open(0, "add\0", OpenFlags::O_RDWR, InodeMode::REG);
+        let fd2: isize = open(
+            AT_FDCWD as usize,
+            "add\0",
+            OpenFlags::O_RDWR,
+            InodeMode::REG,
+        );
         let mut read_buf: [u8; 1024] = [0; 1024];
         read(fd2 as usize, &mut read_buf);
         // println!("file test: read tbuf [{:?}]", read_buf);
         // let utf2str = core::str::from_utf8(&read_buf).unwrap();
         // println!("file test: read text [{}]", utf2str);
         // lseek(fd2 as usize, 0, 0);
-        let argvs = ["Sun".as_ptr(), "Star".as_ptr()];
-        let envps = ["Loop".as_ptr(), "Func".as_ptr()];
+        let argvs = ["Sun\0".as_ptr(), "Star\0".as_ptr(), null()];
+        let envps = ["Loop\0".as_ptr(), "Func\0".as_ptr(), null()];
         execve("add\0", &argvs, &envps);
     }
 
