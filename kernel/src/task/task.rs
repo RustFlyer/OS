@@ -5,9 +5,10 @@ use alloc::{
 };
 use core::cell::SyncUnsafeCell;
 use core::task::Waker;
+use vfs::dentry::Dentry;
 
 use mutex::{ShareMutex, SpinNoIrqLock, new_share_mutex};
-use osfs::fd_table::FdTable;
+use osfs::{fd_table::FdTable, sys_root_dentry};
 use time::TaskTimeStat;
 
 use super::{
@@ -43,7 +44,6 @@ pub enum TaskState {
     UnInterruptable,
 }
 
-#[derive(Debug)]
 pub struct Task {
     tid: TidHandle,
     process: Option<Weak<Task>>,
@@ -64,6 +64,7 @@ pub struct Task {
     exit_code: SpinNoIrqLock<i32>,
 
     fd_table: SpinNoIrqLock<FdTable>,
+    cwd: ShareMutex<Arc<dyn Dentry>>,
 
     name: String,
 }
@@ -88,6 +89,7 @@ impl Task {
             pgid: new_share_mutex(pgid),
             exit_code: SpinNoIrqLock::new(0),
             fd_table: SpinNoIrqLock::new(FdTable::new()),
+            cwd: new_share_mutex(sys_root_dentry()),
             name,
         }
     }
@@ -112,6 +114,7 @@ impl Task {
         exit_code: SpinNoIrqLock<i32>,
 
         fd_table: SpinNoIrqLock<FdTable>,
+        cwd: ShareMutex<Arc<dyn Dentry>>,
 
         name: String,
     ) -> Self {
@@ -130,6 +133,7 @@ impl Task {
             pgid,
             exit_code,
             fd_table,
+            cwd,
             name,
         }
     }
@@ -191,6 +195,10 @@ impl Task {
 
     pub fn with_mut_fdtable<T>(&self, f: impl FnOnce(&mut FdTable) -> T) -> T {
         f(&mut self.fd_table.lock())
+    }
+
+    pub fn cwd_mut(&self) -> Arc<dyn Dentry> {
+        self.cwd.lock().clone()
     }
 
     pub fn get_waker(&self) -> Waker {

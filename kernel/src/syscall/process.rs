@@ -2,10 +2,12 @@ use crate::task::{Task, TaskState};
 use crate::vm::user_ptr::UserReadPtr;
 use crate::{processor::current_task, task::future::spawn_user_task};
 use alloc::boxed::Box;
-use alloc::string::ToString;
+use alloc::string::{String, ToString};
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 use config::inode::{InodeMode, InodeType};
 use config::process::CloneFlags;
+use driver::println;
 use log::debug;
 use osfs::sys_root_dentry;
 use systype::{SysError, SyscallResult};
@@ -68,6 +70,10 @@ pub fn sys_clone(
 pub fn sys_execve(path: usize, _argv: usize, _envp: usize) -> SyscallResult {
     let task = current_task();
 
+    debug!("path: {:#x},argv: {:#x},envp: {:#x}", path, _argv, _envp);
+    debug!("path: {:#x},argv: {:#x},envp: {:#x}", path, _argv, _envp);
+    debug!("path: {:#x},argv: {:#x},envp: {:#x}", path, _argv, _envp);
+
     let read_c_str = |addr| {
         let mut addr_space_lock = task.addr_space_mut().lock();
         let mut data_ptr = UserReadPtr::<u8>::new(addr, &mut *addr_space_lock);
@@ -80,7 +86,38 @@ pub fn sys_execve(path: usize, _argv: usize, _envp: usize) -> SyscallResult {
         }
     };
 
+    let read_c_ptrs = |addr| {
+        let mut addr_space_lock = task.addr_space_mut().lock();
+        let mut data_ptr = UserReadPtr::<*const u8>::new(addr, &mut *addr_space_lock);
+        // debug!("data_ptr: {:?}, {:?}", data_ptr, data_ptr);
+        match unsafe { data_ptr.read_ptr_array(2) } {
+            Ok(ptrs) => {
+                let mut c_vec: Vec<String> = Vec::new();
+                for ptr in ptrs {
+                    debug!("ptr: {:?}, {:?}", ptr, ptr.addr());
+                    // let mut p = UserReadPtr::<u8>::new(ptr, &mut addr_space_lock);
+                    // let pstr = match p.read_c_string(30) {
+                    //     Ok(p_data) => match core::str::from_utf8(&p_data) {
+                    //         Ok(utf8_str) => utf8_str.to_string(),
+                    //         Err(_) => "".to_string(),
+                    //     },
+                    //     Err(_) => "".to_string(),
+                    // };
+                    c_vec.push("".to_string());
+                }
+                return c_vec;
+            }
+            Err(_) => unimplemented!(),
+        }
+    };
+
     let path = read_c_str(path);
+    // let _argv = read_c_ptrs(_argv);
+    // let _envp = read_c_ptrs(_envp);
+
+    // for t in _argv {
+    //     println!("argv: {}", t);
+    // }
 
     log::info!("[sys_execve]: path: {path:?}",);
     let dentry = {

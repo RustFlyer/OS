@@ -5,14 +5,17 @@ extern crate user_lib;
 
 use core::{ffi::CStr, ptr};
 
-use config::{inode::InodeMode, vfs::OpenFlags};
+use config::{
+    inode::InodeMode,
+    vfs::{AT_FDCWD, AtFd, OpenFlags},
+};
 use user_lib::{execve, exit, fork, lseek, open, println, read, sleep, write, yield_};
 
 #[unsafe(no_mangle)]
 fn main() {
     {
         let fd: isize = open(
-            0,
+            AT_FDCWD as usize,
             "tes\0",
             OpenFlags::O_CREAT | OpenFlags::O_RDWR,
             InodeMode::REG,
@@ -42,7 +45,9 @@ fn main() {
         // let utf2str = core::str::from_utf8(&read_buf).unwrap();
         // println!("file test: read text [{}]", utf2str);
         // lseek(fd2 as usize, 0, 0);
-        execve("add\0", &[], &[]);
+        let argvs = ["Sun".as_ptr(), "Star".as_ptr()];
+        let envps = ["Loop".as_ptr(), "Func".as_ptr()];
+        execve("add\0", &argvs, &envps);
     }
 
     exit(9)

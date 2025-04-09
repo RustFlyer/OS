@@ -12,7 +12,7 @@ pub struct ThreadGroup(BTreeMap<Tid, Weak<Task>>);
 impl Debug for ThreadGroup {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         for t in self.iter() {
-            write!(f, "thread [{}] id [{}]", t.get_name(), t.tid());
+            let _ = write!(f, "thread [{}] id [{}]", t.get_name(), t.tid());
         }
         Ok(())
     }

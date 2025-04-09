@@ -38,11 +38,11 @@ use config::mm::PAGE_SIZE;
 use mm::address::VirtAddr;
 use systype::{SysError, SysResult};
 
+use super::{addr_space::AddrSpace, mem_perm::MemPerm};
 use crate::{
     processor::current_hart,
     trap::trap_env::{set_kernel_stvec, set_kernel_stvec_user_rw},
 };
-use super::{addr_space::AddrSpace, mem_perm::MemPerm};
 
 /// Smart pointer that can be used to read memory in user address space.
 pub type UserReadPtr<'a, T> = UserPtr<'a, T, ReadMarker>;

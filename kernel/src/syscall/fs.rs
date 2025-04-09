@@ -1,11 +1,12 @@
 use alloc::string::ToString;
 
 use driver::sbi::getchar;
+use log::info;
 use strum::FromRepr;
 
 use config::{
     inode::{InodeMode, InodeType},
-    vfs::{OpenFlags, SeekFrom},
+    vfs::{AtFd, OpenFlags, SeekFrom},
 };
 use mutex::SleepLock;
 use osfs::sys_root_dentry;
@@ -39,10 +40,12 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
     };
 
     log::debug!("path name = {}", pathname);
-    let dentry = {
-        let path = Path::new(sys_root_dentry(), sys_root_dentry(), &pathname);
-        path.walk().expect("sys_openat: fail to find dentry")
-    };
+    // let dentry = {
+    //     let path = Path::new(sys_root_dentry(), sys_root_dentry(), &pathname);
+    //     path.walk().expect("sys_openat: fail to find dentry")
+    // };
+
+    let dentry = task.resolve_path(AtFd::from(dirfd), pathname)?;
 
     log::debug!("flags = {:?}", flags);
     if flags.contains(OpenFlags::O_CREAT) {

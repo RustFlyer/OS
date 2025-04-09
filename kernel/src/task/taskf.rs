@@ -1,8 +1,15 @@
 use alloc::collections::btree_map::BTreeMap;
+use alloc::string::String;
 use alloc::string::ToString;
 use alloc::sync::Arc;
+use config::vfs::AtFd;
 use core::cell::SyncUnsafeCell;
 use core::time::Duration;
+use elf::abi::ELFCLASSNONE;
+use osfs::sys_root_dentry;
+use systype::SysResult;
+use vfs::dentry::Dentry;
+use vfs::path::Path;
 
 use riscv::asm::sfence_vma_all;
 
@@ -96,6 +103,7 @@ impl Task {
         let pgid;
 
         let fd_table = SpinNoIrqLock::new(FdTable::new());
+        let cwd = new_share_mutex(self.cwd_mut());
 
         if cloneflags.contains(CloneFlags::THREAD) {
             is_process = false;
@@ -110,7 +118,6 @@ impl Task {
             threadgroup = new_share_mutex(ThreadGroup::new());
             parent = new_share_mutex(Some(Arc::downgrade(self)));
             children = new_share_mutex(BTreeMap::new());
-
             pgid = new_share_mutex(self.get_pgid());
         }
 
@@ -120,9 +127,7 @@ impl Task {
         } else {
             let cow_address_space = self.addr_space_mut().lock().clone_cow().unwrap();
             addr_space = Arc::new(SpinNoIrqLock::new(cow_address_space));
-            unsafe {
-                sfence_vma_all();
-            }
+            sfence_vma_all();
         }
 
         let name = self.get_name() + "(fork)";
@@ -142,6 +147,7 @@ impl Task {
             pgid,
             SpinNoIrqLock::new(0),
             fd_table,
+            cwd,
             name,
         ));
 
@@ -155,6 +161,26 @@ impl Task {
 
         TASK_MANAGER.add_task(&new);
         new
+    }
+
+    pub fn resolve_path(&self, dirfd: AtFd, pathname: String) -> SysResult<Arc<dyn Dentry>> {
+        let p = if pathname.starts_with("/") {
+            let path = Path::new(sys_root_dentry(), sys_root_dentry(), &pathname);
+            path.walk()?
+        } else {
+            match dirfd {
+                AtFd::FdCwd => {
+                    let path = Path::new(sys_root_dentry(), self.cwd_mut(), &pathname);
+                    path.walk()?
+                }
+                AtFd::Normal(fd) => {
+                    let file = self.with_mut_fdtable(|table| table.get_file(fd))?;
+                    Path::new(sys_root_dentry(), file.dentry(), &pathname).walk()?
+                }
+            }
+        };
+
+        Ok(p)
     }
 
     pub fn exit(&self) {

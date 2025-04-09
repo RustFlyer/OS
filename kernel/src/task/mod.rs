@@ -8,7 +8,6 @@ pub mod tid;
 
 pub use future::yield_now;
 
-use log::info;
 #[allow(unused)]
 pub use manager::TASK_MANAGER;
 pub use task::{Task, TaskState};
@@ -25,9 +24,6 @@ pub fn init() {
     // let add1 = get_app_data_by_name("add1").unwrap();
     // let add2 = get_app_data_by_name("add2").unwrap();
     // let file_test = get_app_data_by_name("file_test").unwrap();
-
-    // info!("add len: [{}]", add.len());
-    // info!("add len: [{}]", add.len());
 
     Task::spawn_from_elf(init_proc, "init_proc");
     // Task::spawn_from_elf(hello_world, "hello_world");
