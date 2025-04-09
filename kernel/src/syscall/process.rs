@@ -46,6 +46,13 @@ pub async fn sys_waitpid() -> SyscallResult {
     Ok(0)
 }
 
+pub async fn sys_wait4(
+    pid: i32,
+    
+) {
+    
+}
+
 pub fn sys_clone(
     flags: usize,
     stack: usize,

@@ -1,9 +1,11 @@
-use core::fmt::{Debug, write};
+use core::fmt::Debug;
 
 use alloc::collections::vec_deque::VecDeque;
 use bitflags::bitflags;
 
-use crate::task::{TaskState, signal::sig_info::*};
+use alloc::sync::Arc;
+
+use crate::task::{manager, signal::sig_info::*, TaskState};
 
 use super::Task;
 
@@ -32,6 +34,29 @@ impl Task {
                 self.tid(),
                 manager.should_wake,
                 self.get_state()
+            );
+        }
+    }
+
+    pub fn set_wake_up_signal(&self, except: SigSet) {
+        debug_assert!(self.get_state() == TaskState::Interruptable);
+        let manager = self.sig_manager_mut();
+        manager.should_wake = except | SigSet::SIGKILL | SigSet::SIGSTOP
+    }
+    pub fn notify_parent(self: &Arc<Self>, code: i32, _signum: Sig) {
+        let parent = self.parent_mut().lock().as_ref().and_then(|p| p.upgrade());
+        let Some(parent) = parent else {
+            return;
+        };
+        let handlers = parent.sig_handlers_mut().lock();
+        if !handlers.get(Sig::SIGCHLD).flags.contains(SigActionFlag::SA_NOCLDSTOP)
+        {
+            parent.receive_siginfo(
+                SigInfo {
+                    sig: Sig::SIGCHLD,
+                    code,
+                    details: SigDetails::None,
+                }
             );
         }
     }
@@ -164,7 +189,7 @@ impl SigHandlers {
 
     /// update actions and bitmap in actions in sig_handlers
     pub fn update(&mut self, sig: Sig, new: Action) {
-        debug_assert!(!sig.is_kill_or_stop());
+        debug_assert!(sig != Sig::SIGKILL && sig != Sig::SIGSTOP);
         self.actions[sig.index()] = new;
         match new.atype {
             ActionType::User { .. } | ActionType::Kill => self.bitmap.add_signal(sig),
