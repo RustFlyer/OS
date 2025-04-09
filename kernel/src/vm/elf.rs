@@ -4,6 +4,7 @@ use alloc::sync::Arc;
 
 use config::mm::{USER_STACK_LOWER, USER_STACK_UPPER};
 use elf::{self, ElfBytes, endian::LittleEndian, file::FileHeader};
+use log::{error, info};
 use mm::address::VirtAddr;
 use systype::{SysError, SysResult};
 use vfs::file::File;
@@ -13,6 +14,7 @@ use crate::{processor::current_task, vm::user_ptr::UserReadWritePtr};
 use super::{
     addr_space::AddrSpace,
     pte::PteFlags,
+    user_ptr::UserWritePtr,
     vm_area::{VmArea, VmaFlags},
 };
 
@@ -105,6 +107,17 @@ impl AddrSpace {
         let stack_bottom = stack.end_va();
         self.add_area(stack)?;
         Ok(stack_bottom)
+    }
+
+    pub fn init_stack(&mut self, sp: usize, argc: usize) {
+        info!("sp {:#x}", sp);
+        let mut sp = UserReadWritePtr::<usize>::new(sp, self);
+        unsafe {
+            let ret = sp.write(argc);
+            if let Err(_) = ret {
+                error!("fail to write argc");
+            }
+        }
     }
 
     /// Maps a heap into the address space.

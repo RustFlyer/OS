@@ -7,6 +7,7 @@ use config::vfs::AtFd;
 use core::cell::SyncUnsafeCell;
 use core::time::Duration;
 use osfs::sys_root_dentry;
+use sbi_rt::legacy::send_ipi;
 use systype::SysResult;
 use vfs::dentry::Dentry;
 use vfs::file::File;
@@ -67,12 +68,11 @@ impl Task {
         let entry_point = addrspace.load_elf(elf_file.clone()).unwrap();
         let stack = addrspace.map_stack().unwrap();
         addrspace.map_heap().unwrap();
-
         *self.addr_space_mut().lock() = addrspace;
 
         let argc = argv.len();
         self.trap_context_mut()
-            .init_user(stack.to_usize(), entry_point.to_usize(), argc, 0, 0);
+            .init_user(stack.to_usize() - 8, entry_point.to_usize(), argc, 0, 0);
 
         *self.elf_mut() = elf_file;
         *self.args_mut() = argv.clone();
@@ -120,6 +120,8 @@ impl Task {
         let trap_context = SyncUnsafeCell::new(*self.trap_context_mut());
         let state = SpinNoIrqLock::new(self.get_state());
 
+        let ustack = self.stack_top();
+
         let process;
         let is_process;
         let threadgroup;
@@ -166,6 +168,7 @@ impl Task {
             tid,
             process,
             is_process,
+            ustack,
             threadgroup,
             trap_context,
             SyncUnsafeCell::new(TaskTimeStat::new()),

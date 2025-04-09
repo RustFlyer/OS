@@ -77,8 +77,15 @@ impl<F: Future + Send + 'static> Future for KernelFuture<F> {
 ///
 /// Task will run in this loop in the kernel all the time
 pub async fn task_executor_unit(task: Arc<Task>) {
-    log::debug!("hart {}: run task in first time!", current_hart().id);
+    log::debug!(
+        "hart {}: run task [{}] in first time!",
+        current_hart().id,
+        task.get_name()
+    );
     task.set_waker(take_waker().await);
+    {
+        task.addr_space_mut().lock().init_stack(task.stack_top(), 0);
+    }
     loop {
         // log::debug!("try to step into user!");
 
@@ -109,7 +116,6 @@ pub async fn task_executor_unit(task: Arc<Task>) {
             }
             _ => {}
         }
-
         // signal_handle_
     }
 

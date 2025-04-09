@@ -50,6 +50,8 @@ pub struct Task {
     process: Option<Weak<Task>>,
     is_process: bool,
 
+    ustack: usize,
+
     threadgroup: ShareMutex<ThreadGroup>,
 
     trap_context: SyncUnsafeCell<TrapContext>,
@@ -89,6 +91,7 @@ impl Task {
             tid,
             process: None,
             is_process: false,
+            ustack: sp - 8,
             threadgroup: new_share_mutex(ThreadGroup::new()),
             trap_context: SyncUnsafeCell::new(TrapContext::new(entry, sp)),
             timer: SyncUnsafeCell::new(TaskTimeStat::new()),
@@ -111,6 +114,7 @@ impl Task {
         tid: TidHandle,
         process: Option<Weak<Task>>,
         is_process: bool,
+        ustack: usize,
 
         threadgroup: ShareMutex<ThreadGroup>,
 
@@ -138,6 +142,7 @@ impl Task {
             tid,
             process,
             is_process,
+            ustack,
             threadgroup,
             trap_context,
             timer,
@@ -174,6 +179,10 @@ impl Task {
         } else {
             self.clone()
         }
+    }
+
+    pub fn stack_top(&self) -> usize {
+        self.ustack
     }
 
     pub fn get_state(&self) -> TaskState {
