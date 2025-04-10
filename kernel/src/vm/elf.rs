@@ -3,28 +3,29 @@
 use alloc::sync::Arc;
 
 use config::mm::{USER_STACK_LOWER, USER_STACK_UPPER};
-use elf::{self, ElfBytes, endian::LittleEndian, file::FileHeader};
-use log::{error, info};
+use elf::{self, ElfStream, ParseError as ElfParseError, endian::LittleEndian, file::FileHeader};
 use mm::address::VirtAddr;
 use systype::{SysError, SysResult};
 use vfs::file::File;
 
-use crate::{processor::current_task, vm::user_ptr::UserReadWritePtr};
+use crate::vm::user_ptr::UserReadWritePtr;
 
 use super::{
     addr_space::AddrSpace,
     pte::PteFlags,
-    user_ptr::UserWritePtr,
     vm_area::{VmArea, VmaFlags},
 };
 
 impl AddrSpace {
     /// Loads an ELF executable into given address space.
     ///
+    /// `elf_file` must be a regular file.
+    ///
     /// Returns the entry point of the ELF executable.
     ///
     /// # Errors
-    /// Returns an error if the loading fails. This can happen if the ELF file is invalid.
+    /// Returns an error if the loading fails. This can happen if the file is not a valid
+    /// ELF file.
     ///
     /// # Discussion
     /// Current implementation of this function takes a slice of ELF data as input, which
@@ -32,9 +33,11 @@ impl AddrSpace {
     /// This is because we have not implemented the file system yet. In the future, this
     /// function should take a file descriptor as input.
     pub fn load_elf(&mut self, elf_file: Arc<dyn File>) -> SysResult<VirtAddr> {
-        let elf_data = elf_file.read_all()?;
-        let elf =
-            ElfBytes::<LittleEndian>::minimal_parse(&elf_data).map_err(|_| SysError::ENOEXEC)?;
+        let elf: ElfStream<LittleEndian, _> =
+            ElfStream::open_stream(elf_file.as_ref()).map_err(|e| match e {
+                ElfParseError::IOError(_) => SysError::EIO,
+                _ => SysError::ENOEXEC,
+            })?;
 
         // Do minimal checks on the ELF file header.
         let FileHeader {
@@ -57,8 +60,7 @@ impl AddrSpace {
         // Map VMAs for each loadable segment.
         for segment in elf
             .segments()
-            .ok_or(SysError::ENOEXEC)?
-            .into_iter()
+            .iter()
             .filter(|seg| seg.p_type == elf::abi::PT_LOAD)
         {
             let va_start = VirtAddr::new(segment.p_vaddr as usize);
@@ -110,13 +112,10 @@ impl AddrSpace {
     }
 
     pub fn init_stack(&mut self, sp: usize, argc: usize) {
-        info!("sp {:#x}", sp);
+        log::info!("sp {:#x}", sp);
         let mut sp = UserReadWritePtr::<usize>::new(sp, self);
         unsafe {
-            let ret = sp.write(argc);
-            if let Err(_) = ret {
-                error!("fail to write argc");
-            }
+            sp.write(argc).unwrap();
         }
     }
 

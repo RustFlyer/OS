@@ -449,3 +449,41 @@ impl dyn File {
 }
 
 impl_downcast!(sync File);
+
+/// This module contains implementations of the `elf::io::Read` and `elf::io::Seek` traits
+/// for the `File` trait. It allows the `elf` crate to read from a `File` as an `ElfStream`.
+mod elf_impls {
+    use elf::io::{Read, Seek, SeekFrom as ElfSeekFrom};
+    use elf::parse::IOError;
+    use elf::parse::ParseError;
+
+    use config::vfs::SeekFrom;
+    use systype::SysError;
+
+    use super::File;
+
+    impl Read for &dyn File {
+        fn read(&mut self, buf: &mut [u8]) -> Result<usize, ParseError> {
+            let bytes_read = <dyn File>::read(&**self, buf).map_err(|e| match e {
+                SysError::EINTR => ParseError::IOError(IOError::Interrupted),
+                _ => ParseError::IOError(IOError::UnexpectedEof),
+            })?;
+            Ok(bytes_read)
+        }
+    }
+
+    impl Seek for &dyn File {
+        fn seek(&mut self, pos: elf::io::SeekFrom) -> Result<u64, ParseError> {
+            let pos = match pos {
+                ElfSeekFrom::Start(n) => SeekFrom::Start(n),
+                ElfSeekFrom::Current(n) => SeekFrom::Current(n),
+                ElfSeekFrom::End(n) => SeekFrom::End(n),
+            };
+            let res = <dyn File>::seek(&**self, pos).map_err(|e| match e {
+                SysError::EINTR => ParseError::IOError(IOError::Interrupted),
+                _ => ParseError::IOError(IOError::UnexpectedEof),
+            })?;
+            Ok(res as u64)
+        }
+    }
+}
