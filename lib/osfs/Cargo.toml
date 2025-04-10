@@ -10,7 +10,7 @@ vfs    = { path = "../vfs" }
 systype =  { path = "../systype" }
 mutex  = { path = "../mutex" }
 driver = { path = "../driver" }
-
+osfuture = { path = "../osfuture" }
 
 bitflags = { workspace = true }
 spin = { workspace = true }

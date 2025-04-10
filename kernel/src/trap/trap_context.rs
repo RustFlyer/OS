@@ -129,6 +129,11 @@ impl TrapContext {
         self.user_reg[10] = val;
     }
 
+    pub fn set_user_tp(&mut self, val: usize) {
+        // tp == x4
+        self.user_reg[4] = val;
+    }
+
     /// 设置用户态trap pc
     pub fn set_entry_point(&mut self, entry: usize) {
         self.sepc = entry;

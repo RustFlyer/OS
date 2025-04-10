@@ -9,7 +9,7 @@ use user_lib::{execve, fork, waitpid};
 fn main() {
     let mut i = 0;
     if fork() == 0 {
-        execve("shell\0", &[], &[]);
+        execve("shell", &[], &[]);
     } else {
         loop {
             waitpid(0, &mut i);

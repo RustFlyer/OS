@@ -1,4 +1,4 @@
-use alloc::string::ToString;
+use alloc::{ffi::CString, string::ToString};
 
 use driver::sbi::getchar;
 use log::info;
@@ -11,12 +11,15 @@ use config::{
 use mutex::SleepLock;
 use osfs::sys_root_dentry;
 use systype::{SysError, SyscallResult};
-use vfs::{file::File, path::Path};
+use vfs::{file::File, kstat::Kstat, path::Path};
 
 use crate::{
     print,
     processor::current_task,
-    vm::user_ptr::{UserReadPtr, UserWritePtr},
+    vm::{
+        addr_space,
+        user_ptr::{UserReadPtr, UserWritePtr},
+    },
 };
 
 #[allow(unused)]
@@ -121,4 +124,38 @@ pub fn sys_lseek(fd: usize, offset: isize, whence: usize) -> SyscallResult {
         Whence::SeekEnd => file.seek(SeekFrom::End(offset as i64)),
         _ => todo!(),
     }
+}
+
+pub fn sys_getcwd(buf: usize, len: usize) -> SyscallResult {
+    let task = current_task();
+    let mut addr_space = task.addr_space_mut().lock();
+    let mut buf = { UserWritePtr::<u8>::new(buf, &mut addr_space) };
+
+    let path = task.cwd_mut().path();
+    let bsize = core::cmp::min(path.len() + 1, len);
+
+    let cstr = CString::new(path).expect("fail to convert CString");
+    let ret = buf.to_usize();
+    unsafe {
+        buf.try_into_mut_slice(bsize)?
+            .copy_from_slice(&cstr.into_bytes_with_nul());
+    }
+    Ok(ret)
+}
+
+pub fn sys_fstat(fd: usize, stat_buf: usize) -> SyscallResult {
+    let task = current_task();
+    let mut addr_space = task.addr_space_mut().lock();
+    let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
+    let kstat = Kstat::from_vfs_file(file.inode())?;
+    unsafe {
+        UserWritePtr::<Kstat>::new(stat_buf, &mut addr_space).write(kstat)?;
+    }
+    Ok(0)
+}
+
+pub fn sys_close(fd: usize) -> SyscallResult {
+    let task = current_task();
+    task.with_mut_fdtable(|table| table.remove(fd))?;
+    Ok(0)
 }

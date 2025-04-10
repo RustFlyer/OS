@@ -50,8 +50,6 @@ pub struct Task {
     process: Option<Weak<Task>>,
     is_process: bool,
 
-    ustack: usize,
-
     threadgroup: ShareMutex<ThreadGroup>,
 
     trap_context: SyncUnsafeCell<TrapContext>,
@@ -66,13 +64,13 @@ pub struct Task {
     pgid: ShareMutex<PGid>,
     exit_code: SpinNoIrqLock<i32>,
 
-    fd_table: SpinNoIrqLock<FdTable>,
+    fd_table: ShareMutex<FdTable>,
     cwd: ShareMutex<Arc<dyn Dentry>>,
 
     elf: SyncUnsafeCell<Arc<dyn File>>,
     args: SyncUnsafeCell<Vec<String>>,
 
-    name: String,
+    name: SyncUnsafeCell<String>,
 }
 
 /// This Impl is mainly for getting and setting the property of Task
@@ -91,7 +89,6 @@ impl Task {
             tid,
             process: None,
             is_process: false,
-            ustack: sp - 8,
             threadgroup: new_share_mutex(ThreadGroup::new()),
             trap_context: SyncUnsafeCell::new(TrapContext::new(entry, sp)),
             timer: SyncUnsafeCell::new(TaskTimeStat::new()),
@@ -102,11 +99,11 @@ impl Task {
             children: new_share_mutex(BTreeMap::new()),
             pgid: new_share_mutex(pgid),
             exit_code: SpinNoIrqLock::new(0),
-            fd_table: SpinNoIrqLock::new(FdTable::new()),
+            fd_table: new_share_mutex(FdTable::new()),
             cwd: new_share_mutex(sys_root_dentry()),
             elf: SyncUnsafeCell::new(elf_file),
             args: SyncUnsafeCell::new(args),
-            name,
+            name: SyncUnsafeCell::new(name),
         }
     }
 
@@ -114,7 +111,6 @@ impl Task {
         tid: TidHandle,
         process: Option<Weak<Task>>,
         is_process: bool,
-        ustack: usize,
 
         threadgroup: ShareMutex<ThreadGroup>,
 
@@ -130,19 +126,18 @@ impl Task {
         pgid: ShareMutex<PGid>,
         exit_code: SpinNoIrqLock<i32>,
 
-        fd_table: SpinNoIrqLock<FdTable>,
+        fd_table: ShareMutex<FdTable>,
         cwd: ShareMutex<Arc<dyn Dentry>>,
 
         elf: SyncUnsafeCell<Arc<dyn File>>,
         args: SyncUnsafeCell<Vec<String>>,
 
-        name: String,
+        name: SyncUnsafeCell<String>,
     ) -> Self {
         Task {
             tid,
             process,
             is_process,
-            ustack,
             threadgroup,
             trap_context,
             timer,
@@ -175,14 +170,10 @@ impl Task {
 
     pub fn process(self: &Arc<Self>) -> Arc<Task> {
         if self.is_process() {
-            self.process.as_ref().cloned().unwrap().upgrade().unwrap()
-        } else {
             self.clone()
+        } else {
+            self.process.as_ref().cloned().unwrap().upgrade().unwrap()
         }
-    }
-
-    pub fn stack_top(&self) -> usize {
-        self.ustack
     }
 
     pub fn get_state(&self) -> TaskState {
@@ -214,6 +205,11 @@ impl Task {
         unsafe { &mut *self.args.get() }
     }
 
+    #[allow(clippy::mut_from_ref)]
+    pub fn name_mut(&self) -> &mut String {
+        unsafe { &mut *self.name.get() }
+    }
+
     pub fn addr_space_mut(&self) -> &ShareMutex<AddrSpace> {
         &self.addr_space
     }
@@ -238,6 +234,14 @@ impl Task {
         self.cwd.lock().clone()
     }
 
+    pub fn fdtable_mut(&self) -> ShareMutex<FdTable> {
+        self.fd_table.clone()
+    }
+
+    pub fn thread_group_mut(&self) -> ShareMutex<ThreadGroup> {
+        self.threadgroup.clone()
+    }
+
     pub fn get_waker(&self) -> Waker {
         self.waker_mut().as_ref().unwrap().clone()
     }
@@ -251,7 +255,16 @@ impl Task {
     }
 
     pub fn get_name(&self) -> String {
-        self.name.clone()
+        self.name_mut().clone()
+    }
+
+    pub fn ppid(&self) -> Pid {
+        let parent = self.parent.lock().clone();
+        parent
+            .expect("Call ppid Without parent")
+            .upgrade()
+            .unwrap()
+            .get_pgid()
     }
     // ========== This Part You Can Check the State of Task  ===========
     pub fn is_process(&self) -> bool {

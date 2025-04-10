@@ -3,6 +3,7 @@
 
 use alloc::{collections::btree_map::BTreeMap, string::String, sync::Arc};
 use config::vfs::MountFlags;
+use dev::DevFsType;
 use driver::BLOCK_DEVICE;
 use mutex::SpinNoIrqLock;
 use spin::Once;
@@ -10,7 +11,9 @@ use vfs::{dentry::Dentry, file::File, fstype::FileSystemType};
 
 extern crate alloc;
 
+pub mod dev;
 pub mod fd_table;
+pub mod simple;
 pub mod simplefile;
 
 pub static FS_MANAGER: SpinNoIrqLock<BTreeMap<String, Arc<dyn FileSystemType>>> =
@@ -26,7 +29,14 @@ type DiskFsType = ext4::fs::ExtFsType;
 
 pub const DISK_FS_NAME: &str = "ext4";
 
+pub fn register_dev() {
+    let devfs = DevFsType::new();
+    FS_MANAGER.lock().insert(devfs.name(), devfs);
+}
+
 pub fn init() {
+    register_dev();
+
     let diskfs = DiskFsType::new();
     FS_MANAGER.lock().insert(diskfs.name(), diskfs);
 
@@ -43,5 +53,10 @@ pub fn init() {
 
     SYS_ROOT_DENTRY.call_once(|| diskfs_root);
 
-    <dyn File>::open(sys_root_dentry()).unwrap().load_dir().unwrap();
+    // dev::tty::init().expect("dev-tty init fails");
+
+    <dyn File>::open(sys_root_dentry())
+        .unwrap()
+        .load_dir()
+        .unwrap();
 }

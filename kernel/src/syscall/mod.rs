@@ -1,10 +1,12 @@
 mod consts;
 mod fs;
+mod misc;
 mod process;
 mod time;
 
 use consts::SyscallNo::{self, *};
 use fs::*;
+use misc::sys_uname;
 use process::*;
 use time::*;
 
@@ -29,6 +31,11 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         EXECVE => sys_execve(args[0], args[1], args[2]),
         GETPID => sys_getpid(),
         GETTID => sys_gettid(),
+        GETCWD => sys_getcwd(args[0], args[1]),
+        FSTAT => sys_fstat(args[0], args[1]),
+        CLOSE => sys_close(args[0]),
+        GETPPID => sys_getppid(),
+        UNAME => sys_uname(args[0]),
         _ => {
             log::error!("Syscall not implemented: {syscall_no}");
             unimplemented!()

@@ -1,24 +1,32 @@
 use alloc::sync::Arc;
-
-use config::{device::BLOCK_SIZE, vfs::Stat};
+use config::{inode::InodeMode, vfs::Stat};
+use driver::{CHAR_DEVICE, CharDevice};
 use systype::SysResult;
 use vfs::{
     inode::{Inode, InodeMeta},
+    inoid::alloc_ino,
     superblock::SuperBlock,
 };
-pub struct ExtLinkInode {
+
+pub struct TtyInode {
     meta: InodeMeta,
+    pub char_dev: Arc<dyn CharDevice>,
 }
 
-impl ExtLinkInode {
-    pub fn new(target: &str, superblock: Arc<dyn SuperBlock>) -> Arc<Self> {
-        Arc::new(Self {
-            meta: InodeMeta::new(0, superblock),
-        })
+pub fn get_char_device() -> Arc<dyn CharDevice> {
+    CHAR_DEVICE.get().unwrap().clone()
+}
+
+impl TtyInode {
+    pub fn new(super_block: Arc<dyn SuperBlock>) -> Arc<Self> {
+        let meta = InodeMeta::new(alloc_ino(), super_block);
+        meta.inner.lock().mode = InodeMode::CHAR;
+        let char_dev = get_char_device();
+        Arc::new(Self { meta, char_dev })
     }
 }
 
-impl Inode for ExtLinkInode {
+impl Inode for TtyInode {
     fn get_meta(&self) -> &InodeMeta {
         &self.meta
     }
@@ -29,15 +37,15 @@ impl Inode for ExtLinkInode {
             st_dev: 0,
             st_ino: self.meta.ino as u64,
             st_mode: inner.mode.bits(),
-            st_nlink: 0,
+            st_nlink: 1,
             st_uid: 0,
             st_gid: 0,
             st_rdev: 0,
             __pad: 0,
             st_size: inner.size as u64,
-            st_blksize: BLOCK_SIZE as u32,
+            st_blksize: 0,
             __pad2: 0,
-            st_blocks: (inner.size / BLOCK_SIZE) as u64,
+            st_blocks: 0 as u64,
             st_atime: inner.atime,
             st_mtime: inner.mtime,
             st_ctime: inner.ctime,

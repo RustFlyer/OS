@@ -19,13 +19,12 @@ fn main() {
             if ch != 13 {
                 buf[bptr] = ch;
                 bptr = bptr + 1;
-            } else {
-                buf[bptr] = 0;
             }
         }
 
-        let apppath = core::str::from_utf8(&buf).unwrap();
-        println!("app path is [{}]", apppath);
+        let buf_slice = &buf[..bptr];
+        let apppath = core::str::from_utf8(&buf_slice).unwrap();
+        println!("app path is [{}] with len [{}]", apppath, bptr);
 
         if fork() == 0 {
             execve(apppath, &[], &[]);

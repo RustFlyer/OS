@@ -467,10 +467,15 @@ dependencies = [
  "ext4",
  "log",
  "mutex",
+ "osfuture",
  "spin",
  "systype",
  "vfs",
 ]
+
+[[package]]
+name = "osfuture"
+version = "0.1.0"
 
 [[package]]
 name = "paste"

@@ -78,7 +78,6 @@ impl FdTable {
 
     pub fn alloc(&mut self, file: Arc<dyn File>, flags: OpenFlags) -> SysResult<Fd> {
         let fdinfo = FdInfo::new(file, flags);
-        // debug!("test alloc");
         if let Some(fd) = self.get_available_slot() {
             info!("alloc fd [{}]", fd);
             self.table[fd] = Some(fdinfo);
@@ -112,6 +111,51 @@ impl FdTable {
                 }
             }
         }
+    }
+
+    pub fn remove(&mut self, fd: Fd) -> SysResult<()> {
+        assert!(fd < self.table.len());
+        if self.table[fd].is_none() {
+            return Err(SysError::EBADF);
+        }
+        self.table[fd] = None;
+        Ok(())
+    }
+
+    fn extend_to(&mut self, len: usize) -> SysResult<()> {
+        if len > MAX_FDS {
+            return Err(SysError::EBADF);
+        }
+        if self.table.len() < len {
+            for _ in self.table.len()..len {
+                self.table.push(None)
+            }
+        }
+        Ok(())
+    }
+
+    pub fn put(&mut self, fd: Fd, fd_info: FdInfo) -> SysResult<()> {
+        self.extend_to(fd + 1)?;
+        self.table[fd] = Some(fd_info);
+        Ok(())
+    }
+
+    pub fn dup(&mut self, old_fd: Fd) -> SysResult<Fd> {
+        let file = self.get_file(old_fd)?;
+        self.alloc(file, OpenFlags::empty())
+    }
+
+    pub fn dup3(&mut self, old_fd: Fd, new_fd: Fd, flags: OpenFlags) -> SysResult<Fd> {
+        let file = self.get_file(old_fd)?;
+        let fd_info = FdInfo::new(file, flags.into());
+        self.put(new_fd, fd_info)?;
+        Ok(new_fd)
+    }
+
+    pub fn dup3_with_flags(&mut self, old_fd: Fd, new_fd: Fd) -> SysResult<Fd> {
+        let old_fd_info = self.get(old_fd)?;
+        self.put(new_fd, old_fd_info.clone())?;
+        Ok(new_fd)
     }
 }
 

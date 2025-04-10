@@ -84,7 +84,6 @@ impl Task {
         *self.addr_space_mut().lock() = addrspace;
         self.switch_addr_space();
 
-        // info!("switch!");
         *self.args_mut() = argv.clone();
         let (sp, argc, argv, envp) = self.init_stack(stack.to_usize(), argv, envp);
 
@@ -92,6 +91,8 @@ impl Task {
             .init_user(sp, entry_point.to_usize(), argc, argv, envp);
 
         *self.elf_mut() = elf_file;
+
+        *self.name_mut() = name.to_string();
 
         self.with_mut_fdtable(|table| table.close());
     }
@@ -136,8 +137,6 @@ impl Task {
         let trap_context = SyncUnsafeCell::new(*self.trap_context_mut());
         let state = SpinNoIrqLock::new(self.get_state());
 
-        let ustack = self.stack_top();
-
         let process;
         let is_process;
         let threadgroup;
@@ -147,16 +146,17 @@ impl Task {
 
         let pgid;
 
-        let fd_table = SpinNoIrqLock::new(FdTable::new());
         let cwd = new_share_mutex(self.cwd_mut());
 
         let elf = SyncUnsafeCell::new((*self.elf_mut()).clone());
         let args = SyncUnsafeCell::new((*self.args_mut()).clone());
 
+        let mut name = self.get_name() + "(fork)";
+
         if cloneflags.contains(CloneFlags::THREAD) {
             is_process = false;
             process = Some(Arc::downgrade(self));
-            threadgroup = new_share_mutex(ThreadGroup::new());
+            threadgroup = self.thread_group_mut().clone();
             parent = self.parent_mut().clone();
             children = self.children_mut().clone();
             pgid = self.pgid_mut().clone();
@@ -172,19 +172,25 @@ impl Task {
         let addr_space;
         if cloneflags.contains(CloneFlags::VM) {
             addr_space = (*self.addr_space_mut()).clone();
+            name = name + "(thread)";
         } else {
             let cow_address_space = self.addr_space_mut().lock().clone_cow().unwrap();
             addr_space = Arc::new(SpinNoIrqLock::new(cow_address_space));
             sfence_vma_all();
         }
 
-        let name = self.get_name() + "(fork)";
+        let fd_table = if cloneflags.contains(CloneFlags::FILES) {
+            self.fdtable_mut().clone()
+        } else {
+            new_share_mutex(self.fdtable_mut().lock().clone())
+        };
+
+        let name = SyncUnsafeCell::new(name);
 
         let new = Arc::new(Self::new_fork_clone(
             tid,
             process,
             is_process,
-            ustack,
             threadgroup,
             trap_context,
             SyncUnsafeCell::new(TaskTimeStat::new()),

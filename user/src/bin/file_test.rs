@@ -53,9 +53,10 @@ fn main() {
         // let utf2str = core::str::from_utf8(&read_buf).unwrap();
         // println!("file test: read text [{}]", utf2str);
         // lseek(fd2 as usize, 0, 0);
-        let argvs = ["Sun\0".as_ptr(), "Star\0".as_ptr(), null()];
-        let envps = ["Loop\0".as_ptr(), "Func\0".as_ptr(), null()];
-        execve("add\0", &argvs, &envps);
+        println!("execve-test begin to run");
+        let argvs = ["Sun", "Star"];
+        let envps = ["Loop", "Func"];
+        execve("add", &argvs, &envps);
     }
 
     exit(9)

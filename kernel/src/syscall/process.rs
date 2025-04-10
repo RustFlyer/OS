@@ -1,5 +1,5 @@
 use crate::task::{Task, TaskState};
-use crate::vm::user_ptr::UserReadPtr;
+use crate::vm::user_ptr::{UserReadPtr, UserWritePtr};
 use crate::{processor::current_task, task::future::spawn_user_task};
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
@@ -23,6 +23,10 @@ pub fn sys_gettid() -> SyscallResult {
 /// getpid() returns the process ID (PID) of the calling process.
 pub fn sys_getpid() -> SyscallResult {
     Ok(current_task().pid())
+}
+
+pub fn sys_getppid() -> SyscallResult {
+    Ok(current_task().ppid())
 }
 
 /// _exit() system call terminates only the calling thread, and actions such as
@@ -50,11 +54,14 @@ pub async fn sys_waitpid() -> SyscallResult {
 
 pub fn sys_clone(
     flags: usize,
-    _stack: usize,
-    _parent_tid_ptr: usize,
-    _tls_ptr: usize,
-    _chilren_tid_ptr: usize,
+    stack: usize,
+    parent_tid_ptr: usize,
+    tls_ptr: usize,
+    chilren_tid_ptr: usize,
 ) -> SyscallResult {
+    log::info!(
+        "[sys_clone] flags:{flags:?}, stack:{stack:#x}, tls:{tls_ptr:?}, parent_tid:{parent_tid_ptr:?}, child_tid:{chilren_tid_ptr:?}"
+    );
     let _exit_signal = flags & 0xff;
     let flags = CloneFlags::from_bits(flags as u64 & !0xff).ok_or(SysError::EINVAL)?;
     log::info!("[sys_clone] flags {flags:?}");
@@ -63,7 +70,25 @@ pub fn sys_clone(
     new_task.trap_context_mut().set_user_a0(0);
     let new_tid = new_task.tid();
     log::info!("[sys_clone] clone a new thread, tid {new_tid}, clone flags {flags:?}",);
+
+    if stack != 0 {
+        new_task.trap_context_mut().set_user_sp(stack);
+    }
+
+    if flags.contains(CloneFlags::PARENT_SETTID) {}
+    if flags.contains(CloneFlags::CHILD_SETTID) {
+        // UserWritePtr::from(child_tid.bits()).write(&new_task, new_tid)?;
+        // new_task.tid_address().set_child_tid = Some(child_tid.bits());
+    }
+    if flags.contains(CloneFlags::CHILD_CLEARTID) {
+        // new_task.tid_address().clear_child_tid = Some(child_tid.bits());
+    }
+    if flags.contains(CloneFlags::SETTLS) {
+        new_task.trap_context_mut().set_user_tp(tls_ptr);
+    }
+
     spawn_user_task(new_task);
+
     Ok(new_tid)
 }
 

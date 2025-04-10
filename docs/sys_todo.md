@@ -1,0 +1,33 @@
+- [x] read  
+- [x] dup       - t
+- [x] fork      
+- [x] getpid        
+- [x] open       
+- [x] times   
+- [x] dup2      - t
+- [x] fstat     
+- [x] openat  
+- [x] sleep       
+- [x] clone  
+- [x] execve  
+- [x] getcwd    
+- [x] gettimeofday  
+- [x] test_echo   
+- [x] write
+- [x] close  
+- [x] yield
+- [?] uname  
+- [ ] getppid
+- [ ] getdents  
+- [ ] pipe
+- [ ] mkdir_        
+- [ ] chdir
+- [ ] mount
+- [ ] umount
+- [ ] munmap  
+- [ ] mmap   
+- [ ] unlink  
+- [ ] brk  
+- [ ] exit      - wait
+- [ ] waitpid
+- [ ] wait
