@@ -17,17 +17,23 @@
 - [x] close  
 - [x] yield
 - [?] uname  
+
 - [ ] getppid
-- [ ] getdents  
-- [ ] pipe
-- [ ] mkdir_        
-- [ ] chdir
-- [ ] mount
-- [ ] umount
-- [ ] munmap  
+
 - [ ] mmap   
-- [ ] unlink  
+- [ ] munmap  
 - [ ] brk  
+
+- [ ] chdir
+- [ ] mkdir_        
+- [ ] unlink  
+
+- [ ] getdents  
+
+- [ ] mount 
+- [ ] umount
+- [ ] pipe  
+
 - [ ] exit      - wait
 - [ ] waitpid
 - [ ] wait
