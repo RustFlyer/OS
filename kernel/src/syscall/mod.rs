@@ -27,6 +27,8 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         READ => sys_read(args[0], args[1], args[2]),
         LSEEK => sys_lseek(args[0], args[1] as isize, args[2]),
         EXECVE => sys_execve(args[0], args[1], args[2]),
+        GETPID => sys_getpid(),
+        GETTID => sys_gettid(),
         _ => {
             log::error!("Syscall not implemented: {syscall_no}");
             unimplemented!()

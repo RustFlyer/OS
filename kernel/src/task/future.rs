@@ -83,9 +83,7 @@ pub async fn task_executor_unit(task: Arc<Task>) {
         task.get_name()
     );
     task.set_waker(take_waker().await);
-    {
-        task.addr_space_mut().lock().init_stack(task.stack_top(), 0);
-    }
+
     loop {
         // log::debug!("try to step into user!");
 

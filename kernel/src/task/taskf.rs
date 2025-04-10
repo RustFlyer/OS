@@ -6,6 +6,7 @@ use alloc::vec::Vec;
 use config::vfs::AtFd;
 use core::cell::SyncUnsafeCell;
 use core::time::Duration;
+use log::info;
 use osfs::sys_root_dentry;
 use sbi_rt::legacy::send_ipi;
 use systype::SysResult;
@@ -57,6 +58,17 @@ impl Task {
         }
     }
 
+    pub fn init_stack(
+        &self,
+        stack_top: usize,
+        argv: Vec<String>,
+        envp: Vec<String>,
+    ) -> (usize, usize, usize, usize) {
+        self.addr_space_mut()
+            .lock()
+            .init_stack(stack_top, argv.len(), argv, envp)
+    }
+
     pub fn execve(
         &self,
         elf_file: Arc<dyn File>,
@@ -68,14 +80,18 @@ impl Task {
         let entry_point = addrspace.load_elf(elf_file.clone()).unwrap();
         let stack = addrspace.map_stack().unwrap();
         addrspace.map_heap().unwrap();
-        *self.addr_space_mut().lock() = addrspace;
 
-        let argc = argv.len();
+        *self.addr_space_mut().lock() = addrspace;
+        self.switch_addr_space();
+
+        // info!("switch!");
+        *self.args_mut() = argv.clone();
+        let (sp, argc, argv, envp) = self.init_stack(stack.to_usize(), argv, envp);
+
         self.trap_context_mut()
-            .init_user(stack.to_usize() - 8, entry_point.to_usize(), argc, 0, 0);
+            .init_user(sp, entry_point.to_usize(), argc, argv, envp);
 
         *self.elf_mut() = elf_file;
-        *self.args_mut() = argv.clone();
 
         self.with_mut_fdtable(|table| table.close());
     }

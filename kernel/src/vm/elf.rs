@@ -1,14 +1,15 @@
 //! Module for loading ELF files.
 
-use alloc::sync::Arc;
+use alloc::{string::String, sync::Arc, vec::Vec};
 
 use config::mm::{USER_STACK_LOWER, USER_STACK_UPPER};
 use elf::{self, ElfStream, ParseError as ElfParseError, endian::LittleEndian, file::FileHeader};
+use log::info;
 use mm::address::VirtAddr;
 use systype::{SysError, SysResult};
 use vfs::file::File;
 
-use crate::vm::user_ptr::UserReadWritePtr;
+use crate::vm::user_ptr::{UserReadWritePtr, UserWritePtr};
 
 use super::{
     addr_space::AddrSpace,
@@ -111,12 +112,65 @@ impl AddrSpace {
         Ok(stack_bottom)
     }
 
-    pub fn init_stack(&mut self, sp: usize, argc: usize) {
+    pub fn init_stack(
+        &mut self,
+        mut sp: usize,
+        argc: usize,
+        argv: Vec<String>,
+        envp: Vec<String>,
+    ) -> (usize, usize, usize, usize) {
         log::info!("sp {:#x}", sp);
-        let mut sp = UserReadWritePtr::<usize>::new(sp, self);
-        unsafe {
-            sp.write(argc).unwrap();
-        }
+        debug_assert!(sp & 0xf == 0);
+
+        let mut push_str = |sp: &mut usize, s: &str| -> usize {
+            let len = s.len();
+            *sp -= len + 1;
+            unsafe {
+                for (i, c) in s.bytes().enumerate() {
+                    UserWritePtr::<u8>::new(*sp + i, self)
+                        .write(c)
+                        .expect("fail to write str in stack");
+                }
+                UserWritePtr::<u8>::new(*sp + len, self)
+                    .write(0u8)
+                    .expect("fail to write str-end in stack");
+            }
+            *sp
+        };
+
+        let env_ptrs: Vec<usize> = envp.iter().rev().map(|s| push_str(&mut sp, s)).collect();
+        let arg_ptrs: Vec<usize> = argv.iter().rev().map(|s| push_str(&mut sp, s)).collect();
+
+        let rand_size = 0;
+        let platform = "RISC-V64";
+        let rand_bytes = "Moon rises 9527";
+
+        sp -= rand_size;
+        push_str(&mut sp, platform);
+        push_str(&mut sp, rand_bytes);
+
+        sp = (sp - 1) & !0xf;
+
+        let mut push_usize = |sp: &mut usize, ptr: usize| {
+            *sp -= core::mem::size_of::<usize>();
+            unsafe {
+                UserWritePtr::<usize>::new(*sp, self)
+                    .write(ptr)
+                    .expect("fail to write usize in stack");
+            }
+        };
+
+        push_usize(&mut sp, 0);
+        env_ptrs.iter().for_each(|ptr| push_usize(&mut sp, *ptr));
+        let env_ptr_ptr = sp;
+
+        push_usize(&mut sp, 0);
+        arg_ptrs.iter().for_each(|ptr| push_usize(&mut sp, *ptr));
+        let arg_ptr_ptr = sp;
+
+        push_usize(&mut sp, argc);
+
+        (sp, argc, arg_ptr_ptr, env_ptr_ptr)
     }
 
     /// Maps a heap into the address space.
