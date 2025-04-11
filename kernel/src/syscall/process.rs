@@ -1,14 +1,10 @@
-use crate::task::{Task, TaskState};
-use crate::vm::user_ptr::{UserReadPtr, UserWritePtr};
+use crate::task::TaskState;
+use crate::vm::user_ptr::UserReadPtr;
 use crate::{processor::current_task, task::future::spawn_user_task};
-use alloc::boxed::Box;
-use alloc::string::{String, ToString};
-use alloc::sync::Arc;
+use alloc::string::ToString;
 use alloc::vec::Vec;
-use config::inode::{InodeMode, InodeType};
 use config::process::CloneFlags;
-use driver::{print, println};
-use log::debug;
+use driver::println;
 use osfs::sys_root_dentry;
 use systype::{SysError, SyscallResult};
 use vfs::file::File;
@@ -76,13 +72,8 @@ pub fn sys_clone(
     }
 
     if flags.contains(CloneFlags::PARENT_SETTID) {}
-    if flags.contains(CloneFlags::CHILD_SETTID) {
-        // UserWritePtr::from(child_tid.bits()).write(&new_task, new_tid)?;
-        // new_task.tid_address().set_child_tid = Some(child_tid.bits());
-    }
-    if flags.contains(CloneFlags::CHILD_CLEARTID) {
-        // new_task.tid_address().clear_child_tid = Some(child_tid.bits());
-    }
+    if flags.contains(CloneFlags::CHILD_SETTID) {}
+    if flags.contains(CloneFlags::CHILD_CLEARTID) {}
     if flags.contains(CloneFlags::SETTLS) {
         new_task.trap_context_mut().set_user_tp(tls_ptr);
     }
@@ -116,17 +107,17 @@ pub fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult {
                 let mut str_ptr = UserReadPtr::<u8>::new(ptr, &mut *addr_space_lock);
                 let r = str_ptr.read_c_string(20);
                 if let Ok(y) = r {
-                    let tstr = core::str::from_utf8(&y).unwrap();
+                    let tstr = core::str::from_utf8(&y).map_err(SysError::from_utf8_err)?;
                     ret.push(tstr.to_string());
                 }
             }
         }
-        ret
+        Ok(ret)
     };
 
     let path = read_c_str(path);
-    let argv = read_c_ptrs(argv);
-    let envp = read_c_ptrs(envp);
+    let argv = read_c_ptrs(argv)?;
+    let envp = read_c_ptrs(envp)?;
 
     println!("argv: {:?}", argv);
     println!("envp: {:?}", envp);
@@ -139,6 +130,5 @@ pub fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult {
     let file = <dyn File>::open(dentry)?;
     let name = format!("{path:?}");
     task.execve(file, argv, envp, &name);
-    // Task::spawn_from_elf(file, &name);
     Ok(0)
 }

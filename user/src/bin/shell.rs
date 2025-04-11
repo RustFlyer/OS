@@ -3,7 +3,7 @@
 
 extern crate user_lib;
 
-use user_lib::{console::getchar, execve, fork, print, println, waitpid};
+use user_lib::{console::getchar, execve, exit, fork, print, println, sleep, waitpid};
 
 #[unsafe(no_mangle)]
 fn main() {
@@ -28,6 +28,8 @@ fn main() {
 
         if fork() == 0 {
             execve(apppath, &[], &[]);
+            exit(0);
         }
+        sleep(8000);
     }
 }

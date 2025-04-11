@@ -6,9 +6,7 @@ use alloc::vec::Vec;
 use config::vfs::AtFd;
 use core::cell::SyncUnsafeCell;
 use core::time::Duration;
-use log::info;
 use osfs::sys_root_dentry;
-use sbi_rt::legacy::send_ipi;
 use systype::SysResult;
 use vfs::dentry::Dentry;
 use vfs::file::File;
@@ -20,7 +18,6 @@ use arch::riscv64::time::get_time_duration;
 use config::process::CloneFlags;
 use mutex::SpinNoIrqLock;
 use mutex::new_share_mutex;
-use osfs::fd_table::FdTable;
 use time::TaskTimeStat;
 use timer::{TIMER_MANAGER, Timer};
 

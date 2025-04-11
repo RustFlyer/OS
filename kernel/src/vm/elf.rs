@@ -4,12 +4,11 @@ use alloc::{string::String, sync::Arc, vec::Vec};
 
 use config::mm::{USER_STACK_LOWER, USER_STACK_UPPER};
 use elf::{self, ElfStream, ParseError as ElfParseError, endian::LittleEndian, file::FileHeader};
-use log::info;
 use mm::address::VirtAddr;
 use systype::{SysError, SysResult};
 use vfs::file::File;
 
-use crate::vm::user_ptr::{UserReadWritePtr, UserWritePtr};
+use crate::vm::user_ptr::UserWritePtr;
 
 use super::{
     addr_space::AddrSpace,
@@ -112,6 +111,15 @@ impl AddrSpace {
         Ok(stack_bottom)
     }
 
+    /// Initializes user stack
+    ///
+    /// Pushes `envp-str`, `argv-str`, `platform-info`, `rand-bytes`, `envp-str-ptr`
+    /// , `argv-str-ptr`, `argc` into the stack from top to bottom.
+    ///
+    /// Returns (`ptr->argc`, `argc`, `ptr->argv-str-ptr`, `ptr->envp-str-ptr`)
+    ///
+    /// # Attention
+    /// the stack-top parameter should be aligned as the lowest bit is 0
     pub fn init_stack(
         &mut self,
         mut sp: usize,

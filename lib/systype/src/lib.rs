@@ -105,6 +105,8 @@ pub enum SysError {
     ENOSYS = 38,
     /// Directory not empty
     ENOTEMPTY = 39,
+    /// Inode is null
+    ENINODE = 40,
     /// Transport endpoint is not connected
     ENOTCONN = 107,
     /// Connection refused
@@ -157,6 +159,7 @@ impl SysError {
             ENOLCK => "No record locks available",
             ENOSYS => "Invalid system call number",
             ENOTEMPTY => "Directory not empty",
+            ENINODE => "Inode is null",
             ENOTCONN => "Transport endpoint is not connected",
             ECONNREFUSED => "Connection refused",
             EUTFFAIL => "UTF-8 Convert Failed",

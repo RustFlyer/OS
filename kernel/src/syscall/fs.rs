@@ -1,25 +1,21 @@
 use alloc::{ffi::CString, string::ToString};
 
 use driver::sbi::getchar;
-use log::info;
 use strum::FromRepr;
 
 use config::{
-    inode::{InodeMode, InodeType},
+    inode::InodeMode,
     vfs::{AtFd, OpenFlags, SeekFrom},
 };
 use mutex::SleepLock;
 use osfs::sys_root_dentry;
 use systype::{SysError, SyscallResult};
-use vfs::{file::File, kstat::Kstat, path::Path};
+use vfs::{file::File, kstat::Kstat};
 
 use crate::{
     print,
     processor::current_task,
-    vm::{
-        addr_space,
-        user_ptr::{UserReadPtr, UserWritePtr},
-    },
+    vm::user_ptr::{UserReadPtr, UserWritePtr},
 };
 
 #[allow(unused)]
@@ -51,7 +47,7 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
         parent.create(dentry.as_ref(), InodeMode::REG | mode)?;
     }
 
-    let inode = dentry.inode().unwrap();
+    let inode = dentry.inode().ok_or(SysError::EDOM)?;
     if flags.contains(OpenFlags::O_DIRECTORY) && !inode.inotype().is_dir() {
         return Err(SysError::ENOTDIR);
     }
@@ -159,3 +155,5 @@ pub fn sys_close(fd: usize) -> SyscallResult {
     task.with_mut_fdtable(|table| table.remove(fd))?;
     Ok(0)
 }
+
+// pub fn sys_mmap() -> SyscallResult {}

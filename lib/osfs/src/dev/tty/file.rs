@@ -40,7 +40,6 @@ impl File for TtyFile {
                 ch = getchar();
                 if ch == 0xff {
                     todo!();
-                    continue;
                 }
             }
             log::debug!(

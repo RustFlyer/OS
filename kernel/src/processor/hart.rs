@@ -1,7 +1,4 @@
-use crate::{
-    task::{Task, TaskState},
-    vm,
-};
+use crate::{task::Task, vm};
 use config::device::MAX_HARTS;
 
 extern crate alloc;
