@@ -5,7 +5,7 @@ use strum::FromRepr;
 
 use config::{
     inode::InodeMode,
-    vfs::{AtFd, OpenFlags, SeekFrom},
+    vfs::{AT_REMOVEDIR, AtFd, OpenFlags, SeekFrom},
 };
 use mutex::SleepLock;
 use systype::{SysError, SyscallResult};
@@ -49,7 +49,7 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
         parent.create(dentry.as_ref(), InodeMode::REG | mode)?;
     }
 
-    let inode = dentry.inode().ok_or(SysError::EDOM)?;
+    let inode = dentry.inode().ok_or(SysError::ENOENT)?;
     if flags.contains(OpenFlags::O_DIRECTORY) && !inode.inotype().is_dir() {
         return Err(SysError::ENOTDIR);
     }
@@ -57,6 +57,8 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
     log::info!("try to open dentry");
     let file = <dyn File>::open(dentry)?;
     file.set_flags(flags);
+
+    log::trace!("file flags: {:?}", file.flags());
 
     // let root_path = "/".to_string();
     // sys_root_dentry().base_open()?.ls(root_path);
@@ -192,6 +194,7 @@ pub fn sys_chdir(path: usize) -> SyscallResult {
     let mut addr_space = task.addr_space_mut().lock();
     let path = UserReadPtr::<u8>::new(path, &mut addr_space).read_c_string(30)?;
     let pathname = core::str::from_utf8(&path).map_err(SysError::from_utf8_err)?;
+
     log::debug!("[sys_chdir] path: {pathname}");
     let dentry = task.resolve_path(AtFd::FdCwd, pathname.to_string())?;
     if !dentry.inode().ok_or(SysError::ENOENT)?.inotype().is_dir() {
@@ -199,4 +202,25 @@ pub fn sys_chdir(path: usize) -> SyscallResult {
     }
     task.set_cwd(dentry);
     Ok(0)
+}
+
+pub fn sys_unlinkat(dirfd: usize, pathname: usize, flags: i32) -> SyscallResult {
+    let task = current_task();
+    let mut addr_space = task.addr_space_mut().lock();
+    let path = UserReadPtr::<u8>::new(pathname, &mut addr_space).read_c_string(30)?;
+    let pathname = core::str::from_utf8(&path).map_err(SysError::from_utf8_err)?;
+
+    log::debug!("[sys_unlinkat] path: {pathname}");
+    let dentry = task.resolve_path(AtFd::from(dirfd), pathname.to_string())?;
+    let parent = dentry.parent().expect("can not remove root directory");
+    let is_dir = dentry.inode().ok_or(SysError::ENOENT)?.inotype().is_dir();
+
+    if flags == AT_REMOVEDIR && !is_dir {
+        return Err(SysError::ENOTDIR);
+    } else if flags != AT_REMOVEDIR && is_dir {
+        return Err(SysError::EISDIR);
+    }
+
+    let r = parent.unlink(dentry.as_ref()).map(|_| 0);
+    r
 }
