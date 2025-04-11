@@ -136,15 +136,14 @@ impl VmArea {
     ///
     /// `start_va` must be page-aligned.
     ///
-    /// `flags` needs to have `RWX` bits set properly; other bits must be zero.
-    pub fn new_kernel(start_va: VirtAddr, end_va: VirtAddr, pte_flags: PteFlags) -> Self {
+    /// `pte_flags` needs to have `RWX` bits set properly; other bits must be zero.
+    pub fn new_kernel(start_va: VirtAddr, end_va: VirtAddr, prot: MemPerm) -> Self {
         Self::new_fixed_offset(
             start_va,
             end_va,
-            // This field is insignificant for kernel VMAs.
+            // This field is of no use for kernel VMAs.
             VmaFlags::PRIVATE,
-            // Set bits A and D because kernel pages are never swapped out.
-            pte_flags | PteFlags::A | PteFlags::D,
+            prot,
             KERNEL_MAP_OFFSET,
         )
     }
@@ -154,20 +153,23 @@ impl VmArea {
     ///
     /// `start_va` must be page-aligned.
     ///
-    /// `flags` needs to have `RWXAD` bits set properly; other bits must be zero.
+    /// `prot` should have `U` bit cleared, because fixed-offset VMAs are supposed to be
+    /// used in kernel space.
     pub fn new_fixed_offset(
         start_va: VirtAddr,
         end_va: VirtAddr,
         flags: VmaFlags,
-        pte_flags: PteFlags,
+        prot: MemPerm,
         offset: usize,
     ) -> Self {
+        debug_assert!(!prot.contains(MemPerm::U));
         Self {
             start: start_va,
             end: end_va.round_up(),
             flags,
-            pte_flags: pte_flags | PteFlags::V | PteFlags::G,
-            prot: MemPerm::from(pte_flags),
+            // Set bits A and D because kernel pages always reside in memory.
+            pte_flags: PteFlags::from(prot) | PteFlags::A | PteFlags::D,
+            prot,
             pages: BTreeMap::new(),
             map_type: TypedArea::Offset(OffsetArea { offset }),
             handler: None,
@@ -179,20 +181,22 @@ impl VmArea {
     /// `start_va` is the virtual address from which data in `memory` is mapped, not the
     /// starting virtual address of the VMA.
     ///
-    /// `flags` needs to have `RWX` bits set properly; other bits must be zero.
+    /// `prot` should have `U` bit set, because this VMA is supposed to be used in user
+    /// space.
     pub fn new_memory_backed(
         start_va: VirtAddr,
         end_va: VirtAddr,
         flags: VmaFlags,
-        pte_flags: PteFlags,
+        prot: MemPerm,
         memory: &'static [u8],
     ) -> Self {
+        debug_assert!(prot.contains(MemPerm::U));
         Self {
             start: start_va.round_down(),
             end: end_va.round_up(),
             flags,
-            pte_flags: pte_flags | PteFlags::V | PteFlags::U,
-            prot: MemPerm::from(pte_flags),
+            pte_flags: PteFlags::from(prot),
+            prot,
             pages: BTreeMap::new(),
             map_type: TypedArea::MemoryBacked(MemoryBackedArea::new(memory, start_va)),
             handler: Some(MemoryBackedArea::fault_handler),
@@ -206,22 +210,24 @@ impl VmArea {
     /// mapping starts. `len` is the length of the region to be mapped in the file, not
     /// the length of the VMA.
     ///
-    /// `flags` needs to have `RWX` bits set properly; other bits must be zero.
+    /// `prot` should have `U` bit set, because this VMA is supposed to be used in user
+    /// space.
     pub fn new_file_backed(
         start_va: VirtAddr,
         end_va: VirtAddr,
         flags: VmaFlags,
-        pte_flags: PteFlags,
+        prot: MemPerm,
         file: Arc<dyn File>,
         offset: usize,
         len: usize,
     ) -> Self {
+        debug_assert!(prot.contains(MemPerm::U));
         Self {
             start: start_va.round_down(),
             end: end_va.round_up(),
             flags,
-            pte_flags: pte_flags | PteFlags::V | PteFlags::U,
-            prot: MemPerm::from(pte_flags),
+            pte_flags: PteFlags::from(prot),
+            prot,
             pages: BTreeMap::new(),
             map_type: TypedArea::FileBacked(FileBackedArea::new(
                 file,
@@ -229,6 +235,30 @@ impl VmArea {
                 len,
             )),
             handler: Some(FileBackedArea::fault_handler),
+        }
+    }
+
+    /// Constructs a user space anonymous area.
+    ///
+    /// `start_va` and `end_va` must be page-aligned.
+    /// 
+    /// `prot` should have `U` bit set, because this VMA is supposed to be used in user
+    /// space.
+    pub fn new_anonymous(
+        start_va: VirtAddr,
+        end_va: VirtAddr,
+        flags: VmaFlags,
+        prot: MemPerm,
+    ) -> Self {
+        Self {
+            start: start_va,
+            end: end_va,
+            flags,
+            pte_flags: PteFlags::from(prot),
+            prot,
+            pages: BTreeMap::new(),
+            map_type: TypedArea::Anonymous(AnonymousArea),
+            handler: Some(AnonymousArea::fault_handler),
         }
     }
 
@@ -578,7 +608,6 @@ impl MemoryBackedArea {
         } = info;
 
         let page = Page::build()?;
-        page_table.map_page_to(fault_addr.page_number(), page.ppn(), area.pte_flags)?;
 
         // Fill the page with appropriate data.
         // There are 3 types of regions in the page:
@@ -607,6 +636,7 @@ impl MemoryBackedArea {
             page.as_mut_slice()[page_offset..page_offset + fill_len].fill(0);
         }
 
+        page_table.map_page_to(fault_addr.page_number(), page.ppn(), area.pte_flags)?;
         pages.insert(fault_addr.page_number(), Arc::new(page));
 
         Ok(())
@@ -821,7 +851,7 @@ impl AnonymousArea {
 
 pub fn test_unmap_range() {
     {
-        let mut vma = VmArea::new_kernel(VirtAddr::new(0x1000), VirtAddr::new(0x8000), PteFlags::V);
+        let mut vma = VmArea::new_kernel(VirtAddr::new(0x1000), VirtAddr::new(0x8000), MemPerm::empty());
         let mut page_table = PageTable::build().unwrap();
 
         for vpn in vma.start_va().page_number().to_usize()..vma.end_va().page_number().to_usize() {
@@ -847,7 +877,7 @@ pub fn test_unmap_range() {
         assert!(!vma_high.contains(VirtAddr::new(0x1000)));
     }
     {
-        let mut vma = VmArea::new_kernel(VirtAddr::new(0x1000), VirtAddr::new(0x8000), PteFlags::V);
+        let mut vma = VmArea::new_kernel(VirtAddr::new(0x1000), VirtAddr::new(0x8000), MemPerm::empty());
         let mut page_table = PageTable::build().unwrap();
 
         for vpn in vma.start_va().page_number().to_usize()..vma.end_va().page_number().to_usize() {
@@ -881,7 +911,7 @@ pub fn test_unmap_range() {
         assert!(!vma_high.contains(VirtAddr::new(0x1000)));
     }
     {
-        let mut vma = VmArea::new_kernel(VirtAddr::new(0x1000), VirtAddr::new(0x8000), PteFlags::V);
+        let mut vma = VmArea::new_kernel(VirtAddr::new(0x1000), VirtAddr::new(0x8000), MemPerm::empty());
         let mut page_table = PageTable::build().unwrap();
 
         for vpn in vma.start_va().page_number().to_usize()..vma.end_va().page_number().to_usize() {
@@ -900,7 +930,7 @@ pub fn test_unmap_range() {
         assert!(vma_high.is_none());
     }
     {
-        let mut vma = VmArea::new_kernel(VirtAddr::new(0x5000), VirtAddr::new(0x8000), PteFlags::V);
+        let mut vma = VmArea::new_kernel(VirtAddr::new(0x5000), VirtAddr::new(0x8000), MemPerm::empty());
         let mut page_table = PageTable::build().unwrap();
 
         for vpn in vma.start_va().page_number().to_usize()..vma.end_va().page_number().to_usize() {

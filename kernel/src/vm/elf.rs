@@ -12,7 +12,7 @@ use crate::vm::user_ptr::UserWritePtr;
 
 use super::{
     addr_space::AddrSpace,
-    pte::PteFlags,
+    mem_perm::MemPerm,
     vm_area::{VmArea, VmaFlags},
 };
 
@@ -69,22 +69,22 @@ impl AddrSpace {
             let offset = segment.p_offset as usize;
 
             let flags = segment.p_flags;
-            let mut pte_flags = PteFlags::empty();
+            let mut prot = MemPerm::U;
             if flags & elf::abi::PF_X != 0 {
-                pte_flags |= PteFlags::X;
+                prot |= MemPerm::X;
             }
             if flags & elf::abi::PF_W != 0 {
-                pte_flags |= PteFlags::W;
+                prot |= MemPerm::W;
             }
             if flags & elf::abi::PF_R != 0 {
-                pte_flags |= PteFlags::R;
+                prot |= MemPerm::R;
             }
 
             let area = VmArea::new_file_backed(
                 va_start,
                 va_end,
                 VmaFlags::PRIVATE,
-                pte_flags,
+                prot,
                 Arc::clone(&elf_file),
                 offset,
                 segment.p_filesz as usize,
