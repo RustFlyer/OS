@@ -14,6 +14,7 @@ use vfs::{
 
 use crate::simple::{dentry::SimpleDentry, inode::SimpleInode};
 
+pub mod stdio;
 pub mod tty;
 
 pub struct DevFsType {
@@ -34,12 +35,12 @@ impl FileSystemType for DevFsType {
     }
 
     fn base_mount(
-        self: alloc::sync::Arc<Self>,
+        self: Arc<Self>,
         name: &str,
         parent: Option<Arc<dyn Dentry>>,
         _flags: MountFlags,
         dev: Option<Arc<dyn BlockDevice>>,
-    ) -> systype::SysResult<Arc<dyn Dentry>> {
+    ) -> SysResult<Arc<dyn Dentry>> {
         let sb = DevSuperBlock::new(dev, self.clone());
         let mount_inode = SimpleInode::new(sb.clone());
         {
@@ -58,7 +59,7 @@ impl FileSystemType for DevFsType {
         Ok(mount_dentry)
     }
 
-    fn kill_sblk(&self, _sblk: Arc<dyn SuperBlock>) -> systype::SysResult<()> {
+    fn kill_sblk(&self, _sblk: Arc<dyn SuperBlock>) -> SysResult<()> {
         todo!()
     }
 }

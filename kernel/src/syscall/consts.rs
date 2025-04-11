@@ -245,3 +245,60 @@ impl SyscallNo {
         }
     }
 }
+
+use bitflags::bitflags;
+
+use crate::vm::mem_perm::MemPerm;
+
+bitflags! {
+    // See in "bits/mman-linux.h"
+    #[derive(Default, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+    pub struct MmapFlags: i32 {
+        // Sharing types (must choose one and only one of these).
+        /// Share changes.
+        const MAP_SHARED = 0x01;
+        /// Changes are private.
+        const MAP_PRIVATE = 0x02;
+        /// Share changes and validate
+        const MAP_SHARED_VALIDATE = 0x03;
+        const MAP_TYPE_MASK = 0x03;
+
+        // Other flags
+        /// Interpret addr exactly.
+        const MAP_FIXED = 0x10;
+        /// Don't use a file.
+        const MAP_ANONYMOUS = 0x20;
+        /// Don't check for reservations.
+        const MAP_NORESERVE = 0x04000;
+    }
+}
+
+bitflags! {
+    // See in "bits/mman-linux.h"
+    // NOTE: Zero bit flag is discouraged. See https://docs.rs/bitflags/latest/bitflags/#zero-bit-flags
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+    pub struct MmapProt: i32 {
+        /// Page can be read.
+        const PROT_READ = 0x1;
+        /// Page can be written.
+        const PROT_WRITE = 0x2;
+        /// Page can be executed.
+        const PROT_EXEC = 0x4;
+    }
+}
+
+impl MemPerm {
+    pub fn from_mmapprot(prot: MmapProt) -> Self {
+        let mut ret = Self::U;
+        if prot.contains(MmapProt::PROT_READ) {
+            ret |= Self::R;
+        }
+        if prot.contains(MmapProt::PROT_WRITE) {
+            ret |= Self::W;
+        }
+        if prot.contains(MmapProt::PROT_EXEC) {
+            ret |= Self::X;
+        }
+        ret
+    }
+}

@@ -15,8 +15,14 @@ use vfs::{file::File, kstat::Kstat};
 use crate::{
     print,
     processor::current_task,
-    vm::user_ptr::{UserReadPtr, UserWritePtr},
+    syscall::consts::MmapFlags,
+    vm::{
+        mem_perm::MemPerm,
+        user_ptr::{UserReadPtr, UserWritePtr},
+    },
 };
+
+use super::consts::MmapProt;
 
 #[allow(unused)]
 static WRITE_LOCK: SleepLock<()> = SleepLock::new(());
@@ -156,4 +162,37 @@ pub fn sys_close(fd: usize) -> SyscallResult {
     Ok(0)
 }
 
-// pub fn sys_mmap() -> SyscallResult {}
+pub fn sys_mmap(
+    addr: usize,
+    length: usize,
+    prot: i32,
+    flags: i32,
+    fd: usize,
+    offset: usize,
+) -> SyscallResult {
+    let task = current_task();
+    let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
+    let flags = MmapFlags::from_bits_truncate(flags);
+    let prot = MmapProt::from_bits_truncate(prot);
+    let perm = MemPerm::from_mmapprot(prot);
+
+    log::info!("[sys_mmap] addr:{addr:?} prot:{prot:?}, flags:{flags:?}, perm:{perm:?}");
+
+    match flags.intersection(MmapFlags::MAP_TYPE_MASK) {
+        MmapFlags::MAP_SHARED => Ok(0),
+        MmapFlags::MAP_PRIVATE => {
+            // let area = VmArea::new_file_backed(
+            //     va_start,
+            //     va_end,
+            //     VmaFlags::PRIVATE,
+            //     pte_flags,
+            //     Arc::clone(&elf_file),
+            //     offset,
+            //     segment.p_filesz as usize,
+            // );
+            // self.add_area(area)?;
+            Ok(0)
+        }
+        _ => Err(SysError::EINVAL),
+    }
+}

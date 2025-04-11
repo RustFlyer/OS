@@ -7,7 +7,7 @@ use vfs::{
     inode::Inode,
 };
 
-use super::file::SimpleDirFile;
+use super::{file::SimpleDirFile, inode::SimpleInode};
 
 pub struct SimpleDentry {
     meta: DentryMeta,
@@ -27,6 +27,10 @@ impl SimpleDentry {
     pub fn into_dyn(self: Arc<Self>) -> Arc<dyn Dentry> {
         self.clone()
     }
+
+    pub fn into_dyn_ref(&self) -> &dyn Dentry {
+        self
+    }
 }
 
 impl Dentry for SimpleDentry {
@@ -34,20 +38,34 @@ impl Dentry for SimpleDentry {
         &self.meta
     }
 
-    fn base_create(&self, _dentry: &dyn Dentry, _mode: InodeMode) -> SysResult<()> {
-        todo!()
+    fn base_create(&self, dentry: &dyn Dentry, mode: InodeMode) -> SysResult<()> {
+        todo!();
+        let sb = self.superblock().ok_or(SysError::ENOTDIR)?;
+        let name = dentry.name();
+        if self.get_child(name).is_none() {}
+        Ok(())
     }
 
     fn base_link(&self, _dentry: &dyn Dentry, _old_dentry: &dyn Dentry) -> SysResult<()> {
         todo!()
     }
 
-    fn base_lookup(&self, _dentry: &dyn Dentry) -> SysResult<()> {
-        todo!()
+    fn base_lookup(&self, dentry: &dyn Dentry) -> SysResult<()> {
+        todo!();
+        if !self.inode().ok_or(SysError::ENOTDIR)?.inotype().is_dir() {
+            return Err(SysError::ENOTDIR);
+        }
+
+        let name = dentry.name();
+        if self.get_child(name).is_none() {
+            // let sub_dentry = self.;
+            // self.add_child(sub_dentry);
+        }
+        Ok(())
     }
 
-    fn base_new_neg_child(self: Arc<Self>, _name: &str) -> Arc<dyn Dentry> {
-        todo!()
+    fn base_new_neg_child(self: Arc<Self>, name: &str) -> Arc<dyn Dentry> {
+        Self::new(name, self.inode(), Some(Arc::downgrade(&self.into_dyn())))
     }
 
     fn base_open(self: Arc<Self>) -> SysResult<Arc<dyn File>> {

@@ -1,5 +1,6 @@
 #![no_main]
 #![no_std]
+#![feature(new_zeroed_alloc)]
 
 use alloc::{collections::btree_map::BTreeMap, string::String, sync::Arc};
 use config::vfs::MountFlags;
@@ -46,9 +47,15 @@ pub fn init() {
         .unwrap();
     log::debug!("success mount diskfs");
 
+    let devfs = FS_MANAGER.lock().get("devfs").unwrap().clone();
+    devfs
+        .mount("dev", Some(diskfs_root.clone()), MountFlags::empty(), None)
+        .unwrap();
+    log::debug!("success mount devfs");
+
     SYS_ROOT_DENTRY.call_once(|| diskfs_root);
 
-    // dev::tty::init().expect("dev-tty init fails");
+    dev::tty::init().expect("dev-tty init fails");
 
     <dyn File>::open(sys_root_dentry())
         .unwrap()

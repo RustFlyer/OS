@@ -1,14 +1,14 @@
 use alloc::{sync::Arc, vec::Vec};
 use driver::{print, sbi::getchar};
 use mutex::SpinNoIrqLock;
-use spin::Once;
+
 use systype::SysResult;
 use vfs::{
     dentry::Dentry,
     file::{File, FileMeta},
 };
 
-use super::{inode::TtyInode, queuebuf::QueueBuffer};
+use super::queuebuf::QueueBuffer;
 
 pub struct TtyFile {
     buf: SpinNoIrqLock<QueueBuffer>,
