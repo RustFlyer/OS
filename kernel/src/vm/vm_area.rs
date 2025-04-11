@@ -70,7 +70,7 @@ pub struct VmArea {
 
 /// Unique data of a specific type of VMA. This enum is used in [`VmArea`].
 #[derive(Debug, Clone)]
-pub enum TypedArea {
+enum TypedArea {
     /// A fixed-offset VMA.
     ///
     /// A fixed-offset VMA is used to map physical addresses to virtual addresses
@@ -591,7 +591,7 @@ impl MemoryBackedArea {
     }
 
     /// Handles a page fault.
-    pub fn fault_handler(area: &mut VmArea, info: PageFaultInfo) -> SysResult<()> {
+    fn fault_handler(area: &mut VmArea, info: PageFaultInfo) -> SysResult<()> {
         let &mut Self { memory, start_va } = match &mut area.map_type {
             TypedArea::MemoryBacked(memory_backed) => memory_backed,
             _ => panic!("fault_handler: not a memory-backed area"),
@@ -704,12 +704,12 @@ impl FileBackedArea {
     /// `file` is the file backing store.
     /// `offset` is the starting offset in the file.
     /// `len` is the length of the mapped region in the file.
-    pub fn new(file: Arc<dyn File>, offset: usize, len: usize) -> Self {
+    fn new(file: Arc<dyn File>, offset: usize, len: usize) -> Self {
         Self { file, offset, len }
     }
 
     /// Handles a page fault.
-    pub fn fault_handler(area: &mut VmArea, info: PageFaultInfo) -> SysResult<()> {
+    fn fault_handler(area: &mut VmArea, info: PageFaultInfo) -> SysResult<()> {
         let &FileBackedArea {
             ref file,
             offset,
@@ -823,7 +823,7 @@ pub struct AnonymousArea;
 
 impl AnonymousArea {
     /// Handles a page fault.
-    pub fn fault_handler(area: &mut VmArea, info: PageFaultInfo) -> SysResult<()> {
+    fn fault_handler(area: &mut VmArea, info: PageFaultInfo) -> SysResult<()> {
         let &mut VmArea {
             ref mut pages,
             flags,
