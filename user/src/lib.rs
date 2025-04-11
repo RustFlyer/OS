@@ -123,7 +123,7 @@ pub fn mmap(
 }
 
 pub fn open(dirfd: usize, pathname: &str, flags: OpenFlags, mode: InodeMode) -> isize {
-    let _cstr = unsafe { CStr::from_ptr(pathname.as_ptr()) };
+    let pathname = CString::new(pathname).unwrap();
     sys_openat(
         dirfd,
         pathname.as_ptr(),

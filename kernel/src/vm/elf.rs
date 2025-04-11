@@ -127,7 +127,7 @@ impl AddrSpace {
         argv: Vec<String>,
         envp: Vec<String>,
     ) -> (usize, usize, usize, usize) {
-        log::info!("sp {:#x}", sp);
+        // log::info!("sp {:#x}", sp);
         debug_assert!(sp & 0xf == 0);
 
         let mut push_str = |sp: &mut usize, s: &str| -> usize {

@@ -228,7 +228,7 @@ impl dyn File {
             _ => self.base_read(buf, position)?,
         };
 
-        log::trace!("read len = {}", bytes_read);
+        // log::trace!("read len = {}", bytes_read);
         self.set_pos(position + bytes_read);
         Ok(bytes_read)
     }
@@ -293,7 +293,7 @@ impl dyn File {
         let size = self.size();
         let position = self.pos();
 
-        if position > size {
+        if position > size && inode.inotype() == InodeType::File {
             todo!("Holes are not supported yet");
         }
 

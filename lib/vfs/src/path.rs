@@ -30,6 +30,8 @@ impl Path {
     /// walk the path to return the final dentry
     pub fn walk(&self) -> SysResult<Arc<dyn Dentry>> {
         let path = self.path.as_str();
+        log::info!("dentry path: {}", path);
+
         let mut dentry = if path.starts_with("/") {
             Arc::clone(&self.root)
         } else {
@@ -43,9 +45,19 @@ impl Path {
                 ".." => {
                     dentry = dentry.parent().ok_or(SysError::ENOENT)?;
                 }
-                name => dentry = dentry.lookup(name)?,
+                name => {
+                    dentry = dentry.lookup(name)?;
+                }
             }
         }
+        log::info!("dentry: {}", dentry.path());
         Ok(dentry)
     }
+}
+
+pub fn split_parent_and_name(path: &str) -> (&str, Option<&str>) {
+    let trimmed_path = path.trim_start_matches('/');
+    trimmed_path.find('/').map_or((trimmed_path, None), |n| {
+        (&trimmed_path[..n], Some(&trimmed_path[n + 1..]))
+    })
 }

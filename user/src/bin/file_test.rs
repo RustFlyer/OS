@@ -19,7 +19,7 @@ fn main() {
     {
         let fd: isize = open(
             AT_FDCWD as usize,
-            "tes\0",
+            "tes",
             OpenFlags::O_CREAT | OpenFlags::O_RDWR,
             InodeMode::REG,
         );

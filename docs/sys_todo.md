@@ -28,9 +28,9 @@
 - [x] mkdir_ 
 - [ ] unlink  
 
-- [ ] getdents  
+- [?] getdents  
 
-- [ ] mount 
+- [?] mount 
 - [ ] umount
 - [ ] pipe  
 

@@ -1,15 +1,16 @@
 use alloc::{ffi::CString, string::ToString};
 
-use driver::sbi::getchar;
+use driver::{BLOCK_DEVICE, sbi::getchar};
+use osfs::FS_MANAGER;
 use strum::FromRepr;
 
 use config::{
     inode::InodeMode,
-    vfs::{AT_REMOVEDIR, AtFd, OpenFlags, SeekFrom},
+    vfs::{AT_REMOVEDIR, AtFd, MountFlags, OpenFlags, SeekFrom},
 };
 use mutex::SleepLock;
 use systype::{SysError, SyscallResult};
-use vfs::{file::File, kstat::Kstat};
+use vfs::{file::File, kstat::Kstat, path::split_parent_and_name, sys_root_dentry};
 
 use crate::{
     print,
@@ -60,8 +61,8 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
 
     log::trace!("file flags: {:?}", file.flags());
 
-    // let root_path = "/".to_string();
-    // sys_root_dentry().base_open()?.ls(root_path);
+    let root_path = "/".to_string();
+    sys_root_dentry().base_open()?.ls(root_path);
 
     task.with_mut_fdtable(|ft| ft.alloc(file, flags))
 }
@@ -71,39 +72,19 @@ pub fn sys_write(fd: usize, addr: usize, len: usize) -> SyscallResult {
     let mut addr_space_lock = task.addr_space_mut().lock();
     let mut data_ptr = UserReadPtr::<u8>::new(addr, &mut *addr_space_lock);
 
-    if fd == 1 {
-        let data = unsafe { data_ptr.read_array(len) }?;
-        let utf8_str = core::str::from_utf8(&data).map_err(SysError::from_utf8_err)?;
-        print!("{}", utf8_str);
-        Ok(utf8_str.len())
-    } else {
-        log::debug!("begin to sys write");
-        let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
-        let buf = unsafe { data_ptr.try_into_slice(len) }?;
-        log::debug!("sys write");
-        file.write(buf)
-    }
+    let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
+    let buf = unsafe { data_ptr.try_into_slice(len) }?;
+    file.write(buf)
 }
 
 pub fn sys_read(fd: usize, buf: usize, count: usize) -> SyscallResult {
     let task = current_task();
     let mut addrspace = task.addr_space_mut().lock();
 
-    let ret = if fd == 0 {
-        let mut buf = UserWritePtr::<u8>::new(buf, &mut addrspace);
-        let data = getchar();
-        unsafe {
-            buf.write(data)?;
-        };
-        Ok(1)
-    } else {
-        let mut buf = UserWritePtr::<u8>::new(buf, &mut addrspace);
-        let buf_ptr = unsafe { buf.try_into_mut_slice(count) }?;
-        let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
-        file.read(buf_ptr)
-    };
-
-    ret
+    let mut buf = UserWritePtr::<u8>::new(buf, &mut addrspace);
+    let buf_ptr = unsafe { buf.try_into_mut_slice(count) }?;
+    let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
+    file.read(buf_ptr)
 }
 
 pub fn sys_lseek(fd: usize, offset: isize, whence: usize) -> SyscallResult {
@@ -235,4 +216,55 @@ pub fn sys_getdents64(fd: usize, buf: usize, len: usize) -> SyscallResult {
     let mut buf = unsafe { ptr.try_into_mut_slice(len) }?;
     log::debug!("[sys_getdents64] try to read dir");
     file.read_dir(&mut buf)
+}
+
+pub fn sys_mount(
+    source: usize,
+    target: usize,
+    fstype: usize,
+    flags: u32,
+    data: usize,
+) -> SyscallResult {
+    let task = current_task();
+    let mut addr_space = task.addr_space_mut().lock();
+
+    let mut read_c_str = |ptr| {
+        let path = UserReadPtr::<u8>::new(ptr, &mut addr_space).read_c_string(30)?;
+        Ok(core::str::from_utf8(&path)
+            .map_err(SysError::from_utf8_err)?
+            .to_string())
+    };
+
+    let source = read_c_str(source)?;
+    let target = read_c_str(target)?;
+    let fstype = read_c_str(fstype)?;
+    let flags = MountFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
+    let data = read_c_str(data)?;
+
+    log::debug!(
+        "[sys_mount] source:{source:?}, target:{target:?}, fstype:{fstype:?}, flags:{flags:?}, data:{data:?}",
+    );
+
+    let ext4_type = FS_MANAGER.lock().get("ext4").unwrap().clone();
+    let fs_type = FS_MANAGER
+        .lock()
+        .get(&fstype)
+        .unwrap_or(&ext4_type.clone())
+        .clone();
+
+    let _fs_root = match fs_type.name().as_str() {
+        name @ "ext4" => {
+            let dev = if name.eq("ext4") {
+                Some(BLOCK_DEVICE.get().unwrap().clone())
+            } else {
+                None
+            };
+            let (parent, name) = split_parent_and_name(&target);
+
+            let parent = task.resolve_path(AtFd::FdCwd, parent.to_string())?;
+            fs_type.mount(name.unwrap(), Some(parent), flags, dev)?
+        }
+        _ => return Err(SysError::EINVAL),
+    };
+    Ok(0)
 }
