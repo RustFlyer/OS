@@ -346,21 +346,21 @@ pub fn test_find_vacant_memory() {
         VirtAddr::new(0x1000),
         VirtAddr::new(0x3000),
         VmaFlags::PRIVATE,
-        PteFlags::R | PteFlags::W,
+        MemPerm::R | MemPerm::W | MemPerm::U,
         MEMORY_1,
     );
     let area2 = VmArea::new_memory_backed(
         VirtAddr::new(0x4000),
         VirtAddr::new(0x7000),
         VmaFlags::PRIVATE,
-        PteFlags::R | PteFlags::W,
+        MemPerm::R | MemPerm::W | MemPerm::U,
         MEMORY_2,
     );
     let area3 = VmArea::new_memory_backed(
         VirtAddr::new(0xa000),
         VirtAddr::new(0xe000),
         VmaFlags::PRIVATE,
-        PteFlags::R | PteFlags::W,
+        MemPerm::R | MemPerm::W | MemPerm::U,
         MEMORY_3,
     );
 
@@ -384,7 +384,7 @@ pub fn test_find_vacant_memory() {
             addr,
             VirtAddr::new(addr.to_usize() + 0x2000),
             VmaFlags::PRIVATE,
-            PteFlags::R | PteFlags::W,
+            MemPerm::R | MemPerm::W | MemPerm::U,
             MEMORY_4,
         );
         addr_space.add_area(area4).unwrap();
@@ -403,14 +403,14 @@ pub fn test_clone_cow() {
         VirtAddr::new(0x1000),
         VirtAddr::new(0x3000),
         VmaFlags::PRIVATE,
-        PteFlags::R | PteFlags::W,
+        MemPerm::R | MemPerm::W | MemPerm::U,
         MEMORY_1,
     );
     let area2 = VmArea::new_memory_backed(
         VirtAddr::new(0x4000),
         VirtAddr::new(0x7000),
         VmaFlags::PRIVATE,
-        PteFlags::R | PteFlags::W,
+        MemPerm::R | MemPerm::W | MemPerm::U,
         MEMORY_2,
     );
 

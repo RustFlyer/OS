@@ -10,6 +10,8 @@ use bitflags::bitflags;
 use config::mm::PPN_WIDTH_SV39;
 use mm::address::PhysPageNum;
 
+use super::mem_perm::MemPerm;
+
 /// Offset of the physical page number in a page table entry. A physical page
 /// number located at bits 10-53 in a page table entry.
 const PPN_OFFSET: usize = 10;
@@ -47,6 +49,15 @@ bitflags! {
         const G = 1 << 5;
         const A = 1 << 6;
         const D = 1 << 7;
+    }
+}
+
+impl PteFlags {
+    /// Creates a new `PteFlags` from a set of `MemPerm`,
+    /// with `RWXU` bits set to the corresponding bits in `MemPerm`,
+    /// and with `V` bit set.
+    pub fn from(perm: MemPerm) -> Self {
+        Self::V | Self::from_bits_truncate(perm.bits())
     }
 }
 
