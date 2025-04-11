@@ -52,6 +52,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         CHDIR => sys_chdir(args[0]),
         BRK => sys_brk(args[0]),
         UNLINKAT => sys_unlinkat(args[0], args[1], args[2] as i32),
+        GETDENTS64 => sys_getdents64(args[0], args[1], args[2]),
         _ => {
             log::error!("Syscall not implemented: {syscall_no}");
             unimplemented!()

@@ -136,6 +136,10 @@ pub fn lseek(fd: usize, offset: isize, whence: usize) -> isize {
     sys_lseek(fd, offset, whence)
 }
 
+pub fn getdents(fd: usize, buf: &mut [u8], len: usize) -> isize {
+    sys_getdents64(fd, buf.as_mut_ptr(), len)
+}
+
 //************ task ***************/
 pub fn exit(exit_code: i32) -> ! {
     sys_exit(exit_code);

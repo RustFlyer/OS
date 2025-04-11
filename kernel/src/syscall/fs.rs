@@ -224,3 +224,15 @@ pub fn sys_unlinkat(dirfd: usize, pathname: usize, flags: i32) -> SyscallResult 
     let r = parent.unlink(dentry.as_ref()).map(|_| 0);
     r
 }
+
+pub fn sys_getdents64(fd: usize, buf: usize, len: usize) -> SyscallResult {
+    log::debug!("[sys_getdents64] fd {fd}, buf {buf:#x}, len {len:#x}");
+    let task = current_task();
+    let mut addr_space = task.addr_space_mut().lock();
+    let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
+    let mut ptr = UserWritePtr::<u8>::new(buf, &mut addr_space);
+    log::debug!("[sys_getdents64] try to get buf");
+    let mut buf = unsafe { ptr.try_into_mut_slice(len) }?;
+    log::debug!("[sys_getdents64] try to read dir");
+    file.read_dir(&mut buf)
+}
