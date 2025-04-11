@@ -39,10 +39,10 @@ impl Dentry for SimpleDentry {
     }
 
     fn base_create(&self, dentry: &dyn Dentry, mode: InodeMode) -> SysResult<()> {
-        todo!();
         let sb = self.superblock().ok_or(SysError::ENOTDIR)?;
-        let name = dentry.name();
-        if self.get_child(name).is_none() {}
+        let inode = SimpleInode::new(sb);
+        inode.set_inotype(InodeType::from(mode));
+        dentry.set_inode(inode);
         Ok(())
     }
 
@@ -51,16 +51,12 @@ impl Dentry for SimpleDentry {
     }
 
     fn base_lookup(&self, dentry: &dyn Dentry) -> SysResult<()> {
-        todo!();
-        if !self.inode().ok_or(SysError::ENOTDIR)?.inotype().is_dir() {
-            return Err(SysError::ENOTDIR);
-        }
-
         let name = dentry.name();
-        if self.get_child(name).is_none() {
-            // let sub_dentry = self.;
-            // self.add_child(sub_dentry);
-        }
+        let child = self.get_child(name).ok_or(SysError::ENOENT)?;
+        let sb = self.superblock().ok_or(SysError::ENOTDIR)?;
+        let inode = SimpleInode::new(sb);
+        inode.set_inotype(InodeType::File);
+        child.set_inode(inode);
         Ok(())
     }
 

@@ -5,7 +5,6 @@ use vfs::{
     dentry::{Dentry, DentryMeta},
     file::File,
     inode::Inode,
-    superblock::SuperBlock,
 };
 
 use super::file::TtyFile;

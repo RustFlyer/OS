@@ -6,7 +6,7 @@ use log::{debug, info};
 use systype::{SysError, SysResult};
 use vfs::file::File;
 
-use crate::simplefile::SFile;
+use crate::{dev::tty::TTY, simplefile::SFile};
 
 pub type Fd = usize;
 
@@ -47,13 +47,13 @@ impl FdTable {
     pub fn new() -> Self {
         let mut table: Vec<Option<FdInfo>> = Vec::with_capacity(MAX_FDS);
 
-        let fdinfo = FdInfo::new(Arc::new(SFile::new()), OpenFlags::empty());
+        let fdinfo = FdInfo::new(TTY.get().unwrap().clone(), OpenFlags::empty());
         table.push(Some(fdinfo));
 
-        let fdinfo = FdInfo::new(Arc::new(SFile::new()), OpenFlags::empty());
+        let fdinfo = FdInfo::new(TTY.get().unwrap().clone(), OpenFlags::empty());
         table.push(Some(fdinfo));
 
-        let fdinfo = FdInfo::new(Arc::new(SFile::new()), OpenFlags::empty());
+        let fdinfo = FdInfo::new(TTY.get().unwrap().clone(), OpenFlags::empty());
         table.push(Some(fdinfo));
 
         Self { table }

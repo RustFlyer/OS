@@ -1,6 +1,7 @@
 use alloc::{ffi::CString, string::ToString};
 
 use driver::sbi::getchar;
+use mm::address::VirtAddr;
 use strum::FromRepr;
 
 use config::{
@@ -15,14 +16,12 @@ use vfs::{file::File, kstat::Kstat};
 use crate::{
     print,
     processor::current_task,
-    syscall::consts::MmapFlags,
     vm::{
         mem_perm::MemPerm,
+        mmap::{MmapFlags, MmapProt},
         user_ptr::{UserReadPtr, UserWritePtr},
     },
 };
-
-use super::consts::MmapProt;
 
 #[allow(unused)]
 static WRITE_LOCK: SleepLock<()> = SleepLock::new(());
@@ -124,7 +123,6 @@ pub fn sys_lseek(fd: usize, offset: isize, whence: usize) -> SyscallResult {
         Whence::SeekSet => file.seek(SeekFrom::Start(offset as u64)),
         Whence::SeekCur => file.seek(SeekFrom::Current(offset as i64)),
         Whence::SeekEnd => file.seek(SeekFrom::End(offset as i64)),
-        _ => todo!(),
     }
 }
 
@@ -162,6 +160,19 @@ pub fn sys_close(fd: usize) -> SyscallResult {
     Ok(0)
 }
 
+pub fn sys_dup(fd: usize) -> SyscallResult {
+    log::info!("[sys_dup] oldfd: {fd}");
+    let task = current_task();
+    task.with_mut_fdtable(|table| table.dup(fd))
+}
+
+pub fn sys_dup3(oldfd: usize, newfd: usize, flags: i32) -> SyscallResult {
+    let task = current_task();
+    let flags = OpenFlags::from_bits_truncate(flags);
+    assert!(oldfd != newfd);
+    task.with_mut_fdtable(|table| table.dup3(oldfd, newfd, flags))
+}
+
 pub fn sys_mmap(
     addr: usize,
     length: usize,
@@ -175,24 +186,15 @@ pub fn sys_mmap(
     let flags = MmapFlags::from_bits_truncate(flags);
     let prot = MmapProt::from_bits_truncate(prot);
     let perm = MemPerm::from_mmapprot(prot);
+    let va = VirtAddr::new(addr);
 
     log::info!("[sys_mmap] addr:{addr:?} prot:{prot:?}, flags:{flags:?}, perm:{perm:?}");
 
-    match flags.intersection(MmapFlags::MAP_TYPE_MASK) {
-        MmapFlags::MAP_SHARED => Ok(0),
-        MmapFlags::MAP_PRIVATE => {
-            // let area = VmArea::new_file_backed(
-            //     va_start,
-            //     va_end,
-            //     VmaFlags::PRIVATE,
-            //     pte_flags,
-            //     Arc::clone(&elf_file),
-            //     offset,
-            //     segment.p_filesz as usize,
-            // );
-            // self.add_area(area)?;
-            Ok(0)
-        }
-        _ => Err(SysError::EINVAL),
+    if addr == 0 && flags.contains(MmapFlags::MAP_FIXED) {
+        return Err(SysError::EINVAL);
     }
+
+    task.addr_space_mut()
+        .lock()
+        .map_file(file, flags, prot, va, length, offset)
 }

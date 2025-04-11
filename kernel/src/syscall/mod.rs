@@ -36,6 +36,16 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         CLOSE => sys_close(args[0]),
         GETPPID => sys_getppid(),
         UNAME => sys_uname(args[0]),
+        DUP => sys_dup(args[0]),
+        DUP3 => sys_dup3(args[0], args[1], args[2] as i32),
+        MMAP => sys_mmap(
+            args[0],
+            args[1],
+            args[2] as i32,
+            args[3] as i32,
+            args[4],
+            args[5],
+        ),
         _ => {
             log::error!("Syscall not implemented: {syscall_no}");
             unimplemented!()
