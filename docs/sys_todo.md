@@ -16,16 +16,16 @@
 - [x] write
 - [x] close  
 - [x] yield
+
 - [?] uname  
+- [x] getppid
 
-- [ ] getppid
-
-- [ ] mmap   
+- [x] mmap   
 - [ ] munmap  
 - [ ] brk  
 
-- [ ] chdir
-- [ ] mkdir_        
+- [x] chdir
+- [x] mkdir_ 
 - [ ] unlink  
 
 - [ ] getdents  
@@ -37,3 +37,5 @@
 - [ ] exit      - wait
 - [ ] waitpid
 - [ ] wait
+
+# src-code link: https://github.com/oscomp/testsuits-for-oskernel/tree/pre-2025/basic/user/src/oscomp

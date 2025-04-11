@@ -1,12 +1,14 @@
 mod consts;
 mod fs;
 mod misc;
+mod mm;
 mod process;
 mod time;
 
 use consts::SyscallNo::{self, *};
 use fs::*;
 use misc::sys_uname;
+use mm::*;
 use process::*;
 use time::*;
 
@@ -46,6 +48,8 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
             args[4],
             args[5],
         ),
+        MKDIR => sys_mkdirat(args[0], args[1], args[2] as u32),
+        CHDIR => sys_chdir(args[0]),
         _ => {
             log::error!("Syscall not implemented: {syscall_no}");
             unimplemented!()

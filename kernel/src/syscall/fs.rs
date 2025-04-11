@@ -1,7 +1,6 @@
 use alloc::{ffi::CString, string::ToString};
 
 use driver::sbi::getchar;
-use mm::address::VirtAddr;
 use strum::FromRepr;
 
 use config::{
@@ -9,7 +8,6 @@ use config::{
     vfs::{AtFd, OpenFlags, SeekFrom},
 };
 use mutex::SleepLock;
-use osfs::sys_root_dentry;
 use systype::{SysError, SyscallResult};
 use vfs::{file::File, kstat::Kstat};
 
@@ -17,8 +15,7 @@ use crate::{
     print,
     processor::current_task,
     vm::{
-        mem_perm::MemPerm,
-        mmap::{MmapFlags, MmapProt},
+        addr_space,
         user_ptr::{UserReadPtr, UserWritePtr},
     },
 };
@@ -61,8 +58,8 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
     let file = <dyn File>::open(dentry)?;
     file.set_flags(flags);
 
-    let root_path = "/".to_string();
-    sys_root_dentry().base_open()?.ls(root_path);
+    // let root_path = "/".to_string();
+    // sys_root_dentry().base_open()?.ls(root_path);
 
     task.with_mut_fdtable(|ft| ft.alloc(file, flags))
 }
@@ -173,28 +170,33 @@ pub fn sys_dup3(oldfd: usize, newfd: usize, flags: i32) -> SyscallResult {
     task.with_mut_fdtable(|table| table.dup3(oldfd, newfd, flags))
 }
 
-pub fn sys_mmap(
-    addr: usize,
-    length: usize,
-    prot: i32,
-    flags: i32,
-    fd: usize,
-    offset: usize,
-) -> SyscallResult {
+pub fn sys_mkdirat(dirfd: usize, pathname: usize, mode: u32) -> SyscallResult {
     let task = current_task();
-    let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
-    let flags = MmapFlags::from_bits_truncate(flags);
-    let prot = MmapProt::from_bits_truncate(prot);
-    let perm = MemPerm::from_mmapprot(prot);
-    let va = VirtAddr::new(addr);
+    let mut addr_space = task.addr_space_mut().lock();
+    let path = UserReadPtr::<u8>::new(pathname, &mut addr_space).read_c_string(30)?;
+    let pathname = core::str::from_utf8(&path).map_err(SysError::from_utf8_err)?;
 
-    log::info!("[sys_mmap] addr:{addr:?} prot:{prot:?}, flags:{flags:?}, perm:{perm:?}");
-
-    if addr == 0 && flags.contains(MmapFlags::MAP_FIXED) {
-        return Err(SysError::EINVAL);
+    let dentry = task.resolve_path(AtFd::from(dirfd), pathname.to_string())?;
+    if !dentry.is_negative() {
+        return Err(SysError::EEXIST);
     }
 
-    task.addr_space_mut()
-        .lock()
-        .map_file(file, flags, prot, va, length, offset)
+    let parent = dentry.parent().ok_or(SysError::ENOENT)?;
+    let mode = InodeMode::from_bits_truncate(mode).union(InodeMode::DIR);
+    parent.mkdir(dentry.as_ref(), mode)?;
+    Ok(0)
+}
+
+pub fn sys_chdir(path: usize) -> SyscallResult {
+    let task = current_task();
+    let mut addr_space = task.addr_space_mut().lock();
+    let path = UserReadPtr::<u8>::new(path, &mut addr_space).read_c_string(30)?;
+    let pathname = core::str::from_utf8(&path).map_err(SysError::from_utf8_err)?;
+    log::debug!("[sys_chdir] path: {pathname}");
+    let dentry = task.resolve_path(AtFd::FdCwd, pathname.to_string())?;
+    if !dentry.inode().ok_or(SysError::ENOENT)?.inotype().is_dir() {
+        return Err(SysError::ENOTDIR);
+    }
+    task.set_cwd(dentry);
+    Ok(0)
 }

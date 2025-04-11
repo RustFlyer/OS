@@ -295,6 +295,10 @@ impl Task {
     pub fn set_pgid(&self, pgid: PGid) {
         *self.pgid_mut().lock() = pgid;
     }
+
+    pub fn set_cwd(&self, dentry: Arc<dyn Dentry>) {
+        *self.cwd.lock() = dentry;
+    }
     // ========== This Part You Can Change the Member of Task  ===========
     pub fn add_child(&self, child: Arc<Task>) {
         self.children

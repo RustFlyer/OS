@@ -5,6 +5,7 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 use config::process::CloneFlags;
 use driver::println;
+use log::info;
 use osfs::sys_root_dentry;
 use systype::{SysError, SyscallResult};
 use vfs::file::File;
@@ -22,7 +23,9 @@ pub fn sys_getpid() -> SyscallResult {
 }
 
 pub fn sys_getppid() -> SyscallResult {
-    Ok(current_task().ppid())
+    let r = current_task().ppid();
+    info!("[sys_getppid] ppid: {r:?}");
+    Ok(r)
 }
 
 /// _exit() system call terminates only the calling thread, and actions such as
