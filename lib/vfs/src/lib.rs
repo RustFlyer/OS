@@ -3,6 +3,10 @@
 #![feature(ptr_as_ref_unchecked)]
 #![feature(sync_unsafe_cell)]
 
+use alloc::sync::Arc;
+use dentry::Dentry;
+use spin::Once;
+
 pub mod dcache;
 pub mod dentry;
 pub mod direntry;
@@ -16,3 +20,9 @@ pub mod superblock;
 
 #[macro_use]
 extern crate alloc;
+
+pub static SYS_ROOT_DENTRY: Once<Arc<dyn Dentry>> = Once::new();
+
+pub fn sys_root_dentry() -> Arc<dyn Dentry> {
+    SYS_ROOT_DENTRY.get().unwrap().clone()
+}

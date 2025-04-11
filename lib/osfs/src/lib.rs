@@ -6,8 +6,7 @@ use config::vfs::MountFlags;
 use dev::DevFsType;
 use driver::BLOCK_DEVICE;
 use mutex::SpinNoIrqLock;
-use spin::Once;
-use vfs::{dentry::Dentry, file::File, fstype::FileSystemType};
+use vfs::{SYS_ROOT_DENTRY, file::File, fstype::FileSystemType};
 
 extern crate alloc;
 
@@ -16,14 +15,10 @@ pub mod fd_table;
 pub mod simple;
 pub mod simplefile;
 
+pub use vfs::sys_root_dentry;
+
 pub static FS_MANAGER: SpinNoIrqLock<BTreeMap<String, Arc<dyn FileSystemType>>> =
     SpinNoIrqLock::new(BTreeMap::new());
-
-static SYS_ROOT_DENTRY: Once<Arc<dyn Dentry>> = Once::new();
-
-pub fn sys_root_dentry() -> Arc<dyn Dentry> {
-    SYS_ROOT_DENTRY.get().unwrap().clone()
-}
 
 type DiskFsType = ext4::fs::ExtFsType;
 
