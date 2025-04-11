@@ -1,9 +1,9 @@
-extern crate alloc;
 use alloc::{
     collections::BTreeMap,
     string::{String, ToString},
     sync::Arc,
 };
+
 use config::vfs::MountFlags;
 use driver::BlockDevice;
 use mutex::SpinNoIrqLock;
