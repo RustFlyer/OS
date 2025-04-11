@@ -254,7 +254,6 @@ impl AddrSpace {
         }
 
         // Find the heap area
-        // let heap_area = self
         let mut vma_iter = self.vm_areas.iter_mut();
         let heap_area = vma_iter.find(|(_, vma)| vma.is_heap()).unwrap().1;
         let heap_start = heap_area.start_va().to_usize();
