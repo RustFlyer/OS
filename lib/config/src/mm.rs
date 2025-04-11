@@ -116,6 +116,14 @@ pub const MMIO_START: usize = MMIO_START_PHYS + KERNEL_MAP_OFFSET;
 /// End of MMIO space in virtual memory
 pub const MMIO_END: usize = MMIO_END_PHYS + KERNEL_MAP_OFFSET;
 
+/// Detailed MMIO space ranges
+pub const MMIO_PHYS_RANGES: &[(usize, usize)] = &[
+    (0x0200_0000, 0x10000),  // CLINT
+    (0x0c00_0000, 0x400000), // PLIC
+    (0x1000_0000, 0x1000),   // UART
+    (0x1000_1000, 0x1000),   // VIRTIO
+];
+
 // /// Address of the device tree blob
 pub static mut DTB_ADDR: usize = 0;
 // /// Maximum size of the device tree blob

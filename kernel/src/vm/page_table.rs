@@ -10,8 +10,9 @@ use riscv::register::satp::{self, Satp};
 
 use arch::riscv64::mm::{fence, sfence_vma_addr, sfence_vma_all_except_global, tlb_shootdown};
 use config::mm::{
-    MMIO_END, MMIO_START, PTE_PER_TABLE, VIRT_END, bss_end, bss_start, data_end, data_start,
-    kernel_end, kernel_start, rodata_end, rodata_start, text_end, text_start,
+    KERNEL_MAP_OFFSET, MMIO_END, MMIO_PHYS_RANGES, MMIO_START, PTE_PER_TABLE, VIRT_END, bss_end,
+    bss_start, data_end, data_start, kernel_end, kernel_start, rodata_end, rodata_start, text_end,
+    text_start,
 };
 use mm::{
     address::{PhysPageNum, VirtAddr, VirtPageNum},
@@ -120,11 +121,13 @@ impl PageTable {
         OffsetArea::map(&alloc_vma, &mut page_table);
 
         /* Map memory-mapped I/O */
-        let mmio_start_va = VirtAddr::new(MMIO_START);
-        let mmio_end_va = VirtAddr::new(MMIO_END);
         let mmio_prot = MemPerm::R | MemPerm::W;
-        let mmio_vma = VmArea::new_kernel(mmio_start_va, mmio_end_va, mmio_prot);
-        OffsetArea::map(&mmio_vma, &mut page_table);
+        for &(start_pa, len) in MMIO_PHYS_RANGES {
+            let mmio_start_va = VirtAddr::new(start_pa + KERNEL_MAP_OFFSET);
+            let mmio_end_va = VirtAddr::new(start_pa + len + KERNEL_MAP_OFFSET);
+            let mmio_vma = VmArea::new_kernel(mmio_start_va, mmio_end_va, mmio_prot);
+            OffsetArea::map(&mmio_vma, &mut page_table);
+        }
 
         page_table
     }
