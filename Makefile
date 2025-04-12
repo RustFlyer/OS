@@ -140,7 +140,7 @@ user:
 
 
 PHONY += fs-img
-fs-img:
+fs-img: user
 	@echo "building fs-img ext4..."
 	@echo $(FS_IMG)
 	@rm -rf $(FS_IMG)
@@ -150,10 +150,10 @@ fs-img:
 	@mkdir -p emnt
 	@sudo mount -t ext4 -o loop $(FS_IMG) emnt
 	@sudo cp -r $(USER_ELFS) emnt/
-	@sudo cp -r file/red emnt/
+	@sudo cp -r testcase/basic/* emnt/
 	@sudo chmod -R 755 emnt/
 	@sudo umount emnt
-	@rm -rf emnt
+	@sudo rm -rf emnt
 	@echo "building fs-img finished"
 
 

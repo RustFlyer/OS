@@ -1,7 +1,7 @@
 use alloc::sync::Arc;
 
 use mutex::ShareMutex;
-use systype::{SysError, SyscallResult};
+use systype::{SysError, SysResult};
 use vfs::file::{File, FileMeta};
 
 use crate::{
@@ -32,14 +32,16 @@ impl File for ExtFileFile {
         &self.meta
     }
 
-    fn base_read(&self, buf: &mut [u8], pos: usize) -> SyscallResult {
+    fn base_read(&self, buf: &mut [u8], pos: usize) -> SysResult<usize> {
         let mut file = self.file.lock();
         file.seek(pos as i64, FileSeekType::SeekSet)
             .map_err(SysError::from_i32)?;
-        file.read(buf).map_err(SysError::from_i32)
+        let bytes_read = file.read(buf).map_err(SysError::from_i32)?;
+        buf[bytes_read..].fill(0);
+        Ok(bytes_read)
     }
 
-    fn base_write(&self, buf: &[u8], pos: usize) -> SyscallResult {
+    fn base_write(&self, buf: &[u8], pos: usize) -> SysResult<usize> {
         let mut file = self.file.lock();
         file.seek(pos as i64, FileSeekType::SeekSet)
             .map_err(SysError::from_i32)?;

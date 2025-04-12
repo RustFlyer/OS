@@ -5,7 +5,8 @@ use bitflags::bitflags;
 use super::pte::PteFlags;
 
 bitflags! {
-    /// Memory permission corresponding to R, W, X, and U bits in a page table entry.
+    /// Memory permission/access type corresponding to R, W, X, and U bits in a page
+    /// table entry.
     ///
     /// The bits of `MemPerm` are a subset of the bits of `PteFlags`, and their bit
     /// positions are the same as those in `PteFlags` for easy conversion between them.

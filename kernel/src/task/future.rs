@@ -39,7 +39,7 @@ impl<F: Future + Send + 'static> Future for UserFuture<F> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let future = unsafe { Pin::get_unchecked_mut(self) };
         let hart = current_hart();
-        log::debug!("switch to task [{}]!", future.task.get_name());
+        // log::debug!("switch to task [{}]!", future.task.get_name());
         hart.user_switch_in(&mut future.task, &mut future.pps);
         let ret = unsafe { Pin::new_unchecked(&mut future.future).poll(cx) };
         hart.user_switch_out(&mut future.pps);

@@ -1,17 +1,18 @@
-use crate::processor::current_hart;
-use crate::syscall::syscall;
-use crate::task::{Task, TaskState, yield_now};
-use crate::trap::load_trap_handler;
-use crate::vm::user_ptr::UserReadPtr;
-use arch::riscv64::time::{get_time_duration, set_nx_timer_irq};
-use mm::address::VirtAddr;
-use mm::vm::mem_perm::MemPerm;
 use riscv::{ExceptionNumber, InterruptNumber};
 use riscv::{
     interrupt::{Exception, Interrupt, Trap},
     register,
 };
+
+use arch::riscv64::time::{get_time_duration, set_nx_timer_irq};
+use mm::address::VirtAddr;
 use timer::TIMER_MANAGER;
+
+use crate::syscall::syscall;
+use crate::task::{Task, TaskState, yield_now};
+use crate::trap::load_trap_handler;
+use crate::vm::mem_perm::MemPerm;
+use crate::vm::user_ptr::UserReadPtr;
 
 /// handle exception or interrupt from a task, return if success.
 /// __trap_from_user saved TrapContext, then jump to
@@ -60,7 +61,7 @@ pub async fn user_exception_handler(task: &Task, e: Exception, stval: usize) {
             let access = match e {
                 Exception::InstructionPageFault => MemPerm::X,
                 Exception::LoadPageFault => MemPerm::R,
-                Exception::StorePageFault => MemPerm::W | MemPerm::R,
+                Exception::StorePageFault => MemPerm::W,
                 _ => unreachable!(),
             };
             let fault_addr = VirtAddr::new(stval);

@@ -1,11 +1,9 @@
-extern crate alloc;
 use alloc::collections::btree_map::BTreeMap;
 use alloc::string::ToString;
 use alloc::sync::Arc;
-use mm::vm::addr_space::{AddrSpace, switch_to};
-use osfs::fd_table::FdTable;
-use riscv::asm::sfence_vma_all;
-use time::TaskTimeStat;
+use vfs::file::File;
+use core::cell::SyncUnsafeCell;
+use core::time::Duration;
 
 use super::future::{self};
 use super::manager::TASK_MANAGER;
@@ -14,14 +12,19 @@ use super::sig_members::SigManager;
 use super::threadgroup::ThreadGroup;
 use super::tid::tid_alloc;
 use super::{task::*, threadgroup};
+use riscv::asm::sfence_vma_all;
+use super::task::*;
+use crate::vm::addr_space::{AddrSpace, switch_to};
 
 use arch::riscv64::time::get_time_duration;
 use config::process::CloneFlags;
-use core::cell::SyncUnsafeCell;
-use core::time::Duration;
 use mutex::SpinNoIrqLock;
 use mutex::new_share_mutex;
+use osfs::fd_table::FdTable;
+use time::TaskTimeStat;
 use timer::{TIMER_MANAGER, Timer};
+
+
 
 impl Task {
     /// Switches Task to User
@@ -50,9 +53,9 @@ impl Task {
     }
 
     /// Spawns from Elf
-    pub fn spawn_from_elf(elf_data: &'static [u8], name: &str) {
+    pub fn spawn_from_elf(elf_file: Arc<dyn File>, name: &str) {
         let mut addrspace = AddrSpace::build_user().unwrap();
-        let entry_point = addrspace.load_elf(elf_data).unwrap();
+        let entry_point = addrspace.load_elf(elf_file).unwrap();
         let stack = addrspace.map_stack().unwrap();
         addrspace.map_heap().unwrap();
         let task = Arc::new(Task::new(

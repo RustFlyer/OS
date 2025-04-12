@@ -4,14 +4,15 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+config = { path = "../config" }
+driver = { path = "../driver" }
 mm = { path = "../mm" }
 mutex = { path = "../mutex" }
-config = { path = "../config" }
 systype = { path = "../systype" }
-driver = { path = "../driver" }
 
-spin = { workspace = true } 
+async-trait = { workspace = true }
 downcast-rs = { workspace = true }
+elf = { workspace = true }
 hashbrown = { workspace = true }
 log = { workspace = true }
-async-trait = { workspace = true }
+spin = { workspace = true }

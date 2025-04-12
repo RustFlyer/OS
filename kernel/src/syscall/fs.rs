@@ -1,5 +1,6 @@
 use alloc::string::ToString;
 
+use driver::sbi::getchar;
 use strum::FromRepr;
 
 use config::{
@@ -50,7 +51,6 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
     }
 
     let inode = dentry.inode().unwrap();
-    inode.set_inotype(InodeType::from(mode));
     if flags.contains(OpenFlags::O_DIRECTORY) && !inode.inotype().is_dir() {
         return Err(SysError::ENOTDIR);
     }
@@ -88,12 +88,25 @@ pub fn sys_write(fd: usize, addr: usize, len: usize) -> SyscallResult {
 pub fn sys_read(fd: usize, buf: usize, count: usize) -> SyscallResult {
     let task = current_task();
     let mut addrspace = task.addr_space_mut().lock();
-    let mut buf = UserWritePtr::<u8>::new(buf, &mut addrspace);
-    let buf_ptr = unsafe { buf.try_into_mut_slice(count) }?;
 
-    log::debug!("begin to sys read");
-    let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
-    let ret = file.read(buf_ptr);
+    // log::debug!("begin to sys read");
+
+    let ret = if fd == 0 {
+        // info!("begin to getchar");
+        let mut buf = UserWritePtr::<u8>::new(buf, &mut addrspace);
+        let data = getchar();
+        unsafe {
+            buf.write(data)?;
+        };
+        // info!("finish getchar {}", data);
+        // info!("finish getchar {} buf: {:?}, count: {}", data, buf, count);
+        Ok(1)
+    } else {
+        let mut buf = UserWritePtr::<u8>::new(buf, &mut addrspace);
+        let buf_ptr = unsafe { buf.try_into_mut_slice(count) }?;
+        let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
+        file.read(buf_ptr)
+    };
 
     // info!("sys read => {:?}", buf_ptr);
 

@@ -10,8 +10,6 @@ use config::mm::{
     KERNEL_MAP_OFFSET, PA_WIDTH_SV39, PAGE_SIZE, PPN_WIDTH_SV39, USER_END, VA_WIDTH_SV39,
     VPN_WIDTH_SV39,
 };
-use log::{info, warn};
-use simdebug::stop;
 
 /// An address in physical memory defined in Sv39.
 ///

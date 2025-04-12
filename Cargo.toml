@@ -1,16 +1,18 @@
 [workspace]
-members = [ "kernel", "lib/*", "user"]
+members = ["kernel", "lib/*", "user"]
 resolver = "2"
 
 [workspace.dependencies]
-async-task =  { version = "4.7", default-features = false }
-bitflags = "2.9"
+async-task = { version = "4.7", default-features = false }
+async-trait = "0.1"
 bit_field = "0.10"
+bitflags = "2.9"
 bitmap-allocator = "0.2"
 buddy_system_allocator = "0.11"
 cfg-if = "1.0"
 crate_interface = "0.1"
-elf = { version = "0.7", default-features = false }
+downcast-rs = { version = "1.2", default-features = false }
+hashbrown = "0.14"
 lazy_static = { version = "1.5", features = ["spin_no_std"] }
 log = "0.4"
 riscv = { version = "0.13", features = ["s-mode"] }
@@ -20,7 +22,8 @@ spin = { version = "0.9", features = ["lazy"] }
 strum = { version = "0.27", default-features = false, features = ["derive"] }
 virtio-drivers = { version = "0.7" }
 uart_16550 = "0.3"
-downcast-rs = { version = "1.2", default-features = false }
-hashbrown = "0.14"
-async-trait = "0.1"
+
+elf = { git = "https://github.com/adong660/rust-elf.git", branch = "no-std-elfstream", default-features = false, features = [
+    "alloc",
+] }
 lwext4_rust = { git = "https://github.com/EchudeT/lwext4_rust.git", rev = "719c" }

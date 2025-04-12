@@ -24,20 +24,24 @@
 //! maintaining modularization and extensibility.
 
 use alloc::{collections::btree_map::BTreeMap, sync::Arc, vec::Vec};
-use config::mm::KERNEL_MAP_OFFSET;
 use core::{fmt::Debug, mem};
 
-use arch::riscv64::mm::sfence_vma_addr;
+use bitflags::bitflags;
 
+use arch::riscv64::mm::{sfence_vma_addr, sfence_vma_all_except_global};
+use config::mm::{KERNEL_MAP_OFFSET, PAGE_SIZE};
+use mm::{
+    address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum},
+    page_cache::page::Page,
+};
 use systype::{SysError, SysResult};
+use vfs::file::File;
 
 use super::{
     mem_perm::MemPerm,
-    page_cache::page::Page,
     page_table::PageTable,
     pte::{PageTableEntry, PteFlags},
 };
-use crate::address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum};
 
 /// A virtual memory area (VMA).
 ///
@@ -45,15 +49,17 @@ use crate::address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum};
 /// a common set of attributes, such as permissions and mapping type.
 #[derive(Clone)]
 pub struct VmArea {
-    /// Starting virtual address.
+    /// Starting virtual address, page-aligned.
     start: VirtAddr,
-    /// Ending virtual address (exclusive).
+    /// Ending virtual address (exclusive), page-aligned.
     end: VirtAddr,
+    /// Flags of the VMA.
+    flags: VmaFlags,
+    /// Memory protection of the VMA.
+    prot: MemPerm,
     /// Cache for leaf page table entry flags, which are default when creating
     /// a new leaf entry.
-    flags: PteFlags,
-    /// Permission.
-    perm: MemPerm,
+    pte_flags: PteFlags,
     /// Allocated physical pages.
     pages: BTreeMap<VirtPageNum, Arc<Page>>,
     /// Unique data of a specific type of VMA.
@@ -66,32 +72,38 @@ pub struct VmArea {
 #[derive(Debug, Clone)]
 pub enum TypedArea {
     /// A fixed-offset VMA.
+    ///
+    /// A fixed-offset VMA is used to map physical addresses to virtual addresses
+    /// by adding a fixed offset. This is used for kernel space and MMIO regions.
+    /// This kind of VMAs do not have a page fault handler, and a page fault will
+    /// never occur in this kind of VMAs.
     Offset(OffsetArea),
     /// A memory-backed VMA.
+    ///
+    /// A memory-backed VMA is backed by a memory region. This is a temporary VMA
+    /// used as an analogy to a file-backed VMA.
     MemoryBacked(MemoryBackedArea),
+    /// A file-backed VMA.
+    ///
+    /// A file-backed VMA is backed by a file. It is created when loading an executable
+    /// file or `mmap`ing a file.
+    FileBacked(FileBackedArea),
     /// An anonymous VMA.
     ///
-    /// An anonymous VMA is not backed by any file or memory. A user heap or stack,
-    /// or an area created by `mmap` with `MAP_ANONYMOUS` flag, is an anonymous VMA.
+    /// An anonymous VMA is not backed by any file or memory. A user stack or an area
+    /// created by `mmap` with `MAP_ANONYMOUS` flag, is an anonymous VMA.
     Anonymous(AnonymousArea),
     /// A heap VMA representing a user heap. This is just a special case of an
     /// anonymous area.
     Heap(AnonymousArea),
-    /// A file-backed VMA.
-    ///
-    /// A file-backed VMA is backed by a file. It is used for memory-mapped files.
-    FileBacked,
 }
 
 /// Page fault handler function type.
 ///
-/// The handler is responsible for handling a “normal” page fault, which is not a COW page fault
+/// The handler is responsible for handling a “normal” page fault, which is not a CoW page fault
 /// or a page fault due to TLB not being flushed. The handler is called when the permission is
-/// allowed, the fault is not a COW fault, and the page is not already mapped by another thread.
-///
-/// The [`Page`] parameter is the physical page allocated for the faulting virtual address, which
-/// the handler may need to fill with appropriate data.
-type PageFaultHandler = fn(&mut VmArea, PageFaultInfo, Page) -> SysResult<()>;
+/// allowed, the fault is not a CoW fault, and the page is not already mapped by another thread.
+type PageFaultHandler = fn(&mut VmArea, PageFaultInfo) -> SysResult<()>;
 
 /// Data passed to a page fault handler.
 ///
@@ -106,19 +118,33 @@ pub struct PageFaultInfo<'a> {
     pub access: MemPerm,
 }
 
+bitflags! {
+    /// Flags of a VMA.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub struct VmaFlags: u8 {
+        /// The VMA is shared.
+        const SHARED = 1 << 0;
+        /// The VMA is private.
+        const PRIVATE = 1 << 1;
+    }
+}
+
 impl VmArea {
     /// Constructs a global [`VmArea`] whose specific type is [`OffsetArea`], representing
-    /// an area in the kernel space which is not a MMIO region.
+    /// an area in the kernel space, which has an offset of `KERNEL_MAP_OFFSET` from the
+    /// physical address.
     ///
     /// `start_va` must be page-aligned.
     ///
     /// `flags` needs to have `RWX` bits set properly; other bits must be zero.
-    pub fn new_kernel(start_va: VirtAddr, end_va: VirtAddr, flags: PteFlags) -> Self {
+    pub fn new_kernel(start_va: VirtAddr, end_va: VirtAddr, pte_flags: PteFlags) -> Self {
         Self::new_fixed_offset(
             start_va,
             end_va,
+            // This field is insignificant for kernel VMAs.
+            VmaFlags::PRIVATE,
             // Set bits A and D because kernel pages are never swapped out.
-            flags | PteFlags::A | PteFlags::D,
+            pte_flags | PteFlags::A | PteFlags::D,
             KERNEL_MAP_OFFSET,
         )
     }
@@ -132,14 +158,16 @@ impl VmArea {
     pub fn new_fixed_offset(
         start_va: VirtAddr,
         end_va: VirtAddr,
-        flags: PteFlags,
+        flags: VmaFlags,
+        pte_flags: PteFlags,
         offset: usize,
     ) -> Self {
         Self {
             start: start_va,
             end: end_va.round_up(),
-            flags: flags | PteFlags::V | PteFlags::G,
-            perm: MemPerm::from(flags),
+            flags,
+            pte_flags: pte_flags | PteFlags::V | PteFlags::G,
+            prot: MemPerm::from(pte_flags),
             pages: BTreeMap::new(),
             map_type: TypedArea::Offset(OffsetArea { offset }),
             handler: None,
@@ -155,17 +183,52 @@ impl VmArea {
     pub fn new_memory_backed(
         start_va: VirtAddr,
         end_va: VirtAddr,
-        flags: PteFlags,
+        flags: VmaFlags,
+        pte_flags: PteFlags,
         memory: &'static [u8],
     ) -> Self {
         Self {
             start: start_va.round_down(),
             end: end_va.round_up(),
-            flags: flags | PteFlags::V | PteFlags::U,
-            perm: MemPerm::from(flags),
+            flags,
+            pte_flags: pte_flags | PteFlags::V | PteFlags::U,
+            prot: MemPerm::from(pte_flags),
             pages: BTreeMap::new(),
             map_type: TypedArea::MemoryBacked(MemoryBackedArea::new(memory, start_va)),
             handler: Some(MemoryBackedArea::fault_handler),
+        }
+    }
+
+    /// Constructs a user space [`VmArea`] whose specific type is [`FileBackedArea`].
+    ///
+    /// `start_va` is the virtual address from which the file is mapped, not the starting
+    /// virtual address of the VMA. `offset` is the offset in the file from which the
+    /// mapping starts. `len` is the length of the region to be mapped in the file, not
+    /// the length of the VMA.
+    ///
+    /// `flags` needs to have `RWX` bits set properly; other bits must be zero.
+    pub fn new_file_backed(
+        start_va: VirtAddr,
+        end_va: VirtAddr,
+        flags: VmaFlags,
+        pte_flags: PteFlags,
+        file: Arc<dyn File>,
+        offset: usize,
+        len: usize,
+    ) -> Self {
+        Self {
+            start: start_va.round_down(),
+            end: end_va.round_up(),
+            flags,
+            pte_flags: pte_flags | PteFlags::V | PteFlags::U,
+            prot: MemPerm::from(pte_flags),
+            pages: BTreeMap::new(),
+            map_type: TypedArea::FileBacked(FileBackedArea::new(
+                file,
+                offset / PAGE_SIZE * PAGE_SIZE,
+                len,
+            )),
+            handler: Some(FileBackedArea::fault_handler),
         }
     }
 
@@ -176,8 +239,9 @@ impl VmArea {
         Self {
             start: start_va,
             end: end_va,
-            flags: PteFlags::V | PteFlags::R | PteFlags::W | PteFlags::U,
-            perm: MemPerm::R | MemPerm::W | MemPerm::U,
+            flags: VmaFlags::PRIVATE,
+            pte_flags: PteFlags::V | PteFlags::R | PteFlags::W | PteFlags::U,
+            prot: MemPerm::R | MemPerm::W | MemPerm::U,
             pages: BTreeMap::new(),
             map_type: TypedArea::Anonymous(AnonymousArea),
             handler: Some(AnonymousArea::fault_handler),
@@ -191,8 +255,9 @@ impl VmArea {
         Self {
             start: start_va,
             end: end_va,
-            flags: PteFlags::V | PteFlags::R | PteFlags::W | PteFlags::U,
-            perm: MemPerm::R | MemPerm::W | MemPerm::U,
+            flags: VmaFlags::PRIVATE,
+            pte_flags: PteFlags::V | PteFlags::R | PteFlags::W | PteFlags::U,
+            prot: MemPerm::R | MemPerm::W | MemPerm::U,
             pages: BTreeMap::new(),
             map_type: TypedArea::Heap(AnonymousArea),
             handler: Some(AnonymousArea::fault_handler),
@@ -217,6 +282,10 @@ impl VmArea {
     /// the range covers the starting or ending part of the original VMA, which
     /// leaves only a single VMA. If both are `None`, it means the range covers
     /// the whole VMA, so the original VMA is totally removed.
+    ///
+    /// # Note
+    /// This function is buggy because it does not update fields in specific
+    /// [`TypedArea`] structs in the [`VmArea`] struct.
     pub fn unmap_range(
         mut self,
         page_table: &mut PageTable,
@@ -278,41 +347,55 @@ impl VmArea {
     /// Returns [`SysError::EFAULT`] if the access permission is not allowed.
     /// Otherwise, returns [`SysError::ENOMEM`] if a new frame cannot be allocated.
     pub fn handle_page_fault(&mut self, mut info: PageFaultInfo) -> SysResult<()> {
-        let &mut VmArea { flags, perm, .. } = self;
-        let &mut PageFaultInfo {
+        let &mut VmArea {
+            pte_flags, prot, ..
+        } = self;
+        let PageFaultInfo {
             fault_addr,
             ref mut page_table,
             access,
-        } = &mut info;
+        } = info;
 
-        // Check permission.
-        if !perm.contains(access) {
-            log::trace!(
-                "MemoryBackedArea::fault_handler: access {:?} not allowed, permision is {:?}",
+        // Check the protection bits.
+        if !prot.contains(access) {
+            log::warn!(
+                "VmArea::handle_page_fault: access {:?} not allowed, the protection is {:?}, at {:#x}",
                 access,
-                perm
+                prot,
+                fault_addr.to_usize()
             );
             return Err(SysError::EFAULT);
         }
 
-        match page_table.map_page(fault_addr.page_number(), flags)? {
-            Ok(page) => {
-                self.handler.unwrap()(self, info, page)?;
+        let pte = {
+            let (pte, flush_all) =
+                page_table.find_entry_force(fault_addr.page_number(), pte_flags)?;
+            if flush_all {
+                sfence_vma_all_except_global();
             }
-            Err(pte) => {
-                if !pte.flags().contains(PteFlags::W) && access.contains(MemPerm::W) {
-                    // Copy-on-write page fault.
-                    self.handle_cow_fault(fault_addr, pte)?;
-                } else {
-                    // If the page is already mapped by another thread, just flush the TLB.
-                    sfence_vma_addr(fault_addr.to_usize());
-                }
+            pte
+        };
+        if pte.is_valid() {
+            if access == MemPerm::W && !pte.flags().contains(PteFlags::W) {
+                // Copy-on-write page fault.
+                self.handle_cow_fault(fault_addr, pte)?;
+            } else {
+                // The page is already mapped by another thread, so just flush the TLB.
+                sfence_vma_addr(fault_addr.to_usize());
             }
+        } else {
+            self.handler.unwrap()(self, info)?;
         }
+
         Ok(())
     }
 
-    /// Handles a COW page fault.
+    /// Handles a copy-on-write page fault.
+    ///
+    /// This function is called when a page fault occurs due to a write access to a
+    /// copy-on-write page. The function allocates a new page and copies the content
+    /// from the original page to the new page. The new page is then mapped to the
+    /// faulting virtual address.
     fn handle_cow_fault(
         &mut self,
         fault_addr: VirtAddr,
@@ -320,6 +403,11 @@ impl VmArea {
     ) -> SysResult<()> {
         let fault_vpn = fault_addr.page_number();
         let fault_page = self.pages.get(&fault_vpn).unwrap();
+        // Note: The if-else branch does not work as expected because the reference
+        // count of a page is not necessarily 1 when the page is not shared. For
+        // example, the page may be in the page cache of a file, which increments the
+        // reference count of the page. The current implementation is not buggy, but
+        // it is not optimal.
         if Arc::strong_count(fault_page) > 1 {
             // Allocate a new page and copy the content if the page is shared.
             let new_page = Page::build()?;
@@ -376,7 +464,7 @@ impl VmArea {
 
     /// Returns the PTE flags of the VMA.
     pub fn flags(&self) -> PteFlags {
-        self.flags
+        self.pte_flags
     }
 
     /// Returns the mapping from virtual page numbers to `Arc<Page>`s mapped in this VMA.
@@ -396,7 +484,8 @@ impl Debug for VmArea {
             .field("start_va", &self.start)
             .field("end_va", &self.end)
             .field("flags", &self.flags)
-            .field("perm", &self.perm)
+            .field("pte_flags", &self.pte_flags)
+            .field("prot", &self.prot)
             .field("num of pages", &self.pages.len())
             .field("map_type", &self.map_type)
             .finish()
@@ -427,18 +516,24 @@ impl OffsetArea {
         let &VmArea {
             start: start_va,
             end: end_va,
-            flags,
+            pte_flags,
             ..
         } = area;
 
         let start_vpn = start_va.page_number();
-        let start_ppn = PhysAddr::new(start_va.to_usize() - offset).page_number().to_usize();
-        let end_ppn = PhysAddr::new(end_va.to_usize() - offset).page_number().to_usize();
+        let start_ppn = PhysAddr::new(start_va.to_usize() - offset)
+            .page_number()
+            .to_usize();
+        let end_ppn = PhysAddr::new(end_va.to_usize() - offset)
+            .page_number()
+            .to_usize();
         let ppns = (start_ppn..end_ppn)
             .map(PhysPageNum::new)
             .collect::<Vec<_>>();
 
-        page_table.map_range_to(start_vpn, &ppns, flags).unwrap();
+        page_table
+            .map_range_to(start_vpn, &ppns, pte_flags)
+            .unwrap();
     }
 }
 
@@ -450,6 +545,7 @@ impl OffsetArea {
 /// `start_va` and after `VmArea::start` is not mapped. The region after
 /// `start_va + memory.len()` and before `VmArea::end` is filled with zeros, which is
 /// like the `.bss` section in an executable file.
+#[deprecated]
 #[derive(Clone)]
 pub struct MemoryBackedArea {
     /// The memory backing store.
@@ -465,8 +561,7 @@ impl MemoryBackedArea {
     }
 
     /// Handles a page fault.
-    pub fn fault_handler(area: &mut VmArea, info: PageFaultInfo, page: Page) -> SysResult<()> {
-        // Extract data needed for fault handling.
+    pub fn fault_handler(area: &mut VmArea, info: PageFaultInfo) -> SysResult<()> {
         let &mut Self { memory, start_va } = match &mut area.map_type {
             TypedArea::MemoryBacked(memory_backed) => memory_backed,
             _ => panic!("fault_handler: not a memory-backed area"),
@@ -476,7 +571,14 @@ impl MemoryBackedArea {
             ref mut pages,
             ..
         } = area;
-        let PageFaultInfo { fault_addr, .. } = info;
+        let PageFaultInfo {
+            fault_addr,
+            page_table,
+            ..
+        } = info;
+
+        let page = Page::build()?;
+        page_table.map_page_to(fault_addr.page_number(), page.ppn(), area.pte_flags)?;
 
         // Fill the page with appropriate data.
         // There are 3 types of regions in the page:
@@ -526,6 +628,161 @@ impl Debug for MemoryBackedArea {
     }
 }
 
+/// A file-backed VMA.
+///
+/// This kind of VMA is backed by a file, i.e., when a page in this kind of VMA is
+/// accessed for the first time, the page is read from the file.
+///
+/// There are some different types of file-backed VMAs based on `prot` and `flags`
+/// fields, and the differences in their implementations are noted below.
+/// - Private, read-only: A page in this kind of VMA is mapped to a page in the page
+///   cache of the file. Any write to the same page in the file in another private,
+///   writable VMA does not affect the data on this page.
+/// - Private, writable: A page in this kind of VMA may or may not be mapped to a page
+///   in the page cache of the file, depending on whether the page is written to for
+///   the first time. Assuming the page is first read from and then written to, the
+///   behavior is as follows:
+///   - When the page is first read from, it is mapped to a page in the page cache of
+///     the file, and is marked as copy-on-write.
+///   - When the page is first written to, a copy-on-write page fault occurs, and a new
+///     page is allocated exclusively for this VMA. The data in the original page is
+///     copied to the new page.
+/// - Shared, read-only or writable: A page in this kind of VMA is mapped to a page in
+///   the page cache of the file, as if it is a private, read-only VMA. This is OK;
+///   see the documentation of `MAP_PRIVATE` flag in `mmap(2)`:
+///   > It is unspecified whether changes made to the file after the mmap() call are
+///   > visible in the mapped region.
+#[derive(Clone)]
+pub struct FileBackedArea {
+    /// The file backing store.
+    file: Arc<dyn File>,
+    /// The starting offset in the file.
+    ///
+    /// This must be page-aligned.
+    offset: usize,
+    /// The length of the mapped region in the file.
+    ///
+    /// This is not the same as the length of the VMA (`area.end - area.start`).
+    /// The length of VMA can be larger than this length; the region after this
+    /// length is filled with zeros.
+    len: usize,
+}
+
+impl FileBackedArea {
+    /// Creates a new file-backed VMA.
+    ///
+    /// `file` is the file backing store.
+    /// `offset` is the starting offset in the file.
+    /// `len` is the length of the mapped region in the file.
+    pub fn new(file: Arc<dyn File>, offset: usize, len: usize) -> Self {
+        Self { file, offset, len }
+    }
+
+    /// Handles a page fault.
+    pub fn fault_handler(area: &mut VmArea, info: PageFaultInfo) -> SysResult<()> {
+        let &FileBackedArea {
+            ref file,
+            offset,
+            len,
+        } = match &area.map_type {
+            TypedArea::FileBacked(file_backed) => file_backed,
+            _ => panic!("FileBackedArea::fault_handler: not a file-backed area"),
+        };
+        let &mut VmArea {
+            start: start_va,
+            flags,
+            prot,
+            mut pte_flags,
+            ..
+        } = area;
+        let PageFaultInfo {
+            fault_addr,
+            page_table,
+            access,
+        } = info;
+
+        // Starting address of the faulting page.
+        let page_addr = fault_addr.round_down().to_usize();
+        // Offset from the start of the VMA to the faulting page.
+        let area_offset = page_addr - start_va.to_usize();
+        // Length of the file region, calculating from the position of the first page
+        // which contains the starting position of the file region.
+        let file_area_len = offset % PAGE_SIZE + len;
+        if area_offset >= file_area_len {
+            // The whole page is after the file region, so we allocate a new page
+            // and fill it with zeros. This is inherently private to this process,
+            // so we need not worry about copy-on-write.
+            let page = Page::build()?;
+            page.as_mut_slice().fill(0);
+            page_table.map_page_to(fault_addr.page_number(), page.ppn(), pte_flags)?;
+            area.pages.insert(fault_addr.page_number(), Arc::new(page));
+            return Ok(());
+        }
+
+        // Offset from the start of the file to the start of the page to be mapped.
+        let file_offset = offset / PAGE_SIZE * PAGE_SIZE + area_offset;
+        let cached_page = match file.inode().page_cache().get_page(file_offset) {
+            Some(page) => page,
+            None => {
+                // The page is not in the page cache, so we need to read it from the file
+                // and insert it into the page cache.
+                // Note: Consider extracting this to a function of `PageCache` or `Inode`.
+                let page = Arc::new(Page::build()?);
+                file.base_read(page.as_mut_slice(), file_offset)?;
+                file.inode()
+                    .page_cache()
+                    .insert_page(file_offset, Arc::clone(&page));
+                page
+            }
+        };
+
+        if area_offset + PAGE_SIZE > file_area_len {
+            // Part of the page is in the file region, and part of the page is not.
+            // Similar to the case where the whole page is not in the file region,
+            // we allocate a new page and copy the first part of the page from the
+            // file region, and fill the rest with zeros. This is also private to
+            // this process.
+            let page = Page::build()?;
+            let copy_len = file_area_len - area_offset;
+            let page_copy_from = &cached_page.as_slice()[..copy_len];
+            let (page_copy_to, page_fill_zero) = page.as_mut_slice().split_at_mut(copy_len);
+            page_copy_to.copy_from_slice(page_copy_from);
+            page_fill_zero.fill(0);
+            page_table.map_page_to(fault_addr.page_number(), page.ppn(), pte_flags)?;
+            area.pages.insert(fault_addr.page_number(), Arc::new(page));
+            return Ok(());
+        }
+
+        // The page to be mapped to the faulting address.
+        let page = if flags.contains(VmaFlags::PRIVATE) && access == MemPerm::W {
+            // Write to a private VMA: Mannually do copy-on-write.
+            let page = Page::build()?;
+            page.copy_from_page(&cached_page);
+            Arc::new(page)
+        } else {
+            // Other conditions: Just use the page in the page cache.
+            cached_page
+        };
+        if flags.contains(VmaFlags::PRIVATE) && prot.contains(MemPerm::W) && access != MemPerm::W {
+            // Read from or execute a private, writable VMA: Set the page as copy-on-write.
+            pte_flags = pte_flags.difference(PteFlags::W);
+        }
+
+        page_table.map_page_to(fault_addr.page_number(), page.ppn(), pte_flags)?;
+        area.pages.insert(fault_addr.page_number(), page);
+        Ok(())
+    }
+}
+
+impl Debug for FileBackedArea {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("FileBackedArea")
+            .field("file", &self.file.dentry().name())
+            .field("offset", &self.offset)
+            .finish()
+    }
+}
+
 /// An anonymous VMA which is not backed by a file or device, such as a user heap or stack.
 ///
 /// Each anonymous VMA is filled with zeros when a process first accesses it, in order to
@@ -536,10 +793,25 @@ pub struct AnonymousArea;
 
 impl AnonymousArea {
     /// Handles a page fault.
-    pub fn fault_handler(area: &mut VmArea, info: PageFaultInfo, page: Page) -> SysResult<()> {
-        let &mut VmArea { ref mut pages, .. } = area;
-        let PageFaultInfo { fault_addr, .. } = info;
+    pub fn fault_handler(area: &mut VmArea, info: PageFaultInfo) -> SysResult<()> {
+        let &mut VmArea {
+            ref mut pages,
+            flags,
+            pte_flags,
+            ..
+        } = area;
+        let PageFaultInfo {
+            fault_addr,
+            page_table,
+            ..
+        } = info;
 
+        if flags.contains(VmaFlags::SHARED) {
+            unimplemented!("Handling a page fault in a shared anonymous VMA");
+        }
+
+        let page = Page::build()?;
+        page_table.map_page_to(fault_addr.page_number(), page.ppn(), pte_flags)?;
         page.as_mut_slice().fill(0);
         pages.insert(fault_addr.page_number(), Arc::new(page));
 

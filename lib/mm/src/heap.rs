@@ -21,7 +21,7 @@ fn alloc_error_handler(layout: Layout) -> ! {
 }
 
 /// Initializes heap allocator.
-///
+/// 
 /// # Safety
 ///
 /// - This function should be called only once

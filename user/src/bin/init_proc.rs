@@ -3,16 +3,16 @@
 
 extern crate user_lib;
 
-use core::ptr::NonNull;
-
-use user_lib::{exit, println, waitpid};
+use user_lib::{execve, fork, waitpid};
 
 #[unsafe(no_mangle)]
 fn main() {
     let mut i = 0;
-    loop {
-        waitpid(0, &mut i);
+    if fork() == 0 {
+        execve("shell\0", &[], &[]);
+    } else {
+        loop {
+            waitpid(0, &mut i);
+        }
     }
-
-    exit(0)
 }

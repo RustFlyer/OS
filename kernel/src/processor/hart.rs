@@ -87,7 +87,7 @@ impl Hart {
         core::mem::swap(self.get_mut_pps(), pps);
         let _task = self.get_task();
         unsafe {
-            mm::vm::switch_to_kernel_page_table();
+            vm::switch_to_kernel_page_table();
         }
         self.clear_task();
         enable_interrupt();

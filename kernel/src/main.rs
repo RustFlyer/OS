@@ -50,7 +50,7 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
             log::info!("hart {}: initialized heap allocator", hart_id);
             frame::init_frame_allocator();
             log::info!("hart {}: initialized frame allocator", hart_id);
-            mm::vm::switch_to_kernel_page_table();
+            vm::switch_to_kernel_page_table();
             log::info!("hart {}: switched to kernel page table", hart_id);
             riscv::asm::fence();
             ptr::write_volatile(&raw mut INITIALIZED, true);
@@ -111,7 +111,7 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         // SAFETY: Only after the first hart has initialized the heap allocator and page table,
         // do the other harts enable the kernel page table.
         unsafe {
-            mm::vm::switch_to_kernel_page_table();
+            vm::switch_to_kernel_page_table();
         }
     }
 
