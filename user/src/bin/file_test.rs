@@ -41,12 +41,7 @@ fn main() {
     }
 
     {
-        let fd2: isize = open(
-            AT_FDCWD as usize,
-            "add\0",
-            OpenFlags::O_RDWR,
-            InodeMode::REG,
-        );
+        let fd2: isize = open(AT_FDCWD as usize, "add", OpenFlags::O_RDWR, InodeMode::REG);
         let mut read_buf: [u8; 1024] = [0; 1024];
         read(fd2 as usize, &mut read_buf);
         // println!("file test: read tbuf [{:?}]", read_buf);

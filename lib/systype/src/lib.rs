@@ -113,6 +113,8 @@ pub enum SysError {
     ECONNREFUSED = 111,
     /// UTF-8 Convert Failed
     EUTFFAIL = 188,
+    /// Trap in Infinite loop
+    ELOOP = 1001,
 }
 
 impl SysError {
@@ -163,6 +165,7 @@ impl SysError {
             ENOTCONN => "Transport endpoint is not connected",
             ECONNREFUSED => "Connection refused",
             EUTFFAIL => "UTF-8 Convert Failed",
+            ELOOP => "Trap in Infinite loop",
         }
     }
 

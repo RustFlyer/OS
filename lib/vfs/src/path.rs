@@ -1,7 +1,8 @@
 use alloc::{string::String, sync::Arc};
+use config::inode::InodeType;
 use systype::{SysError, SysResult};
 
-use crate::dentry::Dentry;
+use crate::{dentry::Dentry, sys_root_dentry};
 
 #[derive(Clone)]
 pub struct Path {
@@ -52,6 +53,38 @@ impl Path {
         }
         log::info!("dentry: {}", dentry.path());
         Ok(dentry)
+    }
+
+    pub fn resolve_dentry(dentry: Arc<dyn Dentry>) -> SysResult<Arc<dyn Dentry>> {
+        const MAX_DEPTH: usize = 40;
+        let mut current_dentry = dentry;
+        for _ in 0..MAX_DEPTH {
+            if current_dentry.is_negative() {
+                return Ok(current_dentry);
+            }
+            match current_dentry.inode().ok_or(SysError::ENOENT)?.inotype() {
+                InodeType::SymLink => {
+                    let mut target_path_buf: [u8; 64] = [0; 64];
+                    let _r = current_dentry
+                        .clone()
+                        .base_open()?
+                        .readlink(&mut target_path_buf)?;
+                    let target_path = core::str::from_utf8_mut(&mut target_path_buf)
+                        .map_err(|_| SysError::EINVAL)?;
+
+                    let parent = current_dentry.parent().ok_or(SysError::ENOENT)?;
+                    let base = if target_path.starts_with('/') {
+                        sys_root_dentry()
+                    } else {
+                        parent
+                    };
+                    let path = Path::new(sys_root_dentry(), base, &target_path);
+                    current_dentry = path.walk()?;
+                }
+                _ => return Ok(current_dentry),
+            }
+        }
+        Err(SysError::ELOOP)
     }
 }
 

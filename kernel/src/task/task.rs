@@ -14,7 +14,7 @@ use time::TaskTimeStat;
 
 use super::{
     threadgroup::ThreadGroup,
-    tid::{PGid, Pid},
+    tid::{PGid, Pid, TidAddress},
 };
 use crate::{
     task::tid::{Tid, TidHandle, tid_alloc},
@@ -64,6 +64,8 @@ pub struct Task {
     pgid: ShareMutex<PGid>,
     exit_code: SpinNoIrqLock<i32>,
 
+    tid_address: SyncUnsafeCell<TidAddress>,
+
     fd_table: ShareMutex<FdTable>,
     cwd: ShareMutex<Arc<dyn Dentry>>,
 
@@ -97,6 +99,7 @@ impl Task {
             children: new_share_mutex(BTreeMap::new()),
             pgid: new_share_mutex(pgid),
             exit_code: SpinNoIrqLock::new(0),
+            tid_address: SyncUnsafeCell::new(TidAddress::new()),
             fd_table: new_share_mutex(FdTable::new()),
             cwd: new_share_mutex(sys_root_dentry()),
             elf: SyncUnsafeCell::new(elf_file),
@@ -123,6 +126,8 @@ impl Task {
         pgid: ShareMutex<PGid>,
         exit_code: SpinNoIrqLock<i32>,
 
+        tid_address: SyncUnsafeCell<TidAddress>,
+
         fd_table: ShareMutex<FdTable>,
         cwd: ShareMutex<Arc<dyn Dentry>>,
 
@@ -144,6 +149,7 @@ impl Task {
             children,
             pgid,
             exit_code,
+            tid_address,
             fd_table,
             cwd,
             elf,
@@ -198,6 +204,11 @@ impl Task {
     #[allow(clippy::mut_from_ref)]
     pub fn name_mut(&self) -> &mut String {
         unsafe { &mut *self.name.get() }
+    }
+
+    #[allow(clippy::mut_from_ref)]
+    pub fn tid_address_mut(&self) -> &mut TidAddress {
+        unsafe { &mut *self.tid_address.get() }
     }
 
     pub fn addr_space_mut(&self) -> &ShareMutex<AddrSpace> {

@@ -4,6 +4,7 @@ use alloc::string::ToString;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use config::vfs::AtFd;
+use config::vfs::OpenFlags;
 use core::cell::SyncUnsafeCell;
 use core::time::Duration;
 use osfs::sys_root_dentry;
@@ -26,6 +27,7 @@ use super::manager::TASK_MANAGER;
 use super::process_manager::PROCESS_GROUP_MANAGER;
 use super::task::*;
 use super::threadgroup::ThreadGroup;
+use super::tid::TidAddress;
 use super::tid::tid_alloc;
 use crate::vm::addr_space::{AddrSpace, switch_to};
 
@@ -187,6 +189,7 @@ impl Task {
             children,
             pgid,
             SpinNoIrqLock::new(0),
+            SyncUnsafeCell::new(TidAddress::new()),
             fd_table,
             cwd,
             elf,
@@ -205,8 +208,13 @@ impl Task {
         new
     }
 
-    pub fn resolve_path(&self, dirfd: AtFd, pathname: String) -> SysResult<Arc<dyn Dentry>> {
-        let p = if pathname.starts_with("/") {
+    pub fn resolve_path(
+        &self,
+        dirfd: AtFd,
+        pathname: String,
+        flags: OpenFlags,
+    ) -> SysResult<Arc<dyn Dentry>> {
+        let dentry = if pathname.starts_with("/") {
             let path = Path::new(sys_root_dentry(), sys_root_dentry(), &pathname);
             path.walk()?
         } else {
@@ -222,7 +230,11 @@ impl Task {
             }
         };
 
-        Ok(p)
+        if flags.contains(OpenFlags::O_NOFOLLOW) {
+            Ok(dentry)
+        } else {
+            Path::resolve_dentry(dentry)
+        }
     }
 
     pub fn exit(&self) {

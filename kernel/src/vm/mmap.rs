@@ -78,7 +78,7 @@ impl AddrSpace {
     /// - If `va` is 0, the system automatically finds a suitable virtual address range
     pub fn map_file(
         &mut self,
-        file: Arc<dyn File>,
+        file: Option<Arc<dyn File>>,
         flags: MmapFlags,
         prot: MmapProt,
         mut va: VirtAddr,
@@ -106,15 +106,19 @@ impl AddrSpace {
         // info!("[map_file] offset: [{offset:?}], length: [{length:?}]");
         // info!("[map_file] va_start: [{va_start:?}], va_end: [{va_end:?}]");
 
-        let area = VmArea::new_file_backed(
-            va_start,
-            va_end,
-            vma_flag,
-            mem_prot,
-            Arc::clone(&file),
-            offset,
-            length as usize,
-        );
+        let area = match file {
+            Some(file) => VmArea::new_file_backed(
+                va_start,
+                va_end,
+                vma_flag,
+                mem_prot,
+                Arc::clone(&file),
+                offset,
+                length as usize,
+            ),
+            None => VmArea::new_anonymous(va_start, va_end, vma_flag, mem_prot),
+        };
+
         self.add_area(area)?;
 
         Ok(va.to_usize())

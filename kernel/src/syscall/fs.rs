@@ -14,7 +14,10 @@ use vfs::{file::File, kstat::Kstat, path::split_parent_and_name, sys_root_dentry
 
 use crate::{
     processor::current_task,
-    vm::user_ptr::{UserReadPtr, UserWritePtr},
+    vm::{
+        addr_space,
+        user_ptr::{UserReadPtr, UserWritePtr},
+    },
 };
 
 #[allow(unused)]
@@ -33,7 +36,7 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
     };
 
     log::debug!("path name = {}", pathname);
-    let dentry = task.resolve_path(AtFd::from(dirfd), pathname)?;
+    let dentry = task.resolve_path(AtFd::from(dirfd), pathname, OpenFlags::empty())?;
 
     log::debug!("flags = {:?}", flags);
     if flags.contains(OpenFlags::O_CREAT) {
@@ -150,7 +153,7 @@ pub fn sys_mkdirat(dirfd: usize, pathname: usize, mode: u32) -> SyscallResult {
     let path = UserReadPtr::<u8>::new(pathname, &mut addr_space).read_c_string(256)?;
     let path = path.into_string().map_err(|_| SysError::EINVAL)?;
 
-    let dentry = task.resolve_path(AtFd::from(dirfd), path)?;
+    let dentry = task.resolve_path(AtFd::from(dirfd), path, OpenFlags::empty())?;
     if !dentry.is_negative() {
         return Err(SysError::EEXIST);
     }
@@ -167,7 +170,7 @@ pub fn sys_chdir(path: usize) -> SyscallResult {
     let path = UserReadPtr::<u8>::new(path, &mut addr_space).read_c_string(256)?;
     let path = path.into_string().map_err(|_| SysError::EINVAL)?;
     log::debug!("[sys_chdir] path: {path}");
-    let dentry = task.resolve_path(AtFd::FdCwd, path)?;
+    let dentry = task.resolve_path(AtFd::FdCwd, path, OpenFlags::empty())?;
     if !dentry.inode().ok_or(SysError::ENOENT)?.inotype().is_dir() {
         return Err(SysError::ENOTDIR);
     }
@@ -176,13 +179,14 @@ pub fn sys_chdir(path: usize) -> SyscallResult {
 }
 
 pub fn sys_unlinkat(dirfd: usize, pathname: usize, flags: i32) -> SyscallResult {
+    log::trace!("[sys_unlinkat] start");
     let task = current_task();
     let mut addr_space = task.addr_space_mut().lock();
     let path = UserReadPtr::<u8>::new(pathname, &mut addr_space).read_c_string(30)?;
     let path = path.into_string().map_err(|_| SysError::EINVAL)?;
 
     log::debug!("[sys_unlinkat] path: {path}");
-    let dentry = task.resolve_path(AtFd::from(dirfd), path)?;
+    let dentry = task.resolve_path(AtFd::from(dirfd), path, OpenFlags::empty())?;
     let parent = dentry.parent().expect("can not remove root directory");
     let is_dir = dentry.inode().ok_or(SysError::ENOENT)?.inotype().is_dir();
 
@@ -279,11 +283,50 @@ pub fn sys_mount(
             };
             let (parent, name) = split_parent_and_name(&target);
             log::debug!("[sys_mount] start mount [{}], [{}]", parent, name.unwrap());
-            let parent = task.resolve_path(AtFd::FdCwd, parent.to_string())?;
+            let parent = task.resolve_path(AtFd::FdCwd, parent.to_string(), OpenFlags::empty())?;
             log::debug!("[sys_mount] parent dentry is {}", parent.path());
             fs_type.mount(name.unwrap(), Some(parent), flags, dev)?
         }
         _ => return Err(SysError::EINVAL),
     };
+    Ok(0)
+}
+
+/// Checks file permissions relative to a directory
+///
+/// Verifies whether the calling process can access the file at `pathname` with the
+/// specified `mode`.
+///
+/// # Parameters
+/// - `dirfd`: Directory file descriptor (use `AT_FDCWD` for current working directory)
+/// - `pathname`: Path string (relative to `dirfd` if not absolute)
+/// - `mode`: Permission mask
+/// - `flags`: Behavior flags (0 or `AT_SYMLINK_NOFOLLOW`)
+pub fn sys_faccessat(dirfd: usize, pathname: usize, _mode: usize, flags: i32) -> SyscallResult {
+    const AT_SYMLINK_NOFOLLOW: usize = 0x100;
+    const AT_EACCESS: usize = 0x200;
+    const AT_EMPTY_PATH: usize = 0x1000;
+    let task = current_task();
+    let mut addr_space_lock = task.addr_space_mut().lock();
+    let path = UserReadPtr::<u8>::new(pathname, &mut addr_space_lock).read_c_string(256)?;
+    let pathname = path.into_string().map_err(|_| SysError::EINVAL)?;
+    let dentry = if flags == AT_SYMLINK_NOFOLLOW as i32 {
+        task.resolve_path(AtFd::from(dirfd), pathname, OpenFlags::O_NOFOLLOW)?
+    } else {
+        task.resolve_path(AtFd::from(dirfd), pathname, OpenFlags::empty())?
+    };
+    dentry.base_open()?;
+    Ok(0)
+}
+
+/// set system robust mutex list
+///
+/// When mutex with attr `PTHREAD_MUTEX_ROBUST` is used, the kernel trace the mutex
+/// with this syscall and mark the mutex state as `FUTEX_OWNER_DIED` as the thread
+/// dies due to exception.
+///
+/// # Attention
+/// - Not Implemented
+pub fn sys_set_robust_list(_robust_list_head: usize, _len: usize) -> SyscallResult {
     Ok(0)
 }

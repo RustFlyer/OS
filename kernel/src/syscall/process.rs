@@ -131,3 +131,10 @@ pub fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult {
     task.execve(file, args, envs, path)?;
     Ok(0)
 }
+
+pub fn sys_set_tid_address(tidptr: usize) -> SyscallResult {
+    let task = current_task();
+    log::info!("[sys_set_tid_address] tidptr:{tidptr:#x}");
+    task.tid_address_mut().clear_child_tid = Some(tidptr);
+    Ok(task.tid())
+}

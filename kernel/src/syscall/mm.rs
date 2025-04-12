@@ -14,11 +14,15 @@ pub fn sys_mmap(
     length: usize,
     prot: i32,
     flags: i32,
-    fd: usize,
+    fd: isize,
     offset: usize,
 ) -> SyscallResult {
     let task = current_task();
-    let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
+    log::trace!("[sys_mmap] fd: {fd:#x}");
+    let file = match fd {
+        -1 => None,
+        fd => Some(task.with_mut_fdtable(|table| table.get_file(fd as usize))?),
+    };
     let flags = MmapFlags::from_bits_truncate(flags);
     let prot = MmapProt::from_bits_truncate(prot);
     let perm = MemPerm::from_mmapprot(prot);
