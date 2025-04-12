@@ -1,4 +1,7 @@
-use alloc::{string::{String, ToString}, sync::Arc};
+use alloc::{
+    string::{String, ToString},
+    sync::Arc,
+};
 
 use config::inode::InodeType;
 use systype::{SysError, SysResult};
@@ -23,9 +26,9 @@ impl PartialEq for Path {
 impl Path {
     /// Creates a path from a starting dentry and a path string.
     ///
-    /// `start` is a valid dentry that serves as the current working directory, from
-    /// which the path will be resolved in case the path is relative. It is ignored
-    /// if the path is absolute.
+    /// `start` is a dentry that serves as the current working directory, from which
+    /// the path will be resolved in case the path is relative. It is ignored if the
+    /// path is absolute.
     ///
     /// `path` is a string representing the path. If it starts with a `/`, it is
     /// resolved as an absolute path. Otherwise, it is resolved as a relative path
@@ -42,8 +45,21 @@ impl Path {
 
     /// Walks the path to find the target dentry.
     ///
-    /// Returns a valid dentry if the path exists. Returns an `ENOENT` error
-    /// if the path does not exist.
+    /// Returns a valid dentry if the target file exists. Returns an invalid dentry
+    /// if the target file does not exist but its parent directory does. Returns an
+    /// `ENOENT` error if any directory in the middle of the path does not exist.
+    ///
+    /// For example, if the file tree is:
+    /// ```.
+    /// /
+    /// ├── a
+    /// │   └── b
+    /// └── c
+    /// ```
+    /// - `walk("/a/b")` returns a valid dentry for `/a/b`.
+    /// - `walk("/a/x")` returns an invalid dentry for `/a/x`.
+    /// - `walk("/x")` returns an invalid dentry for `/x`.
+    /// - `walk("/x/y")` returns an `ENOENT` error.
     ///
     /// Other errors may be returned if it encounters other issues.
     pub fn walk(&self) -> SysResult<Arc<dyn Dentry>> {
@@ -58,48 +74,44 @@ impl Path {
             .split("/")
             .filter(|name| !name.is_empty() && *name != ".")
         {
+            if dentry.is_negative() {
+                return Err(SysError::ENOENT);
+            }
             match name {
                 ".." => {
                     dentry = dentry.parent().ok_or(SysError::ENOENT)?;
                 }
                 name => {
                     dentry = dentry.lookup(name)?;
-                    if dentry.is_negative() {
-                        return Err(SysError::ENOENT);
-                    }
                 }
             }
         }
         Ok(dentry)
     }
 
-    pub fn resolve_dentry(dentry: Arc<dyn Dentry>) -> SysResult<Arc<dyn Dentry>> {
+    pub fn resolve_dentry(mut dentry: Arc<dyn Dentry>) -> SysResult<Arc<dyn Dentry>> {
         const MAX_DEPTH: usize = 40;
-        let mut current_dentry = dentry;
         for _ in 0..MAX_DEPTH {
-            if current_dentry.is_negative() {
-                return Ok(current_dentry);
+            if dentry.is_negative() {
+                return Ok(dentry);
             }
-            match current_dentry.inode().ok_or(SysError::ENOENT)?.inotype() {
+            match dentry.inode().unwrap().inotype() {
                 InodeType::SymLink => {
                     let mut target_path_buf: [u8; 64] = [0; 64];
-                    let _r = current_dentry
-                        .clone()
-                        .base_open()?
-                        .readlink(&mut target_path_buf)?;
+                    let _r = dentry.clone().base_open()?.readlink(&mut target_path_buf)?;
                     let target_path = core::str::from_utf8_mut(&mut target_path_buf)
                         .map_err(|_| SysError::EINVAL)?;
 
-                    let parent = current_dentry.parent().ok_or(SysError::ENOENT)?;
+                    let parent = dentry.parent().ok_or(SysError::ENOENT)?;
                     let base = if target_path.starts_with('/') {
                         sys_root_dentry()
                     } else {
                         parent
                     };
                     let path = Path::new(base, target_path.to_string());
-                    current_dentry = path.walk()?;
+                    dentry = path.walk()?;
                 }
-                _ => return Ok(current_dentry),
+                _ => return Ok(dentry),
             }
         }
         Err(SysError::ELOOP)

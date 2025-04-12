@@ -215,13 +215,11 @@ impl Task {
         flags: OpenFlags,
     ) -> SysResult<Arc<dyn Dentry>> {
         let dentry = if pathname.starts_with("/") {
-            let path = Path::new(sys_root_dentry(), pathname);
-            path.walk()?
+            Path::new(sys_root_dentry(), pathname).walk()?
         } else {
             match dirfd {
                 AtFd::FdCwd => {
-                    let path = Path::new(self.cwd_mut(), pathname);
-                    path.walk()?
+                    Path::new(self.cwd_mut(), pathname).walk()?
                 }
                 AtFd::Normal(fd) => {
                     let file = self.with_mut_fdtable(|table| table.get_file(fd))?;
