@@ -33,7 +33,7 @@
 
 use core::{fmt::Debug, marker::PhantomData, ops::ControlFlow, slice};
 
-use alloc::vec::Vec;
+use alloc::{ffi::CString, vec::Vec};
 use config::mm::PAGE_SIZE;
 use mm::address::VirtAddr;
 use systype::{SysError, SysResult};
@@ -260,7 +260,7 @@ impl<A> UserPtr<'_, usize, A>
 where
     A: ReadAccess,
 {
-    /// Reads an array of `usize`s, zero-terminated, from the memory location.
+    /// Reads an zero-terminated array of `usize`s from the memory location.
     ///
     /// This function will check if the memory location is accessible and read
     /// the `usize`s. It will read `usize`s until a zero is encountered or the
@@ -268,7 +268,14 @@ where
     /// terminated pointer array, but it returns `usize`s rather than pointers
     /// in order to make the use of it convenience.
     ///
-    /// `len` is the maximum number of pointers to read.
+    /// `len` is the maximum number of pointers to read, including the null
+    /// terminator. `len` must be greater than 0.
+    ///
+    /// Returns the array of `usize`s as a `Vec<usize>`, which does NOT include
+    /// the null terminator. Therefore, at most `len - 1` `usize`s will be
+    /// returned. If there is no null terminator in the first `len` pointers,
+    /// `len - 1` `usize`s will be returned. Note that an empty `Vec` may be
+    /// returned if the first pointer is null or if `len` is 1.
     ///
     /// # Error
     /// Returns an `EFAULT` error if the memory location is not accessible.
@@ -278,6 +285,8 @@ where
     /// reads is also a valid pointer. The responsibility of checking the
     /// validity of the pointers lies with the caller.
     pub fn read_ptr_array(&mut self, len: usize) -> SysResult<Vec<usize>> {
+        debug_assert!(len > 0);
+
         let mut vec: Vec<usize> = Vec::new();
         let mut push_and_check = |ptr: usize| {
             if ptr == 0 {
@@ -291,7 +300,7 @@ where
             check_user_access_with(
                 self.addr_space,
                 self.ptr as usize,
-                len * size_of::<usize>(),
+                (len - 1) * size_of::<usize>(),
                 MemPerm::R,
                 &mut push_and_check,
             )?;
@@ -304,18 +313,19 @@ impl<A> UserPtr<'_, u8, A>
 where
     A: ReadAccess,
 {
-    /// Reads a C-style string (null-terminated byte array) from the memory
-    /// location.
+    /// Reads a C-style string from the memory location.
     ///
     /// This function will check if the memory location is accessible and read
     /// the string. It will read the string until a null byte is encountered
     /// or the maximum length `len` is reached.
     ///
-    /// `len` is the maximum number of bytes in the resulting string.
+    /// `len` is the maximum number of bytes in the resulting string, including
+    /// the null terminator. `len` must be greater than 0.
     ///
-    /// Returns the string as a vector of bytes, including the null terminator.
+    /// Returns the string as a [`CString`], which includes the null terminator.
     /// If there is no null terminator in the first `len` bytes, the string will
-    /// be truncated such that the last byte is the null terminator.
+    /// be truncated such that the last byte is the null terminator. Note that
+    /// an empty string may be returned if the first byte is null or if `len` is 1.
     ///
     /// # Error
     /// Returns an `EFAULT` error if the memory location is not accessible.
@@ -323,7 +333,9 @@ where
     /// # Note
     /// Pay attention that a C-style string is not necessarily a valid UTF-8
     /// [`str`] in Rust, nor can it always be represented as a [`Vec<char>`].
-    pub fn read_c_string(&mut self, len: usize) -> SysResult<Vec<u8>> {
+    pub fn read_c_string(&mut self, len: usize) -> SysResult<CString> {
+        debug_assert!(len > 0);
+
         let mut vec: Vec<u8> = Vec::new();
         let mut push_and_check = |byte: u8| {
             if byte == 0 {
@@ -342,8 +354,8 @@ where
                 &mut push_and_check,
             )?;
         }
-        // vec.push(0);
-        Ok(vec)
+        // SAFETY: `vec` has no null byte in the middle.
+        Ok(unsafe { CString::from_vec_unchecked(vec) })
     }
 }
 

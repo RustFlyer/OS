@@ -55,49 +55,40 @@ impl Task {
         }
     }
 
-    pub fn init_stack(
-        &self,
-        stack_top: usize,
-        argv: Vec<String>,
-        envp: Vec<String>,
-    ) -> (usize, usize, usize, usize) {
-        self.addr_space_mut()
-            .lock()
-            .init_stack(stack_top, argv.len(), argv, envp)
-    }
-
     pub fn execve(
         &self,
         elf_file: Arc<dyn File>,
-        argv: Vec<String>,
-        envp: Vec<String>,
-        name: &str,
-    ) {
-        let mut addrspace = AddrSpace::build_user().unwrap();
-        let entry_point = addrspace.load_elf(elf_file.clone()).unwrap();
-        let stack = addrspace.map_stack().unwrap();
-        addrspace.map_heap().unwrap();
+        args: Vec<String>,
+        envs: Vec<String>,
+        name: String,
+    ) -> SysResult<()> {
+        let mut addrspace = AddrSpace::build_user()?;
+        let (entry_point, auxv) = addrspace.load_elf(elf_file.clone())?;
+        let stack_top = addrspace.map_stack()?;
+        addrspace.map_heap()?;
 
         *self.addr_space_mut().lock() = addrspace;
         self.switch_addr_space();
 
-        *self.args_mut() = argv.clone();
-        let (sp, argc, argv, envp) = self.init_stack(stack.to_usize(), argv, envp);
+        let (sp, argc, argv, envp) =
+            self.addr_space_mut()
+                .lock()
+                .init_stack(stack_top.to_usize(), args, envs, auxv)?;
 
         self.trap_context_mut()
             .init_user(sp, entry_point.to_usize(), argc, argv, envp);
 
         *self.elf_mut() = elf_file;
-
-        *self.name_mut() = name.to_string();
-
+        *self.name_mut() = name;
         self.with_mut_fdtable(|table| table.close());
+
+        Ok(())
     }
 
     /// Spawns from Elf
     pub fn spawn_from_elf(elf_file: Arc<dyn File>, name: &str) {
         let mut addrspace = AddrSpace::build_user().unwrap();
-        let entry_point = addrspace.load_elf(elf_file.clone()).unwrap();
+        let (entry_point, _) = addrspace.load_elf(elf_file.clone()).unwrap();
         let stack = addrspace.map_stack().unwrap();
         addrspace.map_heap().unwrap();
         let task = Arc::new(Task::new(
@@ -105,7 +96,6 @@ impl Task {
             stack.to_usize(),
             addrspace,
             elf_file,
-            Vec::new(),
             name.to_string(),
         ));
 
@@ -146,7 +136,6 @@ impl Task {
         let cwd = new_share_mutex(self.cwd_mut());
 
         let elf = SyncUnsafeCell::new((*self.elf_mut()).clone());
-        let args = SyncUnsafeCell::new((*self.args_mut()).clone());
 
         let mut name = self.get_name() + "(fork)";
 
@@ -201,7 +190,6 @@ impl Task {
             fd_table,
             cwd,
             elf,
-            args,
             name,
         ));
 

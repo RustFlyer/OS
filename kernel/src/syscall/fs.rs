@@ -1,12 +1,12 @@
-use alloc::{ffi::CString, string::ToString};
+use alloc::ffi::CString;
 
-use driver::sbi::getchar;
 use strum::FromRepr;
 
 use config::{
     inode::InodeMode,
     vfs::{AtFd, OpenFlags, SeekFrom},
 };
+use driver::sbi::getchar;
 use mutex::SleepLock;
 use systype::{SysError, SyscallResult};
 use vfs::{file::File, kstat::Kstat};
@@ -14,10 +14,7 @@ use vfs::{file::File, kstat::Kstat};
 use crate::{
     print,
     processor::current_task,
-    vm::{
-        addr_space,
-        user_ptr::{UserReadPtr, UserWritePtr},
-    },
+    vm::user_ptr::{UserReadPtr, UserWritePtr},
 };
 
 #[allow(unused)]
@@ -31,13 +28,8 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
     let pathname = {
         let mut addr_space_lock = task.addr_space_mut().lock();
         let mut data_ptr = UserReadPtr::<u8>::new(pathname, &mut *addr_space_lock);
-        match data_ptr.read_c_string(30) {
-            Ok(data) => match core::str::from_utf8(&data) {
-                Ok(utf8_str) => utf8_str.to_string(),
-                Err(_) => unimplemented!(),
-            },
-            Err(_) => unimplemented!(),
-        }
+        let cstring = data_ptr.read_c_string(256)?;
+        cstring.into_string().map_err(|_| SysError::EINVAL)?
     };
 
     log::debug!("path name = {}", pathname);
@@ -173,10 +165,10 @@ pub fn sys_dup3(oldfd: usize, newfd: usize, flags: i32) -> SyscallResult {
 pub fn sys_mkdirat(dirfd: usize, pathname: usize, mode: u32) -> SyscallResult {
     let task = current_task();
     let mut addr_space = task.addr_space_mut().lock();
-    let path = UserReadPtr::<u8>::new(pathname, &mut addr_space).read_c_string(30)?;
-    let pathname = core::str::from_utf8(&path).map_err(SysError::from_utf8_err)?;
+    let path = UserReadPtr::<u8>::new(pathname, &mut addr_space).read_c_string(256)?;
+    let path = path.into_string().map_err(|_| SysError::EINVAL)?;
 
-    let dentry = task.resolve_path(AtFd::from(dirfd), pathname.to_string())?;
+    let dentry = task.resolve_path(AtFd::from(dirfd), path)?;
     if !dentry.is_negative() {
         return Err(SysError::EEXIST);
     }
@@ -190,10 +182,10 @@ pub fn sys_mkdirat(dirfd: usize, pathname: usize, mode: u32) -> SyscallResult {
 pub fn sys_chdir(path: usize) -> SyscallResult {
     let task = current_task();
     let mut addr_space = task.addr_space_mut().lock();
-    let path = UserReadPtr::<u8>::new(path, &mut addr_space).read_c_string(30)?;
-    let pathname = core::str::from_utf8(&path).map_err(SysError::from_utf8_err)?;
-    log::debug!("[sys_chdir] path: {pathname}");
-    let dentry = task.resolve_path(AtFd::FdCwd, pathname.to_string())?;
+    let path = UserReadPtr::<u8>::new(path, &mut addr_space).read_c_string(256)?;
+    let path = path.into_string().map_err(|_| SysError::EINVAL)?;
+    log::debug!("[sys_chdir] path: {path}");
+    let dentry = task.resolve_path(AtFd::FdCwd, path)?;
     if !dentry.inode().ok_or(SysError::ENOENT)?.inotype().is_dir() {
         return Err(SysError::ENOTDIR);
     }
