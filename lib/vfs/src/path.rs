@@ -1,12 +1,13 @@
-use alloc::{string::String, sync::Arc};
+use alloc::{string::{String, ToString}, sync::Arc};
+
 use config::inode::InodeType;
 use systype::{SysError, SysResult};
 
 use crate::{dentry::Dentry, sys_root_dentry};
 
+/// A struct representing a path in the filesystem.
 #[derive(Clone)]
 pub struct Path {
-    root: Arc<dyn Dentry>,
     start: Arc<dyn Dentry>,
     path: String,
 }
@@ -20,21 +21,36 @@ impl PartialEq for Path {
 }
 
 impl Path {
-    pub fn new(root: Arc<dyn Dentry>, start: Arc<dyn Dentry>, path: &str) -> Self {
-        Self {
-            root,
-            start,
-            path: String::from(path),
-        }
+    /// Creates a path from a starting dentry and a path string.
+    ///
+    /// `start` is a valid dentry that serves as the current working directory, from
+    /// which the path will be resolved in case the path is relative. It is ignored
+    /// if the path is absolute.
+    ///
+    /// `path` is a string representing the path. If it starts with a `/`, it is
+    /// resolved as an absolute path. Otherwise, it is resolved as a relative path
+    /// from the `start` dentry.
+    ///
+    /// This function does not check the validity of the path. If there are illegal
+    /// characters in `path`, or if `path` is empty, the behavior is undefined. The
+    /// caller must ensure that `path` is a valid path string.
+    pub fn new(start: Arc<dyn Dentry>, path: String) -> Self {
+        debug_assert!(!path.is_empty());
+        debug_assert!(!path.contains('\0'));
+        Self { start, path }
     }
 
-    /// walk the path to return the final dentry
+    /// Walks the path to find the target dentry.
+    ///
+    /// Returns a valid dentry if the path exists. Returns an `ENOENT` error
+    /// if the path does not exist.
+    ///
+    /// Other errors may be returned if it encounters other issues.
     pub fn walk(&self) -> SysResult<Arc<dyn Dentry>> {
         let path = self.path.as_str();
-        log::info!("dentry path: {}", path);
 
         let mut dentry = if path.starts_with("/") {
-            Arc::clone(&self.root)
+            Arc::clone(&sys_root_dentry())
         } else {
             Arc::clone(&self.start)
         };
@@ -48,10 +64,12 @@ impl Path {
                 }
                 name => {
                     dentry = dentry.lookup(name)?;
+                    if dentry.is_negative() {
+                        return Err(SysError::ENOENT);
+                    }
                 }
             }
         }
-        log::info!("dentry: {}", dentry.path());
         Ok(dentry)
     }
 
@@ -78,7 +96,7 @@ impl Path {
                     } else {
                         parent
                     };
-                    let path = Path::new(sys_root_dentry(), base, &target_path);
+                    let path = Path::new(base, target_path.to_string());
                     current_dentry = path.walk()?;
                 }
                 _ => return Ok(current_dentry),

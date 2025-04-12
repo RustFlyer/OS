@@ -123,7 +123,7 @@ pub fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult {
     println!("envs: {:?}", envs);
     log::info!("[sys_execve]: path: {path:?}",);
     let dentry = {
-        let path = Path::new(sys_root_dentry(), sys_root_dentry(), &path);
+        let path = Path::new(sys_root_dentry(), path.clone());
         path.walk()?
     };
 

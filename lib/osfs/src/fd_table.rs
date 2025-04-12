@@ -88,7 +88,11 @@ impl FdTable {
     }
 
     pub fn get(&self, fd: Fd) -> SysResult<&FdInfo> {
-        self.table.get(fd).unwrap().as_ref().ok_or(SysError::EBADF)
+        self.table
+            .get(fd)
+            .ok_or(SysError::EBADF)?
+            .as_ref()
+            .ok_or(SysError::EBADF)
     }
 
     pub fn get_mut(&mut self, fd: Fd) -> SysResult<&mut FdInfo> {

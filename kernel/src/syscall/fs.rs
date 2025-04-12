@@ -309,11 +309,11 @@ pub fn sys_faccessat(dirfd: usize, pathname: usize, _mode: usize, flags: i32) ->
     let task = current_task();
     let mut addr_space_lock = task.addr_space_mut().lock();
     let path = UserReadPtr::<u8>::new(pathname, &mut addr_space_lock).read_c_string(256)?;
-    let pathname = path.into_string().map_err(|_| SysError::EINVAL)?;
+    let path= path.into_string().map_err(|_| SysError::EINVAL)?;
     let dentry = if flags == AT_SYMLINK_NOFOLLOW as i32 {
-        task.resolve_path(AtFd::from(dirfd), pathname, OpenFlags::O_NOFOLLOW)?
+        task.resolve_path(AtFd::from(dirfd), path, OpenFlags::O_NOFOLLOW)?
     } else {
-        task.resolve_path(AtFd::from(dirfd), pathname, OpenFlags::empty())?
+        task.resolve_path(AtFd::from(dirfd), path, OpenFlags::empty())?
     };
     dentry.base_open()?;
     Ok(0)
