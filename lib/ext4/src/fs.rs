@@ -37,11 +37,14 @@ impl FileSystemType for ExtFsType {
         _flags: MountFlags,
         dev: Option<Arc<dyn driver::BlockDevice>>,
     ) -> SysResult<Arc<dyn Dentry>> {
+        assert!(dev.is_some());
+        log::debug!("[base_mount] run");
         let meta = SuperBlockMeta::new(dev, self.clone());
         let superblock = ExtSuperBlock::new(meta);
         let root_dir = ExtDir::open("/").map_err(SysError::from_i32)?;
         let root_inode = ExtDirInode::new(superblock.clone(), root_dir);
         root_inode.set_inotype(InodeType::Dir);
+
         let root_dentry = ExtDentry::new(
             name,
             Some(root_inode.clone()),

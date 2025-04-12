@@ -51,6 +51,20 @@ pub trait FileSystemType: Send + Sync {
 }
 
 impl dyn FileSystemType {
+    /// file system mount
+    ///
+    /// Mounts the filesystem instance(`self`) under the `parent`-filesystem with `name`.
+    ///
+    /// # Arguments
+    /// - `name`: Name of the mount point (e.g., "usr" for `/parent/usr`).
+    /// - `parent`: Parent directory's dentry. If `None`, mounts as the root filesystem.
+    /// - `flags`: Mount options (e.g., read-only, no-execute). See [`MountFlags`].
+    /// - `dev`: Block device for storage-backed filesystems (e.g., `/dev/sda1`).
+    ///   Virtual filesystems (e.g., devfs) should pass `None`.
+    ///
+    /// # Returns
+    /// - `Ok(Arc<dyn Dentry>)`: Newly created dentry for the mount point.
+    /// - `Err(SysError)`: If mounting fails (e.g., invalid device).
     pub fn mount(
         self: &Arc<Self>,
         name: &str,

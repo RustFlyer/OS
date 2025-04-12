@@ -218,6 +218,35 @@ pub fn sys_getdents64(fd: usize, buf: usize, len: usize) -> SyscallResult {
     file.read_dir(&mut buf)
 }
 
+/// Implements the `mount` syscall for attaching a filesystem.
+///
+/// # Arguments (User-space Perspective)
+/// - `source`: Pointer to a null-terminated string (C-style) in user memory:
+///   - For **device-backed** filesystems (e.g., ext4): Path to block device (e.g., `/dev/sda1`).
+///   - For **virtual** filesystems (e.g., procfs): May be empty or a dummy string (e.g., `"none"`).
+///   - **Corresponds to**: `dev: Option<Arc<dyn BlockDevice>>` in `mount()`, but passed as a path.
+///
+/// - `target`: Pointer to a null-terminated string for the mount point path (e.g., `/mnt/usb`).
+///   - **Corresponds to**: Combined `parent: Option<Arc<dyn Dentry>>` and `name: &str` in `mount()`,
+///     where `target` is the full path (parent + name).
+///
+/// - `fstype`: Pointer to a null-terminated string for filesystem type (e.g., `"ext4"`, `"proc"`).
+///   - **VFS Handling**: Used internally to select the appropriate `FileSystem` implementation.
+///   - No direct equivalent in `mount()`, as `mount()` operates on an existing `FileSystem` instance.
+///
+/// - `flags`: Bitmask of mount options (e.g., `MS_RDONLY`).
+///   - **Direct mapping**: Converted to `MountFlags` in `mount()`.
+///
+/// - `data`: Pointer to additional configuration (often `NULL`).
+///   - **Usage**: Filesystem-specific (e.g., NFS server options). May be ignored for simple FS.
+///   - No direct equivalent in `mount()` (handled internally by FS drivers).
+///
+/// # Returns
+/// - `Ok(0)` on success.
+/// - `Err(SysError)` on failure (e.g., `EINVAL` for invalid flags or paths).
+///
+/// # Attention
+/// - `source` dev is substituted by BLOCK_DEVICE now.
 pub fn sys_mount(
     source: usize,
     target: usize,
@@ -239,7 +268,7 @@ pub fn sys_mount(
     let target = read_c_str(target)?;
     let fstype = read_c_str(fstype)?;
     let flags = MountFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
-    let data = read_c_str(data)?;
+    // let data = read_c_str(data)?;
 
     log::debug!(
         "[sys_mount] source:{source:?}, target:{target:?}, fstype:{fstype:?}, flags:{flags:?}, data:{data:?}",
@@ -254,14 +283,17 @@ pub fn sys_mount(
 
     let _fs_root = match fs_type.name().as_str() {
         name @ "ext4" => {
+            log::debug!("[sys_mount] ext4 check pass");
             let dev = if name.eq("ext4") {
+                log::debug!("[sys_mount] ext4 get block dev");
                 Some(BLOCK_DEVICE.get().unwrap().clone())
             } else {
                 None
             };
             let (parent, name) = split_parent_and_name(&target);
-
+            log::debug!("[sys_mount] start mount [{}], [{}]", parent, name.unwrap());
             let parent = task.resolve_path(AtFd::FdCwd, parent.to_string())?;
+            log::debug!("[sys_mount] parent dentry is {}", parent.path());
             fs_type.mount(name.unwrap(), Some(parent), flags, dev)?
         }
         _ => return Err(SysError::EINVAL),
