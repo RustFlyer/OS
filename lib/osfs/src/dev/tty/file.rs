@@ -42,10 +42,10 @@ impl File for TtyFile {
                     todo!();
                 }
             }
-            log::debug!(
-                "[TtyFuture::poll] recv ch {ch}, cnt {cnt}, len {}",
-                buf.len()
-            );
+            // log::debug!(
+            //     "[TtyFuture::poll] recv ch {ch}, cnt {cnt}, len {}",
+            //     buf.len()
+            // );
             buf[cnt] = ch;
 
             cnt += 1;
