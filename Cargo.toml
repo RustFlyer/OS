@@ -22,8 +22,15 @@ spin = { version = "0.9", features = ["lazy"] }
 strum = { version = "0.27", default-features = false, features = ["derive"] }
 virtio-drivers = { version = "0.7" }
 uart_16550 = "0.3"
+fatfs = { default-features = false,  git = "https://github.com/EchudeT/rust-fatfs.git", rev = "7d80", features = [
+    "alloc",
+    "lfn",
+    "log_level_info",
+] }
+
 
 elf = { git = "https://github.com/adong660/rust-elf.git", branch = "no-std-elfstream", default-features = false, features = [
     "alloc",
 ] }
 lwext4_rust = { git = "https://github.com/EchudeT/lwext4_rust.git", rev = "719c" }
+

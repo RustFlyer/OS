@@ -16,8 +16,7 @@
 - [x] write
 - [x] close  
 - [x] yield
-
-- [?] uname  
+- [x] uname  
 - [x] getppid
 
 - [x] mmap   
@@ -28,7 +27,7 @@
 - [x] mkdir_ 
 - [ ] unlink  
 
-- [?] getdents  
+- [x] getdents  
 
 - [?] mount 
 - [ ] umount

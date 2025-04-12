@@ -4,12 +4,23 @@ target = "riscv64gc-unknown-none-elf"
 [target.riscv64gc-unknown-none-elf]
 rustflags = ["-Cforce-frame-pointers=yes"]
 
+
 [source.crates-io]
 replace-with = "vendored-sources"
 
 [source."git+https://github.com/EchudeT/lwext4_rust.git?rev=719c"]
 git = "https://github.com/EchudeT/lwext4_rust.git"
 rev = "719c"
+replace-with = "vendored-sources"
+
+[source."git+https://github.com/EchudeT/rust-fatfs.git?rev=7d80"]
+git = "https://github.com/EchudeT/rust-fatfs.git"
+rev = "7d80"
+replace-with = "vendored-sources"
+
+[source."git+https://github.com/adong660/rust-elf.git?branch=no-std-elfstream"]
+git = "https://github.com/adong660/rust-elf.git"
+branch = "no-std-elfstream"
 replace-with = "vendored-sources"
 
 [source.vendored-sources]

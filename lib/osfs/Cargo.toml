@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 config = { path = "../config" }
 ext4   = { path = "../ext4" }
+fat32  = { path = "../fat32" }
 vfs    = { path = "../vfs" }
 systype =  { path = "../systype" }
 mutex  = { path = "../mutex" }
