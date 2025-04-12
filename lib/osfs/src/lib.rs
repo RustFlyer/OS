@@ -5,8 +5,9 @@
 use alloc::{collections::btree_map::BTreeMap, string::String, sync::Arc};
 use config::vfs::MountFlags;
 use dev::DevFsType;
-use driver::BLOCK_DEVICE;
+use driver::{BLOCK_DEVICE, BlockDevice};
 use mutex::SpinNoIrqLock;
+use systype::{SysError, SysResult};
 use vfs::{SYS_ROOT_DENTRY, file::File, fstype::FileSystemType};
 
 extern crate alloc;
@@ -22,12 +23,21 @@ pub static FS_MANAGER: SpinNoIrqLock<BTreeMap<String, Arc<dyn FileSystemType>>> 
     SpinNoIrqLock::new(BTreeMap::new());
 
 type DiskFsType = ext4::fs::ExtFsType;
+type DiskFsTypeFat = fat32::fs::FatFsType;
 
 pub const DISK_FS_NAME: &str = "ext4";
+
+pub fn get_block_device() -> SysResult<Arc<dyn BlockDevice>> {
+    let devices = BLOCK_DEVICE.get().ok_or(SysError::ENODEV)?.clone();
+    Ok(devices)
+}
 
 pub fn register_dev() {
     let devfs = DevFsType::new();
     FS_MANAGER.lock().insert(devfs.name(), devfs);
+
+    let devfs2 = DiskFsTypeFat::new();
+    FS_MANAGER.lock().insert(devfs2.name(), devfs2);
 }
 
 pub fn init() {

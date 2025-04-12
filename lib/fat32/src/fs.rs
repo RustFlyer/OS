@@ -1,6 +1,7 @@
 use alloc::{boxed::Box, sync::Arc};
 use config::vfs::MountFlags;
 use driver::BlockDevice;
+use systype::SysResult;
 use vfs::{
     dentry::Dentry,
     fstype::{FileSystemType, FileSystemTypeMeta},
@@ -32,7 +33,7 @@ impl FileSystemType for FatFsType {
         parent: Option<Arc<dyn Dentry>>,
         _flags: MountFlags,
         dev: Option<Arc<dyn BlockDevice>>,
-    ) -> systype::SysResult<Arc<dyn Dentry>> {
+    ) -> SysResult<Arc<dyn Dentry>> {
         debug_assert!(dev.is_some());
         let sb = FatSuperBlock::new(SuperBlockMeta::new(dev, self.clone()));
         let sblk = sb.clone();
@@ -55,7 +56,7 @@ impl FileSystemType for FatFsType {
         Ok(root_dentry)
     }
 
-    fn kill_sblk(&self, _sb: Arc<dyn SuperBlock>) -> systype::SysResult<()> {
+    fn kill_sblk(&self, _sb: Arc<dyn SuperBlock>) -> SysResult<()> {
         todo!()
     }
 }

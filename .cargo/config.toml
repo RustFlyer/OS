@@ -13,9 +13,9 @@ git = "https://github.com/EchudeT/lwext4_rust.git"
 rev = "719c"
 replace-with = "vendored-sources"
 
-[source."git+https://github.com/EchudeT/rust-fatfs.git?rev=7d80"]
+[source."git+https://github.com/EchudeT/rust-fatfs.git?rev=e656"]
 git = "https://github.com/EchudeT/rust-fatfs.git"
-rev = "7d80"
+rev = "e656"
 replace-with = "vendored-sources"
 
 [source."git+https://github.com/adong660/rust-elf.git?branch=no-std-elfstream"]

@@ -22,7 +22,7 @@ spin = { version = "0.9", features = ["lazy"] }
 strum = { version = "0.27", default-features = false, features = ["derive"] }
 virtio-drivers = { version = "0.7" }
 uart_16550 = "0.3"
-fatfs = { default-features = false,  git = "https://github.com/EchudeT/rust-fatfs.git", rev = "7d80", features = [
+fatfs = { default-features = false,  git = "https://github.com/EchudeT/rust-fatfs.git", rev = "e656", features = [
     "alloc",
     "lfn",
     "log_level_info",

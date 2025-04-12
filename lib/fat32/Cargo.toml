@@ -12,3 +12,4 @@ mutex = { path = "../mutex/" }
 simdebug = { path = "../simdebug/" }
 
 fatfs = { workspace = true }
+log = { workspace = true }

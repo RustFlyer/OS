@@ -287,6 +287,20 @@ pub fn sys_mount(
             log::debug!("[sys_mount] parent dentry is {}", parent.path());
             fs_type.mount(name.unwrap(), Some(parent), flags, dev)?
         }
+        name @ "fat32" => {
+            log::debug!("[sys_mount] fat32 check pass");
+            let dev = if name.eq("fat32") {
+                log::debug!("[sys_mount] fat32 get block dev");
+                Some(BLOCK_DEVICE.get().unwrap().clone())
+            } else {
+                None
+            };
+            let (parent, name) = split_parent_and_name(&target);
+            log::debug!("[sys_mount] start mount [{}], [{}]", parent, name.unwrap());
+            let parent = task.resolve_path(AtFd::FdCwd, parent.to_string(), OpenFlags::empty())?;
+            log::debug!("[sys_mount] parent dentry is {}", parent.path());
+            fs_type.mount(name.unwrap(), Some(parent), flags, dev)?
+        }
         _ => return Err(SysError::EINVAL),
     };
     Ok(0)
