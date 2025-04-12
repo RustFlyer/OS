@@ -48,7 +48,7 @@ impl FileSystemType for ExtFsType {
         let root_dentry = ExtDentry::new(
             name,
             Some(root_inode.clone()),
-            parent.as_ref().map(|p| Arc::downgrade(p)),
+            parent.as_ref().map(Arc::downgrade),
         );
         root_dentry.set_inode(root_inode);
 

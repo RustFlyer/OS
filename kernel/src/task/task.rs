@@ -68,7 +68,6 @@ pub struct Task {
     cwd: ShareMutex<Arc<dyn Dentry>>,
 
     elf: SyncUnsafeCell<Arc<dyn File>>,
-    args: SyncUnsafeCell<Vec<String>>,
 
     name: SyncUnsafeCell<String>,
 }
@@ -80,7 +79,6 @@ impl Task {
         sp: usize,
         addrspace: AddrSpace,
         elf_file: Arc<dyn File>,
-        args: Vec<String>,
         name: String,
     ) -> Self {
         let tid = tid_alloc();
@@ -102,7 +100,6 @@ impl Task {
             fd_table: new_share_mutex(FdTable::new()),
             cwd: new_share_mutex(sys_root_dentry()),
             elf: SyncUnsafeCell::new(elf_file),
-            args: SyncUnsafeCell::new(args),
             name: SyncUnsafeCell::new(name),
         }
     }
@@ -130,7 +127,6 @@ impl Task {
         cwd: ShareMutex<Arc<dyn Dentry>>,
 
         elf: SyncUnsafeCell<Arc<dyn File>>,
-        args: SyncUnsafeCell<Vec<String>>,
 
         name: SyncUnsafeCell<String>,
     ) -> Self {
@@ -151,7 +147,6 @@ impl Task {
             fd_table,
             cwd,
             elf,
-            args,
             name,
         }
     }
@@ -198,11 +193,6 @@ impl Task {
     #[allow(clippy::mut_from_ref)]
     pub fn elf_mut(&self) -> &mut Arc<dyn File> {
         unsafe { &mut *self.elf.get() }
-    }
-
-    #[allow(clippy::mut_from_ref)]
-    pub fn args_mut(&self) -> &mut Vec<String> {
-        unsafe { &mut *self.args.get() }
     }
 
     #[allow(clippy::mut_from_ref)]

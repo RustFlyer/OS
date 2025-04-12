@@ -1,17 +1,17 @@
+use core::arch::asm;
+
 use arch::riscv64::{
     interrupt::disable_interrupt,
     sstatus::{self, Sstatus},
 };
-use core::arch::asm;
 use riscv::register::sstatus::{FS, SPP};
-
-#[derive(Clone, Copy, Debug)]
-#[repr(C)]
 
 /*when sp points to user stack of a task/process,
 sscratch(in RISCV) points to the start
 of the TrapContext of this task/process in user address space,
 until they switch when __trap_from_user, and the context begin to be saved*/
+#[derive(Clone, Copy, Debug)]
+#[repr(C)]
 pub struct TrapContext {
     // integer registers and CSR to be saved when trap from user to kernel
     pub user_reg: [usize; 32], // 0-31, general register

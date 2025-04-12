@@ -1,17 +1,18 @@
-use crate::task::TaskState;
-use crate::vm::user_ptr::UserReadPtr;
-use crate::{processor::current_task, task::future::spawn_user_task};
-use alloc::string::ToString;
 use alloc::vec::Vec;
+
+use log::info;
+
 use config::process::CloneFlags;
 use driver::println;
-use log::info;
 use osfs::sys_root_dentry;
 use systype::{SysError, SyscallResult};
 use vfs::file::File;
 use vfs::path::Path;
 
+use crate::task::TaskState;
 use crate::task::future::yield_now;
+use crate::vm::user_ptr::UserReadPtr;
+use crate::{processor::current_task, task::future::spawn_user_task};
 
 pub fn sys_gettid() -> SyscallResult {
     Ok(current_task().tid())
@@ -89,41 +90,37 @@ pub fn sys_clone(
 pub fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult {
     let task = current_task();
 
-    let read_c_str = |addr| {
+    let read_string = |addr| {
         let mut addr_space_lock = task.addr_space_mut().lock();
-        let mut data_ptr = UserReadPtr::<u8>::new(addr, &mut addr_space_lock);
-        match data_ptr.read_c_string(30) {
-            Ok(data) => match core::str::from_utf8(&data) {
-                Ok(utf8_str) => utf8_str.to_string(),
-                Err(_) => unimplemented!(),
-            },
-            Err(_) => unimplemented!(),
-        }
+        let mut user_ptr = UserReadPtr::<u8>::new(addr, &mut addr_space_lock);
+        user_ptr
+            .read_c_string(256)?
+            .into_string()
+            .map_err(|_| SysError::EINVAL)
     };
 
-    let read_c_ptrs = |addr| {
-        let mut ret = Vec::new();
+    let read_string_array = |addr| {
+        let mut strings = Vec::new();
         let mut addr_space_lock = task.addr_space_mut().lock();
-        let mut data_ptr = UserReadPtr::<usize>::new(addr, &mut *addr_space_lock);
-        if let Ok(ptrs) = data_ptr.read_ptr_array(20) {
-            for ptr in ptrs {
-                let mut str_ptr = UserReadPtr::<u8>::new(ptr, &mut *addr_space_lock);
-                let r = str_ptr.read_c_string(20);
-                if let Ok(y) = r {
-                    let tstr = core::str::from_utf8(&y).map_err(SysError::from_utf8_err)?;
-                    ret.push(tstr.to_string());
-                }
-            }
+        let mut user_ptr = UserReadPtr::<usize>::new(addr, &mut addr_space_lock);
+        let pointers = user_ptr.read_ptr_array(256)?;
+        for ptr in pointers {
+            let mut user_ptr = UserReadPtr::<u8>::new(ptr, &mut addr_space_lock);
+            let string = user_ptr
+                .read_c_string(256)?
+                .into_string()
+                .map_err(|_| SysError::EINVAL)?;
+            strings.push(string);
         }
-        Ok(ret)
+        Ok(strings)
     };
 
-    let path = read_c_str(path);
-    let argv = read_c_ptrs(argv)?;
-    let envp = read_c_ptrs(envp)?;
+    let path = read_string(path)?;
+    let args = read_string_array(argv)?;
+    let envs = read_string_array(envp)?;
 
-    println!("argv: {:?}", argv);
-    println!("envp: {:?}", envp);
+    println!("args: {:?}", args);
+    println!("envs: {:?}", envs);
     log::info!("[sys_execve]: path: {path:?}",);
     let dentry = {
         let path = Path::new(sys_root_dentry(), sys_root_dentry(), &path);
@@ -131,7 +128,6 @@ pub fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult {
     };
 
     let file = <dyn File>::open(dentry)?;
-    let name = format!("{path:?}");
-    task.execve(file, argv, envp, &name);
+    task.execve(file, args, envs, path)?;
     Ok(0)
 }
