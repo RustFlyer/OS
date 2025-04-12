@@ -34,6 +34,7 @@ impl ExtFile {
         let c_path = CString::new(path).unwrap();
         let mut file: MaybeUninit<ext4_file> = MaybeUninit::uninit();
         let err = unsafe { ext4_fopen2(file.as_mut_ptr(), c_path.as_ptr(), flags) };
+        log::info!("extfile open: {err}");
         match err {
             0 => unsafe { Ok(Self(file.assume_init())) },
             e => {

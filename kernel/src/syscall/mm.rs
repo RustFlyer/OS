@@ -34,3 +34,10 @@ pub fn sys_mmap(
         .lock()
         .map_file(file, flags, prot, va, length, offset)
 }
+
+pub fn sys_brk(addr: usize) -> SyscallResult {
+    current_task()
+        .addr_space_mut()
+        .lock()
+        .change_heap_size(addr, 0)
+}

@@ -22,7 +22,7 @@
 
 - [x] mmap   
 - [ ] munmap  
-- [ ] brk  
+- [x] brk  
 
 - [x] chdir
 - [x] mkdir_ 

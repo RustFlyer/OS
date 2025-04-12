@@ -355,6 +355,7 @@ impl dyn File {
     #[deprecated = "Legacy function from Phoenix OS."]
     pub fn load_dir(&self) -> SysResult<()> {
         let inode = self.inode();
+        log::debug!("inode state: {:?}", inode.state());
         if inode.state() == InodeState::Uninit {
             self.base_load_dir()?;
             inode.set_state(InodeState::Synced)
