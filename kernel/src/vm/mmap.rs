@@ -1,5 +1,6 @@
 use alloc::sync::Arc;
 use bitflags::bitflags;
+use config::mm::{MMAP_END, MMAP_START};
 use mm::address::VirtAddr;
 use systype::{SysError, SysResult};
 use vfs::file::File;
@@ -87,7 +88,12 @@ impl AddrSpace {
     ) -> SysResult<usize> {
         if va.to_usize() == 0 {
             va = self
-                .find_vacant_memory(va, length)
+                .find_vacant_memory(
+                    va,
+                    length,
+                    VirtAddr::new(MMAP_START),
+                    VirtAddr::new(MMAP_END),
+                )
                 .ok_or(SysError::ENOMEM)?;
         }
 
