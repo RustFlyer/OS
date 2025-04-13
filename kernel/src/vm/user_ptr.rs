@@ -34,7 +34,7 @@
 use core::{fmt::Debug, marker::PhantomData, ops::ControlFlow, slice};
 
 use alloc::{ffi::CString, vec::Vec};
-use config::mm::PAGE_SIZE;
+use config::mm::{PAGE_SIZE, USER_END};
 use mm::address::VirtAddr;
 use systype::{SysError, SysResult};
 
@@ -297,7 +297,7 @@ where
         };
         // SAFETY: every `usize` is valid.
         unsafe {
-            check_user_access_with(
+            access_with_checking(
                 self.addr_space,
                 self.ptr as usize,
                 (len - 1) * size_of::<usize>(),
@@ -346,7 +346,7 @@ where
         };
         // SAFETY: every `u8` is valid.
         unsafe {
-            check_user_access_with(
+            access_with_checking(
                 self.addr_space,
                 self.ptr as usize,
                 len - 1,
@@ -474,12 +474,15 @@ where
     }
 }
 
-/// Checks if certain user memory access is allowed, given the starting address
-/// and length.
+/// Checks if certain access to a given range of user memory is allowed.
 ///
-/// `perm` must be `R`, `W`, or `RW`. `W` is equivalent to `RW`.
+/// `addr_space` is the address space of the current process.
+///
+/// `addr` is the starting address of the memory region to be accessed.
 ///
 /// `len` is the length in bytes of the memory region to be accessed.
+///
+/// `perm` must be `R`, `W`, or `RW`. `W` is equivalent to `RW`.
 ///
 /// Returns `Ok(())` if the access is allowed, otherwise returns an `EFAULT` error.
 fn check_user_access(
@@ -528,16 +531,19 @@ fn check_user_access(
     Ok(())
 }
 
-/// Checks if certain user memory access is allowed, given the starting address,
-/// the length, and a closure which performs additional actions on primitive
-/// integer or pointer values along with the check and controls whether to stop
-/// the process early.
+/// Accesses a user memory region by element with a closure, checking the access
+/// permissions during the process.
 ///
-/// `perm` must be `MemPerm::R`, `MemPerm::W`, or `MemPerm::R` | `MemPerm::W`.
+/// `addr_space` is the address space of the current process.
+///
+/// `addr` is the starting address of the memory region to be accessed.
 ///
 /// `len` is the max length in bytes of the memory region to be accessed. However,
-/// the closure may stop the process early, so the actual length may be less than
-/// `len`.
+/// the closure may stop the process early, or the access may fail due to lack of
+/// permissions, so the actual length of the memory region accessed may be less
+/// than `len`.
+///
+/// `perm` must be `MemPerm::R`, `MemPerm::W`, or `MemPerm::R` | `MemPerm::W`.
 ///
 /// `T` must be a primitive integer or pointer type, and `addr` must be aligned
 /// to the size of `T`. `len` must be a multiple of the size of `T`.
@@ -550,7 +556,7 @@ fn check_user_access(
 ///
 /// # Safety
 /// The values that the closure operates on must be valid and properly aligned.
-unsafe fn check_user_access_with<F, T>(
+unsafe fn access_with_checking<F, T>(
     addr_space: &mut AddrSpace,
     mut addr: usize,
     len: usize,
@@ -571,11 +577,8 @@ where
     debug_assert!(addr % size_of::<T>() == 0);
     debug_assert!(len % size_of::<T>() == 0);
 
-    let end_addr = addr + len;
-    if !VirtAddr::check_validity(addr)
-        || !VirtAddr::check_validity(end_addr - 1)
-        || !VirtAddr::new(end_addr - 1).in_user_space()
-    {
+    let end_addr = usize::min(addr + len, USER_END);
+    if addr >= end_addr {
         return Err(SysError::EFAULT);
     }
 
