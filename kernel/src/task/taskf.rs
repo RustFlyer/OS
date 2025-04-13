@@ -3,6 +3,7 @@ use alloc::string::ToString;
 use alloc::sync::Arc;
 use vfs::file::File;
 use core::cell::SyncUnsafeCell;
+use core::sync::atomic::AtomicUsize;
 use core::time::Duration;
 
 use super::future::{self};
@@ -103,6 +104,7 @@ impl Task {
         let sig_handlers;
         let sig_manager;
         let sig_stack;
+        let sig_cx_ptr;
         let fd_table = SpinNoIrqLock::new(FdTable::new());
 
         if cloneflags.contains(CloneFlags::THREAD) {
@@ -126,6 +128,7 @@ impl Task {
         sig_handlers = (*self.sig_handlers_mut()).clone();
         sig_manager = SyncUnsafeCell::new(SigManager::new());
         sig_stack = SyncUnsafeCell::new(self.sig_stack_mut().clone());
+        sig_cx_ptr = AtomicUsize::new(0);
 
         let addr_space;
         if cloneflags.contains(CloneFlags::VM) {
@@ -156,6 +159,7 @@ impl Task {
             sig_handlers,
             sig_manager,
             sig_stack,
+            sig_cx_ptr,
             fd_table,
             name,
         ));

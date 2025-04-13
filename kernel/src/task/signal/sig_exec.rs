@@ -72,9 +72,9 @@ fn sig_exec(task: Arc<Task>, si: SigInfo) -> bool {
             };
             // extend the sig_stack
             // 在栈上压入一个sig_cx，存储trap frame里的寄存器信息
-
             let mut new_sp = sp - size_of::<SigContext>();
-            let sig_cx_ptr: UserWritePtr<SigContext> = new_sp.into();
+            let mut addr_space = task.addr_space_mut().lock();
+            let mut sig_cx_ptr = UserWritePtr::<SigContext>::new(new_sp, &mut *addr_space);
             // TODO: should increase the size of the sig_stack? It seems umi doesn't
             let mut sig_cx = SigContext {
                 flags: 0,
@@ -114,7 +114,7 @@ fn sig_exec(task: Arc<Task>, si: SigInfo) -> bool {
                 siginfo_v.si_signo = si.sig.raw() as _;
                 siginfo_v.si_code = si.code;
                 new_sp -= size_of::<LinuxSigInfo>();
-                let siginfo_ptr: UserWritePtr<LinuxSigInfo> = new_sp.into();
+                let mut siginfo_ptr = UserWritePtr::<LinuxSigInfo>::new(new_sp, &mut *addr_space);
                 unsafe { siginfo_ptr.write(siginfo_v) };
                 cx.user_reg[11] = new_sp;
             }

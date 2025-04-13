@@ -114,13 +114,13 @@ pub fn sys_sigmask(mode: usize, mut input_mask: UserReadPtr<SigSet>, mut prev_ma
 }
 
 pub fn sys_sigreturn() -> SyscallResult {
-    let trap_cx = current_task().trap_context_mut();
-    let mask = current_task().sig_mask_mut();
-    // Question: Why UserRead? And does it impl usize "into"?
-    // Question: Why error when sig_cx_ptr is not anounced to be mutatable?
-    let mut sig_cx_ptr: UserReadPtr<SigContext> = current_task().into();
+    let task = current_task();
+    let trap_cx = task.trap_context_mut();
+    let mask = task.sig_mask_mut();
+    let sig_cx_ptr = task.get_sig_cx_ptr();
+    let mut addr_space = task.addr_space_mut().lock();
+    let mut sig_cx_ptr = UserReadPtr::<SigContext>::new(sig_cx_ptr, &mut *addr_space);
     log::trace!("[sys_rt_sigreturn] sig_cx_ptr: {sig_cx_ptr:?}");
-    // Question: What about the changes on Task signal members from other threads?
     unsafe { 
         let sig_cx = sig_cx_ptr.read()?; 
         *mask = sig_cx.mask;

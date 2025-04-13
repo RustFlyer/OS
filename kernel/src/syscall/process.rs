@@ -1,4 +1,4 @@
-use crate::task::{Task, TaskState, tid::{Pid, PGid}, manager::TASK_MANAGER, process_manager::PROCESS_GROUP_MANAGER};
+use crate::{syscall::signal::sys_kill, task::{manager::TASK_MANAGER, process_manager::PROCESS_GROUP_MANAGER, signal::sig_info::Sig, tid::{PGid, Pid}, Task, TaskState}};
 use crate::task::signal::sig_info::SigSet;
 use crate::task::future::{suspend_now, yield_now};
 use crate::vm::user_ptr::{UserReadPtr, UserWritePtr};
@@ -8,6 +8,7 @@ use alloc::string::ToString;
 use bitflags::*;
 use config::inode::{InodeMode, InodeType};
 use config::process::CloneFlags;
+use driver::println;
 use log::debug;
 use osfs::sys_root_dentry;
 use systype::{SysError, SyscallResult};
@@ -34,12 +35,25 @@ pub fn sys_exit(exit_code: i32) -> SyscallResult {
     if task.is_process() {
         task.set_exit_code((exit_code & 0xFF) << 8);
     }
+    let tid = match task.parent_mut().lock().unwrap().upgrade() {
+        None => None,
+        Some(parent) => Some(parent.tid()),
+        };
+    if tid == None {
+        log::info!("root task trying to exit");
+    } else {
+        sys_kill(Sig::SIGCHLD.raw() as i32, tid.unwrap() as isize);
+    }
     Ok(0)
 }
 
 pub async fn sys_sched_yield() -> SyscallResult {
     yield_now().await;
     Ok(0)
+}
+
+pub async fn sys_wait() {
+    
 }
 
 pub async fn sys_waitpid() -> SyscallResult {
