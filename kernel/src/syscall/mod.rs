@@ -59,6 +59,8 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         FACCESSAT => sys_faccessat(args[0], args[1], args[2], args[3] as i32),
         SET_TID_ADDRESS => sys_set_tid_address(args[0]),
         SET_ROBUST_LIST => sys_set_robust_list(args[0], args[1]),
+        UMOUNT2 => sys_umount2(args[0], args[1] as u32),
+        MUNMAP => sys_munmap(args[0], args[1]),
         _ => {
             log::error!("Syscall not implemented: {syscall_no}");
             unimplemented!()

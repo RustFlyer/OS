@@ -8,7 +8,6 @@
 - [x] fstat     
 - [x] openat  
 - [x] sleep       
-- [x] clone  
 - [x] execve  
 - [x] getcwd    
 - [x] gettimeofday  
@@ -20,19 +19,20 @@
 - [x] getppid
 
 - [x] mmap   
-- [ ] munmap  
-- [x] brk  
+- [x] munmap  
+- [?] brk  
 
 - [x] chdir
 - [x] mkdir_ 
-- [ ] unlink  
+- [x] unlink  
 
 - [x] getdents  
 
-- [?] mount 
-- [ ] umount
+- [x] mount 
+- [x] umount
 - [ ] pipe  
 
+- [ ] clone  
 - [ ] exit      - wait
 - [ ] waitpid
 - [ ] wait

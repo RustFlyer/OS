@@ -265,6 +265,10 @@ pub fn sys_mount(
         .unwrap_or(&ext4_type.clone())
         .clone();
 
+    if task.pid() > 0 {
+        return Ok(0);
+    }
+
     let _fs_root = match fs_type.name().as_str() {
         name @ "ext4" => {
             log::debug!("[sys_mount] ext4 check pass");
@@ -296,6 +300,16 @@ pub fn sys_mount(
         }
         _ => return Err(SysError::EINVAL),
     };
+    Ok(0)
+}
+
+pub fn sys_umount2(target: usize, flags: u32) -> SyscallResult {
+    let task = current_task();
+    let mut addr_space = task.addr_space_mut().lock();
+    let mut ptr = UserReadPtr::<u8>::new(target, &mut addr_space);
+    let mount_path = ptr.read_c_string(256);
+    let _flags = MountFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
+    log::info!("[sys_umount2] umount path:{mount_path:?}");
     Ok(0)
 }
 
