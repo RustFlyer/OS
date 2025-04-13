@@ -1,4 +1,6 @@
+use alloc::boxed::Box;
 use alloc::sync::{Arc, Weak};
+use async_trait::async_trait;
 use config::{inode::InodeType, vfs::Stat};
 use driver::print;
 use systype::SysResult;
@@ -9,7 +11,6 @@ use vfs::{
     inoid::alloc_ino,
     superblock::SuperBlock,
 };
-
 pub struct StdOutDentry {
     meta: DentryMeta,
 }
@@ -90,12 +91,13 @@ impl Inode for StdOutInode {
     }
 }
 
+#[async_trait]
 impl File for StdOutFile {
     fn meta(&self) -> &FileMeta {
         &self.meta
     }
 
-    fn base_write(&self, buf: &[u8], _offset: usize) -> SysResult<usize> {
+    async fn base_write(&self, buf: &[u8], _offset: usize) -> SysResult<usize> {
         if let Ok(data) = core::str::from_utf8(buf) {
             print!("{}", data);
         } else {

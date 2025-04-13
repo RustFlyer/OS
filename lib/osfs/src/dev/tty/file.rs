@@ -1,4 +1,5 @@
 use alloc::{sync::Arc, vec::Vec};
+use async_trait::async_trait;
 use driver::{print, sbi::getchar};
 use mutex::SpinNoIrqLock;
 
@@ -8,8 +9,8 @@ use vfs::{
     file::{File, FileMeta},
 };
 
-use super::queuebuf::QueueBuffer;
-
+use super::queuebuffer::QueueBuffer;
+use alloc::boxed::Box;
 pub struct TtyFile {
     buf: SpinNoIrqLock<QueueBuffer>,
     meta: FileMeta,
@@ -24,12 +25,13 @@ impl TtyFile {
     }
 }
 
+#[async_trait]
 impl File for TtyFile {
     fn meta(&self) -> &FileMeta {
         &self.meta
     }
 
-    fn base_read(&self, buf: &mut [u8], _pos: usize) -> SysResult<usize> {
+    async fn base_read(&self, buf: &mut [u8], _pos: usize) -> SysResult<usize> {
         let mut cnt = 0;
         loop {
             let ch: u8;
@@ -60,7 +62,7 @@ impl File for TtyFile {
         }
     }
 
-    fn base_write(&self, buf: &[u8], _offset: usize) -> SysResult<usize> {
+    async fn base_write(&self, buf: &[u8], _offset: usize) -> SysResult<usize> {
         let utf8_buf: Vec<u8> = buf.iter().filter(|c| c.is_ascii()).map(|c| *c).collect();
         print!("{}", unsafe { core::str::from_utf8_unchecked(&utf8_buf) });
 

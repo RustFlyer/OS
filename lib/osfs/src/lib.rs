@@ -14,6 +14,7 @@ extern crate alloc;
 
 pub mod dev;
 pub mod fd_table;
+pub mod pipe;
 pub mod simple;
 pub mod simplefile;
 

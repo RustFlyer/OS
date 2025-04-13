@@ -19,6 +19,7 @@ driver = { path = "../lib/driver/" }
 systype = { path = "../lib/systype/" }
 vfs = { path = "../lib/vfs/" }
 osfs = { path = "../lib/osfs" }
+osfuture = { path = "../lib/osfuture" }
 
 bitflags = { workspace = true }
 elf = { workspace = true }

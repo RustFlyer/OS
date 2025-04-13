@@ -1,4 +1,6 @@
+use alloc::boxed::Box;
 use alloc::sync::{Arc, Weak};
+use async_trait::async_trait;
 use config::{inode::InodeType, vfs::Stat};
 use driver::sbi::getchar;
 use systype::SysResult;
@@ -9,7 +11,6 @@ use vfs::{
     inoid::alloc_ino,
     superblock::SuperBlock,
 };
-
 pub struct StdInDentry {
     meta: DentryMeta,
 }
@@ -90,12 +91,13 @@ impl Inode for StdInInode {
     }
 }
 
+#[async_trait]
 impl File for StdInFile {
     fn meta(&self) -> &FileMeta {
         &self.meta
     }
 
-    fn base_read(&self, buf: &mut [u8], _pos: usize) -> systype::SysResult<usize> {
+    async fn base_read(&self, buf: &mut [u8], _pos: usize) -> systype::SysResult<usize> {
         if buf.is_empty() {
             return Ok(0);
         }

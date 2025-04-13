@@ -13,3 +13,4 @@ simdebug = { path = "../simdebug/" }
 
 fatfs = { workspace = true }
 log = { workspace = true }
+async-trait = { workspace = true }

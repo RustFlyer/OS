@@ -271,6 +271,7 @@ dependencies = [
 name = "fat32"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "config",
  "driver",
  "fatfs",
@@ -354,6 +355,7 @@ dependencies = [
  "mm",
  "mutex",
  "osfs",
+ "osfuture",
  "pps",
  "riscv",
  "riscv-rt",
@@ -485,6 +487,7 @@ checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
 name = "osfs"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "bitflags 2.9.0",
  "config",
  "driver",
@@ -501,6 +504,9 @@ dependencies = [
 [[package]]
 name = "osfuture"
 version = "0.1.0"
+dependencies = [
+ "log",
+]
 
 [[package]]
 name = "paste"
@@ -817,6 +823,7 @@ dependencies = [
  "log",
  "mm",
  "mutex",
+ "osfuture",
  "spin",
  "systype",
 ]

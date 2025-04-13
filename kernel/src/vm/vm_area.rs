@@ -25,6 +25,7 @@
 
 use alloc::{collections::btree_map::BTreeMap, sync::Arc, vec::Vec};
 use core::{fmt::Debug, mem};
+use osfuture::block_on;
 
 use bitflags::bitflags;
 
@@ -255,7 +256,7 @@ impl VmArea {
     /// Constructs a user space anonymous area.
     ///
     /// `start_va` and `end_va` must be page-aligned.
-    /// 
+    ///
     /// `prot` should have `U` bit set, because this VMA is supposed to be used in user
     /// space.
     pub fn new_anonymous(
@@ -367,7 +368,7 @@ impl VmArea {
             vma.end = remove_from;
             vma.pages = pages_low;
             // Note: we may need to extract the updating logic of fields in specific
-            // `TypedArea` structs to a common function, and 
+            // `TypedArea` structs to a common function, and
             if let TypedArea::FileBacked(file_backed) = &mut vma.map_type {
                 file_backed.len = file_backed
                     .len
@@ -858,7 +859,7 @@ impl FileBackedArea {
                 // and insert it into the page cache.
                 // Note: Consider extracting this to a function of `PageCache` or `Inode`.
                 let page = Arc::new(Page::build()?);
-                file.base_read(page.as_mut_slice(), file_offset)?;
+                block_on(async { file.base_read(page.as_mut_slice(), file_offset).await })?;
                 file.inode()
                     .page_cache()
                     .insert_page(file_offset, Arc::clone(&page));
@@ -950,7 +951,11 @@ impl AnonymousArea {
 
 pub fn test_unmap_range() {
     {
-        let mut vma = VmArea::new_kernel(VirtAddr::new(0x1000), VirtAddr::new(0x8000), MemPerm::empty());
+        let mut vma = VmArea::new_kernel(
+            VirtAddr::new(0x1000),
+            VirtAddr::new(0x8000),
+            MemPerm::empty(),
+        );
         let mut page_table = PageTable::build().unwrap();
 
         for vpn in vma.start_va().page_number().to_usize()..vma.end_va().page_number().to_usize() {
@@ -976,7 +981,11 @@ pub fn test_unmap_range() {
         assert!(!vma_high.contains(VirtAddr::new(0x1000)));
     }
     {
-        let mut vma = VmArea::new_kernel(VirtAddr::new(0x1000), VirtAddr::new(0x8000), MemPerm::empty());
+        let mut vma = VmArea::new_kernel(
+            VirtAddr::new(0x1000),
+            VirtAddr::new(0x8000),
+            MemPerm::empty(),
+        );
         let mut page_table = PageTable::build().unwrap();
 
         for vpn in vma.start_va().page_number().to_usize()..vma.end_va().page_number().to_usize() {
@@ -1010,7 +1019,11 @@ pub fn test_unmap_range() {
         assert!(!vma_high.contains(VirtAddr::new(0x1000)));
     }
     {
-        let mut vma = VmArea::new_kernel(VirtAddr::new(0x1000), VirtAddr::new(0x8000), MemPerm::empty());
+        let mut vma = VmArea::new_kernel(
+            VirtAddr::new(0x1000),
+            VirtAddr::new(0x8000),
+            MemPerm::empty(),
+        );
         let mut page_table = PageTable::build().unwrap();
 
         for vpn in vma.start_va().page_number().to_usize()..vma.end_va().page_number().to_usize() {
@@ -1029,7 +1042,11 @@ pub fn test_unmap_range() {
         assert!(vma_high.is_none());
     }
     {
-        let mut vma = VmArea::new_kernel(VirtAddr::new(0x5000), VirtAddr::new(0x8000), MemPerm::empty());
+        let mut vma = VmArea::new_kernel(
+            VirtAddr::new(0x5000),
+            VirtAddr::new(0x8000),
+            MemPerm::empty(),
+        );
         let mut page_table = PageTable::build().unwrap();
 
         for vpn in vma.start_va().page_number().to_usize()..vma.end_va().page_number().to_usize() {

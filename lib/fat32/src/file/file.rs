@@ -1,4 +1,7 @@
+use crate::{FatFile, as_sys_err, dentry::FatDentry, inode::file::FatFileInode};
+use alloc::boxed::Box;
 use alloc::{sync::Arc, vec};
+use async_trait::async_trait;
 use config::inode::InodeType;
 use fatfs::{Read, Seek, Write};
 use mutex::ShareMutex;
@@ -7,9 +10,6 @@ use vfs::{
     direntry::DirEntry,
     file::{File, FileMeta},
 };
-
-use crate::{FatFile, as_sys_err, dentry::FatDentry, inode::file::FatFileInode};
-
 pub struct FatFileFile {
     meta: FileMeta,
     file: ShareMutex<FatFile>,
@@ -24,12 +24,13 @@ impl FatFileFile {
     }
 }
 
+#[async_trait]
 impl File for FatFileFile {
     fn meta(&self) -> &FileMeta {
         &self.meta
     }
 
-    fn base_read(&self, buf: &mut [u8], pos: usize) -> SysResult<usize> {
+    async fn base_read(&self, buf: &mut [u8], pos: usize) -> SysResult<usize> {
         match self.inode().inotype() {
             InodeType::File => {
                 let mut file = self.file.lock();
@@ -47,7 +48,7 @@ impl File for FatFileFile {
         }
     }
 
-    fn base_write(&self, buf: &[u8], offset: usize) -> SysResult<usize> {
+    async fn base_write(&self, buf: &[u8], offset: usize) -> SysResult<usize> {
         if buf.is_empty() {
             return Ok(0);
         }

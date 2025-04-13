@@ -9,6 +9,7 @@ use config::{
 };
 use elf::{self, ElfStream, ParseError as ElfParseError, endian::LittleEndian, file::FileHeader};
 use mm::address::VirtAddr;
+use osfuture::block_on;
 use systype::{SysError, SysResult};
 use vfs::{file::File, path::Path, sys_root_dentry};
 
@@ -97,15 +98,14 @@ impl AddrSpace {
                 let len = interp.p_filesz as usize;
                 let mut buf = vec![0u8; len];
                 elf_file.seek(SeekFrom::Start(offset as u64))?;
-                elf_file.read(&mut buf)?;
+                block_on(async { elf_file.read(&mut buf).await })?;
                 CString::from_vec_with_nul(buf)
                     .map_err(|_| SysError::ENOENT)?
                     .into_string()
                     .map_err(|_| SysError::ENOENT)?
             };
             let interp_file = {
-                let dentry =
-                    Path::new(sys_root_dentry(), interp_name).walk()?;
+                let dentry = Path::new(sys_root_dentry(), interp_name).walk()?;
                 <dyn File>::open(dentry)?
             };
             let interp_stream: ElfStream<LittleEndian, _> =

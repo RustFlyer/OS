@@ -1,5 +1,6 @@
 use alloc::{ffi::CString, string::ToString};
 
+use osfuture::block_on;
 use strum::FromRepr;
 
 use config::{
@@ -7,7 +8,10 @@ use config::{
     vfs::{AT_REMOVEDIR, AtFd, MountFlags, OpenFlags, SeekFrom},
 };
 use driver::BLOCK_DEVICE;
-use osfs::FS_MANAGER;
+use osfs::{
+    FS_MANAGER,
+    pipe::{inode::PIPE_BUF_LEN, new_pipe},
+};
 use systype::{SysError, SyscallResult};
 use vfs::{file::File, kstat::Kstat, path::split_parent_and_name, sys_root_dentry};
 
@@ -54,24 +58,28 @@ pub fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) -> Sysca
     task.with_mut_fdtable(|ft| ft.alloc(file, flags))
 }
 
-pub fn sys_write(fd: usize, addr: usize, len: usize) -> SyscallResult {
-    let task = current_task();
-    let mut addr_space_lock = task.addr_space_mut().lock();
-    let mut data_ptr = UserReadPtr::<u8>::new(addr, &mut addr_space_lock);
+pub async fn sys_write(fd: usize, addr: usize, len: usize) -> SyscallResult {
+    block_on(async {
+        let task = current_task();
+        let mut addr_space_lock = task.addr_space_mut().lock();
+        let mut data_ptr = UserReadPtr::<u8>::new(addr, &mut addr_space_lock);
 
-    let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
-    let buf = unsafe { data_ptr.try_into_slice(len) }?;
-    file.write(buf)
+        let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
+        let buf = unsafe { data_ptr.try_into_slice(len) }?;
+        file.write(buf).await
+    })
 }
 
-pub fn sys_read(fd: usize, buf: usize, count: usize) -> SyscallResult {
-    let task = current_task();
-    let mut addrspace = task.addr_space_mut().lock();
+pub async fn sys_read(fd: usize, buf: usize, count: usize) -> SyscallResult {
+    block_on(async {
+        let task = current_task();
+        let mut addrspace = task.addr_space_mut().lock();
+        let mut buf = UserWritePtr::<u8>::new(buf, &mut addrspace);
 
-    let mut buf = UserWritePtr::<u8>::new(buf, &mut addrspace);
-    let buf_ptr = unsafe { buf.try_into_mut_slice(count) }?;
-    let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
-    file.read(buf_ptr)
+        let buf_ptr = unsafe { buf.try_into_mut_slice(count) }?;
+        let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
+        file.read(buf_ptr).await
+    })
 }
 
 pub fn sys_lseek(fd: usize, offset: isize, whence: usize) -> SyscallResult {
@@ -349,5 +357,25 @@ pub fn sys_faccessat(dirfd: usize, pathname: usize, _mode: usize, flags: i32) ->
 /// # Attention
 /// - Not Implemented
 pub fn sys_set_robust_list(_robust_list_head: usize, _len: usize) -> SyscallResult {
+    Ok(0)
+}
+
+pub fn sys_pipe2(pipefd: usize, flags: i32) -> SyscallResult {
+    let task = current_task();
+    let mut addr_space = task.addr_space_mut().lock();
+    let flags = OpenFlags::from_bits(flags)
+        .unwrap_or_else(|| unimplemented!("unknown flags, should add them"));
+    let (pipe_read, pipe_write) = new_pipe(PIPE_BUF_LEN);
+    let pipe = task.with_mut_fdtable(|table| {
+        let fd_read = table.alloc(pipe_read, flags)?;
+        let fd_write = table.alloc(pipe_write, flags)?;
+        log::info!("[sys_pipe2] read_fd: {fd_read}, write_fd: {fd_write}, flags: {flags:?}");
+        Ok([fd_read as u32, fd_write as u32])
+    })?;
+
+    let mut pipefd = UserWritePtr::<u32>::new(pipefd, &mut addr_space);
+    unsafe {
+        pipefd.write_array(&pipe)?;
+    }
     Ok(0)
 }

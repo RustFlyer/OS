@@ -13,6 +13,7 @@ mutex  = { path = "../mutex" }
 driver = { path = "../driver" }
 osfuture = { path = "../osfuture" }
 
+async-trait = { workspace = true }
 bitflags = { workspace = true }
 spin = { workspace = true }
 log = { workspace = true }

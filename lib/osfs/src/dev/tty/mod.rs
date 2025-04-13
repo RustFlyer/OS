@@ -1,7 +1,7 @@
 pub mod dentry;
 pub mod file;
 pub mod inode;
-pub mod queuebuf;
+pub mod queuebuffer;
 
 use alloc::{string::String, sync::Arc};
 use dentry::TtyDentry;
