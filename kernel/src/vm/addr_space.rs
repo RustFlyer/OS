@@ -18,10 +18,10 @@
 //! directly. VMAs are then created to manage the user part of the address space.
 
 use alloc::{collections::btree_map::BTreeMap, vec::Vec};
-use core::ops::Bound;
+use config::mm::{MMAP_END, MMAP_START};
+use core::{cmp, ops::Bound};
 
 use arch::riscv64::mm::{fence, tlb_shootdown_all};
-use config::mm::{USER_END, USER_START};
 use mm::address::VirtAddr;
 use systype::{SysError, SysResult};
 
@@ -103,56 +103,68 @@ impl AddrSpace {
         Ok(())
     }
 
-    /// Finds a vacant memory region in the user part of the address space.
+    /// Finds a vacant memory region in the user address space.
     ///
     /// This function first tries to find a vacant memory region that starts from `start_va`
     /// and has a length of `length`. If such requirement cannot be satisfied, it tries to
-    /// find a vacant memory region that has a length of `length` and starts from any address.
+    /// find a vacant memory region elsewhere from `find_from` to `find_to`, and the starting
+    /// address of the region is guaranteed to be larger than `start_va`.
     ///
-    /// `start_va` must be page-aligned. `length` need not to be. However, the region to be
-    /// found is rounded up to the page size.
+    /// The region to be found is always page-aligned.
     ///
     /// Returns the starting address of the vacant memory region if found.
-    pub fn find_vacant_memory(&self, start_va: VirtAddr, length: usize) -> Option<VirtAddr> {
+    pub fn find_vacant_memory(
+        &self,
+        start_va: VirtAddr,
+        length: usize,
+        find_from: VirtAddr,
+        find_to: VirtAddr,
+    ) -> Option<VirtAddr> {
+        let start_va = start_va.round_up();
         let length = VirtAddr::new(length).round_up().to_usize();
 
         // Check if the specified range is vacant.
-        let gap = self.vm_areas.upper_bound(Bound::Included(&start_va));
-        let vma_prev = gap.peek_prev().map(|(_, vma)| vma);
-        let vma_next = gap.peek_next().map(|(_, vma)| vma);
-        if vma_prev.map(|vma| vma.end_va() <= start_va).unwrap_or(true)
-            && vma_next
-                .map(|vma| vma.start_va() >= VirtAddr::new(start_va.to_usize() + length))
-                .unwrap_or(true)
+        if start_va.to_usize() >= find_from.to_usize()
+            && start_va.to_usize() + length <= find_to.to_usize()
         {
-            return Some(start_va);
+            let gap = self.vm_areas.upper_bound(Bound::Included(&start_va));
+            let vma_prev = gap.peek_prev().map(|(_, vma)| vma);
+            let vma_next = gap.peek_next().map(|(_, vma)| vma);
+            if vma_prev.map(|vma| vma.end_va() <= start_va).unwrap_or(true)
+                && vma_next
+                    .map(|vma| vma.start_va() >= VirtAddr::new(start_va.to_usize() + length))
+                    .unwrap_or(true)
+            {
+                return Some(start_va);
+            }
         }
 
-        // Find a vacant region elsewhere.
-
-        // If there are more than two VMAs, try to find a gap between two VMAs.
-        let mut iter = self.vm_areas.iter().peekable();
-        while let Some((&_, vma)) = iter.next() {
+        // Find a vacant region after `start_va`.
+        let start_va = cmp::max(find_from, start_va);
+        let mut iter = self
+            .vm_areas
+            .iter()
+            .skip_while(|&(_, vma)| vma.end_va() <= start_va)
+            .peekable();
+        // If there is no VMA after `start_va`, we can use the space between `start_va` and
+        // `find_to`.
+        if iter.peek().is_none() {
+            if start_va.to_usize() + length <= find_to.to_usize() {
+                return Some(start_va);
+            } else {
+                return None;
+            }
+        }
+        // Otherwise, try to find a vacant region after one of the VMAs.
+        while let Some((_, vma)) = iter.next() {
             let end_va = vma.end_va();
-            if let Some(&(&next_start_va, _)) = iter.peek() {
-                if next_start_va.to_usize() - end_va.to_usize() >= length {
-                    return Some(end_va);
-                }
+            let next_start_va = iter
+                .peek()
+                .map(|&(&start_va, _)| start_va)
+                .unwrap_or(find_to);
+            if next_start_va.to_usize() - end_va.to_usize() >= length {
+                return Some(end_va);
             }
-        }
-
-        // Look at the regions before the first VMA and after the last VMA.
-        if let Some((_, first_vma)) = self.vm_areas.iter().next() {
-            if first_vma.start_va().to_usize() - USER_START >= length {
-                return Some(VirtAddr::new(USER_START));
-            }
-            let (_, last_vma) = self.vm_areas.iter().next_back().unwrap();
-            if USER_END - last_vma.end_va().to_usize() >= length {
-                return Some(last_vma.end_va());
-            }
-        } else {
-            // If there is no VMA, the whole user part is vacant.
-            return Some(VirtAddr::new(USER_START));
         }
 
         None
@@ -367,17 +379,32 @@ pub fn test_find_vacant_memory() {
     // These assertions should be suitable for the current implementation,
     // but they are not necessarily true for the purpose of the function.
     assert_eq!(
-        addr_space.find_vacant_memory(VirtAddr::new(0x0000), 0x1000),
+        addr_space.find_vacant_memory(
+            VirtAddr::new(0x0000),
+            0x1000,
+            VirtAddr::new(MMAP_START),
+            VirtAddr::new(MMAP_END)
+        ),
         Some(VirtAddr::new(0x0000))
     );
     assert_eq!(
-        addr_space.find_vacant_memory(VirtAddr::new(0x1000), 0x3000),
+        addr_space.find_vacant_memory(
+            VirtAddr::new(0x1000),
+            0x3000,
+            VirtAddr::new(MMAP_START),
+            VirtAddr::new(MMAP_END)
+        ),
         Some(VirtAddr::new(0x3000))
     );
 
     addr_space.add_area(area2).unwrap();
     addr_space.add_area(area3).unwrap();
-    if let Some(addr) = addr_space.find_vacant_memory(VirtAddr::new(0x0000), 0x2000) {
+    if let Some(addr) = addr_space.find_vacant_memory(
+        VirtAddr::new(0x0000),
+        0x2000,
+        VirtAddr::new(MMAP_START),
+        VirtAddr::new(MMAP_END),
+    ) {
         assert_eq!(addr.to_usize(), 0x7000);
         let area4 = VmArea::new_memory_backed(
             addr,
