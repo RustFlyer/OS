@@ -3,6 +3,7 @@ use alloc::string::String;
 use alloc::string::ToString;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use config::inode::InodeType;
 use config::vfs::AtFd;
 use config::vfs::OpenFlags;
 use core::cell::SyncUnsafeCell;
@@ -160,7 +161,7 @@ impl Task {
         let addr_space;
         if cloneflags.contains(CloneFlags::VM) {
             addr_space = (*self.addr_space_mut()).clone();
-            name = name + "(thread)";
+            name += "(thread)";
         } else {
             let cow_address_space = self.addr_space_mut().lock().clone_cow().unwrap();
             addr_space = Arc::new(SpinNoIrqLock::new(cow_address_space));
@@ -218,9 +219,7 @@ impl Task {
             Path::new(sys_root_dentry(), pathname).walk()?
         } else {
             match dirfd {
-                AtFd::FdCwd => {
-                    Path::new(self.cwd_mut(), pathname).walk()?
-                }
+                AtFd::FdCwd => Path::new(self.cwd_mut(), pathname).walk()?,
                 AtFd::Normal(fd) => {
                     let file = self.with_mut_fdtable(|table| table.get_file(fd))?;
                     Path::new(file.dentry(), pathname).walk()?
@@ -228,10 +227,12 @@ impl Task {
             }
         };
 
-        if flags.contains(OpenFlags::O_NOFOLLOW) {
+        if flags.contains(OpenFlags::O_NOFOLLOW) || dentry.is_negative() {
             Ok(dentry)
+        } else if dentry.inode().unwrap().inotype() == InodeType::SymLink {
+            Path::resolve_symlink_through(dentry)
         } else {
-            Path::resolve_dentry(dentry)
+            Ok(dentry)
         }
     }
 
