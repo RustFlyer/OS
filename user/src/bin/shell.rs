@@ -30,6 +30,6 @@ fn main() {
             execve(apppath, &[], &[]);
             exit(0);
         }
-        sleep(8000);
+        sleep(3000);
     }
 }

@@ -3,7 +3,7 @@ pub mod file;
 pub mod inode;
 pub mod queuebuf;
 
-use alloc::sync::Arc;
+use alloc::{string::String, sync::Arc};
 use dentry::TtyDentry;
 use file::TtyFile;
 use inode::TtyInode;
@@ -16,8 +16,8 @@ use crate::sys_root_dentry;
 pub static TTY: Once<Arc<TtyFile>> = Once::new();
 
 pub fn init() -> SysResult<()> {
-    let path = "/dev/tty";
-    let path = Path::new(sys_root_dentry(), sys_root_dentry(), path);
+    let path = String::from("/dev/tty");
+    let path = Path::new(sys_root_dentry(), path);
     let tty_dentry = path.walk()?;
     let parent = tty_dentry.parent().unwrap();
     let weak_parent = Arc::downgrade(&parent);

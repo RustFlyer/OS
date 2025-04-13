@@ -114,7 +114,7 @@ impl AddrSpace {
                 mem_prot,
                 Arc::clone(&file),
                 offset,
-                length as usize,
+                length,
             ),
             None => VmArea::new_anonymous(va_start, va_end, vma_flag, mem_prot),
         };

@@ -1,12 +1,21 @@
+//! Module for abstracting paths in the filesystem.
+//!
+//! This module provides a [`Path`] struct that represents a path in the filesystem
+//! and provides methods to resolve it to a dentry. The user can create a [`Path`]
+//! from a path string, and then call [`Path::walk`] to resolve it to a dentry.
+//! Symlinks are supported and the user can decide whether to resolve them or not.
+
 use alloc::{string::String, sync::Arc};
+
 use config::inode::InodeType;
 use systype::{SysError, SysResult};
 
-use crate::{dentry::Dentry, sys_root_dentry};
+use crate::{dentry::Dentry, file::File, sys_root_dentry};
 
+/// A struct representing a path in the filesystem which can be resolved to a
+/// dentry.
 #[derive(Clone)]
 pub struct Path {
-    root: Arc<dyn Dentry>,
     start: Arc<dyn Dentry>,
     path: String,
 }
@@ -20,21 +29,64 @@ impl PartialEq for Path {
 }
 
 impl Path {
-    pub fn new(root: Arc<dyn Dentry>, start: Arc<dyn Dentry>, path: &str) -> Self {
-        Self {
-            root,
-            start,
-            path: String::from(path),
-        }
+    /// Creates a path from a starting dentry and a path string.
+    ///
+    /// `start` is a dentry that serves as the current working directory, from which
+    /// the path will be resolved in case the path is relative. It is ignored if the
+    /// path is absolute.
+    ///
+    /// `path` is a string representing the path. If it starts with a `/`, it is
+    /// resolved as an absolute path. Otherwise, it is resolved as a relative path
+    /// from the `start` dentry.
+    ///
+    /// This function does not check the validity of the path. If there are illegal
+    /// characters in `path`, or if `path` is empty, the behavior is undefined. The
+    /// caller must ensure that `path` is a valid path string.
+    pub fn new(start: Arc<dyn Dentry>, path: String) -> Self {
+        debug_assert!(!path.is_empty());
+        debug_assert!(!path.contains('\0'));
+        Self { start, path }
     }
 
-    /// walk the path to return the final dentry
+    /// Walks the path to find the target dentry.
+    ///
+    /// Returns a valid dentry if the target file exists.
+    /// Returns an invalid dentry if the target file does not exist but its parent
+    /// directory does. Returns an
+    /// `ENOENT` error if any directory in the middle of the path does not exist.
+    /// Returns an `ENOTDIR` error if any directory in the middle of the path is not a
+    /// directory.
+    /// Returns an `ELOOP` error if it encounters too many symlinks.
+    ///
+    /// For example, if the file tree is:
+    /// ```.
+    /// /
+    /// ├── a
+    /// │   └── b
+    /// └── c
+    /// ```
+    /// - `walk("/a/b")` returns a valid dentry for `/a/b`.
+    /// - `walk("/a/x")` returns an invalid dentry for `/a/x`.
+    /// - `walk("/x")` returns an invalid dentry for `/x`.
+    /// - `walk("/x/y")` returns an `ENOENT` error.
+    ///
+    /// Other errors may be returned if it encounters other issues.
+    ///
+    /// Note that this function will resolve symlinks in the middle of the path.
+    /// However, if the target file itself is a symlink, it will not be resolved.
+    /// The caller may want to call [`Self::resolve_symlink`] on the returned dentry
+    /// to resolve it.
     pub fn walk(&self) -> SysResult<Arc<dyn Dentry>> {
+        self.walk_recursive(&mut 0)
+    }
+
+    /// Do the same as [`Self::walk`], but with a counter to help to limit the
+    /// recursion depth.
+    fn walk_recursive(&self, counter: &mut usize) -> SysResult<Arc<dyn Dentry>> {
         let path = self.path.as_str();
-        log::info!("dentry path: {}", path);
 
         let mut dentry = if path.starts_with("/") {
-            Arc::clone(&self.root)
+            Arc::clone(&sys_root_dentry())
         } else {
             Arc::clone(&self.start)
         };
@@ -42,6 +94,19 @@ impl Path {
             .split("/")
             .filter(|name| !name.is_empty() && *name != ".")
         {
+            loop {
+                if dentry.is_negative() {
+                    return Err(SysError::ENOENT);
+                }
+                let inode_type = dentry.inode().unwrap().inotype();
+                if inode_type == InodeType::SymLink {
+                    dentry = Self::resolve_symlink_recursive(Arc::clone(&dentry), counter)?;
+                } else if inode_type == InodeType::Dir {
+                    break;
+                } else {
+                    return Err(SysError::ENOTDIR);
+                }
+            }
             match name {
                 ".." => {
                     dentry = dentry.parent().ok_or(SysError::ENOENT)?;
@@ -51,40 +116,62 @@ impl Path {
                 }
             }
         }
-        log::info!("dentry: {}", dentry.path());
         Ok(dentry)
     }
 
-    pub fn resolve_dentry(dentry: Arc<dyn Dentry>) -> SysResult<Arc<dyn Dentry>> {
-        const MAX_DEPTH: usize = 40;
-        let mut current_dentry = dentry;
-        for _ in 0..MAX_DEPTH {
-            if current_dentry.is_negative() {
-                return Ok(current_dentry);
-            }
-            match current_dentry.inode().ok_or(SysError::ENOENT)?.inotype() {
-                InodeType::SymLink => {
-                    let mut target_path_buf: [u8; 64] = [0; 64];
-                    let _r = current_dentry
-                        .clone()
-                        .base_open()?
-                        .readlink(&mut target_path_buf)?;
-                    let target_path = core::str::from_utf8_mut(&mut target_path_buf)
-                        .map_err(|_| SysError::EINVAL)?;
+    /// Resolves a symlink to its target dentry.
+    ///
+    /// This function reads the symlink file and finds the target dentry.
+    ///
+    /// `dentry` must be a valid symlink.
+    ///
+    /// Returns the target dentry if the target file exists.
+    /// Returns an invalid dentry if the target file does not exist but its parent
+    /// directory does.
+    /// Returns an `ENOENT` error if any directory in the middle of the path does not
+    /// exist.
+    /// Returns an `ENOTDIR` error if any directory in the middle of the path is not
+    /// a directory.
+    /// Returns `ELOOP` error if it encounters too many symlinks.
+    ///
+    /// Note that the returned dentry may still be a symlink, and this function will
+    /// not resolve it. You may not want to call this function on a symlink dentry
+    /// generally; call [`Self::resolve_symlink_through`] instead.
+    pub fn resolve_symlink(dentry: Arc<dyn Dentry>) -> SysResult<Arc<dyn Dentry>> {
+        Self::resolve_symlink_recursive(dentry, &mut 1)
+    }
 
-                    let parent = current_dentry.parent().ok_or(SysError::ENOENT)?;
-                    let base = if target_path.starts_with('/') {
-                        sys_root_dentry()
-                    } else {
-                        parent
-                    };
-                    let path = Path::new(sys_root_dentry(), base, &target_path);
-                    current_dentry = path.walk()?;
-                }
-                _ => return Ok(current_dentry),
-            }
+    /// Do the same as [`Self::resolve_symlink`], but with a counter passed to
+    /// [`Self::walk_recursive`] to help to limit the recursion depth.
+    fn resolve_symlink_recursive(
+        dentry: Arc<dyn Dentry>,
+        counter: &mut usize,
+    ) -> SysResult<Arc<dyn Dentry>> {
+        debug_assert!(dentry.inode().unwrap().inotype() == InodeType::SymLink);
+
+        const MAX_SYMLINK_DEPTH: usize = 40;
+        *counter += 1;
+        if *counter > MAX_SYMLINK_DEPTH {
+            return Err(SysError::ELOOP);
         }
-        Err(SysError::ELOOP)
+
+        let target_path = <dyn File>::open(Arc::clone(&dentry))?.readlink_string()?;
+        Path::new(dentry, target_path).walk_recursive(counter)
+    }
+
+    /// Do the same as [`Self::resolve_symlink`], but will resolve the symlink
+    /// until it finds a non-symlink dentry.
+    pub fn resolve_symlink_through(mut dentry: Arc<dyn Dentry>) -> SysResult<Arc<dyn Dentry>> {
+        let mut counter = 0;
+        loop {
+            if dentry.is_negative() {
+                return Err(SysError::ENOENT);
+            }
+            if dentry.inode().unwrap().inotype() != InodeType::SymLink {
+                return Ok(dentry);
+            }
+            dentry = Self::resolve_symlink_recursive(Arc::clone(&dentry), &mut counter)?;
+        }
     }
 }
 

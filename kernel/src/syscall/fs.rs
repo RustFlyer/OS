@@ -7,36 +7,29 @@ use config::{
     vfs::{AT_REMOVEDIR, AtFd, MountFlags, OpenFlags, SeekFrom},
 };
 use driver::BLOCK_DEVICE;
-use mutex::SleepLock;
 use osfs::FS_MANAGER;
 use systype::{SysError, SyscallResult};
 use vfs::{file::File, kstat::Kstat, path::split_parent_and_name, sys_root_dentry};
 
 use crate::{
     processor::current_task,
-    vm::{
-        addr_space,
-        user_ptr::{UserReadPtr, UserWritePtr},
-    },
+    vm::user_ptr::{UserReadPtr, UserWritePtr},
 };
 
-#[allow(unused)]
-static WRITE_LOCK: SleepLock<()> = SleepLock::new(());
-
-pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) -> SyscallResult {
+pub fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) -> SyscallResult {
     let task = current_task();
     let flags = OpenFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
     let mode = InodeMode::from_bits_truncate(mode);
 
-    let pathname = {
+    let path = {
         let mut addr_space_lock = task.addr_space_mut().lock();
         let mut data_ptr = UserReadPtr::<u8>::new(pathname, &mut addr_space_lock);
         let cstring = data_ptr.read_c_string(256)?;
         cstring.into_string().map_err(|_| SysError::EINVAL)?
     };
 
-    log::debug!("path name = {}", pathname);
-    let dentry = task.resolve_path(AtFd::from(dirfd), pathname, OpenFlags::empty())?;
+    log::debug!("path name = {}", path);
+    let dentry = task.resolve_path(AtFd::from(dirfd), path, OpenFlags::empty())?;
 
     log::debug!("flags = {:?}", flags);
     if flags.contains(OpenFlags::O_CREAT) {
@@ -85,18 +78,18 @@ pub fn sys_lseek(fd: usize, offset: isize, whence: usize) -> SyscallResult {
     #[derive(FromRepr)]
     #[repr(usize)]
     enum Whence {
-        SeekSet = 0,
-        SeekCur = 1,
-        SeekEnd = 2,
+        Set = 0,
+        Cur = 1,
+        End = 2,
     }
     let task = current_task();
     let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
     let whence = Whence::from_repr(whence).ok_or(SysError::EINVAL)?;
 
     match whence {
-        Whence::SeekSet => file.seek(SeekFrom::Start(offset as u64)),
-        Whence::SeekCur => file.seek(SeekFrom::Current(offset as i64)),
-        Whence::SeekEnd => file.seek(SeekFrom::End(offset as i64)),
+        Whence::Set => file.seek(SeekFrom::Start(offset as u64)),
+        Whence::Cur => file.seek(SeekFrom::Current(offset as i64)),
+        Whence::End => file.seek(SeekFrom::End(offset as i64)),
     }
 }
 
@@ -323,11 +316,11 @@ pub fn sys_faccessat(dirfd: usize, pathname: usize, _mode: usize, flags: i32) ->
     let task = current_task();
     let mut addr_space_lock = task.addr_space_mut().lock();
     let path = UserReadPtr::<u8>::new(pathname, &mut addr_space_lock).read_c_string(256)?;
-    let pathname = path.into_string().map_err(|_| SysError::EINVAL)?;
+    let path = path.into_string().map_err(|_| SysError::EINVAL)?;
     let dentry = if flags == AT_SYMLINK_NOFOLLOW as i32 {
-        task.resolve_path(AtFd::from(dirfd), pathname, OpenFlags::O_NOFOLLOW)?
+        task.resolve_path(AtFd::from(dirfd), path, OpenFlags::O_NOFOLLOW)?
     } else {
-        task.resolve_path(AtFd::from(dirfd), pathname, OpenFlags::empty())?
+        task.resolve_path(AtFd::from(dirfd), path, OpenFlags::empty())?
     };
     dentry.base_open()?;
     Ok(0)

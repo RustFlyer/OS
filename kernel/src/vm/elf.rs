@@ -105,7 +105,7 @@ impl AddrSpace {
             };
             let interp_file = {
                 let dentry =
-                    Path::new(sys_root_dentry(), sys_root_dentry(), &interp_name).walk()?;
+                    Path::new(sys_root_dentry(), interp_name).walk()?;
                 <dyn File>::open(dentry)?
             };
             let interp_stream: ElfStream<LittleEndian, _> =

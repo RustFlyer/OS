@@ -98,11 +98,11 @@ impl ExtDir {
                 sss[..len].copy_from_slice(&dentry.name[..len]);
                 sss[len] = 0;
 
-                debug!(
-                    "  {} {}",
-                    dentry.inode_type,
-                    core::str::from_utf8(&sss).unwrap()
-                );
+                // debug!(
+                //     "  {} {}",
+                //     dentry.inode_type,
+                //     core::str::from_utf8(&sss).unwrap()
+                // );
                 name.push(sss[..(len + 1)].to_vec());
                 inode_type.push((dentry.inode_type as usize).into());
 
