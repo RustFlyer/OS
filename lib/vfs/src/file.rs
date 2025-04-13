@@ -47,14 +47,14 @@ pub trait File: Send + Sync + DowncastSync {
     fn meta(&self) -> &FileMeta;
 
     /// Reads data from this file from the given position into the provided buffer.
-    /// If the range of the position to read is partly or completely beyond the end
-    /// of the file, the part that is beyond it is filled with zeros.
+    ///
+    /// Returns the number of bytes read.
     ///
     /// This function should be implemented by an underlying file system for every file
     /// type it supports to read from. For example, a file system that supports regular
     /// files should implement this function to read data from a regular file, and a file
-    /// system that supports null files should implement this function to always indicate
-    /// an EOF (i.e., do nothing and returns 0 bytes read).
+    /// system that supports null files should implement this function to always fill the
+    /// buffer with zeros.
     async fn base_read(&self, _buf: &mut [u8], _pos: usize) -> SysResult<usize> {
         panic!(
             "`base_read` is not supported for this file: {}",
@@ -234,6 +234,37 @@ impl dyn File {
         // log::trace!("read len = {}", bytes_read);
         self.set_pos(position + bytes_read);
         Ok(bytes_read)
+    }
+
+    /// Reads a page from the file at the given position, and returns a [`Page`]
+    /// pointing to the page in the file's page cache.
+    ///
+    /// This function tries to get the page from the page cache. If the page is not
+    /// cached, it will create a new [`Page`] in the page cache and read data from
+    /// the underlying file system into the page. If part of the page is beyond the
+    /// end of the file, the rest of the page will be filled with zeros.
+    ///
+    /// `pos` must be aligned to the page size and must be less than the file size.
+    ///
+    /// This function does not update the file position.
+    ///
+    /// # Note
+    /// Consider change this function to a method of `PageCache` instead of `File`.
+    pub async fn read_page(&self, pos: usize) -> SysResult<Arc<Page>> {
+        debug_assert!(pos % PAGE_SIZE == 0);
+        debug_assert!(pos < self.size());
+
+        let inode = self.inode();
+        let page_cache = inode.page_cache();
+        if let Some(page) = page_cache.get_page(pos) {
+            return Ok(page);
+        }
+
+        let page = Arc::new(Page::build()?);
+        let bytes_read = self.base_read(page.as_mut_slice(), pos).await?;
+        page.as_mut_slice()[bytes_read..].fill(0);
+        page_cache.insert_page(pos, Arc::clone(&page));
+        Ok(page)
     }
 
     /// A helper function which reads data starting from the given position from a file that

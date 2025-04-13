@@ -852,20 +852,7 @@ impl FileBackedArea {
 
         // Offset from the start of the file to the start of the page to be mapped.
         let file_offset = offset + area_offset;
-        let cached_page = match file.inode().page_cache().get_page(file_offset) {
-            Some(page) => page,
-            None => {
-                // The page is not in the page cache, so we need to read it from the file
-                // and insert it into the page cache.
-                // Note: Consider extracting this to a function of `PageCache` or `Inode`.
-                let page = Arc::new(Page::build()?);
-                block_on(async { file.base_read(page.as_mut_slice(), file_offset).await })?;
-                file.inode()
-                    .page_cache()
-                    .insert_page(file_offset, Arc::clone(&page));
-                page
-            }
-        };
+        let cached_page = block_on(async { file.read_page(file_offset).await })?;
 
         if area_offset + PAGE_SIZE > region_len {
             // Part of the page is in the file region, and part of the page is not.

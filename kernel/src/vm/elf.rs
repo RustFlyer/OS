@@ -330,9 +330,6 @@ impl AddrSpace {
             )
             .ok_or(SysError::ENOMEM)?;
         let heap = VmArea::new_heap(start, VirtAddr::new(start.to_usize() + length));
-        log::warn!("[map_heap] heap: [{heap:?}]");
-        log::warn!("[map_heap] heap start: [{:#x}]", heap.start_va().to_usize());
-        log::warn!("[map_heap] heap end: [{:#x}]", heap.end_va().to_usize());
         self.add_area(heap).unwrap();
         Ok(())
     }
