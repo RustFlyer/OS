@@ -24,9 +24,10 @@ pub fn sys_getpid() -> SyscallResult {
     Ok(current_task().pid())
 }
 
-/// _exit() system call terminates only the calling thread, and actions such as
-/// reparenting child processes or sending SIGCHLD to the parent process are
-/// performed only if this is the last thread in the thread group.
+/// sys_exit() system call terminates only the calling thread
+/// the return value (zero) should be discarded
+/// TODO: reparenting child processes
+/// TODO: send SIGCHLD to the parent process are performed only if this is the last thread in the thread group.
 pub fn sys_exit(exit_code: i32) -> SyscallResult {
     let task = current_task();
     task.set_state(TaskState::Zombie);
@@ -35,14 +36,10 @@ pub fn sys_exit(exit_code: i32) -> SyscallResult {
     if task.is_process() {
         task.set_exit_code((exit_code & 0xFF) << 8);
     }
-    let tid = match task.parent_mut().lock().unwrap().upgrade() {
-        None => None,
-        Some(parent) => Some(parent.tid()),
-        };
-    if tid == None {
-        log::info!("root task trying to exit");
-    } else {
-        sys_kill(Sig::SIGCHLD.raw() as i32, tid.unwrap() as isize);
+    let parent_tid = task.parent_mut().lock().as_ref().and_then(|weak| weak.upgrade()).map(|parent_arc| parent_arc.tid()).unwrap();
+    match sys_kill(Sig::SIGCHLD.raw() as i32, parent_tid as isize) {
+        Ok(z) => log::info!("sys_kill sent SIGCHLD to {}, return value {} should be 0", parent_tid, z),
+        Err(e) => log::error!("sys_kill failed to send SIGCHLD to {}, Error Type: {:?}", parent_tid, e),
     }
     Ok(0)
 }
@@ -52,20 +49,41 @@ pub async fn sys_sched_yield() -> SyscallResult {
     Ok(0)
 }
 
-pub async fn sys_wait() {
-    
+pub fn exit(exit_code: i32) -> ! {
+    sys_exit(exit_code);
+    loop {}
 }
 
-pub async fn sys_waitpid() -> SyscallResult {
-    Ok(0)
+/// wait for any child of current task sending SIGCHLD
+/// return child's pid
+pub async fn wait(wstatus: usize) -> isize {
+    match sys_wait4(-1, wstatus, 0).await {
+        Ok(ctid) => ctid as isize,
+        Err(e) => {
+            log::error!("sys_wait4 failed, Error Type: {:?}", e);
+            -1
+        }
+    }
+}
+
+pub async fn waitpid(pid: usize, wstatus: usize, options: i32) -> isize {
+    match sys_wait4(pid as i32, wstatus, options).await {
+        Ok(ctid) => ctid as isize,
+        Err(e) => {
+            log::error!("sys_wait4 failed, Error Type: {:?}", e);
+            -1
+        }
+    }
 }
 
 pub async fn sys_wait4(
     pid: i32,
-    mut status: UserWritePtr<'_, i32>,
+    wstatus: usize,
     options: i32
 ) -> SyscallResult {
     let task = current_task();
+    let mut addr_space_lock = task.addr_space_mut().lock();
+    let mut status = UserWritePtr::<i32>::new(wstatus, &mut addr_space_lock);
     let option = WaitOptions::from_bits_truncate(options);
 
     let target = match pid {
@@ -241,7 +259,7 @@ bitflags! {
         /// Report status of stopped children.
         const WUNTRACED = 0x00000002;
         /// Report continued child.
-        const WCONTINUED = 0x00000008;
+        const WCONTINUED = 0x00000004;
     }
 }
 
