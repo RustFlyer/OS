@@ -70,6 +70,7 @@ pub fn sys_exit(exit_code: i32) -> SyscallResult {
             e
         ),
     }
+    log::error!("[sys_exit] out");
     Ok(0)
 }
 
@@ -79,10 +80,8 @@ pub async fn sys_sched_yield() -> SyscallResult {
 }
 
 pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult {
-    return Ok(0);
+    log::error!("[sys_wait4] in");
     let task = current_task();
-    let mut addr_space_lock = task.addr_space_mut().lock().await;
-    let mut status = UserWritePtr::<i32>::new(wstatus, &mut addr_space_lock);
 
     let option = WaitOptions::from_bits_truncate(options);
 
@@ -131,6 +130,8 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
     };
 
     if let Some(res_task) = res_task {
+        let mut addr_space_lock = task.addr_space_mut().lock().await;
+        let mut status = UserWritePtr::<i32>::new(wstatus, &mut addr_space_lock);
         let zombie_task = res_task.upgrade().unwrap();
         task.timer_mut().update_child_time((
             zombie_task.timer_mut().user_time(),
@@ -158,10 +159,13 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
         let (child_pid, exit_code, child_utime, child_stime) = loop {
             task.set_state(TaskState::Interruptable);
             task.set_wake_up_signal(!task.get_sig_mask() | SigSet::SIGCHLD);
+            log::info!("suspend_now again");
             suspend_now().await;
+            log::info!("return from suspend");
             task.set_state(TaskState::Running);
             let si = task.sig_manager_mut().get_expect(SigSet::SIGCHLD);
             if let Some(_info) = si {
+                log::info!("siginfo get");
                 let children = task.children_mut().lock();
                 let child = match target {
                     WaitFor::AnyChild => children.values().find(|c| {
@@ -184,6 +188,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
                     WaitFor::PGid(_) => unimplemented!(),
                     WaitFor::AnyChildInGroup => unimplemented!(),
                 };
+                log::info!("siginfo get child: {child:?}");
                 if let Some(child) = child {
                     let child = child.upgrade().unwrap();
                     break (
@@ -193,12 +198,19 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
                         child.timer_mut().sys_time(),
                     );
                 }
+                log::info!("siginfo end");
             } else {
+                log::info!("return SysError::EINTR");
                 return Err(SysError::EINTR);
             }
         };
+        log::info!("timer_mut get and update_child_time");
         task.timer_mut()
             .update_child_time((child_utime, child_stime));
+
+        log::info!("addrspace get and write status");
+        let mut addr_space_lock = task.addr_space_mut().lock().await;
+        let mut status = UserWritePtr::<i32>::new(wstatus, &mut addr_space_lock);
         if !status.is_null() {
             // status stores signal in the lowest 8 bits and exit code in higher 8 bits
             // status macros can be found in <bits/waitstatus.h>
@@ -207,10 +219,12 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
                 status.write(exit_code)?;
             }
         }
+        log::info!("write success");
         let child = TASK_MANAGER.get_task(child_pid).unwrap();
         task.remove_child(child);
         TASK_MANAGER.remove_task(child_pid);
         PROCESS_GROUP_MANAGER.remove(&task);
+        log::error!("[sys_wait4] out");
         return Ok(child_pid);
     }
 }

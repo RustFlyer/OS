@@ -12,7 +12,7 @@ use simdebug::stop;
 
 use super::{MutexSupport, spin_mutex::SpinMutex};
 
-const MAX_SPIN_COUNT: usize = 100;
+const MAX_SPIN_COUNT: usize = 1000;
 
 #[derive(Debug)]
 struct MutexInner {
@@ -88,7 +88,8 @@ impl<'a, T: ?Sized, S: MutexSupport> SleepMutexCasFuture<'a, T, S> {
             }
 
             if spin_count >= MAX_SPIN_COUNT {
-                log::debug!("[sleepCasMutex] step into wait list");
+                stop();
+                // log::debug!("[sleepCasMutex] step into wait list");
                 unsafe { &mut *this.grant.inner.get() }.1 = Some(take_waker().await);
                 let queue = unsafe { &mut (*inner.queue.get()) };
                 if queue.is_none() {
@@ -155,14 +156,14 @@ impl<'a, T: ?Sized, S: MutexSupport> Drop for SleepMutexCasGuard<'a, T, S> {
         let queue = unsafe { &mut (*inner.queue.get()) };
         if queue.is_none() {
             inner.locked = false;
-            // log::trace!("[SleepMutexCasGuard::drop] queue is none");
+            // log::error!("[SleepMutexCasGuard::drop] queue is none");
             return;
         }
         let waiter = match queue.as_mut().unwrap().pop_front() {
             None => {
                 // The wait queue is empty
                 inner.locked = false;
-                log::trace!("[SleepMutexCasGuard::drop] queue is empty");
+                // log::error!("[SleepMutexCasGuard::drop] queue is empty");
                 return;
             }
             Some(waiter) => waiter,
@@ -174,7 +175,7 @@ impl<'a, T: ?Sized, S: MutexSupport> Drop for SleepMutexCasGuard<'a, T, S> {
         let waker = grant_inner.1.take().unwrap();
         grant_inner.0.store(true, Ordering::Release);
         waker.wake();
-        log::trace!("[SleepMutexCasGuard::drop] grant someone...");
+        // log::trace!("[SleepMutexCasGuard::drop] grant someone...");
     }
 }
 

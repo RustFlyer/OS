@@ -26,10 +26,12 @@ fn main() {
         let apppath = core::str::from_utf8(&buf_slice).unwrap();
         println!("app path is [{}] with len [{}]", apppath, bptr);
 
-        if fork() == 0 {
+        let mut exitcode = 0;
+        let pid = fork();
+        if pid == 0 {
             execve(apppath, &[], &[]);
             exit(0);
         }
-        sleep(3000);
+        waitpid(pid, &mut exitcode);
     }
 }

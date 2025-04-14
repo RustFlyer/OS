@@ -8,10 +8,13 @@ pub mod taskf;
 pub mod threadgroup;
 pub mod tid;
 
+use arch::riscv64::time::get_time_duration;
+use future::spawn_kernel_task;
 pub use future::yield_now;
 pub use task::{Task, TaskState};
 
 use osfs::sys_root_dentry;
+use timer::TIMER_MANAGER;
 use vfs::file::File;
 
 pub fn init() {
@@ -29,6 +32,18 @@ pub fn init() {
     // let file_test = get_app_data_by_name("file_test").unwrap();
 
     Task::spawn_from_elf(init_proc, "init_proc");
+    spawn_kernel_task(async {
+        let mut ticks: usize = 0;
+        loop {
+            ticks = ticks + 1;
+            if ticks % 1000 == 0 {
+                let current = get_time_duration();
+                TIMER_MANAGER.check(current);
+                ticks = 0;
+            }
+            yield_now().await;
+        }
+    });
     // Task::spawn_from_elf(hello_world, "hello_world");
     // Task::spawn_from_elf(time_test, "time_test");
     // Task::spawn_from_elf(add, "add");

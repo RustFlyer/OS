@@ -13,8 +13,6 @@ use mm::*;
 use process::*;
 use time::*;
 
-use crate::processor::current_task;
-
 pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
     let Some(syscall_no) = SyscallNo::from_repr(syscall_no) else {
         log::error!("Syscall number not included: {syscall_no}");
@@ -22,13 +20,6 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
     };
 
     // log::trace!("[{}]", syscall_no.as_str());
-
-    {
-        // log::debug!("begin to test sleep lock");
-        let task = current_task();
-        task.addr_space_mut().lock().await;
-        // log::debug!("success pass sleep lock");
-    }
 
     let result = match syscall_no {
         GETTIMEOFDAY => sys_gettimeofday(args[0], args[1]).await,

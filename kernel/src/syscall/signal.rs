@@ -12,6 +12,7 @@ use systype::{SysError, SyscallResult};
 /// if pid > 0, send a SigInfo built on sig_code to the process with pid
 /// TODO: broadcast(to process group) when pid <= 0; permission check when sig_code == 0; i32 or u32
 pub fn sys_kill(sig_code: i32, pid: isize) -> SyscallResult {
+    log::error!("[sys_kill] in");
     let sig = Sig::from_i32(sig_code);
     if !sig.is_valid() {
         log::error!("invalid sig_code: {:}", sig_code);
@@ -40,6 +41,7 @@ pub fn sys_kill(sig_code: i32, pid: isize) -> SyscallResult {
             todo!()
         }
     }
+    log::error!("[sys_kill] out");
     Ok(0)
 }
 

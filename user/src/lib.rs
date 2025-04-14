@@ -178,8 +178,8 @@ pub fn wait(exit_code: &mut i32) -> isize {
     sys_waitpid(-1, exit_code as *mut _)
 }
 
-pub fn waitpid(pid: usize, exit_code: &mut i32) -> isize {
-    sys_waitpid(pid as isize, exit_code as *mut _)
+pub fn waitpid(pid: isize, exit_code: &mut i32) -> isize {
+    sys_waitpid(pid, exit_code as *mut _)
 }
 
 pub fn pipe(pipe_fd: &mut [i32]) -> isize {

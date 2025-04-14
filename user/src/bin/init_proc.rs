@@ -12,7 +12,7 @@ fn main() {
         execve("shell", &[], &[]);
     } else {
         loop {
-            waitpid(0, &mut i);
+            waitpid(-1, &mut i);
         }
     }
 }

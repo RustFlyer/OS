@@ -1,6 +1,4 @@
 use alloc::sync::Arc;
-use arch::riscv64::mm::sfence_vma_all;
-use mm::address::VirtAddr;
 use osfuture::block_on;
 
 use core::future::Future;
@@ -12,7 +10,6 @@ use crate::processor::hart::current_hart;
 use crate::task::signal::sig_exec::sig_check;
 use crate::task::task::TaskState;
 use crate::trap;
-use crate::vm::trace_page_table_lookup;
 use core::task::Waker;
 
 use pps::ProcessorPrivilegeState;
@@ -43,7 +40,6 @@ impl<F: Future + Send + 'static> Future for UserFuture<F> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let future = unsafe { Pin::get_unchecked_mut(self) };
         let hart = current_hart();
-        // log::debug!("switch to task [{}]!", future.task.get_name());
         block_on(async { hart.user_switch_in(&mut future.task, &mut future.pps).await });
         let ret = unsafe { Pin::new_unchecked(&mut future.future).poll(cx) };
         hart.user_switch_out(&mut future.pps);
@@ -108,7 +104,6 @@ pub async fn task_executor_unit(task: Arc<Task>) {
 
         let id = current_hart().id;
         if task.timer_mut().schedule_time_out() && executor::has_waiting_task_alone(id) {
-            // log::debug!("yield to another!");
             yield_now().await;
         }
 
