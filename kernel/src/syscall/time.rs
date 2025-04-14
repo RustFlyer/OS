@@ -7,9 +7,9 @@ use crate::{
     vm::user_ptr::{UserReadPtr, UserWritePtr},
 };
 
-pub fn sys_gettimeofday(tv: usize, _tz: usize) -> SyscallResult {
+pub async fn sys_gettimeofday(tv: usize, _tz: usize) -> SyscallResult {
     let task = current_task();
-    let mut addrspace = task.addr_space_mut().lock();
+    let mut addrspace = task.addr_space_mut().lock().await;
     let mut tv_ptr = UserWritePtr::<TimeVal>::new(tv, &mut addrspace);
     if !tv_ptr.is_null() {
         unsafe {
@@ -19,9 +19,9 @@ pub fn sys_gettimeofday(tv: usize, _tz: usize) -> SyscallResult {
     Ok(0)
 }
 
-pub fn sys_times(tms: usize) -> SyscallResult {
+pub async fn sys_times(tms: usize) -> SyscallResult {
     let task = current_task();
-    let mut addrspace = task.addr_space_mut().lock();
+    let mut addrspace = task.addr_space_mut().lock().await;
     let mut tms_ptr = UserWritePtr::<TMS>::new(tms, &mut addrspace);
     if !tms_ptr.is_null() {
         unsafe {
@@ -34,7 +34,7 @@ pub fn sys_times(tms: usize) -> SyscallResult {
 pub async fn sys_nanosleep(req: usize, rem: usize) -> SyscallResult {
     let task = current_task();
     let req_time = {
-        let mut addrspace = task.addr_space_mut().lock();
+        let mut addrspace = task.addr_space_mut().lock().await;
         let mut req_read = UserReadPtr::<TimeSpec>::new(req, &mut addrspace);
         if req_read.is_null() {
             log::info!("[sys_nanosleep] sleep request is null");
@@ -48,7 +48,7 @@ pub async fn sys_nanosleep(req: usize, rem: usize) -> SyscallResult {
         return Ok(0);
     }
 
-    let mut addrspace = task.addr_space_mut().lock();
+    let mut addrspace = task.addr_space_mut().lock().await;
     let mut rem_write = UserWritePtr::<TimeSpec>::new(rem, &mut addrspace);
     if !rem_write.is_null() {
         unsafe {

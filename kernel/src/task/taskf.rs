@@ -1,21 +1,21 @@
 use alloc::collections::btree_map::BTreeMap;
 use alloc::string::ToString;
 use alloc::sync::Arc;
-use vfs::file::File;
 use core::cell::SyncUnsafeCell;
 use core::sync::atomic::AtomicUsize;
 use core::time::Duration;
+use mutex::optimistic_mutex::new_optimistic_mutex;
+use vfs::file::File;
 
 use super::future::{self};
 use super::manager::TASK_MANAGER;
 use super::process_manager::PROCESS_GROUP_MANAGER;
 use super::sig_members::SigManager;
+use super::task::*;
 use super::threadgroup::ThreadGroup;
 use super::tid::tid_alloc;
-use super::{task::*, threadgroup};
-use riscv::asm::sfence_vma_all;
-use super::task::*;
 use crate::vm::addr_space::{AddrSpace, switch_to};
+use riscv::asm::sfence_vma_all;
 
 use arch::riscv64::time::get_time_duration;
 use config::process::CloneFlags;
@@ -24,8 +24,6 @@ use mutex::new_share_mutex;
 use osfs::fd_table::FdTable;
 use time::TaskTimeStat;
 use timer::{TIMER_MANAGER, Timer};
-
-
 
 impl Task {
     /// Switches Task to User
@@ -76,9 +74,10 @@ impl Task {
     /// # Safety
     /// This function must be called before the current page table is dropped, or the kernel
     /// may lose its memory mappings.
-    pub fn switch_addr_space(&self) {
+    pub async fn switch_addr_space(&self) {
         unsafe {
-            switch_to(&self.addr_space_mut().lock());
+            let addrspace = self.addr_space_mut().lock().await;
+            switch_to(&addrspace);
         }
     }
 
@@ -86,7 +85,7 @@ impl Task {
     ///
     /// - todo1: Memory Copy / Cow
     /// - todo2: Control of relevant Thread Group
-    pub fn fork(self: &Arc<Self>, cloneflags: CloneFlags) -> Arc<Self> {
+    pub async fn fork(self: &Arc<Self>, cloneflags: CloneFlags) -> Arc<Self> {
         let tid = tid_alloc();
         let trap_context = SyncUnsafeCell::new(*self.trap_context_mut());
         let state = SpinNoIrqLock::new(self.get_state());
@@ -134,8 +133,8 @@ impl Task {
         if cloneflags.contains(CloneFlags::VM) {
             addr_space = (*self.addr_space_mut()).clone();
         } else {
-            let cow_address_space = self.addr_space_mut().lock().clone_cow().unwrap();
-            addr_space = Arc::new(SpinNoIrqLock::new(cow_address_space));
+            let cow_address_space = self.addr_space_mut().lock().await.clone_cow().unwrap();
+            addr_space = new_optimistic_mutex(cow_address_space);
             sfence_vma_all();
         }
 

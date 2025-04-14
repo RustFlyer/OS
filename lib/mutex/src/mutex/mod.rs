@@ -13,6 +13,7 @@ use riscv::register::sstatus;
 
 use self::sleep_mutex::SleepMutex;
 use self::spin_mutex::SpinMutex;
+pub mod optimistic_mutex;
 /// ShareMutex
 pub mod share_mutex;
 /// SleepMutex

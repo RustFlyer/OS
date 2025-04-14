@@ -65,11 +65,8 @@ pub async fn user_exception_handler(task: &Task, e: Exception, stval: usize) {
                 _ => unreachable!(),
             };
             let fault_addr = VirtAddr::new(stval);
-            if let Err(e) = task
-                .addr_space_mut()
-                .lock()
-                .handle_page_fault(fault_addr, access)
-            {
+            let mut addrspace = task.addr_space_mut().lock().await;
+            if let Err(e) = addrspace.handle_page_fault(fault_addr, access) {
                 // Should send a `SIGSEGV` signal to the task
                 log::error!(
                     "[user_exception_handler] unsolved page fault at {:#x}, access: {:?}, error: {:?}",
@@ -83,7 +80,7 @@ pub async fn user_exception_handler(task: &Task, e: Exception, stval: usize) {
         // 非法指令
         Exception::IllegalInstruction => {
             log::warn!("[trap_handler] illegal instruction at {:#x}", stval);
-            let mut addr_space_lock = task.addr_space_mut().lock();
+            let mut addr_space_lock = task.addr_space_mut().lock().await;
             let mut user_ptr = UserReadPtr::<u32>::new(stval, &mut addr_space_lock);
 
             let old_sstatus = register::sstatus::read();

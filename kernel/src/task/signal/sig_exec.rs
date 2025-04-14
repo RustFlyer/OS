@@ -8,19 +8,19 @@ use systype::SysResult;
 
 use super::sig_info::{Sig, SigInfo};
 
-pub fn sig_check(task: Arc<Task>, mut intr: bool) -> SysResult<()> {
+pub async fn sig_check(task: Arc<Task>, mut intr: bool) -> SysResult<()> {
     let old_mask = task.get_sig_mask();
 
     while let Some(si) = task.sig_manager_mut().dequeue_signal(&old_mask) {
         // if sig_exec turns to user handler, it will return true to break the loop and run user handler.
-        if sig_exec(task.clone(), si) {
+        if sig_exec(task.clone(), si).await {
             break;
         }
     }
     Ok(())
 }
 
-fn sig_exec(task: Arc<Task>, si: SigInfo) -> bool {
+async fn sig_exec(task: Arc<Task>, si: SigInfo) -> bool {
     let action = task.sig_handlers_mut().lock().get(si.sig);
     let cx = task.trap_context_mut();
     let old_mask = task.get_sig_mask();
@@ -73,7 +73,7 @@ fn sig_exec(task: Arc<Task>, si: SigInfo) -> bool {
             // extend the sig_stack
             // 在栈上压入一个sig_cx，存储trap frame里的寄存器信息
             let mut new_sp = sp - size_of::<SigContext>();
-            let mut addr_space = task.addr_space_mut().lock();
+            let mut addr_space = task.addr_space_mut().lock().await;
             let mut sig_cx_ptr = UserWritePtr::<SigContext>::new(new_sp, &mut *addr_space);
             // TODO: should increase the size of the sig_stack? It seems umi doesn't
             let mut sig_cx = SigContext {

@@ -11,6 +11,7 @@ use alloc::{
 use core::cell::SyncUnsafeCell;
 use core::sync::atomic::{AtomicUsize, Ordering};
 use core::task::Waker;
+use mutex::optimistic_mutex::{OptimisticLock, new_optimistic_mutex};
 
 use mutex::{ShareMutex, SpinNoIrqLock, new_share_mutex};
 use osfs::fd_table::FdTable;
@@ -20,10 +21,7 @@ use super::{
     threadgroup::ThreadGroup,
     tid::{PGid, Pid},
 };
-use crate::{
-    trap::trap_context::TrapContext,
-    vm::addr_space::AddrSpace,
-};
+use crate::{trap::trap_context::TrapContext, vm::addr_space::AddrSpace};
 
 /// State of Task
 ///
@@ -60,7 +58,7 @@ pub struct Task {
     timer: SyncUnsafeCell<TaskTimeStat>,
     waker: SyncUnsafeCell<Option<Waker>>,
     state: SpinNoIrqLock<TaskState>,
-    addr_space: ShareMutex<AddrSpace>,
+    addr_space: OptimisticLock<AddrSpace>,
 
     parent: ShareMutex<Option<Weak<Task>>>,
     children: ShareMutex<BTreeMap<Tid, Weak<Task>>>,
@@ -92,7 +90,7 @@ impl Task {
             timer: SyncUnsafeCell::new(TaskTimeStat::new()),
             waker: SyncUnsafeCell::new(None),
             state: SpinNoIrqLock::new(TaskState::Running),
-            addr_space: Arc::new(SpinNoIrqLock::new(addrspace)),
+            addr_space: new_optimistic_mutex(addrspace),
             parent: new_share_mutex(None),
             children: new_share_mutex(BTreeMap::new()),
             pgid: new_share_mutex(pgid),
@@ -118,7 +116,7 @@ impl Task {
         timer: SyncUnsafeCell<TaskTimeStat>,
         waker: SyncUnsafeCell<Option<Waker>>,
         state: SpinNoIrqLock<TaskState>,
-        addr_space: ShareMutex<AddrSpace>,
+        addr_space: OptimisticLock<AddrSpace>,
 
         parent: ShareMutex<Option<Weak<Task>>>,
         children: ShareMutex<BTreeMap<Tid, Weak<Task>>>,
@@ -218,7 +216,7 @@ impl Task {
         unsafe { &mut *self.sig_stack.get() }
     }
 
-    pub fn addr_space_mut(&self) -> &ShareMutex<AddrSpace> {
+    pub fn addr_space_mut(&self) -> &OptimisticLock<AddrSpace> {
         &self.addr_space
     }
 

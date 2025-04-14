@@ -15,7 +15,7 @@ use super::{MutexSupport, spin_mutex::SpinMutex};
 // intrusive_adapter!(
 //     SMQueueAdapter = Arc<GrantInfo>: GrantInfo { link: LinkedListLink }
 // );
-
+#[derive(Debug)]
 struct MutexInner {
     locked: bool,
     // queue: LinkedList<SMQueueAdapter>,
@@ -23,6 +23,7 @@ struct MutexInner {
 }
 
 /// SleepMutex can step over `await`
+#[derive(Debug)]
 pub struct SleepMutex<T: ?Sized, S: MutexSupport> {
     lock: SpinMutex<MutexInner, S>, // push at prev, release at next
     data: UnsafeCell<T>,            // actual data

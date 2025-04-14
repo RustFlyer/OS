@@ -1,8 +1,17 @@
-use crate::{syscall::signal::sys_kill, task::{manager::TASK_MANAGER, process_manager::PROCESS_GROUP_MANAGER, signal::sig_info::Sig, tid::{PGid, Pid}, Task, TaskState}};
-use crate::task::signal::sig_info::SigSet;
 use crate::task::future::{suspend_now, yield_now};
+use crate::task::signal::sig_info::SigSet;
 use crate::vm::user_ptr::{UserReadPtr, UserWritePtr};
 use crate::{processor::current_task, task::future::spawn_user_task};
+use crate::{
+    syscall::signal::sys_kill,
+    task::{
+        Task, TaskState,
+        manager::TASK_MANAGER,
+        process_manager::PROCESS_GROUP_MANAGER,
+        signal::sig_info::Sig,
+        tid::{PGid, Pid},
+    },
+};
 use alloc::boxed::Box;
 use alloc::string::ToString;
 use bitflags::*;
@@ -36,10 +45,24 @@ pub fn sys_exit(exit_code: i32) -> SyscallResult {
     if task.is_process() {
         task.set_exit_code((exit_code & 0xFF) << 8);
     }
-    let parent_tid = task.parent_mut().lock().as_ref().and_then(|weak| weak.upgrade()).map(|parent_arc| parent_arc.tid()).unwrap();
+    let parent_tid = task
+        .parent_mut()
+        .lock()
+        .as_ref()
+        .and_then(|weak| weak.upgrade())
+        .map(|parent_arc| parent_arc.tid())
+        .unwrap();
     match sys_kill(Sig::SIGCHLD.raw() as i32, parent_tid as isize) {
-        Ok(z) => log::info!("sys_kill sent SIGCHLD to {}, return value {} should be 0", parent_tid, z),
-        Err(e) => log::error!("sys_kill failed to send SIGCHLD to {}, Error Type: {:?}", parent_tid, e),
+        Ok(z) => log::info!(
+            "sys_kill sent SIGCHLD to {}, return value {} should be 0",
+            parent_tid,
+            z
+        ),
+        Err(e) => log::error!(
+            "sys_kill failed to send SIGCHLD to {}, Error Type: {:?}",
+            parent_tid,
+            e
+        ),
     }
     Ok(0)
 }
@@ -76,11 +99,7 @@ pub async fn waitpid(pid: usize, wstatus: usize, options: i32) -> isize {
     }
 }
 
-pub async fn sys_wait4(
-    pid: i32,
-    wstatus: usize,
-    options: i32
-) -> SyscallResult {
+pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult {
     let task = current_task();
     let mut addr_space_lock = task.addr_space_mut().lock();
     let mut status = UserWritePtr::<i32>::new(wstatus, &mut addr_space_lock);
@@ -100,15 +119,21 @@ pub async fn sys_wait4(
             log::info!("[sys_wait4] fail: no child");
             return Err(SysError::ECHILD);
         }
-        // TODO: check if PG has  
+        // TODO: check if PG has
         match target {
             WaitFor::AnyChild => children
                 .values()
                 // Question: How to handle &&Weak<Task>
-                .find(|c| c.upgrade().map_or(false, |t| t.is_in_state(TaskState::Zombie) && t.with_thread_group(|tg| tg.len() == 1))),
+                .find(|c| {
+                    c.upgrade().map_or(false, |t| {
+                        t.is_in_state(TaskState::Zombie) && t.with_thread_group(|tg| tg.len() == 1)
+                    })
+                }),
             WaitFor::Pid(pid) => {
                 if let Some(child) = children.get(&pid) {
-                    if child.upgrade().map_or(false, |t| t.is_in_state(TaskState::Zombie) && t.with_thread_group(|tg| tg.len() == 1)) {
+                    if child.upgrade().map_or(false, |t| {
+                        t.is_in_state(TaskState::Zombie) && t.with_thread_group(|tg| tg.len() == 1)
+                    }) {
                         Some(child)
                     } else {
                         None
@@ -126,8 +151,10 @@ pub async fn sys_wait4(
 
     if let Some(res_task) = res_task {
         let zombie_task = res_task.upgrade().unwrap();
-        task.timer_mut()
-            .update_child_time((zombie_task.timer_mut().user_time(), zombie_task.timer_mut().sys_time()));
+        task.timer_mut().update_child_time((
+            zombie_task.timer_mut().user_time(),
+            zombie_task.timer_mut().sys_time(),
+        ));
         if !status.is_null() {
             // status stores signal in the lowest 8 bits and exit code in higher 8 bits
             let exit_code = zombie_task.get_exit_code();
@@ -156,12 +183,18 @@ pub async fn sys_wait4(
             if let Some(_info) = si {
                 let children = task.children_mut().lock();
                 let child = match target {
-                    WaitFor::AnyChild => children
-                        .values()
-                        .find(|c| c.upgrade().map_or(false, |t| t.is_in_state(TaskState::Zombie) && t.with_thread_group(|tg| tg.len() == 1))),
+                    WaitFor::AnyChild => children.values().find(|c| {
+                        c.upgrade().map_or(false, |t| {
+                            t.is_in_state(TaskState::Zombie)
+                                && t.with_thread_group(|tg| tg.len() == 1)
+                        })
+                    }),
                     WaitFor::Pid(pid) => {
                         let child = children.get(&pid).unwrap();
-                        if child.upgrade().map_or(false, |t| t.is_in_state(TaskState::Zombie) && t.with_thread_group(|tg| tg.len() == 1)) {
+                        if child.upgrade().map_or(false, |t| {
+                            t.is_in_state(TaskState::Zombie)
+                                && t.with_thread_group(|tg| tg.len() == 1)
+                        }) {
                             Some(child)
                         } else {
                             None
@@ -249,7 +282,6 @@ pub fn sys_execve(path: usize, _argv: usize, _envp: usize) -> SyscallResult {
     Ok(0)
 }
 
-
 bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
     /// Defined in <bits/waitflags.h>.
@@ -264,13 +296,13 @@ bitflags! {
 }
 
 #[derive(Debug)]
-        enum WaitFor {
-            // wait for any child process in the specific process group
-            PGid(PGid),
-            // wait for any child process
-            AnyChild,
-            // wait for any child process in the same process group of the calling process
-            AnyChildInGroup,
-            // wait for the child process with the specific pid
-            Pid(Pid),
-        }
+enum WaitFor {
+    // wait for any child process in the specific process group
+    PGid(PGid),
+    // wait for any child process
+    AnyChild,
+    // wait for any child process in the same process group of the calling process
+    AnyChildInGroup,
+    // wait for the child process with the specific pid
+    Pid(Pid),
+}
