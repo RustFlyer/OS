@@ -96,6 +96,7 @@ impl Task {
     pub fn spawn_from_elf(elf_file: Arc<dyn File>, name: &str) {
         let mut addrspace = AddrSpace::build_user().unwrap();
         let (entry_point, _) = addrspace.load_elf(elf_file.clone()).unwrap();
+        log::debug!("[spawn_from_elf] entry: {:#x}", entry_point.to_usize());
         let stack = addrspace.map_stack().unwrap();
         addrspace.map_heap().unwrap();
         let task = Arc::new(Task::new(

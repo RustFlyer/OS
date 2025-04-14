@@ -66,13 +66,15 @@ impl Hart {
         &mut self.pps
     }
 
-    pub fn user_switch_in(&mut self, new_task: &mut Arc<Task>, pps: &mut ProcessorPrivilegeState) {
-        // log::info!("switch to [{}]", new_task.get_name());
-        // assert_ne!(new_task.get_state(), TaskState::Zombie);
+    pub async fn user_switch_in(
+        &mut self,
+        new_task: &mut Arc<Task>,
+        pps: &mut ProcessorPrivilegeState,
+    ) {
         disable_interrupt();
         core::mem::swap(self.get_mut_pps(), pps);
         pps.auto_sum();
-        new_task.switch_addr_space();
+        new_task.switch_addr_space().await;
         new_task.timer_mut().record_switch_in();
         self.set_task(Arc::clone(new_task));
         enable_interrupt();

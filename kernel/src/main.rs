@@ -24,8 +24,11 @@ use core::ptr;
 
 use config::mm::{DTB_END, DTB_START};
 use mm::{self, frame, heap};
+use mutex::optimistic_mutex::optimistic_mutex_test;
+use osfuture::block_on;
 use processor::hart;
 use simdebug::when_debug;
+use vm::test_unmap_range;
 
 #[macro_use]
 extern crate alloc;
@@ -98,10 +101,6 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         log::info!("hart {}: initialized FS", hart_id);
 
         // boot::start_harts(hart_id);
-
-        when_debug!({
-            simdebug::backtrace_test();
-        });
 
         loader::init();
         task::init();

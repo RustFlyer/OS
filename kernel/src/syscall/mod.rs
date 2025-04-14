@@ -21,13 +21,13 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         unimplemented!()
     };
 
-    log::trace!("[{}]", syscall_no.as_str());
+    // log::trace!("[{}]", syscall_no.as_str());
 
     {
-        log::debug!("begin to test sleep lock");
+        // log::debug!("begin to test sleep lock");
         let task = current_task();
         task.addr_space_mut().lock().await;
-        log::debug!("success pass sleep lock");
+        // log::debug!("success pass sleep lock");
     }
 
     let result = match syscall_no {

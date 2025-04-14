@@ -78,29 +78,8 @@ pub async fn sys_sched_yield() -> SyscallResult {
     Ok(0)
 }
 
-/// wait for any child of current task sending SIGCHLD
-/// return child's pid
-pub async fn wait(wstatus: usize) -> isize {
-    match sys_wait4(-1, wstatus, 0).await {
-        Ok(ctid) => ctid as isize,
-        Err(e) => {
-            log::error!("sys_wait4 failed, Error Type: {:?}", e);
-            -1
-        }
-    }
-}
-
-pub async fn waitpid(pid: usize, wstatus: usize, options: i32) -> isize {
-    match sys_wait4(pid as i32, wstatus, options).await {
-        Ok(ctid) => ctid as isize,
-        Err(e) => {
-            log::error!("sys_wait4 failed, Error Type: {:?}", e);
-            -1
-        }
-    }
-}
-
 pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult {
+    return Ok(0);
     let task = current_task();
     let mut addr_space_lock = task.addr_space_mut().lock().await;
     let mut status = UserWritePtr::<i32>::new(wstatus, &mut addr_space_lock);
