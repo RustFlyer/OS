@@ -330,7 +330,7 @@ impl Task {
         root.children_mut().lock().extend(children.clone());
         children.clear();
 
-        if let Some(parent) = *self.parent_mut().lock() {
+        if let Some(parent) = self.parent_mut().lock().as_ref() {
             if let Some(parent) = parent.upgrade() {
                 parent.receive_siginfo(
                     SigInfo {
@@ -343,5 +343,25 @@ impl Task {
                 log::error!("no arc parent");
             }
         }
+
+        // TODO: Upon _exit(2), all attached shared memory segments are detached from the
+        // process.
+        // self.with_shm_ids(|ids| {
+        //     for (_, shm_id) in ids.iter() {
+        //         SHARED_MEMORY_MANAGER.detach(*shm_id, self.pid());
+        //     }
+        // });
+
+        // TODO: drop most resources here instead of wait4 function parent
+        // called
+        // self.with_mut_fd_table(|table| table.clear());
+
+        if self.is_process() {
+            self.set_state(TaskState::Zombie);
+        } else {
+            self.process().set_state(TaskState::Zombie);
+        }
+        // When the task is not leader, which means its is not a process, it
+        // will get dropped when hart leaves this task.
     }
 }
