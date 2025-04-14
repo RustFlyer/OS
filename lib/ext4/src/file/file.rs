@@ -39,7 +39,6 @@ impl File for ExtFileFile {
         file.seek(pos as i64, FileSeekType::SeekSet)
             .map_err(SysError::from_i32)?;
         let bytes_read = file.read(buf).map_err(SysError::from_i32)?;
-        buf[bytes_read..].fill(0);
         Ok(bytes_read)
     }
 

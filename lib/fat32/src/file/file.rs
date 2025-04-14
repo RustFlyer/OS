@@ -34,7 +34,7 @@ impl File for FatFileFile {
         match self.inode().inotype() {
             InodeType::File => {
                 let mut file = self.file.lock();
-                let fat_offset = file.offset() as usize;
+                let fat_offset = file.offset();
                 if pos != fat_offset {
                     file.seek(fatfs::SeekFrom::Start(pos as u64))
                         .map_err(as_sys_err)?;
@@ -64,7 +64,7 @@ impl File for FatFileFile {
                     file.write_all(&empty).map_err(as_sys_err)?;
                 }
 
-                let fat_offset = file.offset() as usize;
+                let fat_offset = file.offset();
                 if offset != fat_offset {
                     file.seek(fatfs::SeekFrom::Start(offset as u64))
                         .map_err(as_sys_err)?;
