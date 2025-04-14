@@ -19,7 +19,6 @@ use config::inode::InodeType;
 use config::process::CloneFlags;
 use config::vfs::AtFd;
 use config::vfs::OpenFlags;
-use osfs::fd_table::FdTable;
 
 use core::cell::SyncUnsafeCell;
 use core::sync::atomic::AtomicUsize;
@@ -75,10 +74,10 @@ impl Task {
         let stack_top = addrspace.map_stack()?;
         addrspace.map_heap()?;
 
-        self.set_addrspace(addrspace);
+        self.set_addrspace(addrspace).await;
         let mut addrspace = self.addr_space_mut().lock().await;
 
-        self.switch_addr_space();
+        self.switch_addr_space().await;
 
         let (sp, argc, argv, envp) =
             addrspace.init_stack(stack_top.to_usize(), args, envs, auxv)?;

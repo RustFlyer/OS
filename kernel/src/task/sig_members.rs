@@ -5,7 +5,7 @@ use bitflags::bitflags;
 
 use alloc::sync::Arc;
 
-use crate::task::{manager, signal::sig_info::*, TaskState};
+use crate::task::{TaskState, signal::sig_info::*};
 
 use super::Task;
 
@@ -49,15 +49,16 @@ impl Task {
             return;
         };
         let handlers = parent.sig_handlers_mut().lock();
-        if !handlers.get(Sig::SIGCHLD).flags.contains(SigActionFlag::SA_NOCLDSTOP)
+        if !handlers
+            .get(Sig::SIGCHLD)
+            .flags
+            .contains(SigActionFlag::SA_NOCLDSTOP)
         {
-            parent.receive_siginfo(
-                SigInfo {
-                    sig: Sig::SIGCHLD,
-                    code,
-                    details: SigDetails::None,
-                }
-            );
+            parent.receive_siginfo(SigInfo {
+                sig: Sig::SIGCHLD,
+                code,
+                details: SigDetails::None,
+            });
         }
     }
 }

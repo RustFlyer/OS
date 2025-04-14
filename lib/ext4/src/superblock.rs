@@ -1,11 +1,8 @@
 extern crate alloc;
 
-use core::{ffi::c_void, fmt::Debug, ptr::null_mut};
-
-use alloc::{boxed::Box, ffi::CString, sync::Arc};
+use alloc::sync::Arc;
 use config::vfs::StatFs;
-use log::info;
-use lwext4_rust::{Ext4BlockWrapper, KernelDevOp};
+use lwext4_rust::Ext4BlockWrapper;
 use systype::SysResult;
 use vfs::superblock::{SuperBlock, SuperBlockMeta};
 

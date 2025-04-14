@@ -23,7 +23,7 @@ lazy_static! {
 ///
 /// Tasks in line is the runnable for async schedule.
 /// Used to take control of async tasks.
-struct TaskLine {
+pub struct TaskLine {
     tasks: SpinNoIrqLock<VecDeque<Runnable>>,
 }
 
@@ -148,11 +148,9 @@ pub fn fetch_one(hart_id: usize) -> Option<Runnable> {
                 continue;
             }
             let hart_mask = 1 << i;
-            unsafe {
-                if (hart_mask & HART_RUN_MASK) != 0 {
-                    if let Some(task) = HART_TASKS_LINES[i].fetch() {
-                        return Some(task);
-                    }
+            if (hart_mask & HART_RUN_MASK) != 0 {
+                if let Some(task) = HART_TASKS_LINES[i].fetch() {
+                    return Some(task);
                 }
             }
         }

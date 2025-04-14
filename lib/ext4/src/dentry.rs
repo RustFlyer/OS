@@ -13,7 +13,7 @@ use config::{
     inode::{InodeMode, InodeType},
     vfs::OpenFlags,
 };
-use systype::{SysError, SysResult, SyscallResult};
+use systype::{SysError, SysResult};
 use vfs::{
     dentry::{Dentry, DentryMeta},
     file::File,

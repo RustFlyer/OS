@@ -3,7 +3,6 @@ extern crate alloc;
 use alloc::sync::Arc;
 use config::device::BLOCK_SIZE;
 use driver::BlockDevice;
-use log::warn;
 use lwext4_rust::{
     KernelDevOp,
     bindings::{SEEK_CUR, SEEK_END, SEEK_SET},

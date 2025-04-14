@@ -1,7 +1,5 @@
 use alloc::ffi::CString;
 use core::mem::MaybeUninit;
-use log::debug;
-use simdebug::stop;
 
 use lwext4_rust::bindings::{
     SEEK_CUR, SEEK_END, SEEK_SET, ext4_fclose, ext4_file, ext4_fopen2, ext4_fread, ext4_fseek,

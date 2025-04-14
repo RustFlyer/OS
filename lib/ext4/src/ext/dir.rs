@@ -1,6 +1,5 @@
 use alloc::{ffi::CString, vec::Vec};
 use core::mem::MaybeUninit;
-use log::debug;
 
 use lwext4_rust::{
     InodeTypes,

@@ -7,7 +7,6 @@ use alloc::{
     collections::BTreeMap,
     string::String,
     sync::{Arc, Weak},
-    vec::Vec,
 };
 use core::cell::SyncUnsafeCell;
 use core::sync::atomic::{AtomicUsize, Ordering};

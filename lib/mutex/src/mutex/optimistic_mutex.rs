@@ -1,6 +1,6 @@
 extern crate alloc;
 
-use super::{SleepCASLock, SleepLock};
+use super::SleepCASLock;
 use alloc::sync::Arc;
 
 pub type OptimisticLock<T> = Arc<SleepCASLock<T>>;

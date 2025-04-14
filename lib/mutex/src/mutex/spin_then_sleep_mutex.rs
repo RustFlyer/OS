@@ -8,7 +8,6 @@ use core::{
     sync::atomic::{AtomicBool, Ordering},
     task::{Context, Poll, Waker},
 };
-use osfuture::block_on;
 use simdebug::stop;
 
 use super::{MutexSupport, spin_mutex::SpinMutex};

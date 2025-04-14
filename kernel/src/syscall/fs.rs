@@ -1,6 +1,5 @@
 use alloc::{ffi::CString, string::ToString};
 
-use osfuture::block_on;
 use strum::FromRepr;
 
 use config::{
@@ -13,7 +12,7 @@ use osfs::{
     pipe::{inode::PIPE_BUF_LEN, new_pipe},
 };
 use systype::{SysError, SyscallResult};
-use vfs::{file::File, kstat::Kstat, path::split_parent_and_name, sys_root_dentry};
+use vfs::{file::File, kstat::Kstat, path::split_parent_and_name};
 
 use crate::{
     processor::current_task,
@@ -52,8 +51,8 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
 
     log::trace!("file flags: {:?}", file.flags());
 
-    let root_path = "/".to_string();
-    sys_root_dentry().base_open()?.ls(root_path);
+    // let root_path = "/".to_string();
+    // sys_root_dentry().base_open()?.ls(root_path);
 
     task.with_mut_fdtable(|ft| ft.alloc(file, flags))
 }

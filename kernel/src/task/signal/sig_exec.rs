@@ -6,13 +6,12 @@ use crate::task::signal::sig_info::SigSet;
 use crate::task::{Task, sig_members::ActionType};
 use crate::vm::user_ptr::UserWritePtr;
 use alloc::sync::Arc;
-use systype::SysResult;
 
 use super::sig_info::{Sig, SigInfo};
 
 global_asm!(include_str!("_sigreturn_trampoline.asm"));
 
-pub async fn sig_check(task: Arc<Task>, mut intr: bool) -> SysResult<()> {
+pub async fn sig_check(task: Arc<Task>, mut _intr: bool) {
     let old_mask = task.get_sig_mask();
 
     while let Some(si) = task.sig_manager_mut().dequeue_signal(&old_mask) {
@@ -21,7 +20,6 @@ pub async fn sig_check(task: Arc<Task>, mut intr: bool) -> SysResult<()> {
             break;
         }
     }
-    Ok(())
 }
 
 async fn sig_exec(task: Arc<Task>, si: SigInfo) -> bool {
@@ -91,7 +89,9 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo) -> bool {
             };
             sig_cx.user_reg[0] = cx.sepc;
             log::trace!("[save_context_into_sigstack] sig_cx_ptr: {sig_cx_ptr:?}");
-            unsafe { sig_cx_ptr.write(sig_cx) };
+            unsafe {
+                let _ = sig_cx_ptr.write(sig_cx);
+            }
             task.set_sig_cx_ptr(new_sp);
             // user defined void (*sa_handler)(int);
             cx.user_reg[10] = si.sig.raw();

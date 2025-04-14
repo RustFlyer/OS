@@ -1,8 +1,5 @@
-use alloc::{ffi::CString, sync::Arc};
+use alloc::sync::Arc;
 
-use lwext4_rust::bindings::ext4_readlink;
-
-use systype::SysResult;
 use vfs::file::{File, FileMeta};
 
 use crate::{dentry::ExtDentry, inode::link::ExtLinkInode};

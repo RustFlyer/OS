@@ -104,7 +104,7 @@ pub fn sys_sigmask(
 
     if !prev_mask.is_null() {
         unsafe {
-            prev_mask.write(*mask);
+            let _ = prev_mask.write(*mask)?;
         }
     }
 

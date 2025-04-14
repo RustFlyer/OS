@@ -1,7 +1,7 @@
 use crate::task::TaskState;
 use crate::task::future::{suspend_now, yield_now};
 use crate::task::signal::sig_info::SigSet;
-use crate::vm::user_ptr::{UserPtr, UserReadPtr, UserWritePtr};
+use crate::vm::user_ptr::{UserReadPtr, UserWritePtr};
 use crate::{processor::current_task, task::future::spawn_user_task};
 use crate::{
     syscall::signal::sys_kill,
@@ -76,11 +76,6 @@ pub fn sys_exit(exit_code: i32) -> SyscallResult {
 pub async fn sys_sched_yield() -> SyscallResult {
     yield_now().await;
     Ok(0)
-}
-
-pub fn exit(exit_code: i32) -> ! {
-    sys_exit(exit_code);
-    loop {}
 }
 
 /// wait for any child of current task sending SIGCHLD

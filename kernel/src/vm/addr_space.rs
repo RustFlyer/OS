@@ -294,13 +294,11 @@ impl AddrSpace {
     /// is not allowed. Otherwise, returns [`SysError::ENOMEM`] if memory allocation fails
     /// when handling the page fault.
     pub fn handle_page_fault(&mut self, fault_addr: VirtAddr, access: MemPerm) -> SysResult<()> {
-        simdebug::when_debug!({
-            log::trace!(
-                "Page fault when accessing {:#x}, type: {:?}",
-                fault_addr.to_usize(),
-                access
-            );
-        });
+        log::trace!(
+            "Page fault when accessing {:#x}, type: {:?}",
+            fault_addr.to_usize(),
+            access
+        );
         let page_table = &mut self.page_table;
         let vma = self
             .vm_areas
