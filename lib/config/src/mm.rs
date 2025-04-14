@@ -94,12 +94,17 @@ pub const PTE_WIDTH: usize = 8;
 /// Number of page table entries in a page table
 pub const PTE_PER_TABLE: usize = PAGE_SIZE / PTE_WIDTH;
 
-/// Start and end of user space
+/// Start of user space
 pub const USER_START: usize = 0x0;
 /// End of user space (avoid using the last page)
 pub const USER_END: usize = 0x0000_003f_ffff_f000;
 /// Start of program interpreter in user space
 pub const USER_INTERP_BASE: usize = 0x0000_0020_0000_0000;
+
+/// Start of mmap space in user space
+pub const MMAP_START: usize = 0x0000_0010_0000_0000;
+/// End of mmap space in user space
+pub const MMAP_END: usize = 0x0000_0020_0000_0000;
 
 /// Position of the stack of a user process in the virtual address space
 pub const USER_STACK_UPPER: usize = 0x0000_003f_ffff_f000;
