@@ -45,33 +45,11 @@ pub fn sys_getppid() -> SyscallResult {
 /// performed only if this is the last thread in the thread group.
 pub fn sys_exit(exit_code: i32) -> SyscallResult {
     let task = current_task();
-    task.set_state(TaskState::Zombie);
-    // non-leader thread are detached (see CLONE_THREAD flag in manual page clone.2)
-    log::info!("task [{}] exit with {}", task.get_name(), exit_code);
-    if task.is_process() {
-        task.set_exit_code((exit_code & 0xFF) << 8);
-    }
-    let parent_tid = task
-        .parent_mut()
-        .lock()
-        .as_ref()
-        .and_then(|weak| weak.upgrade())
-        .map(|parent_arc| parent_arc.tid())
-        .unwrap();
-    match sys_kill(Sig::SIGCHLD.raw() as i32, parent_tid as isize) {
-        Ok(z) => log::info!(
-            "sys_kill sent SIGCHLD to {}, return value {} should be 0",
-            parent_tid,
-            z
-        ),
-        Err(e) => log::error!(
-            "sys_kill failed to send SIGCHLD to {}, Error Type: {:?}",
-            parent_tid,
-            e
-        ),
-    }
-    log::error!("[sys_exit] out");
-    Ok(0)
+        task.set_state(TaskState::Zombie);
+        if task.is_process() {
+            task.set_exit_code((exit_code & 0xFF) << 8);
+        }
+        Ok(0)
 }
 
 pub async fn sys_sched_yield() -> SyscallResult {

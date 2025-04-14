@@ -7,6 +7,7 @@ use super::threadgroup::ThreadGroup;
 use super::tid::TidAddress;
 use super::tid::tid_alloc;
 
+use crate::task::signal::sig_info::{Sig, SigDetails, SigInfo};
 use crate::vm::addr_space::{AddrSpace, switch_to};
 use alloc::collections::btree_map::BTreeMap;
 use alloc::string::String;
@@ -16,7 +17,7 @@ use alloc::vec::Vec;
 
 use arch::riscv64::time::get_time_duration;
 use config::inode::InodeType;
-use config::process::CloneFlags;
+use config::process::{CloneFlags, INIT_PROC_ID};
 use config::vfs::AtFd;
 use config::vfs::OpenFlags;
 
@@ -262,7 +263,85 @@ impl Task {
         }
     }
 
-    pub fn exit(&self) {
-        self.set_state(TaskState::Zombie);
+    pub fn exit(self: &Arc<Self>) {
+        log::info!("thread {} do exit", self.tid());
+        assert_ne!(
+            self.tid(),
+            INIT_PROC_ID,
+            "initproc die!!!, sepc {:#x}",
+            self.trap_context_mut().sepc
+        );
+
+        let tg_lock = self.thread_group_mut();
+        let mut guard = tg_lock.lock();
+
+        if (!(self.process().get_state() == TaskState::Zombie))
+            || (self.is_process() && guard.len() > 1)
+            || (!self.is_process() && guard.len() > 2)
+        {
+            if !self.is_process() {
+                // NOTE: process will be removed by parent calling `sys_wait4`
+                guard.remove(self);
+                TASK_MANAGER.remove_task(self.tid());
+            }
+            return;
+        }
+
+        if self.is_process() {
+            assert!(guard.len() == 1);
+        } else {
+            assert!(guard.len() == 2);
+            // NOTE: leader will be removed by parent calling `sys_wait4`
+            guard.remove(self);
+            TASK_MANAGER.remove_task(self.tid());
+        }
+
+        log::info!("[Task::do_exit] exit the whole process");
+
+        log::debug!("[Task::do_exit] reparent children to init");
+        debug_assert_ne!(self.tid(), INIT_PROC_ID);
+
+        //Question: Is mut safe here?
+        let mut children = self.children_mut().lock().clone();
+        if children.is_empty() {
+            return;
+        }
+        let root = TASK_MANAGER.get_task(INIT_PROC_ID).unwrap();
+        for c in children.values() {
+            let child = c.upgrade().unwrap();
+            log::debug!(
+                "[Task::do_eixt] reparent child process pid {} to init",
+                child.pid()
+            );
+            if child.get_state() == TaskState::Zombie {
+                // NOTE: self has not called wait to clear zombie children, we need to notify
+                // init to clear these zombie children.
+                root.receive_siginfo(
+                    SigInfo {
+                        sig: Sig::SIGCHLD,
+                        code: SigInfo::CLD_EXITED,
+                        details: SigDetails::None,
+                    }
+                )
+            }
+            // Question: Why Deref doesn't work here
+            *child.parent_mut().lock() = Some(Arc::downgrade(&root));
+        }
+        root.children_mut().lock().extend(children.clone());
+        children.clear();
+
+        if let Some(parent) = *self.parent_mut().lock() {
+            if let Some(parent) = parent.upgrade() {
+                parent.receive_siginfo(
+                    SigInfo {
+                        sig: Sig::SIGCHLD,
+                        code: SigInfo::CLD_EXITED,
+                        details: SigDetails::None,
+                    },
+                )
+            } else {
+                log::error!("no arc parent");
+            }
+        }
     }
 }
