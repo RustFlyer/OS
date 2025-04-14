@@ -268,6 +268,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "fat32"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "config",
+ "driver",
+ "fatfs",
+ "log",
+ "mutex",
+ "simdebug",
+ "systype",
+ "vfs",
+]
+
+[[package]]
+name = "fatfs"
+version = "0.4.0"
+source = "git+https://github.com/EchudeT/rust-fatfs.git?rev=e656#e656ae24eeebee59af4f37a9e9e751f4aa964141"
+dependencies = [
+ "bitflags 2.9.0",
+ "log",
+ "spin",
+]
+
+[[package]]
 name = "glob"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -330,6 +355,7 @@ dependencies = [
  "mm",
  "mutex",
  "osfs",
+ "osfuture",
  "pps",
  "riscv",
  "riscv-rt",
@@ -461,15 +487,25 @@ checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
 name = "osfs"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "bitflags 2.9.0",
  "config",
  "driver",
  "ext4",
+ "fat32",
  "log",
  "mutex",
+ "osfuture",
  "spin",
  "systype",
  "vfs",
+]
+
+[[package]]
+name = "osfuture"
+version = "0.1.0"
+dependencies = [
+ "log",
 ]
 
 [[package]]
@@ -787,6 +823,7 @@ dependencies = [
  "log",
  "mm",
  "mutex",
+ "osfuture",
  "spin",
  "systype",
 ]

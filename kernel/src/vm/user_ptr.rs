@@ -33,16 +33,16 @@
 
 use core::{fmt::Debug, marker::PhantomData, ops::ControlFlow, slice};
 
-use alloc::vec::Vec;
-use config::mm::PAGE_SIZE;
+use alloc::{ffi::CString, vec::Vec};
+use config::mm::{PAGE_SIZE, USER_END};
 use mm::address::VirtAddr;
 use systype::{SysError, SysResult};
 
+use super::{addr_space::AddrSpace, mem_perm::MemPerm};
 use crate::{
     processor::current_hart,
     trap::trap_env::{set_kernel_stvec, set_kernel_stvec_user_rw},
 };
-use super::{addr_space::AddrSpace, mem_perm::MemPerm};
 
 /// Smart pointer that can be used to read memory in user address space.
 pub type UserReadPtr<'a, T> = UserPtr<'a, T, ReadMarker>;
@@ -260,7 +260,7 @@ impl<A> UserPtr<'_, usize, A>
 where
     A: ReadAccess,
 {
-    /// Reads an array of `usize`s, zero-terminated, from the memory location.
+    /// Reads an zero-terminated array of `usize`s from the memory location.
     ///
     /// This function will check if the memory location is accessible and read
     /// the `usize`s. It will read `usize`s until a zero is encountered or the
@@ -268,16 +268,25 @@ where
     /// terminated pointer array, but it returns `usize`s rather than pointers
     /// in order to make the use of it convenience.
     ///
-    /// `len` is the maximum number of pointers to read.
+    /// `len` is the maximum number of pointers to read, including the null
+    /// terminator. `len` must be greater than 0.
+    ///
+    /// Returns the array of `usize`s as a `Vec<usize>`, which does NOT include
+    /// the null terminator. Therefore, at most `len - 1` `usize`s will be
+    /// returned. If there is no null terminator in the first `len` pointers,
+    /// `len - 1` `usize`s will be returned. Note that an empty `Vec` may be
+    /// returned if the first pointer is null or if `len` is 1.
     ///
     /// # Error
     /// Returns an `EFAULT` error if the memory location is not accessible.
     ///
     /// # Safety
     /// This function is safe, but it does not garantee that each `usize`s it
-    /// reads are also a valid pointer. The responsibility of checking the
+    /// reads is also a valid pointer. The responsibility of checking the
     /// validity of the pointers lies with the caller.
     pub fn read_ptr_array(&mut self, len: usize) -> SysResult<Vec<usize>> {
+        debug_assert!(len > 0);
+
         let mut vec: Vec<usize> = Vec::new();
         let mut push_and_check = |ptr: usize| {
             if ptr == 0 {
@@ -288,10 +297,10 @@ where
         };
         // SAFETY: every `usize` is valid.
         unsafe {
-            check_user_access_with(
+            access_with_checking(
                 self.addr_space,
                 self.ptr as usize,
-                len * size_of::<usize>(),
+                (len - 1) * size_of::<usize>(),
                 MemPerm::R,
                 &mut push_and_check,
             )?;
@@ -304,18 +313,19 @@ impl<A> UserPtr<'_, u8, A>
 where
     A: ReadAccess,
 {
-    /// Reads a C-style string (null-terminated byte array) from the memory
-    /// location.
+    /// Reads a C-style string from the memory location.
     ///
     /// This function will check if the memory location is accessible and read
     /// the string. It will read the string until a null byte is encountered
     /// or the maximum length `len` is reached.
     ///
-    /// `len` is the maximum number of bytes in the resulting string.
+    /// `len` is the maximum number of bytes in the resulting string, including
+    /// the null terminator. `len` must be greater than 0.
     ///
-    /// Returns the string as a vector of bytes, including the null terminator.
+    /// Returns the string as a [`CString`], which includes the null terminator.
     /// If there is no null terminator in the first `len` bytes, the string will
-    /// be truncated such that the last byte is the null terminator.
+    /// be truncated such that the last byte is the null terminator. Note that
+    /// an empty string may be returned if the first byte is null or if `len` is 1.
     ///
     /// # Error
     /// Returns an `EFAULT` error if the memory location is not accessible.
@@ -323,7 +333,9 @@ where
     /// # Note
     /// Pay attention that a C-style string is not necessarily a valid UTF-8
     /// [`str`] in Rust, nor can it always be represented as a [`Vec<char>`].
-    pub fn read_c_string(&mut self, len: usize) -> SysResult<Vec<u8>> {
+    pub fn read_c_string(&mut self, len: usize) -> SysResult<CString> {
+        debug_assert!(len > 0);
+
         let mut vec: Vec<u8> = Vec::new();
         let mut push_and_check = |byte: u8| {
             if byte == 0 {
@@ -334,7 +346,7 @@ where
         };
         // SAFETY: every `u8` is valid.
         unsafe {
-            check_user_access_with(
+            access_with_checking(
                 self.addr_space,
                 self.ptr as usize,
                 len - 1,
@@ -342,8 +354,8 @@ where
                 &mut push_and_check,
             )?;
         }
-        // vec.push(0);
-        Ok(vec)
+        // SAFETY: `vec` has no null byte in the middle.
+        Ok(unsafe { CString::from_vec_unchecked(vec) })
     }
 }
 
@@ -462,12 +474,15 @@ where
     }
 }
 
-/// Checks if certain user memory access is allowed, given the starting address
-/// and length.
+/// Checks if certain access to a given range of user memory is allowed.
 ///
-/// `perm` must be `R`, `W`, or `RW`. `W` is equivalent to `RW`.
+/// `addr_space` is the address space of the current process.
+///
+/// `addr` is the starting address of the memory region to be accessed.
 ///
 /// `len` is the length in bytes of the memory region to be accessed.
+///
+/// `perm` must be `R`, `W`, or `RW`. `W` is equivalent to `RW`.
 ///
 /// Returns `Ok(())` if the access is allowed, otherwise returns an `EFAULT` error.
 fn check_user_access(
@@ -516,16 +531,19 @@ fn check_user_access(
     Ok(())
 }
 
-/// Checks if certain user memory access is allowed, given the starting address,
-/// the length, and a closure which performs additional actions on primitive
-/// integer or pointer values along with the check and controls whether to stop
-/// the process early.
+/// Accesses a user memory region by element with a closure, checking the access
+/// permissions during the process.
 ///
-/// `perm` must be `MemPerm::R`, `MemPerm::W`, or `MemPerm::R` | `MemPerm::W`.
+/// `addr_space` is the address space of the current process.
+///
+/// `addr` is the starting address of the memory region to be accessed.
 ///
 /// `len` is the max length in bytes of the memory region to be accessed. However,
-/// the closure may stop the process early, so the actual length may be less than
-/// `len`.
+/// the closure may stop the process early, or the access may fail due to lack of
+/// permissions, so the actual length of the memory region accessed may be less
+/// than `len`.
+///
+/// `perm` must be `MemPerm::R`, `MemPerm::W`, or `MemPerm::R` | `MemPerm::W`.
 ///
 /// `T` must be a primitive integer or pointer type, and `addr` must be aligned
 /// to the size of `T`. `len` must be a multiple of the size of `T`.
@@ -538,7 +556,7 @@ fn check_user_access(
 ///
 /// # Safety
 /// The values that the closure operates on must be valid and properly aligned.
-unsafe fn check_user_access_with<F, T>(
+unsafe fn access_with_checking<F, T>(
     addr_space: &mut AddrSpace,
     mut addr: usize,
     len: usize,
@@ -559,11 +577,8 @@ where
     debug_assert!(addr % size_of::<T>() == 0);
     debug_assert!(len % size_of::<T>() == 0);
 
-    let end_addr = addr + len;
-    if !VirtAddr::check_validity(addr)
-        || !VirtAddr::check_validity(end_addr - 1)
-        || !VirtAddr::new(end_addr - 1).in_user_space()
-    {
+    let end_addr = usize::min(addr + len, USER_END);
+    if addr >= end_addr {
         return Err(SysError::EFAULT);
     }
 

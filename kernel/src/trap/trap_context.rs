@@ -1,17 +1,17 @@
+use core::arch::asm;
+
 use arch::riscv64::{
     interrupt::disable_interrupt,
     sstatus::{self, Sstatus},
 };
-use core::arch::asm;
 use riscv::register::sstatus::{FS, SPP};
-
-#[derive(Clone, Copy, Debug)]
-#[repr(C)]
 
 /*when sp points to user stack of a task/process,
 sscratch(in RISCV) points to the start
 of the TrapContext of this task/process in user address space,
 until they switch when __trap_from_user, and the context begin to be saved*/
+#[derive(Clone, Copy, Debug)]
+#[repr(C)]
 pub struct TrapContext {
     // integer registers and CSR to be saved when trap from user to kernel
     pub user_reg: [usize; 32], // 0-31, general register
@@ -102,7 +102,8 @@ impl TrapContext {
         self.user_reg[11] = argv;
         self.user_reg[12] = envp;
         self.sepc = sepc;
-        self.sstatus = sstatus::read();
+
+        // self.sstatus = sstatus::read();
     }
 
     pub fn syscall_no(&self) -> usize {
@@ -129,6 +130,11 @@ impl TrapContext {
     pub fn set_user_a0(&mut self, val: usize) {
         // a0 == x10
         self.user_reg[10] = val;
+    }
+
+    pub fn set_user_tp(&mut self, val: usize) {
+        // tp == x4
+        self.user_reg[4] = val;
     }
 
     /// 设置用户态trap pc

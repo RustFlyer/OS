@@ -1,7 +1,9 @@
+use alloc::boxed::Box;
 use alloc::ffi::CString;
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use async_trait::async_trait;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 use downcast_rs::{DowncastSync, impl_downcast};
@@ -39,6 +41,7 @@ impl FileMeta {
     }
 }
 
+#[async_trait]
 pub trait File: Send + Sync + DowncastSync {
     /// Returns the metadata of this file.
     fn meta(&self) -> &FileMeta;
@@ -52,7 +55,7 @@ pub trait File: Send + Sync + DowncastSync {
     /// files should implement this function to read data from a regular file, and a file
     /// system that supports null files should implement this function to always indicate
     /// an EOF (i.e., do nothing and returns 0 bytes read).
-    fn base_read(&self, _buf: &mut [u8], _pos: usize) -> SysResult<usize> {
+    async fn base_read(&self, _buf: &mut [u8], _pos: usize) -> SysResult<usize> {
         panic!(
             "`base_read` is not supported for this file: {}",
             self.dentry().path()
@@ -66,7 +69,7 @@ pub trait File: Send + Sync + DowncastSync {
     /// files should implement this function to write data to a regular file, and a file
     /// system that supports null files should implement this function to always discard
     /// the data in the buffer (i.e., do nothing).
-    fn base_write(&self, _buf: &[u8], _offset: usize) -> SysResult<usize> {
+    async fn base_write(&self, _buf: &[u8], _offset: usize) -> SysResult<usize> {
         panic!(
             "`base_write` is not supported for this file: {}",
             self.dentry().path()
@@ -113,14 +116,14 @@ pub trait File: Send + Sync + DowncastSync {
 
     /// Given interested events, keep track of these events and return events
     /// that is ready.
-    fn base_poll(&self, events: PollEvents) -> PollEvents {
+    async fn base_poll(&self, events: PollEvents) -> PollEvents {
         unimplemented!();
         let mut res = PollEvents::empty();
-        if events.contains(PollEvents::POLLIN) {
-            res |= PollEvents::POLLIN;
+        if events.contains(PollEvents::IN) {
+            res |= PollEvents::IN;
         }
-        if events.contains(PollEvents::POLLOUT) {
-            res |= PollEvents::POLLOUT;
+        if events.contains(PollEvents::OUT) {
+            res |= PollEvents::OUT;
         }
         res
     }
@@ -219,16 +222,16 @@ impl dyn File {
     /// read directory entries.
     ///
     /// Returns the number of bytes read.
-    pub fn read(&self, buf: &mut [u8]) -> SysResult<usize> {
+    pub async fn read(&self, buf: &mut [u8]) -> SysResult<usize> {
         let inode = self.inode();
         let position = self.pos();
 
         let bytes_read = match inode.inotype() {
-            InodeType::File => self.read_through_page_cache(buf, position)?,
-            _ => self.base_read(buf, position)?,
+            InodeType::File => self.read_through_page_cache(buf, position).await?,
+            _ => self.base_read(buf, position).await?,
         };
 
-        log::trace!("read len = {}", bytes_read);
+        // log::trace!("read len = {}", bytes_read);
         self.set_pos(position + bytes_read);
         Ok(bytes_read)
     }
@@ -243,7 +246,7 @@ impl dyn File {
     /// This function does not update the file position.
     ///
     /// Returns the number of bytes read.
-    fn read_through_page_cache(&self, mut buf: &mut [u8], pos: usize) -> SysResult<usize> {
+    async fn read_through_page_cache(&self, mut buf: &mut [u8], pos: usize) -> SysResult<usize> {
         let inode = self.inode();
         let page_cache = inode.page_cache();
 
@@ -256,7 +259,7 @@ impl dyn File {
                 Some(page) => page,
                 None => {
                     let page = Arc::new(Page::build()?);
-                    self.base_read(page.as_mut_slice(), page_pos)?;
+                    self.base_read(page.as_mut_slice(), page_pos).await?;
                     page_cache.insert_page(page_pos, Arc::clone(&page));
                     page
                 }
@@ -284,7 +287,7 @@ impl dyn File {
     /// write data to a directory file.
     ///
     /// Returns the number of bytes written.
-    pub fn write(&self, buf: &[u8]) -> SysResult<usize> {
+    pub async fn write(&self, buf: &[u8]) -> SysResult<usize> {
         if self.flags().contains(OpenFlags::O_APPEND) {
             self.set_pos(self.size());
         }
@@ -293,13 +296,13 @@ impl dyn File {
         let size = self.size();
         let position = self.pos();
 
-        if position > size {
+        if position > size && inode.inotype() == InodeType::File {
             todo!("Holes are not supported yet");
         }
 
         let bytes_written = match inode.inotype() {
-            InodeType::File => self.write_through_page_cache(buf, position)?,
-            _ => self.base_write(buf, position)?,
+            InodeType::File => self.write_through_page_cache(buf, position).await?,
+            _ => self.base_write(buf, position).await?,
         };
         let new_position = position + bytes_written;
         self.set_pos(new_position);
@@ -319,7 +322,7 @@ impl dyn File {
     /// This function does not update the file position and the file size.
     ///
     /// Returns the number of bytes written.
-    fn write_through_page_cache(&self, mut buf: &[u8], pos: usize) -> SysResult<usize> {
+    async fn write_through_page_cache(&self, mut buf: &[u8], pos: usize) -> SysResult<usize> {
         let inode = self.inode();
         let page_cache = inode.page_cache();
 
@@ -331,7 +334,7 @@ impl dyn File {
                 Some(page) => page,
                 None => {
                     let page = Arc::new(Page::build()?);
-                    self.base_read(page.as_mut_slice(), page_pos)?;
+                    self.base_read(page.as_mut_slice(), page_pos).await?;
                     page_cache.insert_page(page_pos, Arc::clone(&page));
                     page
                 }
@@ -346,15 +349,16 @@ impl dyn File {
 
     /// Given interested events, keep track of these events and return events
     /// that is ready.
-    pub fn poll(&self, events: PollEvents) -> PollEvents {
+    pub async fn poll(&self, events: PollEvents) -> PollEvents {
         unimplemented!();
         log::info!("[File::poll] path:{}", self.dentry().path());
-        self.base_poll(events)
+        self.base_poll(events).await
     }
 
     #[deprecated = "Legacy function from Phoenix OS."]
     pub fn load_dir(&self) -> SysResult<()> {
         let inode = self.inode();
+        log::debug!("inode state: {:?}", inode.state());
         if inode.state() == InodeState::Uninit {
             self.base_load_dir()?;
             inode.set_state(InodeState::Synced)
@@ -411,6 +415,9 @@ impl dyn File {
             buf_it[LEN_BEFORE_NAME..LEN_BEFORE_NAME + c_name_len - 1]
                 .copy_from_slice(dentry.name().as_bytes());
             buf_it[LEN_BEFORE_NAME + c_name_len - 1] = b'\0';
+
+            log::debug!("[sys_getdents64] linux dirent name {}", dentry.name());
+
             buf_it = &mut buf_it[rec_len..];
             writen_len += rec_len;
         }
@@ -421,11 +428,11 @@ impl dyn File {
     ///
     /// `self` must not be a directory file.
     #[deprecated = "Legacy function from Phoenix OS."]
-    pub fn read_all(&self) -> SysResult<Vec<u8>> {
+    pub async fn read_all(&self) -> SysResult<Vec<u8>> {
         let size = self.size();
         let mut buf = vec![0; size];
 
-        let _ulen = self.read(&mut buf)?;
+        let _ulen = self.read(&mut buf).await?;
         Ok(buf)
     }
 
@@ -458,13 +465,15 @@ mod elf_impls {
     use elf::parse::ParseError;
 
     use config::vfs::SeekFrom;
+    use osfuture::block_on;
     use systype::SysError;
 
     use super::File;
 
     impl Read for &dyn File {
         fn read(&mut self, buf: &mut [u8]) -> Result<usize, ParseError> {
-            let bytes_read = <dyn File>::read(&**self, buf).map_err(|e| match e {
+            let res = block_on(async { <dyn File>::read(&**self, buf).await });
+            let bytes_read = res.map_err(|e| match e {
                 SysError::EINTR => ParseError::IOError(IOError::Interrupted),
                 _ => ParseError::IOError(IOError::UnexpectedEof),
             })?;

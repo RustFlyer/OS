@@ -1,0 +1,16 @@
+[package]
+name = "fat32"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+vfs = { path = "../vfs/" }
+driver = { path = "../driver/" }
+config = { path = "../config/" }
+systype = { path = "../systype/" }
+mutex = { path = "../mutex/" }
+simdebug = { path = "../simdebug/" }
+
+fatfs = { workspace = true }
+log = { workspace = true }
+async-trait = { workspace = true }

@@ -9,6 +9,7 @@ driver = { path = "../driver" }
 mm = { path = "../mm" }
 mutex = { path = "../mutex" }
 systype = { path = "../systype" }
+osfuture = { path = "../osfuture" }
 
 async-trait = { workspace = true }
 downcast-rs = { workspace = true }

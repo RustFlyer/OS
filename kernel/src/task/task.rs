@@ -7,19 +7,21 @@ use alloc::{
     collections::BTreeMap,
     string::String,
     sync::{Arc, Weak},
+    vec::Vec,
 };
 use core::cell::SyncUnsafeCell;
 use core::sync::atomic::{AtomicUsize, Ordering};
 use core::task::Waker;
 use mutex::optimistic_mutex::{OptimisticLock, new_optimistic_mutex};
-
 use mutex::{ShareMutex, SpinNoIrqLock, new_share_mutex};
-use osfs::fd_table::FdTable;
+use vfs::{dentry::Dentry, file::File};
+
+use osfs::{fd_table::FdTable, sys_root_dentry};
 use time::TaskTimeStat;
 
 use super::{
     threadgroup::ThreadGroup,
-    tid::{PGid, Pid},
+    tid::{PGid, Pid, TidAddress},
 };
 use crate::{trap::trap_context::TrapContext, vm::addr_space::AddrSpace};
 
@@ -46,7 +48,6 @@ pub enum TaskState {
     UnInterruptable,
 }
 
-#[derive(Debug)]
 pub struct Task {
     tid: TidHandle,
     process: Option<Weak<Task>>,
@@ -71,14 +72,24 @@ pub struct Task {
     sig_manager: SyncUnsafeCell<SigManager>,
     sig_stack: SyncUnsafeCell<Option<SignalStack>>,
     sig_cx_ptr: AtomicUsize,
-    fd_table: SpinNoIrqLock<FdTable>,
 
-    name: String,
+    tid_address: SyncUnsafeCell<TidAddress>,
+    fd_table: ShareMutex<FdTable>,
+    cwd: ShareMutex<Arc<dyn Dentry>>,
+    elf: SyncUnsafeCell<Arc<dyn File>>,
+
+    name: SyncUnsafeCell<String>,
 }
 
 /// This Impl is mainly for getting and setting the property of Task
 impl Task {
-    pub fn new(entry: usize, sp: usize, addrspace: AddrSpace, name: String) -> Self {
+    pub fn new(
+        entry: usize,
+        sp: usize,
+        addrspace: AddrSpace,
+        elf_file: Arc<dyn File>,
+        name: String,
+    ) -> Self {
         let tid = tid_alloc();
         let pgid = tid.0;
         Task {
@@ -100,8 +111,12 @@ impl Task {
             sig_handlers: new_share_mutex(SigHandlers::new()),
             sig_stack: SyncUnsafeCell::new(None),
             sig_cx_ptr: AtomicUsize::new(0),
-            fd_table: SpinNoIrqLock::new(FdTable::new()),
-            name,
+
+            tid_address: SyncUnsafeCell::new(TidAddress::new()),
+            fd_table: new_share_mutex(FdTable::new()),
+            cwd: new_share_mutex(sys_root_dentry()),
+            elf: SyncUnsafeCell::new(elf_file),
+            name: SyncUnsafeCell::new(name),
         }
     }
 
@@ -129,9 +144,13 @@ impl Task {
         sig_manager: SyncUnsafeCell<SigManager>,
         sig_stack: SyncUnsafeCell<Option<SignalStack>>,
         sig_cx_ptr: AtomicUsize,
-        fd_table: SpinNoIrqLock<FdTable>,
 
-        name: String,
+        tid_address: SyncUnsafeCell<TidAddress>,
+        fd_table: ShareMutex<FdTable>,
+        cwd: ShareMutex<Arc<dyn Dentry>>,
+        elf: SyncUnsafeCell<Arc<dyn File>>,
+
+        name: SyncUnsafeCell<String>,
     ) -> Self {
         Task {
             tid,
@@ -156,8 +175,11 @@ impl Task {
             sig_manager,
             sig_stack,
             sig_cx_ptr,
-            fd_table,
 
+            tid_address,
+            fd_table,
+            cwd,
+            elf,
             name,
         }
     }
@@ -176,9 +198,9 @@ impl Task {
 
     pub fn process(self: &Arc<Self>) -> Arc<Task> {
         if self.is_process() {
-            self.process.as_ref().cloned().unwrap().upgrade().unwrap()
-        } else {
             self.clone()
+        } else {
+            self.process.as_ref().cloned().unwrap().upgrade().unwrap()
         }
     }
 
@@ -220,6 +242,24 @@ impl Task {
         &self.addr_space
     }
 
+    pub fn elf_mut(&self) -> &mut Arc<dyn File> {
+        unsafe { &mut *self.elf.get() }
+    }
+
+    #[allow(clippy::mut_from_ref)]
+    pub fn name_mut(&self) -> &mut String {
+        unsafe { &mut *self.name.get() }
+    }
+
+    #[allow(clippy::mut_from_ref)]
+    pub fn tid_address_mut(&self) -> &mut TidAddress {
+        unsafe { &mut *self.tid_address.get() }
+    }
+
+    pub fn addr_space_mut(&self) -> &ShareMutex<AddrSpace> {
+        &self.addr_space
+    }
+
     pub fn parent_mut(&self) -> &ShareMutex<Option<Weak<Task>>> {
         &self.parent
     }
@@ -244,6 +284,18 @@ impl Task {
         f(&mut self.fd_table.lock())
     }
 
+    pub fn cwd_mut(&self) -> Arc<dyn Dentry> {
+        self.cwd.lock().clone()
+    }
+
+    pub fn fdtable_mut(&self) -> ShareMutex<FdTable> {
+        self.fd_table.clone()
+    }
+
+    pub fn thread_group_mut(&self) -> ShareMutex<ThreadGroup> {
+        self.threadgroup.clone()
+    }
+
     pub fn get_waker(&self) -> Waker {
         self.waker_mut().as_ref().unwrap().clone()
     }
@@ -257,7 +309,16 @@ impl Task {
     }
 
     pub fn get_name(&self) -> String {
-        self.name.clone()
+        self.name_mut().clone()
+    }
+
+    pub fn ppid(&self) -> Pid {
+        let parent = self.parent.lock().clone();
+        parent
+            .expect("Call ppid Without parent")
+            .upgrade()
+            .unwrap()
+            .get_pgid()
     }
 
     pub fn get_sig_mask(&self) -> SigSet {
@@ -267,6 +328,7 @@ impl Task {
     pub fn get_sig_cx_ptr(&self) -> usize {
         self.sig_cx_ptr.load(Ordering::Relaxed)
     }
+
     // ========== This Part You Can Check the State of Task  ===========
     pub fn is_process(&self) -> bool {
         self.is_process
@@ -299,6 +361,10 @@ impl Task {
 
     pub fn set_sig_cx_ptr(&self, new_ptr: usize) {
         self.sig_cx_ptr.store(new_ptr, Ordering::Relaxed);
+    }
+
+    pub fn set_cwd(&self, dentry: Arc<dyn Dentry>) {
+        *self.cwd.lock() = dentry;
     }
     // ========== This Part You Can Change the Member of Task  ===========
     pub fn add_child(&self, child: Arc<Task>) {

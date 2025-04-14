@@ -3,7 +3,7 @@
 
 extern crate user_lib;
 
-use user_lib::{console::getchar, execve, print, println, waitpid};
+use user_lib::{console::getchar, execve, exit, fork, print, println, sleep, waitpid};
 
 #[unsafe(no_mangle)]
 fn main() {
@@ -19,14 +19,17 @@ fn main() {
             if ch != 13 {
                 buf[bptr] = ch;
                 bptr = bptr + 1;
-            } else {
-                buf[bptr] = 0;
             }
         }
 
-        let apppath = core::str::from_utf8(&buf).unwrap();
-        println!("app path is [{}]", apppath);
+        let buf_slice = &buf[..bptr];
+        let apppath = core::str::from_utf8(&buf_slice).unwrap();
+        println!("app path is [{}] with len [{}]", apppath, bptr);
 
-        execve(apppath, &[], &[]);
+        if fork() == 0 {
+            execve(apppath, &[], &[]);
+            exit(0);
+        }
+        sleep(3000);
     }
 }

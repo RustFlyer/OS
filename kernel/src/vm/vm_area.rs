@@ -25,6 +25,7 @@
 
 use alloc::{collections::btree_map::BTreeMap, sync::Arc, vec::Vec};
 use core::{fmt::Debug, mem};
+use osfuture::block_on;
 
 use bitflags::bitflags;
 
@@ -45,8 +46,8 @@ use super::{
 
 /// A virtual memory area (VMA).
 ///
-/// A VMA is a contiguous region of virtual memory in an address space that has
-/// a common set of attributes, such as permissions and mapping type.
+/// A VMA is a contiguous, page-aligned region of virtual memory in an address
+/// space that has a common set of attributes, such as permissions and mapping type.
 #[derive(Clone)]
 pub struct VmArea {
     /// Starting virtual address, page-aligned.
@@ -70,7 +71,7 @@ pub struct VmArea {
 
 /// Unique data of a specific type of VMA. This enum is used in [`VmArea`].
 #[derive(Debug, Clone)]
-pub enum TypedArea {
+enum TypedArea {
     /// A fixed-offset VMA.
     ///
     /// A fixed-offset VMA is used to map physical addresses to virtual addresses
@@ -136,15 +137,15 @@ impl VmArea {
     ///
     /// `start_va` must be page-aligned.
     ///
-    /// `flags` needs to have `RWX` bits set properly; other bits must be zero.
-    pub fn new_kernel(start_va: VirtAddr, end_va: VirtAddr, pte_flags: PteFlags) -> Self {
+    /// `pte_flags` needs to have `RWX` bits set properly; other bits must be zero.
+    pub fn new_kernel(start_va: VirtAddr, end_va: VirtAddr, prot: MemPerm) -> Self {
+        debug_assert!(start_va.to_usize() % PAGE_SIZE == 0);
         Self::new_fixed_offset(
             start_va,
             end_va,
-            // This field is insignificant for kernel VMAs.
+            // This field is of no use for kernel VMAs.
             VmaFlags::PRIVATE,
-            // Set bits A and D because kernel pages are never swapped out.
-            pte_flags | PteFlags::A | PteFlags::D,
+            prot,
             KERNEL_MAP_OFFSET,
         )
     }
@@ -154,20 +155,24 @@ impl VmArea {
     ///
     /// `start_va` must be page-aligned.
     ///
-    /// `flags` needs to have `RWXAD` bits set properly; other bits must be zero.
+    /// `prot` should have `U` bit cleared, because fixed-offset VMAs are supposed to be
+    /// used in kernel space.
     pub fn new_fixed_offset(
         start_va: VirtAddr,
         end_va: VirtAddr,
         flags: VmaFlags,
-        pte_flags: PteFlags,
+        prot: MemPerm,
         offset: usize,
     ) -> Self {
+        debug_assert!(start_va.to_usize() % PAGE_SIZE == 0);
+        debug_assert!(!prot.contains(MemPerm::U));
         Self {
             start: start_va,
             end: end_va.round_up(),
             flags,
-            pte_flags: pte_flags | PteFlags::V | PteFlags::G,
-            prot: MemPerm::from(pte_flags),
+            // Set bits A and D because kernel pages always reside in memory.
+            pte_flags: PteFlags::from(prot) | PteFlags::A | PteFlags::D,
+            prot,
             pages: BTreeMap::new(),
             map_type: TypedArea::Offset(OffsetArea { offset }),
             handler: None,
@@ -179,20 +184,23 @@ impl VmArea {
     /// `start_va` is the virtual address from which data in `memory` is mapped, not the
     /// starting virtual address of the VMA.
     ///
-    /// `flags` needs to have `RWX` bits set properly; other bits must be zero.
+    /// `prot` should have `U` bit set, because this VMA is supposed to be used in user
+    /// space.
+    #[deprecated]
     pub fn new_memory_backed(
         start_va: VirtAddr,
         end_va: VirtAddr,
         flags: VmaFlags,
-        pte_flags: PteFlags,
+        prot: MemPerm,
         memory: &'static [u8],
     ) -> Self {
+        debug_assert!(prot.contains(MemPerm::U));
         Self {
             start: start_va.round_down(),
             end: end_va.round_up(),
             flags,
-            pte_flags: pte_flags | PteFlags::V | PteFlags::U,
-            prot: MemPerm::from(pte_flags),
+            pte_flags: PteFlags::from(prot),
+            prot,
             pages: BTreeMap::new(),
             map_type: TypedArea::MemoryBacked(MemoryBackedArea::new(memory, start_va)),
             handler: Some(MemoryBackedArea::fault_handler),
@@ -201,34 +209,71 @@ impl VmArea {
 
     /// Constructs a user space [`VmArea`] whose specific type is [`FileBackedArea`].
     ///
-    /// `start_va` is the virtual address from which the file is mapped, not the starting
-    /// virtual address of the VMA. `offset` is the offset in the file from which the
-    /// mapping starts. `len` is the length of the region to be mapped in the file, not
-    /// the length of the VMA.
+    /// `offset` and `len` define the file region to be mapped. `start_va` and `end_va`
+    /// define the virtual address range to be mapped to the file region (and possibly
+    /// a zero-filling region at the end). If `end_va - start_va` is larger than `len`,
+    /// the tailing part of the VMA is filled with zeros.
     ///
-    /// `flags` needs to have `RWX` bits set properly; other bits must be zero.
+    /// To `mmap` a file region, `offset` and `len` must be page-aligned, and `len` must
+    /// be equal to `end_va - start_va`. If the file region spans to the end of the file,
+    /// `len` must be rounded up to page size.
+    ///
+    /// To load a segment from an executable file, `offset` and `len` do not need to be
+    /// page-aligned, and `len` can be smaller than `end_va - start_va`. If `len` is
+    /// smaller than that, the VMA must be private, and the tailing part of the VMA is
+    /// filled with zeros. Make sure that the file region defined by `offset` and `len`
+    /// is within the file.
+    ///
+    /// `prot` should have `U` bit set, because this VMA is supposed to be used in user
+    /// space.
     pub fn new_file_backed(
         start_va: VirtAddr,
         end_va: VirtAddr,
         flags: VmaFlags,
-        pte_flags: PteFlags,
+        prot: MemPerm,
         file: Arc<dyn File>,
         offset: usize,
         len: usize,
     ) -> Self {
+        debug_assert!(
+            (len == end_va.to_usize() - start_va.to_usize())
+                || ((len < end_va.to_usize() - start_va.to_usize())
+                    && flags.contains(VmaFlags::PRIVATE))
+        );
+        debug_assert!(prot.contains(MemPerm::U));
         Self {
             start: start_va.round_down(),
             end: end_va.round_up(),
             flags,
-            pte_flags: pte_flags | PteFlags::V | PteFlags::U,
-            prot: MemPerm::from(pte_flags),
+            pte_flags: PteFlags::from(prot),
+            prot,
             pages: BTreeMap::new(),
-            map_type: TypedArea::FileBacked(FileBackedArea::new(
-                file,
-                offset / PAGE_SIZE * PAGE_SIZE,
-                len,
-            )),
+            map_type: TypedArea::FileBacked(FileBackedArea::new(file, offset, len)),
             handler: Some(FileBackedArea::fault_handler),
+        }
+    }
+
+    /// Constructs a user space anonymous area.
+    ///
+    /// `start_va` and `end_va` must be page-aligned.
+    ///
+    /// `prot` should have `U` bit set, because this VMA is supposed to be used in user
+    /// space.
+    pub fn new_anonymous(
+        start_va: VirtAddr,
+        end_va: VirtAddr,
+        flags: VmaFlags,
+        prot: MemPerm,
+    ) -> Self {
+        Self {
+            start: start_va,
+            end: end_va,
+            flags,
+            pte_flags: PteFlags::from(prot),
+            prot,
+            pages: BTreeMap::new(),
+            map_type: TypedArea::Anonymous(AnonymousArea),
+            handler: Some(AnonymousArea::fault_handler),
         }
     }
 
@@ -236,6 +281,8 @@ impl VmArea {
     ///
     /// `start_va` and `end_va` must be page-aligned.
     pub fn new_stack(start_va: VirtAddr, end_va: VirtAddr) -> Self {
+        debug_assert!(start_va.to_usize() % PAGE_SIZE == 0);
+        debug_assert!(end_va.to_usize() % PAGE_SIZE == 0);
         Self {
             start: start_va,
             end: end_va,
@@ -252,6 +299,8 @@ impl VmArea {
     ///
     /// `start_va` and `end_va` must be page-aligned.
     pub fn new_heap(start_va: VirtAddr, end_va: VirtAddr) -> Self {
+        debug_assert!(start_va.to_usize() % PAGE_SIZE == 0);
+        debug_assert!(end_va.to_usize() % PAGE_SIZE == 0);
         Self {
             start: start_va,
             end: end_va,
@@ -279,13 +328,9 @@ impl VmArea {
     ///
     /// Returns a tuple of two `Option<VmArea>`, which are the new VMAs created
     /// by splitting the original VMA. If one of the new VMAs is `None`, it means
-    /// the range covers the starting or ending part of the original VMA, which
-    /// leaves only a single VMA. If both are `None`, it means the range covers
+    /// the range covers the starting part or ending part of the original VMA,
+    /// so only a single VMA is left. If both are `None`, it means the range covers
     /// the whole VMA, so the original VMA is totally removed.
-    ///
-    /// # Note
-    /// This function is buggy because it does not update fields in specific
-    /// [`TypedArea`] structs in the [`VmArea`] struct.
     pub fn unmap_range(
         mut self,
         page_table: &mut PageTable,
@@ -293,14 +338,13 @@ impl VmArea {
         remove_to: VirtAddr,
     ) -> (Option<Self>, Option<Self>) {
         debug_assert!(remove_from < remove_to);
-        let start_va = VirtAddr::max(self.start, remove_from);
-        let end_va = VirtAddr::min(self.end, remove_to);
-
-        if start_va == self.start && end_va == self.end {
+        let remove_from = VirtAddr::max(self.start, remove_from);
+        let remove_to = VirtAddr::min(self.end, remove_to);
+        if remove_from == self.start && remove_to == self.end {
             // The range to be removed is the whole VMA.
             return (None, None);
         }
-        if start_va >= end_va {
+        if remove_from >= remove_to {
             // The range to be removed is empty.
             return (Some(self), None);
         }
@@ -308,32 +352,43 @@ impl VmArea {
         // Re-assign `Page`s in the old VMA to the new VMA(s).
         let (pages_low, pages_mid, pages_high) = {
             let mut pages = mem::take(&mut self.pages);
-            let mut pages_mid_high = pages.split_off(&start_va.page_number());
-            let pages_high = pages_mid_high.split_off(&end_va.page_number());
+            let mut pages_mid_high = pages.split_off(&remove_from.page_number());
+            let pages_high = pages_mid_high.split_off(&remove_to.page_number());
             (pages, pages_mid_high, pages_high)
         };
 
-        // Unmap the pages to be removed in the page table.
+        // Invalidate the page table entries in the range to be removed.
         for (vpn, _) in pages_mid {
             let pte = page_table.find_entry(vpn).unwrap();
             *pte = PageTableEntry::default();
         }
 
         let vma_low = if remove_from > self.start {
-            Some(Self {
-                end: start_va,
-                pages: pages_low,
-                ..self.clone()
-            })
+            let mut vma = self.clone();
+            vma.end = remove_from;
+            vma.pages = pages_low;
+            // Note: we may need to extract the updating logic of fields in specific
+            // `TypedArea` structs to a common function, and
+            if let TypedArea::FileBacked(file_backed) = &mut vma.map_type {
+                file_backed.len = file_backed
+                    .len
+                    .min(remove_from.to_usize() - vma.start.to_usize());
+            }
+            Some(vma)
         } else {
             None
         };
         let vma_high = if remove_to < self.end {
-            Some(Self {
-                start: end_va,
-                pages: pages_high,
-                ..self.clone()
-            })
+            let mut vma = self.clone();
+            vma.start = remove_to;
+            vma.pages = pages_high;
+            if let TypedArea::FileBacked(file_backed) = &mut vma.map_type {
+                file_backed.len = file_backed
+                    .len
+                    .saturating_sub(remove_to.to_usize() - vma.start.to_usize());
+                file_backed.offset += remove_to.to_usize() - vma.start.to_usize();
+            }
+            Some(vma)
         } else {
             None
         };
@@ -359,10 +414,10 @@ impl VmArea {
         // Check the protection bits.
         if !prot.contains(access) {
             log::warn!(
-                "VmArea::handle_page_fault: access {:?} not allowed, the protection is {:?}, at {:#x}",
+                "VmArea::handle_page_fault: access {:?} at {:#x} not allowed, with protection {:?}",
                 access,
+                fault_addr.to_usize(),
                 prot,
-                fault_addr.to_usize()
             );
             return Err(SysError::EFAULT);
         }
@@ -561,7 +616,7 @@ impl MemoryBackedArea {
     }
 
     /// Handles a page fault.
-    pub fn fault_handler(area: &mut VmArea, info: PageFaultInfo) -> SysResult<()> {
+    fn fault_handler(area: &mut VmArea, info: PageFaultInfo) -> SysResult<()> {
         let &mut Self { memory, start_va } = match &mut area.map_type {
             TypedArea::MemoryBacked(memory_backed) => memory_backed,
             _ => panic!("fault_handler: not a memory-backed area"),
@@ -578,7 +633,6 @@ impl MemoryBackedArea {
         } = info;
 
         let page = Page::build()?;
-        page_table.map_page_to(fault_addr.page_number(), page.ppn(), area.pte_flags)?;
 
         // Fill the page with appropriate data.
         // There are 3 types of regions in the page:
@@ -607,6 +661,7 @@ impl MemoryBackedArea {
             page.as_mut_slice()[page_offset..page_offset + fill_len].fill(0);
         }
 
+        page_table.map_page_to(fault_addr.page_number(), page.ppn(), area.pte_flags)?;
         pages.insert(fault_addr.page_number(), Arc::new(page));
 
         Ok(())
@@ -630,8 +685,80 @@ impl Debug for MemoryBackedArea {
 
 /// A file-backed VMA.
 ///
-/// This kind of VMA is backed by a file, i.e., when a page in this kind of VMA is
-/// accessed for the first time, the page is read from the file.
+/// This struct is both used to `mmap` a file-backed area to a user process, and to
+/// load a loadable segment from an executable file.
+///
+/// A VMA of this kind is backed by a file. It maps a region in a file, or a file region,
+/// to an area in the virtual address space of a process. A file region is defined as a
+/// contiguous region of a file, which is not necessarily page-aligned, and specially,
+/// a file region may span beyond the end of the file, at most to the end of the last
+/// page of the file. (Note that the last page of a file may or may not be a page full of
+/// file data, because the file size is not necessarily a multiple of page size.) The
+/// tailing part of the page is filled with zeros.
+///
+/// This struct defines the range of a file region to a VMA by its `offset` and `len`
+/// fields. The `offset` field is a page-aligned offset in the file, pointing to the
+/// start of the file region. The `len` field is the length of the file region, which is
+/// not necessarily page-aligned, and can span at most to the end of the last page of the
+/// file. The VMA itself is page-aligned, and can be larger than the file region at its
+/// end. The region from the end of the file region to the end of the VMA is filled with
+/// zeros.
+///
+/// There is a special case of a file region: 0-length file region. A VMA that has a
+/// 0-length file region is completely filled with zeros. Specially, a such VMA allows an
+/// `offset` that is beyond the last page of the file, which would violates the
+/// definition of a file region if its length was not 0.
+///
+/// ## Unification of `mmap`ing and loading an executable file segment
+///
+/// There are two origins of file-backed VMAs: `mmap/munmap` and loading an executable
+/// file segment.
+///
+/// `mmap` always maps a file by pages. That is, it always tries to map a file region
+/// whose starting offset and ending offset is page-aligned. If there is a partial page
+/// at the end of the file, the tailing part is filled with zeros. In addition, the
+/// length of the VMA is the same as the length of the file region (`len`). This is
+/// perfectly corresponds to the design of page cache, which caches a file by pages
+/// as well. Only a point here: to satisfy the zero-filling requirement, the page cache
+/// is required to fill the tailing part of the last partial page with zeros, which is
+/// resonable.
+///
+/// `munmap` may split a VMA or change the size of a VMA, so new VMA structs are created.
+/// However, because `munmap` also unmaps by pages, the unmapping is very simple to
+/// implement, so we do not write more about it here.
+///
+/// Loading an executable file is largely different from `mmap/munmap`. The VMA itself
+/// must still be page-aligned, but the file region is not necessarily so. For example,
+/// a file region starts from 0x1789 and ends at 0x3456, and the `len` field is 0x4100.
+/// The VMA will start from CONST + 0x1000 (rounded down from 0x1789) and end at
+/// CONST + 0x6000 (rounded up from 0x1789 + 0x4100). The region from 0x1000 to 0x1789
+/// is filled with whatever data from file offset 0x1000 to 0x1789. The region from
+/// 0x1789 to 0x3456 is the data we really want (e.g., a .data segment). The region from
+/// 0x3456 to 0x5889 (0x1789 + 0x4100) is filled with zeros as a .bss segment. The region
+/// from 0x5789 to 0x6000 is filled zeros as well, but they are not part of the .bss
+/// segment.
+///
+/// Note that data from offset 0x1000 to 0x1789 will not cause problems if the ELF file
+/// is well-formed. For example, an executable segment may never share a page with a
+/// writable segment, so the data in the writable segment will not be executed by mistake.
+/// On the other hand, a read-only segment may share a page with a read/write segment,
+/// because 1) read data from the read/write segment as if it is a read-only segment does
+/// not cause problems, and 2) when the read/write segment is written to, a copy-on-write
+/// page fault occurs, so the write will not corrupt the read-only segment.
+///
+/// Therefore, we can just re-define a file region: it starts from a page-aligned offset,
+/// and may or may not end at a page-aligned offset. Formerly mentioned starting offset
+/// 0x1789 can be simply transformed to 0x1000. However, to simplify the use of this
+/// struct, we will do the transformation in the constructor of this struct, so that the
+/// caller need not worry about the details.
+///
+/// The definition of a file region brings a great convenience to unifying `mmap`ing and
+/// loading an executable file segment as one VMA struct—the former is a special case of
+/// the latter, requiring the end of a file region to be page-aligned, and that the
+/// length of the VMA is the same as the length of the file region. Therefore, we can
+/// just use a single algorithm to handle mapping, unmapping, and page fault handling.
+///
+/// ## Protection, sharing, and page cache
 ///
 /// There are some different types of file-backed VMAs based on `prot` and `flags`
 /// fields, and the differences in their implementations are noted below.
@@ -648,23 +775,21 @@ impl Debug for MemoryBackedArea {
 ///     page is allocated exclusively for this VMA. The data in the original page is
 ///     copied to the new page.
 /// - Shared, read-only or writable: A page in this kind of VMA is mapped to a page in
-///   the page cache of the file, as if it is a private, read-only VMA. This is OK;
-///   see the documentation of `MAP_PRIVATE` flag in `mmap(2)`:
+///   the page cache of the file, as if it is a private, read-only VMA. This violates
+///   the semantics of private, read-only VMAs, but it is OK; see the documentation of
+///   `MAP_PRIVATE` flag in `mmap(2)`:
 ///   > It is unspecified whether changes made to the file after the mmap() call are
 ///   > visible in the mapped region.
+///
+/// The area from the end of the file region to the end of the VMA has no corresponding
+/// file region, so a VMA that has such a region must be private.
 #[derive(Clone)]
 pub struct FileBackedArea {
     /// The file backing store.
     file: Arc<dyn File>,
-    /// The starting offset in the file.
-    ///
-    /// This must be page-aligned.
+    /// The page-aligned offset of the mapped region in the file.
     offset: usize,
     /// The length of the mapped region in the file.
-    ///
-    /// This is not the same as the length of the VMA (`area.end - area.start`).
-    /// The length of VMA can be larger than this length; the region after this
-    /// length is filled with zeros.
     len: usize,
 }
 
@@ -674,16 +799,30 @@ impl FileBackedArea {
     /// `file` is the file backing store.
     /// `offset` is the starting offset in the file.
     /// `len` is the length of the mapped region in the file.
+    ///
+    /// If the user wants to `mmap` a file region, `offset` and `len` must be
+    /// page-aligned. If the file region spans to the end of the file, `len` must be
+    /// rounded up to the size of a page.
+    ///
+    /// If the user wants to load a segment from an executable file, `offset` and
+    /// `len` should just be the starting offset and length of the segment; the
+    /// user need not worry about alignment.
     pub fn new(file: Arc<dyn File>, offset: usize, len: usize) -> Self {
-        Self { file, offset, len }
+        let offset_aligned = offset / PAGE_SIZE * PAGE_SIZE;
+        let len_aligned = len + offset % PAGE_SIZE;
+        Self {
+            file,
+            offset: offset_aligned,
+            len: len_aligned,
+        }
     }
 
     /// Handles a page fault.
-    pub fn fault_handler(area: &mut VmArea, info: PageFaultInfo) -> SysResult<()> {
+    fn fault_handler(area: &mut VmArea, info: PageFaultInfo) -> SysResult<()> {
         let &FileBackedArea {
             ref file,
             offset,
-            len,
+            len: region_len,
         } = match &area.map_type {
             TypedArea::FileBacked(file_backed) => file_backed,
             _ => panic!("FileBackedArea::fault_handler: not a file-backed area"),
@@ -691,7 +830,6 @@ impl FileBackedArea {
         let &mut VmArea {
             start: start_va,
             flags,
-            prot,
             mut pte_flags,
             ..
         } = area;
@@ -701,17 +839,10 @@ impl FileBackedArea {
             access,
         } = info;
 
-        // Starting address of the faulting page.
-        let page_addr = fault_addr.round_down().to_usize();
         // Offset from the start of the VMA to the faulting page.
-        let area_offset = page_addr - start_va.to_usize();
-        // Length of the file region, calculating from the position of the first page
-        // which contains the starting position of the file region.
-        let file_area_len = offset % PAGE_SIZE + len;
-        if area_offset >= file_area_len {
-            // The whole page is after the file region, so we allocate a new page
-            // and fill it with zeros. This is inherently private to this process,
-            // so we need not worry about copy-on-write.
+        let area_offset = fault_addr.round_down().to_usize() - start_va.to_usize();
+        if area_offset >= region_len {
+            // The whole page is after the file region, so allocate a zeroed page for it.
             let page = Page::build()?;
             page.as_mut_slice().fill(0);
             page_table.map_page_to(fault_addr.page_number(), page.ppn(), pte_flags)?;
@@ -720,7 +851,7 @@ impl FileBackedArea {
         }
 
         // Offset from the start of the file to the start of the page to be mapped.
-        let file_offset = offset / PAGE_SIZE * PAGE_SIZE + area_offset;
+        let file_offset = offset + area_offset;
         let cached_page = match file.inode().page_cache().get_page(file_offset) {
             Some(page) => page,
             None => {
@@ -728,7 +859,7 @@ impl FileBackedArea {
                 // and insert it into the page cache.
                 // Note: Consider extracting this to a function of `PageCache` or `Inode`.
                 let page = Arc::new(Page::build()?);
-                file.base_read(page.as_mut_slice(), file_offset)?;
+                block_on(async { file.base_read(page.as_mut_slice(), file_offset).await })?;
                 file.inode()
                     .page_cache()
                     .insert_page(file_offset, Arc::clone(&page));
@@ -736,14 +867,13 @@ impl FileBackedArea {
             }
         };
 
-        if area_offset + PAGE_SIZE > file_area_len {
+        if area_offset + PAGE_SIZE > region_len {
             // Part of the page is in the file region, and part of the page is not.
             // Similar to the case where the whole page is not in the file region,
             // we allocate a new page and copy the first part of the page from the
-            // file region, and fill the rest with zeros. This is also private to
-            // this process.
+            // file region, and fill the rest with zeros.
             let page = Page::build()?;
-            let copy_len = file_area_len - area_offset;
+            let copy_len = region_len - area_offset;
             let page_copy_from = &cached_page.as_slice()[..copy_len];
             let (page_copy_to, page_fill_zero) = page.as_mut_slice().split_at_mut(copy_len);
             page_copy_to.copy_from_slice(page_copy_from);
@@ -755,19 +885,19 @@ impl FileBackedArea {
 
         // The page to be mapped to the faulting address.
         let page = if flags.contains(VmaFlags::PRIVATE) && access == MemPerm::W {
-            // Write to a private VMA: Mannually do copy-on-write.
+            // Write to a private VMA: Do copy-on-write beforehand.
             let page = Page::build()?;
             page.copy_from_page(&cached_page);
             Arc::new(page)
         } else {
-            // Other conditions: Just use the page in the page cache.
+            // Other conditions: Just use the cached page.
+            if flags.contains(VmaFlags::PRIVATE) {
+                // Read from or execute a private VMA: Mark the page as read-only, which
+                // posiibly means copy-on-write.
+                pte_flags = pte_flags.difference(PteFlags::W);
+            }
             cached_page
         };
-        if flags.contains(VmaFlags::PRIVATE) && prot.contains(MemPerm::W) && access != MemPerm::W {
-            // Read from or execute a private, writable VMA: Set the page as copy-on-write.
-            pte_flags = pte_flags.difference(PteFlags::W);
-        }
-
         page_table.map_page_to(fault_addr.page_number(), page.ppn(), pte_flags)?;
         area.pages.insert(fault_addr.page_number(), page);
         Ok(())
@@ -793,7 +923,7 @@ pub struct AnonymousArea;
 
 impl AnonymousArea {
     /// Handles a page fault.
-    pub fn fault_handler(area: &mut VmArea, info: PageFaultInfo) -> SysResult<()> {
+    fn fault_handler(area: &mut VmArea, info: PageFaultInfo) -> SysResult<()> {
         let &mut VmArea {
             ref mut pages,
             flags,
@@ -821,7 +951,11 @@ impl AnonymousArea {
 
 pub fn test_unmap_range() {
     {
-        let mut vma = VmArea::new_kernel(VirtAddr::new(0x1000), VirtAddr::new(0x8000), PteFlags::V);
+        let mut vma = VmArea::new_kernel(
+            VirtAddr::new(0x1000),
+            VirtAddr::new(0x8000),
+            MemPerm::empty(),
+        );
         let mut page_table = PageTable::build().unwrap();
 
         for vpn in vma.start_va().page_number().to_usize()..vma.end_va().page_number().to_usize() {
@@ -847,7 +981,11 @@ pub fn test_unmap_range() {
         assert!(!vma_high.contains(VirtAddr::new(0x1000)));
     }
     {
-        let mut vma = VmArea::new_kernel(VirtAddr::new(0x1000), VirtAddr::new(0x8000), PteFlags::V);
+        let mut vma = VmArea::new_kernel(
+            VirtAddr::new(0x1000),
+            VirtAddr::new(0x8000),
+            MemPerm::empty(),
+        );
         let mut page_table = PageTable::build().unwrap();
 
         for vpn in vma.start_va().page_number().to_usize()..vma.end_va().page_number().to_usize() {
@@ -881,7 +1019,11 @@ pub fn test_unmap_range() {
         assert!(!vma_high.contains(VirtAddr::new(0x1000)));
     }
     {
-        let mut vma = VmArea::new_kernel(VirtAddr::new(0x1000), VirtAddr::new(0x8000), PteFlags::V);
+        let mut vma = VmArea::new_kernel(
+            VirtAddr::new(0x1000),
+            VirtAddr::new(0x8000),
+            MemPerm::empty(),
+        );
         let mut page_table = PageTable::build().unwrap();
 
         for vpn in vma.start_va().page_number().to_usize()..vma.end_va().page_number().to_usize() {
@@ -900,7 +1042,11 @@ pub fn test_unmap_range() {
         assert!(vma_high.is_none());
     }
     {
-        let mut vma = VmArea::new_kernel(VirtAddr::new(0x5000), VirtAddr::new(0x8000), PteFlags::V);
+        let mut vma = VmArea::new_kernel(
+            VirtAddr::new(0x5000),
+            VirtAddr::new(0x8000),
+            MemPerm::empty(),
+        );
         let mut page_table = PageTable::build().unwrap();
 
         for vpn in vma.start_va().page_number().to_usize()..vma.end_va().page_number().to_usize() {

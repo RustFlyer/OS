@@ -167,9 +167,11 @@ impl Dentry for ExtDentry {
     }
 
     fn base_unlink(&self, dentry: &dyn Dentry) -> SysResult<()> {
+        self.meta.children.lock().remove(dentry.name());
         let path = dentry.path();
         let c_path = CString::new(path).unwrap();
         let err = unsafe { ext4_fremove(c_path.as_ptr()) };
+        // *dentry.get_meta().inode.lock() = None;
         if err != 0 {
             return Err(SysError::from_i32(err));
         }

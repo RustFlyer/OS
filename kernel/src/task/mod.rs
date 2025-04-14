@@ -9,13 +9,10 @@ pub mod threadgroup;
 pub mod tid;
 
 pub use future::yield_now;
-pub use manager::TASK_MANAGER;
 pub use task::{Task, TaskState};
 
 use osfs::sys_root_dentry;
 use vfs::file::File;
-
-use crate::loader::get_app_data_by_name;
 
 pub fn init() {
     // let init_proc = get_app_data_by_name("init_proc").unwrap();

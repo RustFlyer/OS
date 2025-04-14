@@ -1,14 +1,15 @@
 use alloc::sync::Arc;
-
-use mutex::ShareMutex;
-use systype::{SysError, SysResult};
-use vfs::file::{File, FileMeta};
+use async_trait::async_trait;
 
 use crate::{
     dentry::ExtDentry,
     ext::file::{ExtFile, FileSeekType},
     inode::file::ExtFileInode,
 };
+use alloc::boxed::Box;
+use mutex::ShareMutex;
+use systype::{SysError, SysResult};
+use vfs::file::{File, FileMeta};
 
 pub struct ExtFileFile {
     meta: FileMeta,
@@ -27,12 +28,13 @@ impl ExtFileFile {
     }
 }
 
+#[async_trait]
 impl File for ExtFileFile {
     fn meta(&self) -> &FileMeta {
         &self.meta
     }
 
-    fn base_read(&self, buf: &mut [u8], pos: usize) -> SysResult<usize> {
+    async fn base_read(&self, buf: &mut [u8], pos: usize) -> SysResult<usize> {
         let mut file = self.file.lock();
         file.seek(pos as i64, FileSeekType::SeekSet)
             .map_err(SysError::from_i32)?;
@@ -41,7 +43,7 @@ impl File for ExtFileFile {
         Ok(bytes_read)
     }
 
-    fn base_write(&self, buf: &[u8], pos: usize) -> SysResult<usize> {
+    async fn base_write(&self, buf: &[u8], pos: usize) -> SysResult<usize> {
         let mut file = self.file.lock();
         file.seek(pos as i64, FileSeekType::SeekSet)
             .map_err(SysError::from_i32)?;

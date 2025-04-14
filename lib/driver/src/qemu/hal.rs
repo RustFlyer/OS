@@ -1,7 +1,5 @@
 use alloc::vec::Vec;
-use config::mm::KERNEL_MAP_OFFSET;
 use core::ptr::NonNull;
-use log::warn;
 use mm::address::{PhysAddr, PhysPageNum, VirtAddr};
 use mm::frame::FrameTracker;
 use mutex::SpinNoIrqLock;

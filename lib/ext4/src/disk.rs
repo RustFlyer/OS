@@ -95,7 +95,7 @@ impl Disk {
 
 impl KernelDevOp for Disk {
     type DevType = Disk;
-    fn flush(dev: &mut Self::DevType) -> Result<usize, i32>
+    fn flush(_dev: &mut Self::DevType) -> Result<usize, i32>
     where
         Self: Sized,
     {

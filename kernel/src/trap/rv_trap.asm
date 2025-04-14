@@ -21,11 +21,16 @@ __trap_from_user:
     # Swap the user stack pointer (sscratch) with the kernel stack pointer (sp)
     csrrw sp, sscratch, sp
     # Now, sp points to *TrapContext in kernel space, sscratch holds the user stack pointer
+<<<<<<< HEAD:kernel/src/trap/rv_trap.asm
     
     # Save general-purpose registers, 0*8 is always 0.
+=======
+
+    # Save general-purpose registers
+>>>>>>> vfs:kernel/src/trap/trap.asm
     sd x1, 1*8(sp)
     # Skip sp (x2), it will be saved later
-    
+
     # Save x3~x31 (x4 is tp, thread pointer, hence it's skipped)
     .set n, 3
     .rept 29
@@ -66,7 +71,7 @@ __trap_from_user:
 
     # Finally, load the kernel stack pointer from the TrapContext
     ld sp, 34*8(sp)
-    
+
     # Return to the kernel return address (ra) in kernel space.
     ret
 
@@ -191,4 +196,3 @@ __user_rw_trap_vector:
     j __trap_from_kernel
     .endr
     unimp
-
