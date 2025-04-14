@@ -75,10 +75,9 @@ impl Task {
         addrspace.map_heap()?;
 
         self.set_addrspace(addrspace).await;
-        let mut addrspace = self.addr_space_mut().lock().await;
-
         self.switch_addr_space().await;
 
+        let mut addrspace = self.addr_space_mut().lock().await;
         let (sp, argc, argv, envp) =
             addrspace.init_stack(stack_top.to_usize(), args, envs, auxv)?;
 
