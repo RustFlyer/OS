@@ -673,3 +673,10 @@ impl Drop for SumGuard {
         current_hart().get_mut_pps().dec_sum_cnt();
     }
 }
+
+unsafe impl<'a, T, M> Send for UserPtr<'a, T, M>
+where
+    T: Send,
+    M: Send + AccessType,
+{
+}

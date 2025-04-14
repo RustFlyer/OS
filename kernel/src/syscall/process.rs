@@ -1,25 +1,21 @@
 use crate::task::TaskState;
 use crate::task::future::{suspend_now, yield_now};
 use crate::task::signal::sig_info::SigSet;
-use crate::vm::user_ptr::{UserReadPtr, UserWritePtr};
+use crate::vm::user_ptr::{UserPtr, UserReadPtr, UserWritePtr};
 use crate::{processor::current_task, task::future::spawn_user_task};
 use crate::{
     syscall::signal::sys_kill,
     task::{
-        Task, TaskState,
         manager::TASK_MANAGER,
         process_manager::PROCESS_GROUP_MANAGER,
         signal::sig_info::Sig,
         tid::{PGid, Pid},
     },
 };
-use alloc::boxed::Box;
-use alloc::string::ToString;
+use alloc::vec::Vec;
 use bitflags::*;
-use config::inode::{InodeMode, InodeType};
 use config::process::CloneFlags;
 use driver::println;
-use log::debug;
 use osfs::sys_root_dentry;
 use systype::{SysError, SyscallResult};
 use vfs::file::File;
@@ -40,7 +36,7 @@ pub fn sys_getpid() -> SyscallResult {
 /// TODO: send SIGCHLD to the parent process are performed only if this is the last thread in the thread group.
 pub fn sys_getppid() -> SyscallResult {
     let r = current_task().ppid();
-    info!("[sys_getppid] ppid: {r:?}");
+    log::info!("[sys_getppid] ppid: {r:?}");
     Ok(r)
 }
 
@@ -111,8 +107,9 @@ pub async fn waitpid(pid: usize, wstatus: usize, options: i32) -> isize {
 
 pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult {
     let task = current_task();
-    let mut addr_space_lock = task.addr_space_mut().lock();
+    let mut addr_space_lock = task.addr_space_mut().lock().await;
     let mut status = UserWritePtr::<i32>::new(wstatus, &mut addr_space_lock);
+
     let option = WaitOptions::from_bits_truncate(options);
 
     let target = match pid {
@@ -244,7 +241,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
     }
 }
 
-pub fn sys_clone(
+pub async fn sys_clone(
     flags: usize,
     stack: usize,
     parent_tid_ptr: usize,
@@ -258,7 +255,7 @@ pub fn sys_clone(
     let flags = CloneFlags::from_bits(flags as u64 & !0xff).ok_or(SysError::EINVAL)?;
     log::info!("[sys_clone] flags {flags:?}");
 
-    let new_task = current_task().fork(flags);
+    let new_task = current_task().fork(flags).await;
     new_task.trap_context_mut().set_user_a0(0);
     let new_tid = new_task.tid();
     log::info!("[sys_clone] clone a new thread, tid {new_tid}, clone flags {flags:?}",);
@@ -279,11 +276,11 @@ pub fn sys_clone(
     Ok(new_tid)
 }
 
-pub fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult {
+pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult {
     let task = current_task();
 
-    let read_string = |addr| {
-        let mut addr_space_lock = task.addr_space_mut().lock();
+    let read_string = async |addr| {
+        let mut addr_space_lock = task.addr_space_mut().lock().await;
         let mut user_ptr = UserReadPtr::<u8>::new(addr, &mut addr_space_lock);
         user_ptr
             .read_c_string(256)?
@@ -291,9 +288,9 @@ pub fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult {
             .map_err(|_| SysError::EINVAL)
     };
 
-    let read_string_array = |addr| {
+    let read_string_array = async |addr| {
         let mut strings = Vec::new();
-        let mut addr_space_lock = task.addr_space_mut().lock();
+        let mut addr_space_lock = task.addr_space_mut().lock().await;
         let mut user_ptr = UserReadPtr::<usize>::new(addr, &mut addr_space_lock);
         let pointers = user_ptr.read_ptr_array(256)?;
         for ptr in pointers {
@@ -307,9 +304,9 @@ pub fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult {
         Ok(strings)
     };
 
-    let path = read_string(path)?;
-    let args = read_string_array(argv)?;
-    let envs = read_string_array(envp)?;
+    let path = read_string(path).await?;
+    let args = read_string_array(argv).await?;
+    let envs = read_string_array(envp).await?;
 
     println!("args: {:?}", args);
     println!("envs: {:?}", envs);
@@ -320,7 +317,7 @@ pub fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult {
     };
 
     let file = <dyn File>::open(dentry)?;
-    task.execve(file, args, envs, path)?;
+    task.execve(file, args, envs, path).await?;
     Ok(0)
 }
 

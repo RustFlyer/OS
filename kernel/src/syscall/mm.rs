@@ -9,7 +9,7 @@ use crate::{
     },
 };
 
-pub fn sys_mmap(
+pub async fn sys_mmap(
     addr: usize,
     length: usize,
     prot: i32,
@@ -36,19 +36,24 @@ pub fn sys_mmap(
 
     task.addr_space_mut()
         .lock()
+        .await
         .map_file(file, flags, prot, va, length, offset)
 }
 
-pub fn sys_munmap(addr: usize, length: usize) -> SyscallResult {
+pub async fn sys_munmap(addr: usize, length: usize) -> SyscallResult {
     let task = current_task();
     let addr = VirtAddr::new(addr);
-    task.addr_space_mut().lock().remove_mapping(addr, length);
+    task.addr_space_mut()
+        .lock()
+        .await
+        .remove_mapping(addr, length);
     Ok(0)
 }
 
-pub fn sys_brk(addr: usize) -> SyscallResult {
+pub async fn sys_brk(addr: usize) -> SyscallResult {
     current_task()
         .addr_space_mut()
         .lock()
+        .await
         .change_heap_size(addr, 0)
 }

@@ -8,127 +8,131 @@ use core::{
     sync::atomic::{AtomicBool, Ordering},
     task::{Context, Poll, Waker},
 };
+use osfuture::block_on;
+use simdebug::stop;
 
 use super::{MutexSupport, spin_mutex::SpinMutex};
-// use intrusive_collections::{LinkedList, LinkedListLink, intrusive_adapter};
 
-// intrusive_adapter!(
-//     SMQueueAdapter = Arc<GrantInfo>: GrantInfo { link: LinkedListLink }
-// );
+const MAX_SPIN_COUNT: usize = 100;
+
 #[derive(Debug)]
 struct MutexInner {
     locked: bool,
-    // queue: LinkedList<SMQueueAdapter>,
     queue: UnsafeCell<Option<VecDeque<Arc<GrantInfo>>>>,
 }
 
-/// SleepMutex can step over `await`
+/// SleepMutexCas can step over `await`
 #[derive(Debug)]
-pub struct SleepMutex<T: ?Sized, S: MutexSupport> {
+pub struct SleepMutexCas<T: ?Sized, S: MutexSupport> {
     lock: SpinMutex<MutexInner, S>, // push at prev, release at next
     data: UnsafeCell<T>,            // actual data
 }
 
-unsafe impl<T: ?Sized + Send, S: MutexSupport> Send for SleepMutex<T, S> {}
-unsafe impl<T: ?Sized + Send, S: MutexSupport> Sync for SleepMutex<T, S> {}
+unsafe impl<T: ?Sized + Send, S: MutexSupport> Send for SleepMutexCas<T, S> {}
+unsafe impl<T: ?Sized + Send, S: MutexSupport> Sync for SleepMutexCas<T, S> {}
 
-impl<T, S: MutexSupport> SleepMutex<T, S> {
-    /// Construct a SleepMutex
+impl<T, S: MutexSupport> SleepMutexCas<T, S> {
     pub const fn new(user_data: T) -> Self {
-        SleepMutex {
+        SleepMutexCas {
             lock: SpinMutex::new(MutexInner {
                 locked: false,
                 queue: UnsafeCell::new(None),
             }),
-            // _marker: PhantomData,
             data: UnsafeCell::new(user_data),
         }
     }
 }
 
-impl<T: ?Sized + Send, S: MutexSupport> SleepMutex<T, S> {
+impl<T: ?Sized + Send, S: MutexSupport> SleepMutexCas<T, S> {
     /// Lock
     #[inline]
     pub async fn lock(&self) -> impl DerefMut<Target = T> + Send + Sync + '_ {
-        let future = &mut SleepMutexFuture::new(self);
+        let future = &mut SleepMutexCasFuture::new(self);
         unsafe { Pin::new_unchecked(future).init().await.await }
     }
 }
 
 struct GrantInfo {
     inner: SyncUnsafeCell<(AtomicBool, Option<Waker>)>,
-    // granted: bool,
-    // waker: Option<Waker>,
-    // link: LinkedListLink,
 }
 
-struct SleepMutexFuture<'a, T: ?Sized, S: MutexSupport> {
-    mutex: &'a SleepMutex<T, S>,
+struct SleepMutexCasFuture<'a, T: ?Sized, S: MutexSupport> {
+    mutex: &'a SleepMutexCas<T, S>,
     grant: Arc<GrantInfo>,
 }
 
-impl<'a, T: ?Sized, S: MutexSupport> SleepMutexFuture<'a, T, S> {
+impl<'a, T: ?Sized, S: MutexSupport> SleepMutexCasFuture<'a, T, S> {
     #[inline(always)]
-    fn new(mutex: &'a SleepMutex<T, S>) -> Self {
-        SleepMutexFuture {
+    fn new(mutex: &'a SleepMutexCas<T, S>) -> Self {
+        SleepMutexCasFuture {
             mutex,
             grant: Arc::new(GrantInfo {
                 inner: SyncUnsafeCell::new((AtomicBool::new(false), None)),
-                // granted: false,
-                // waker: None,
-                // link: LinkedListLink::new(),
             }),
         }
     }
 
-    async fn init(self: Pin<&mut Self>) -> Pin<&mut SleepMutexFuture<'a, T, S>> {
+    async fn init(self: Pin<&mut Self>) -> Pin<&mut SleepMutexCasFuture<'a, T, S>> {
         let this = unsafe { self.get_unchecked_mut() };
-        let inner = unsafe { &mut *this.mutex.lock.sent_lock() };
-        if !inner.locked {
-            // The sleep lock is not yet locked, just granted.
-            log::trace!("[SleepMutexFuture::init] get the lock");
-            inner.locked = true;
-            unsafe { &mut *this.grant.inner.get() }
-                .0
-                .store(true, Ordering::Release);
-        } else {
-            log::trace!("[SleepMutexFuture::init] wait for lock...");
-            unsafe { &mut *this.grant.inner.get() }.1 = Some(take_waker().await);
-            let queue = unsafe { &mut (*inner.queue.get()) };
-            if queue.is_none() {
-                *queue = Some(VecDeque::new());
+        let mut spin_count = 0;
+
+        loop {
+            let inner = unsafe { &mut *this.mutex.lock.sent_lock() };
+
+            if !inner.locked {
+                // log::debug!("[sleepCasMutex] get mutex");
+                inner.locked = true;
+                unsafe { &mut *this.grant.inner.get() }
+                    .0
+                    .store(true, Ordering::Release);
+                break;
             }
-            queue.as_mut().unwrap().push_back(this.grant.clone());
+
+            if spin_count >= MAX_SPIN_COUNT {
+                log::debug!("[sleepCasMutex] step into wait list");
+                unsafe { &mut *this.grant.inner.get() }.1 = Some(take_waker().await);
+                let queue = unsafe { &mut (*inner.queue.get()) };
+                if queue.is_none() {
+                    *queue = Some(VecDeque::new());
+                }
+                queue.as_mut().unwrap().push_back(this.grant.clone());
+                break;
+            }
+
+            spin_count += 1;
+            core::hint::spin_loop();
         }
+
         unsafe { Pin::new_unchecked(this) }
     }
 }
 
-impl<'a, T: ?Sized, S: MutexSupport> Future for SleepMutexFuture<'a, T, S> {
-    type Output = SleepMutexGuard<'a, T, S>;
+impl<'a, T: ?Sized, S: MutexSupport> Future for SleepMutexCasFuture<'a, T, S> {
+    type Output = SleepMutexCasGuard<'a, T, S>;
     #[inline(always)]
     fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
+        stop();
         let granted = unsafe { &*self.grant.inner.get() }
             .0
             .load(Ordering::Acquire);
         match granted {
             false => Poll::Pending,
             true => {
-                // log::trace!("[SleepMutexFuture::poll] granted");
-                Poll::Ready(SleepMutexGuard { mutex: self.mutex })
+                // log::trace!("[SleepMutexCasFuture::poll] granted");
+                Poll::Ready(SleepMutexCasGuard { mutex: self.mutex })
             }
         }
     }
 }
 
-struct SleepMutexGuard<'a, T: ?Sized, S: MutexSupport> {
-    mutex: &'a SleepMutex<T, S>,
+struct SleepMutexCasGuard<'a, T: ?Sized, S: MutexSupport> {
+    mutex: &'a SleepMutexCas<T, S>,
 }
 
-unsafe impl<'a, T: ?Sized + Send, S: MutexSupport> Send for SleepMutexGuard<'a, T, S> {}
-unsafe impl<'a, T: ?Sized + Send, S: MutexSupport> Sync for SleepMutexGuard<'a, T, S> {}
+unsafe impl<'a, T: ?Sized + Send, S: MutexSupport> Send for SleepMutexCasGuard<'a, T, S> {}
+unsafe impl<'a, T: ?Sized + Send, S: MutexSupport> Sync for SleepMutexCasGuard<'a, T, S> {}
 
-impl<'a, T: ?Sized, S: MutexSupport> Deref for SleepMutexGuard<'a, T, S> {
+impl<'a, T: ?Sized, S: MutexSupport> Deref for SleepMutexCasGuard<'a, T, S> {
     type Target = T;
     #[inline(always)]
     fn deref(&self) -> &T {
@@ -136,30 +140,30 @@ impl<'a, T: ?Sized, S: MutexSupport> Deref for SleepMutexGuard<'a, T, S> {
     }
 }
 
-impl<'a, T: ?Sized, S: MutexSupport> DerefMut for SleepMutexGuard<'a, T, S> {
+impl<'a, T: ?Sized, S: MutexSupport> DerefMut for SleepMutexCasGuard<'a, T, S> {
     #[inline(always)]
     fn deref_mut(&mut self) -> &mut T {
         unsafe { &mut *self.mutex.data.get() }
     }
 }
 
-impl<'a, T: ?Sized, S: MutexSupport> Drop for SleepMutexGuard<'a, T, S> {
+impl<'a, T: ?Sized, S: MutexSupport> Drop for SleepMutexCasGuard<'a, T, S> {
     #[inline]
     fn drop(&mut self) {
-        // log::trace!("[SleepMutexGuard::drop] drop...");
+        // log::trace!("[SleepMutexCasGuard::drop] drop...");
         let mut inner = self.mutex.lock.lock();
         debug_assert!(inner.locked);
         let queue = unsafe { &mut (*inner.queue.get()) };
         if queue.is_none() {
             inner.locked = false;
-            // log::trace!("[SleepMutexGuard::drop] queue is none");
+            // log::trace!("[SleepMutexCasGuard::drop] queue is none");
             return;
         }
         let waiter = match queue.as_mut().unwrap().pop_front() {
             None => {
                 // The wait queue is empty
                 inner.locked = false;
-                log::trace!("[SleepMutexGuard::drop] queue is empty");
+                log::trace!("[SleepMutexCasGuard::drop] queue is empty");
                 return;
             }
             Some(waiter) => waiter,
@@ -171,7 +175,7 @@ impl<'a, T: ?Sized, S: MutexSupport> Drop for SleepMutexGuard<'a, T, S> {
         let waker = grant_inner.1.take().unwrap();
         grant_inner.0.store(true, Ordering::Release);
         waker.wake();
-        log::trace!("[SleepMutexGuard::drop] grant someone...");
+        log::trace!("[SleepMutexCasGuard::drop] grant someone...");
     }
 }
 
@@ -186,7 +190,6 @@ impl Future for TakeWakerFuture {
     type Output = Waker;
     #[inline(always)]
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        // 直接返回当前上下文的Waker克隆
         Poll::Ready(cx.waker().clone())
     }
 }

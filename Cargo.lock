@@ -464,7 +464,9 @@ version = "0.1.0"
 dependencies = [
  "bitflags 2.9.0",
  "log",
+ "osfuture",
  "riscv",
+ "simdebug",
 ]
 
 [[package]]

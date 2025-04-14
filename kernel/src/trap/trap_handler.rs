@@ -65,7 +65,9 @@ pub async fn user_exception_handler(task: &Task, e: Exception, stval: usize) {
                 _ => unreachable!(),
             };
             let fault_addr = VirtAddr::new(stval);
+            // log::debug!("begin to test sleep lock");
             let mut addrspace = task.addr_space_mut().lock().await;
+            // log::debug!("pass sleep lock {:?}", addrspace.change_heap_size(0, 0));
             if let Err(e) = addrspace.handle_page_fault(fault_addr, access) {
                 // Should send a `SIGSEGV` signal to the task
                 log::error!(

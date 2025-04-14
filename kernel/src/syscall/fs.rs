@@ -20,13 +20,13 @@ use crate::{
     vm::user_ptr::{UserReadPtr, UserWritePtr},
 };
 
-pub fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) -> SyscallResult {
+pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) -> SyscallResult {
     let task = current_task();
     let flags = OpenFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
     let mode = InodeMode::from_bits_truncate(mode);
 
     let path = {
-        let mut addr_space_lock = task.addr_space_mut().lock();
+        let mut addr_space_lock = task.addr_space_mut().lock().await;
         let mut data_ptr = UserReadPtr::<u8>::new(pathname, &mut addr_space_lock);
         let cstring = data_ptr.read_c_string(256)?;
         cstring.into_string().map_err(|_| SysError::EINVAL)?
@@ -59,27 +59,23 @@ pub fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) -> Sysca
 }
 
 pub async fn sys_write(fd: usize, addr: usize, len: usize) -> SyscallResult {
-    block_on(async {
-        let task = current_task();
-        let mut addr_space_lock = task.addr_space_mut().lock();
-        let mut data_ptr = UserReadPtr::<u8>::new(addr, &mut addr_space_lock);
+    let task = current_task();
+    let mut addr_space_lock = task.addr_space_mut().lock().await;
+    let mut data_ptr = UserReadPtr::<u8>::new(addr, &mut addr_space_lock);
 
-        let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
-        let buf = unsafe { data_ptr.try_into_slice(len) }?;
-        file.write(buf).await
-    })
+    let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
+    let buf = unsafe { data_ptr.try_into_slice(len) }?;
+    file.write(buf).await
 }
 
 pub async fn sys_read(fd: usize, buf: usize, count: usize) -> SyscallResult {
-    block_on(async {
-        let task = current_task();
-        let mut addrspace = task.addr_space_mut().lock();
-        let mut buf = UserWritePtr::<u8>::new(buf, &mut addrspace);
+    let task = current_task();
+    let mut addrspace = task.addr_space_mut().lock().await;
+    let mut buf = UserWritePtr::<u8>::new(buf, &mut addrspace);
 
-        let buf_ptr = unsafe { buf.try_into_mut_slice(count) }?;
-        let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
-        file.read(buf_ptr).await
-    })
+    let buf_ptr = unsafe { buf.try_into_mut_slice(count) }?;
+    let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
+    file.read(buf_ptr).await
 }
 
 pub fn sys_lseek(fd: usize, offset: isize, whence: usize) -> SyscallResult {
@@ -101,9 +97,9 @@ pub fn sys_lseek(fd: usize, offset: isize, whence: usize) -> SyscallResult {
     }
 }
 
-pub fn sys_getcwd(buf: usize, len: usize) -> SyscallResult {
+pub async fn sys_getcwd(buf: usize, len: usize) -> SyscallResult {
     let task = current_task();
-    let mut addr_space = task.addr_space_mut().lock();
+    let mut addr_space = task.addr_space_mut().lock().await;
     let mut buf = { UserWritePtr::<u8>::new(buf, &mut addr_space) };
 
     let path = task.cwd_mut().path();
@@ -118,9 +114,9 @@ pub fn sys_getcwd(buf: usize, len: usize) -> SyscallResult {
     Ok(ret)
 }
 
-pub fn sys_fstat(fd: usize, stat_buf: usize) -> SyscallResult {
+pub async fn sys_fstat(fd: usize, stat_buf: usize) -> SyscallResult {
     let task = current_task();
-    let mut addr_space = task.addr_space_mut().lock();
+    let mut addr_space = task.addr_space_mut().lock().await;
     let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
     let kstat = Kstat::from_vfs_file(file.inode())?;
     unsafe {
@@ -148,9 +144,9 @@ pub fn sys_dup3(oldfd: usize, newfd: usize, flags: i32) -> SyscallResult {
     task.with_mut_fdtable(|table| table.dup3(oldfd, newfd, flags))
 }
 
-pub fn sys_mkdirat(dirfd: usize, pathname: usize, mode: u32) -> SyscallResult {
+pub async fn sys_mkdirat(dirfd: usize, pathname: usize, mode: u32) -> SyscallResult {
     let task = current_task();
-    let mut addr_space = task.addr_space_mut().lock();
+    let mut addr_space = task.addr_space_mut().lock().await;
     let path = UserReadPtr::<u8>::new(pathname, &mut addr_space).read_c_string(256)?;
     let path = path.into_string().map_err(|_| SysError::EINVAL)?;
 
@@ -165,9 +161,9 @@ pub fn sys_mkdirat(dirfd: usize, pathname: usize, mode: u32) -> SyscallResult {
     Ok(0)
 }
 
-pub fn sys_chdir(path: usize) -> SyscallResult {
+pub async fn sys_chdir(path: usize) -> SyscallResult {
     let task = current_task();
-    let mut addr_space = task.addr_space_mut().lock();
+    let mut addr_space = task.addr_space_mut().lock().await;
     let path = UserReadPtr::<u8>::new(path, &mut addr_space).read_c_string(256)?;
     let path = path.into_string().map_err(|_| SysError::EINVAL)?;
     log::debug!("[sys_chdir] path: {path}");
@@ -179,10 +175,10 @@ pub fn sys_chdir(path: usize) -> SyscallResult {
     Ok(0)
 }
 
-pub fn sys_unlinkat(dirfd: usize, pathname: usize, flags: i32) -> SyscallResult {
+pub async fn sys_unlinkat(dirfd: usize, pathname: usize, flags: i32) -> SyscallResult {
     log::trace!("[sys_unlinkat] start");
     let task = current_task();
-    let mut addr_space = task.addr_space_mut().lock();
+    let mut addr_space = task.addr_space_mut().lock().await;
     let path = UserReadPtr::<u8>::new(pathname, &mut addr_space).read_c_string(30)?;
     let path = path.into_string().map_err(|_| SysError::EINVAL)?;
 
@@ -200,10 +196,10 @@ pub fn sys_unlinkat(dirfd: usize, pathname: usize, flags: i32) -> SyscallResult 
     parent.unlink(dentry.as_ref()).map(|_| 0)
 }
 
-pub fn sys_getdents64(fd: usize, buf: usize, len: usize) -> SyscallResult {
+pub async fn sys_getdents64(fd: usize, buf: usize, len: usize) -> SyscallResult {
     log::debug!("[sys_getdents64] fd {fd}, buf {buf:#x}, len {len:#x}");
     let task = current_task();
-    let mut addr_space = task.addr_space_mut().lock();
+    let mut addr_space = task.addr_space_mut().lock().await;
     let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
     let mut ptr = UserWritePtr::<u8>::new(buf, &mut addr_space);
     log::debug!("[sys_getdents64] try to get buf");
@@ -241,7 +237,7 @@ pub fn sys_getdents64(fd: usize, buf: usize, len: usize) -> SyscallResult {
 ///
 /// # Attention
 /// - `source` dev is substituted by BLOCK_DEVICE now.
-pub fn sys_mount(
+pub async fn sys_mount(
     source: usize,
     target: usize,
     fstype: usize,
@@ -249,7 +245,7 @@ pub fn sys_mount(
     data: usize,
 ) -> SyscallResult {
     let task = current_task();
-    let mut addr_space = task.addr_space_mut().lock();
+    let mut addr_space = task.addr_space_mut().lock().await;
 
     let mut read_c_str = |ptr| {
         let path = UserReadPtr::<u8>::new(ptr, &mut addr_space).read_c_string(30)?;
@@ -311,9 +307,9 @@ pub fn sys_mount(
     Ok(0)
 }
 
-pub fn sys_umount2(target: usize, flags: u32) -> SyscallResult {
+pub async fn sys_umount2(target: usize, flags: u32) -> SyscallResult {
     let task = current_task();
-    let mut addr_space = task.addr_space_mut().lock();
+    let mut addr_space = task.addr_space_mut().lock().await;
     let mut ptr = UserReadPtr::<u8>::new(target, &mut addr_space);
     let mount_path = ptr.read_c_string(256);
     let _flags = MountFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
@@ -331,13 +327,22 @@ pub fn sys_umount2(target: usize, flags: u32) -> SyscallResult {
 /// - `pathname`: Path string (relative to `dirfd` if not absolute)
 /// - `mode`: Permission mask
 /// - `flags`: Behavior flags (0 or `AT_SYMLINK_NOFOLLOW`)
-pub fn sys_faccessat(dirfd: usize, pathname: usize, _mode: usize, flags: i32) -> SyscallResult {
+pub async fn sys_faccessat(
+    dirfd: usize,
+    pathname: usize,
+    _mode: usize,
+    flags: i32,
+) -> SyscallResult {
     const AT_SYMLINK_NOFOLLOW: usize = 0x100;
     const AT_EACCESS: usize = 0x200;
     const AT_EMPTY_PATH: usize = 0x1000;
     let task = current_task();
-    let mut addr_space_lock = task.addr_space_mut().lock();
-    let path = UserReadPtr::<u8>::new(pathname, &mut addr_space_lock).read_c_string(256)?;
+
+    let path = {
+        let mut addr_space_lock = task.addr_space_mut().lock().await;
+        UserReadPtr::<u8>::new(pathname, &mut addr_space_lock).read_c_string(256)
+    }?;
+
     let path = path.into_string().map_err(|_| SysError::EINVAL)?;
     let dentry = if flags == AT_SYMLINK_NOFOLLOW as i32 {
         task.resolve_path(AtFd::from(dirfd), path, OpenFlags::O_NOFOLLOW)?
@@ -360,9 +365,8 @@ pub fn sys_set_robust_list(_robust_list_head: usize, _len: usize) -> SyscallResu
     Ok(0)
 }
 
-pub fn sys_pipe2(pipefd: usize, flags: i32) -> SyscallResult {
+pub async fn sys_pipe2(pipefd: usize, flags: i32) -> SyscallResult {
     let task = current_task();
-    let mut addr_space = task.addr_space_mut().lock();
     let flags = OpenFlags::from_bits(flags)
         .unwrap_or_else(|| unimplemented!("unknown flags, should add them"));
     let (pipe_read, pipe_write) = new_pipe(PIPE_BUF_LEN);
@@ -373,6 +377,7 @@ pub fn sys_pipe2(pipefd: usize, flags: i32) -> SyscallResult {
         Ok([fd_read as u32, fd_write as u32])
     })?;
 
+    let mut addr_space = task.addr_space_mut().lock().await;
     let mut pipefd = UserWritePtr::<u32>::new(pipefd, &mut addr_space);
     unsafe {
         pipefd.write_array(&pipe)?;

@@ -1,3 +1,5 @@
+use core::arch::global_asm;
+
 use crate::task::TaskState;
 use crate::task::sig_members::{SigActionFlag, SigContext};
 use crate::task::signal::sig_info::SigSet;
@@ -7,6 +9,8 @@ use alloc::sync::Arc;
 use systype::SysResult;
 
 use super::sig_info::{Sig, SigInfo};
+
+global_asm!(include_str!("_sigreturn_trampoline.asm"));
 
 pub async fn sig_check(task: Arc<Task>, mut intr: bool) -> SysResult<()> {
     let old_mask = task.get_sig_mask();
@@ -115,7 +119,9 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo) -> bool {
                 siginfo_v.si_code = si.code;
                 new_sp -= size_of::<LinuxSigInfo>();
                 let mut siginfo_ptr = UserWritePtr::<LinuxSigInfo>::new(new_sp, &mut *addr_space);
-                unsafe { siginfo_ptr.write(siginfo_v) };
+                unsafe {
+                    let _ = siginfo_ptr.write(siginfo_v);
+                }
                 cx.user_reg[11] = new_sp;
             }
             cx.sepc = entry;

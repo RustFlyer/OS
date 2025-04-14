@@ -256,10 +256,6 @@ impl Task {
         unsafe { &mut *self.tid_address.get() }
     }
 
-    pub fn addr_space_mut(&self) -> &ShareMutex<AddrSpace> {
-        &self.addr_space
-    }
-
     pub fn parent_mut(&self) -> &ShareMutex<Option<Weak<Task>>> {
         &self.parent
     }
@@ -365,6 +361,10 @@ impl Task {
 
     pub fn set_cwd(&self, dentry: Arc<dyn Dentry>) {
         *self.cwd.lock() = dentry;
+    }
+
+    pub async fn set_addrspace(&self, addrspace: AddrSpace) {
+        *self.addr_space.lock().await = addrspace;
     }
     // ========== This Part You Can Change the Member of Task  ===========
     pub fn add_child(&self, child: Arc<Task>) {

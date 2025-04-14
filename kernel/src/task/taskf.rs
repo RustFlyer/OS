@@ -19,6 +19,7 @@ use config::inode::InodeType;
 use config::process::CloneFlags;
 use config::vfs::AtFd;
 use config::vfs::OpenFlags;
+use osfs::fd_table::FdTable;
 
 use core::cell::SyncUnsafeCell;
 use core::sync::atomic::AtomicUsize;
@@ -62,7 +63,7 @@ impl Task {
         }
     }
 
-    pub fn execve(
+    pub async fn execve(
         &self,
         elf_file: Arc<dyn File>,
         args: Vec<String>,
@@ -74,13 +75,13 @@ impl Task {
         let stack_top = addrspace.map_stack()?;
         addrspace.map_heap()?;
 
-        *self.addr_space_mut().lock() = addrspace;
+        self.set_addrspace(addrspace);
+        let mut addrspace = self.addr_space_mut().lock().await;
+
         self.switch_addr_space();
 
         let (sp, argc, argv, envp) =
-            self.addr_space_mut()
-                .lock()
-                .init_stack(stack_top.to_usize(), args, envs, auxv)?;
+            addrspace.init_stack(stack_top.to_usize(), args, envs, auxv)?;
 
         self.trap_context_mut()
             .init_user(sp, entry_point.to_usize(), argc, argv, envp);
@@ -146,7 +147,6 @@ impl Task {
         let sig_manager;
         let sig_stack;
         let sig_cx_ptr;
-        let fd_table = SpinNoIrqLock::new(FdTable::new());
         let cwd = new_share_mutex(self.cwd_mut());
 
         let elf = SyncUnsafeCell::new((*self.elf_mut()).clone());

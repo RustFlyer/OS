@@ -1,7 +1,11 @@
 use crate::{
-    processor::current_task, 
-    task::{sig_members::{Action, SigContext}, signal::sig_info::*, TASK_MANAGER}, 
-    vm::user_ptr::{UserReadPtr, UserWritePtr}
+    processor::current_task,
+    task::{
+        manager::TASK_MANAGER,
+        sig_members::{Action, SigContext},
+        signal::sig_info::*,
+    },
+    vm::user_ptr::{UserReadPtr, UserWritePtr},
 };
 use systype::{SysError, SyscallResult};
 
@@ -43,7 +47,11 @@ pub fn sys_kill(sig_code: i32, pid: isize) -> SyscallResult {
 /// user should offer two new Action instances, one of them(prev_sa) can be default
 /// if no need for restore, prev_sa can be NULL
 /// Question: Current task could be a thread, so it's process doesn't change. Does this work?
-pub fn sys_sigaction(sig_code: i32, mut new_sa: UserReadPtr<Action>, mut prev_sa: UserWritePtr<Action>) -> SyscallResult {
+pub fn sys_sigaction(
+    sig_code: i32,
+    mut new_sa: UserReadPtr<Action>,
+    mut prev_sa: UserWritePtr<Action>,
+) -> SyscallResult {
     let tid = current_task().tid();
     // maybe use TASK_MANAGER.get_task(tid).unwrap() to get handlers?
     let task = current_task();
@@ -58,15 +66,17 @@ pub fn sys_sigaction(sig_code: i32, mut new_sa: UserReadPtr<Action>, mut prev_sa
 
     if !prev_sa.is_null() {
         let prev = handlers.get(sig);
-        unsafe { prev_sa.write(prev.into())?; }
+        unsafe {
+            prev_sa.write(prev.into())?;
+        }
     }
 
     if !new_sa.is_null() {
-        unsafe { 
+        unsafe {
             let mut sa = new_sa.read()?;
             sa.mask.remove_signal(Sig::SIGKILL);
             sa.mask.remove_signal(Sig::SIGSTOP);
-            
+
             log::info!("[sys_sigaction] new Action:{:?}", sa);
             handlers.update(sig, sa);
         }
@@ -79,7 +89,11 @@ pub fn sys_sigaction(sig_code: i32, mut new_sa: UserReadPtr<Action>, mut prev_sa
 /// user should offer two SigSet instance, one of them(prev_mask) can be default
 /// if no need for restore, prev_mask can be NULL
 /// only affects current thread
-pub fn sys_sigmask(mode: usize, mut input_mask: UserReadPtr<SigSet>, mut prev_mask: UserWritePtr<SigSet>) -> SyscallResult {
+pub fn sys_sigmask(
+    mode: usize,
+    mut input_mask: UserReadPtr<SigSet>,
+    mut prev_mask: UserWritePtr<SigSet>,
+) -> SyscallResult {
     // Question: is it safe?
     let task = current_task();
     let mask = task.sig_mask_mut();
@@ -89,18 +103,26 @@ pub fn sys_sigmask(mode: usize, mut input_mask: UserReadPtr<SigSet>, mut prev_ma
     const SIGSETMASK: usize = 2;
 
     if !prev_mask.is_null() {
-        unsafe { prev_mask.write(*mask); }
+        unsafe {
+            prev_mask.write(*mask);
+        }
     }
 
     if !input_mask.is_null() {
-        unsafe{ 
+        unsafe {
             let input = input_mask.read()?;
             log::info!("[sys_sigmask] input:{input:#x}");
 
             match mode {
-                SIGBLOCK => { *mask |= input; }
-                SIGUNBLOCK => { mask.remove(input); }
-                SIGSETMASK =>  { *mask = input; }
+                SIGBLOCK => {
+                    *mask |= input;
+                }
+                SIGUNBLOCK => {
+                    mask.remove(input);
+                }
+                SIGSETMASK => {
+                    *mask = input;
+                }
                 _ => {
                     return Err(SysError::EINVAL);
                 }
@@ -113,16 +135,16 @@ pub fn sys_sigmask(mode: usize, mut input_mask: UserReadPtr<SigSet>, mut prev_ma
     Ok(0)
 }
 
-pub fn sys_sigreturn() -> SyscallResult {
+pub async fn sys_sigreturn() -> SyscallResult {
     let task = current_task();
     let trap_cx = task.trap_context_mut();
     let mask = task.sig_mask_mut();
     let sig_cx_ptr = task.get_sig_cx_ptr();
-    let mut addr_space = task.addr_space_mut().lock();
+    let mut addr_space = task.addr_space_mut().lock().await;
     let mut sig_cx_ptr = UserReadPtr::<SigContext>::new(sig_cx_ptr, &mut *addr_space);
     log::trace!("[sys_rt_sigreturn] sig_cx_ptr: {sig_cx_ptr:?}");
-    unsafe { 
-        let sig_cx = sig_cx_ptr.read()?; 
+    unsafe {
+        let sig_cx = sig_cx_ptr.read()?;
         *mask = sig_cx.mask;
         // TODO: no sig_stack for now so don't need to restore
         trap_cx.sepc = sig_cx.user_reg[0];

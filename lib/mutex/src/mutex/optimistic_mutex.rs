@@ -1,10 +1,10 @@
 extern crate alloc;
 
-use super::SleepLock;
+use super::{SleepCASLock, SleepLock};
 use alloc::sync::Arc;
 
-pub type OptimisticLock<T> = Arc<SleepLock<T>>;
+pub type OptimisticLock<T> = Arc<SleepCASLock<T>>;
 
 pub fn new_optimistic_mutex<T>(data: T) -> OptimisticLock<T> {
-    Arc::new(SleepLock::new(data))
+    Arc::new(SleepCASLock::new(data))
 }

@@ -10,6 +10,7 @@
  */
 
 use riscv::register::sstatus;
+use spin_then_sleep_mutex::SleepMutexCas;
 
 use self::sleep_mutex::SleepMutex;
 use self::spin_mutex::SpinMutex;
@@ -20,6 +21,7 @@ pub mod share_mutex;
 pub mod sleep_mutex;
 /// SpinMutex
 pub mod spin_mutex;
+pub mod spin_then_sleep_mutex;
 
 pub use share_mutex::{ShareMutex, new_share_mutex};
 /// SpinLock
@@ -27,6 +29,7 @@ pub type SpinLock<T> = SpinMutex<T, Spin>;
 /// SpinNoIrqLock(Cannot be interrupted)
 pub type SpinNoIrqLock<T> = SpinMutex<T, SpinNoIrq>;
 pub type SleepLock<T> = SleepMutex<T, SpinNoIrq>;
+pub type SleepCASLock<T> = SleepMutexCas<T, SpinNoIrq>;
 
 /// Low-level support for mutex(spinlock, sleeplock, etc)
 pub trait MutexSupport {

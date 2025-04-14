@@ -23,7 +23,6 @@ mod vm;
 use core::ptr;
 
 use config::mm::{DTB_END, DTB_START};
-use driver::block_device_test;
 use mm::{self, frame, heap};
 use processor::hart;
 use simdebug::when_debug;
