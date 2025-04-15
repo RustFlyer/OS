@@ -43,6 +43,9 @@ pub fn sys_getppid() -> SyscallResult {
 pub fn sys_exit(_exit_code: i32) -> SyscallResult {
     let task = current_task();
     task.set_state(TaskState::Zombie);
+    if task.is_process() {
+        task.set_exit_code((_exit_code & 0xFF) << 8);
+    }
     Ok(0)
 }
 
@@ -186,11 +189,9 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
                 status.write(exit_code)?;
             }
         }
-
-        // log::info!("write success");
         let child = TASK_MANAGER.get_task(child_pid).unwrap();
         task.remove_child(child);
-        // log::error!("[sys_wait4] remove child_pid {}", child_pid);
+        log::error!("[sys_wait4] remove child_pid {}", child_pid);
         TASK_MANAGER.remove_task(child_pid);
         PROCESS_GROUP_MANAGER.remove(&task);
         // log::error!("[sys_wait4] out");
