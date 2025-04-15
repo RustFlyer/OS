@@ -288,6 +288,7 @@ impl Task {
         }
 
         if self.is_process() {
+            log::info!("tg length: {}",guard.len());
             assert!(guard.len() == 1);
         } else {
             assert!(guard.len() == 2);
@@ -303,10 +304,8 @@ impl Task {
 
         //Question: Is mut safe here?
         let mut children = self.children_mut().lock().clone();
-        if children.is_empty() {
-            return;
-        }
-        let root = TASK_MANAGER.get_task(INIT_PROC_ID).unwrap();
+        if !children.is_empty() {
+            let root = TASK_MANAGER.get_task(INIT_PROC_ID).unwrap();
         for c in children.values() {
             let child = c.upgrade().unwrap();
             log::debug!(
@@ -329,6 +328,7 @@ impl Task {
         }
         root.children_mut().lock().extend(children.clone());
         children.clear();
+        }
 
         if let Some(parent) = self.parent_mut().lock().as_ref() {
             if let Some(parent) = parent.upgrade() {
