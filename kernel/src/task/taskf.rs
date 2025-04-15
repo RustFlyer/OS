@@ -308,26 +308,26 @@ impl Task {
         let mut children = self.children_mut().lock().clone();
         if !children.is_empty() {
             let root = TASK_MANAGER.get_task(INIT_PROC_ID).unwrap();
-        for c in children.values() {
-            let child = c.upgrade().unwrap();
-            log::debug!(
-                "[Task::do_eixt] reparent child process pid {} to init",
-                child.pid()
-            );
-            if child.get_state() == TaskState::Zombie {
-                // NOTE: self has not called wait to clear zombie children, we need to notify
-                // init to clear these zombie children.
-                root.receive_siginfo(SigInfo {
-                    sig: Sig::SIGCHLD,
-                    code: SigInfo::CLD_EXITED,
-                    details: SigDetails::None,
-                })
+            for c in children.values() {
+                let child = c.upgrade().unwrap();
+                log::debug!(
+                    "[Task::do_eixt] reparent child process pid {} to init",
+                    child.pid()
+                );
+                if child.get_state() == TaskState::Zombie {
+                    // NOTE: self has not called wait to clear zombie children, we need to notify
+                    // init to clear these zombie children.
+                    root.receive_siginfo(SigInfo {
+                        sig: Sig::SIGCHLD,
+                        code: SigInfo::CLD_EXITED,
+                        details: SigDetails::None,
+                    })
+                }
+                // Question: Why Deref doesn't work here
+                *child.parent_mut().lock() = Some(Arc::downgrade(&root));
             }
-            // Question: Why Deref doesn't work here
-            *child.parent_mut().lock() = Some(Arc::downgrade(&root));
-        }
-        root.children_mut().lock().extend(children.clone());
-        children.clear();
+            root.children_mut().lock().extend(children.clone());
+            children.clear();
         }
 
         if let Some(parent) = self.parent_mut().lock().as_ref() {

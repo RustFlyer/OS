@@ -8,6 +8,7 @@ use crate::task::{
 };
 use crate::vm::user_ptr::{UserReadPtr, UserWritePtr};
 use crate::{processor::current_task, task::future::spawn_user_task};
+use alloc::string::ToString;
 use alloc::vec::Vec;
 use bitflags::*;
 use config::process::CloneFlags;
@@ -136,6 +137,12 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
             if let Some(_info) = si {
                 log::info!("siginfo get");
                 let children = task.children_mut().lock();
+                children.values().for_each(|c| {
+                    log::info!(
+                        "[WaitFor] try to convert Weak, {}",
+                        c.upgrade().map_or("None".to_string(), |t| { t.get_name() })
+                    )
+                });
                 let child = match target {
                     WaitFor::AnyChild => children.values().find(|c| {
                         c.upgrade().map_or(false, |t| {
@@ -147,6 +154,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
                     WaitFor::Pid(pid) => {
                         let child = children.get(&pid).unwrap();
                         if child.upgrade().map_or(false, |t| {
+                            log::info!("[WaitFor::Pid({pid})] try to convert Arc");
                             t.is_in_state(TaskState::Zombie)
                                 && t.with_thread_group(|tg| tg.len() == 1)
                         }) {
@@ -220,6 +228,8 @@ pub async fn sys_clone(
     new_task.trap_context_mut().set_user_a0(0);
     let new_tid = new_task.tid();
     log::info!("[sys_clone] clone a new thread, tid {new_tid}, clone flags {flags:?}",);
+
+    current_task().add_child(new_task.clone());
 
     if stack != 0 {
         new_task.trap_context_mut().set_user_sp(stack);
