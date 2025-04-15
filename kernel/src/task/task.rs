@@ -91,7 +91,7 @@ impl Task {
     ) -> Self {
         let tid = tid_alloc();
         let pgid = tid.0;
-        Task {
+        let task = Task {
             tid,
             process: None,
             is_process: false,
@@ -116,7 +116,8 @@ impl Task {
             cwd: new_share_mutex(sys_root_dentry()),
             elf: SyncUnsafeCell::new(elf_file),
             name: SyncUnsafeCell::new(name),
-        }
+        };
+        task
     }
 
     pub fn new_fork_clone(
