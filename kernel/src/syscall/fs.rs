@@ -35,7 +35,7 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
     let dentry = task.resolve_path(AtFd::from(dirfd), path, OpenFlags::empty())?;
 
     log::debug!("flags = {:?}", flags);
-    if flags.contains(OpenFlags::O_CREAT) {
+    if flags.contains(OpenFlags::O_CREAT) && dentry.is_negative() {
         let parent = dentry.parent().expect("can not create with root entry");
         parent.create(dentry.as_ref(), InodeMode::REG | mode)?;
     }

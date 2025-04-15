@@ -55,7 +55,7 @@ pub async fn sys_sched_yield() -> SyscallResult {
 }
 
 pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult {
-    log::error!("[sys_wait4] in");
+    // log::error!("[sys_wait4] in");
     let task = current_task();
     let option = WaitOptions::from_bits_truncate(options);
     let target = match pid {
@@ -268,8 +268,8 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
     let args = read_string_array(argv).await?;
     let envs = read_string_array(envp).await?;
 
-    println!("args: {:?}", args);
-    println!("envs: {:?}", envs);
+    // println!("args: {:?}", args);
+    // println!("envs: {:?}", envs);
     log::info!("[sys_execve]: path: {path:?}",);
     let dentry = {
         let path = Path::new(sys_root_dentry(), path.clone());

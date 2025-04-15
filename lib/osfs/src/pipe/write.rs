@@ -33,10 +33,10 @@ impl Drop for PipeWriteFile {
             .unwrap()
             .downcast_arc::<PipeInode>()
             .unwrap_or_else(|_| unreachable!());
-        // log::info!(
-        //     "[PipeWriteFile::drop] pipe ino {} write end is closed",
-        //     pipe.get_meta().ino
-        // );
+        log::info!(
+            "[PipeWriteFile::drop] pipe ino {} write end is closed",
+            pipe.get_meta().ino
+        );
         let mut inner = pipe.inner.lock();
         inner.is_write_closed = true;
         while let Some(waker) = inner.read_waker.pop_front() {
