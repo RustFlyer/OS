@@ -5,13 +5,13 @@ extern crate user_lib;
 
 use config::{
     inode::InodeMode,
-    vfs::{AT_FDCWD, OpenFlags},
+    vfs::{AtFlags, OpenFlags},
 };
 use user_lib::{exit, getdents, open, println};
 
 #[unsafe(no_mangle)]
 fn main() {
-    let fd = open(AT_FDCWD as usize, ".", OpenFlags::O_RDONLY, InodeMode::DIR);
+    let fd = open(AtFlags::AT_FDCWD.bits(), ".", OpenFlags::O_RDONLY, InodeMode::DIR);
 
     let mut buf: [u8; 512] = [0; 512];
     let len = buf.len();

@@ -10,7 +10,7 @@ use core::{
 
 use config::{
     inode::InodeMode,
-    vfs::{AT_FDCWD, AtFd, OpenFlags},
+    vfs::{AtFd, AtFlags, OpenFlags},
 };
 use user_lib::{execve, exit, fork, lseek, open, println, read, sleep, write, yield_};
 
@@ -18,7 +18,7 @@ use user_lib::{execve, exit, fork, lseek, open, println, read, sleep, write, yie
 fn main() {
     {
         let fd: isize = open(
-            AT_FDCWD as usize,
+            AtFlags::AT_FDCWD.bits(),
             "tes",
             OpenFlags::O_CREAT | OpenFlags::O_RDWR,
             InodeMode::REG,
@@ -41,7 +41,7 @@ fn main() {
     }
 
     {
-        let fd2: isize = open(AT_FDCWD as usize, "add", OpenFlags::O_RDWR, InodeMode::REG);
+        let fd2: isize = open(AtFlags::AT_FDCWD.bits(), "add", OpenFlags::O_RDWR, InodeMode::REG);
         let mut read_buf: [u8; 1024] = [0; 1024];
         read(fd2 as usize, &mut read_buf);
         // println!("file test: read tbuf [{:?}]", read_buf);
