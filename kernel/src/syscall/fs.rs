@@ -4,7 +4,7 @@ use strum::FromRepr;
 
 use config::{
     inode::InodeMode,
-    vfs::{AT_REMOVEDIR, AtFd, MountFlags, OpenFlags, SeekFrom},
+    vfs::{AccessFlags, AtFd, AtFlags, MountFlags, OpenFlags, SeekFrom},
 };
 use driver::BLOCK_DEVICE;
 use osfs::{
@@ -12,7 +12,11 @@ use osfs::{
     pipe::{inode::PIPE_BUF_LEN, new_pipe},
 };
 use systype::{SysError, SyscallResult};
-use vfs::{file::File, kstat::Kstat, path::split_parent_and_name};
+use vfs::{
+    file::File,
+    kstat::Kstat,
+    path::{Path, split_parent_and_name},
+};
 
 use crate::{
     processor::current_task,
@@ -20,9 +24,14 @@ use crate::{
 };
 
 pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) -> SyscallResult {
+    log::trace!(
+        "[sys_openat] dirfd: {dirfd}, pathname: {pathname:#x}, flags: {flags:#x}, mode: {mode:#x}"
+    );
+
     let task = current_task();
     let flags = OpenFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
-    let mode = InodeMode::from_bits_truncate(mode);
+    // `mode` is not supported yet.
+    let _mode = InodeMode::from_bits_truncate(mode);
 
     let path = {
         let mut addr_space_lock = task.addr_space_mut().lock().await;
@@ -30,29 +39,36 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
         let cstring = data_ptr.read_c_string(256)?;
         cstring.into_string().map_err(|_| SysError::EINVAL)?
     };
+    log::trace!("[sys_openat] path: {path}");
 
-    log::debug!("path name = {}", path);
-    let dentry = task.resolve_path(AtFd::from(dirfd), path, OpenFlags::empty())?;
-
-    log::debug!("flags = {:?}", flags);
-    if flags.contains(OpenFlags::O_CREAT) {
-        let parent = dentry.parent().expect("can not create with root entry");
-        parent.create(dentry.as_ref(), InodeMode::REG | mode)?;
+    let mut dentry = task.walk_at(AtFd::from(dirfd), path)?;
+    // Handle symlinks early here to simplify the logic.
+    if !dentry.is_negative() && dentry.inode().unwrap().inotype().is_symlink() {
+        if flags.contains(OpenFlags::O_NOFOLLOW) {
+            return Err(SysError::ELOOP);
+        }
+        dentry = Path::resolve_symlink_through(dentry)?;
     }
 
-    let inode = dentry.inode().ok_or(SysError::ENOENT)?;
-    if flags.contains(OpenFlags::O_DIRECTORY) && !inode.inotype().is_dir() {
+    if dentry.is_negative() {
+        if flags.contains(OpenFlags::O_CREAT) {
+            let parent = dentry.parent().unwrap();
+            parent.create(dentry.as_ref(), InodeMode::REG)?
+        } else {
+            return Err(SysError::ENOENT);
+        }
+    }
+
+    // Now `dentry` must be valid.
+    let inode = dentry.inode().unwrap();
+    let inode_type = inode.inotype();
+
+    if flags.contains(OpenFlags::O_DIRECTORY) && !inode_type.is_dir() {
         return Err(SysError::ENOTDIR);
     }
 
-    log::info!("try to open dentry");
     let file = <dyn File>::open(dentry)?;
     file.set_flags(flags);
-
-    log::trace!("file flags: {:?}", file.flags());
-
-    // let root_path = "/".to_string();
-    // sys_root_dentry().base_open()?.ls(root_path);
 
     task.with_mut_fdtable(|ft| ft.alloc(file, flags))
 }
@@ -149,7 +165,7 @@ pub async fn sys_mkdirat(dirfd: usize, pathname: usize, mode: u32) -> SyscallRes
     let path = UserReadPtr::<u8>::new(pathname, &mut addr_space).read_c_string(256)?;
     let path = path.into_string().map_err(|_| SysError::EINVAL)?;
 
-    let dentry = task.resolve_path(AtFd::from(dirfd), path, OpenFlags::empty())?;
+    let dentry = task.walk_at(AtFd::from(dirfd), path)?;
     if !dentry.is_negative() {
         return Err(SysError::EEXIST);
     }
@@ -166,7 +182,7 @@ pub async fn sys_chdir(path: usize) -> SyscallResult {
     let path = UserReadPtr::<u8>::new(path, &mut addr_space).read_c_string(256)?;
     let path = path.into_string().map_err(|_| SysError::EINVAL)?;
     log::debug!("[sys_chdir] path: {path}");
-    let dentry = task.resolve_path(AtFd::FdCwd, path, OpenFlags::empty())?;
+    let dentry = task.walk_at(AtFd::FdCwd, path)?;
     if !dentry.inode().ok_or(SysError::ENOENT)?.inotype().is_dir() {
         return Err(SysError::ENOTDIR);
     }
@@ -175,20 +191,27 @@ pub async fn sys_chdir(path: usize) -> SyscallResult {
 }
 
 pub async fn sys_unlinkat(dirfd: usize, pathname: usize, flags: i32) -> SyscallResult {
-    log::trace!("[sys_unlinkat] start");
     let task = current_task();
-    let mut addr_space = task.addr_space_mut().lock().await;
-    let path = UserReadPtr::<u8>::new(pathname, &mut addr_space).read_c_string(30)?;
-    let path = path.into_string().map_err(|_| SysError::EINVAL)?;
+    let flags = AtFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
 
+    let path = {
+        let mut addr_space_lock = task.addr_space_mut().lock().await;
+        let mut data_ptr = UserReadPtr::<u8>::new(pathname, &mut addr_space_lock);
+        let cstring = data_ptr.read_c_string(256)?;
+        cstring.into_string().map_err(|_| SysError::EINVAL)?
+    };
     log::debug!("[sys_unlinkat] path: {path}");
-    let dentry = task.resolve_path(AtFd::from(dirfd), path, OpenFlags::empty())?;
+
+    let dentry = task.walk_at(AtFd::from(dirfd), path)?;
     let parent = dentry.parent().expect("can not remove root directory");
     let is_dir = dentry.inode().ok_or(SysError::ENOENT)?.inotype().is_dir();
 
-    if flags == AT_REMOVEDIR && !is_dir {
-        return Err(SysError::ENOTDIR);
-    } else if flags != AT_REMOVEDIR && is_dir {
+    if flags.contains(AtFlags::AT_REMOVEDIR) {
+        if !is_dir {
+            return Err(SysError::ENOTDIR);
+        }
+        todo!("remove directory");
+    } else if is_dir {
         return Err(SysError::EISDIR);
     }
 
@@ -283,7 +306,7 @@ pub async fn sys_mount(
             };
             let (parent, name) = split_parent_and_name(&target);
             log::debug!("[sys_mount] start mount [{}], [{}]", parent, name.unwrap());
-            let parent = task.resolve_path(AtFd::FdCwd, parent.to_string(), OpenFlags::empty())?;
+            let parent = task.walk_at(AtFd::FdCwd, parent.to_string())?;
             log::debug!("[sys_mount] parent dentry is {}", parent.path());
             fs_type.mount(name.unwrap(), Some(parent), flags, dev)?
         }
@@ -297,7 +320,7 @@ pub async fn sys_mount(
             };
             let (parent, name) = split_parent_and_name(&target);
             log::debug!("[sys_mount] start mount [{}], [{}]", parent, name.unwrap());
-            let parent = task.resolve_path(AtFd::FdCwd, parent.to_string(), OpenFlags::empty())?;
+            let parent = task.walk_at(AtFd::FdCwd, parent.to_string())?;
             log::debug!("[sys_mount] parent dentry is {}", parent.path());
             fs_type.mount(name.unwrap(), Some(parent), flags, dev)?
         }
@@ -325,30 +348,33 @@ pub async fn sys_umount2(target: usize, flags: u32) -> SyscallResult {
 /// - `dirfd`: Directory file descriptor (use `AT_FDCWD` for current working directory)
 /// - `pathname`: Path string (relative to `dirfd` if not absolute)
 /// - `mode`: Permission mask
-/// - `flags`: Behavior flags (0 or `AT_SYMLINK_NOFOLLOW`)
-pub async fn sys_faccessat(
-    dirfd: usize,
-    pathname: usize,
-    _mode: usize,
-    flags: i32,
-) -> SyscallResult {
-    const AT_SYMLINK_NOFOLLOW: usize = 0x100;
-    const AT_EACCESS: usize = 0x200;
-    const AT_EMPTY_PATH: usize = 0x1000;
+/// - `flags`: Behavior flags
+pub async fn sys_faccessat(dirfd: usize, pathname: usize, mode: i32, flags: i32) -> SyscallResult {
     let task = current_task();
+    let _mode = AccessFlags::from_bits(mode).ok_or(SysError::EINVAL)?;
+    let flags = AtFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
 
     let path = {
         let mut addr_space_lock = task.addr_space_mut().lock().await;
-        UserReadPtr::<u8>::new(pathname, &mut addr_space_lock).read_c_string(256)
-    }?;
-
-    let path = path.into_string().map_err(|_| SysError::EINVAL)?;
-    let dentry = if flags == AT_SYMLINK_NOFOLLOW as i32 {
-        task.resolve_path(AtFd::from(dirfd), path, OpenFlags::O_NOFOLLOW)?
-    } else {
-        task.resolve_path(AtFd::from(dirfd), path, OpenFlags::empty())?
+        let mut user_ptr = UserReadPtr::<u8>::new(pathname, &mut addr_space_lock);
+        let cstring = user_ptr.read_c_string(256)?;
+        cstring.into_string().map_err(|_| SysError::EINVAL)?
     };
-    dentry.base_open()?;
+
+    let mut dentry = task.walk_at(AtFd::from(dirfd), path)?;
+    if dentry.is_negative() {
+        return Err(SysError::ENOENT);
+    }
+    if dentry.inode().unwrap().inotype().is_symlink()
+        && !flags.contains(AtFlags::AT_SYMLINK_NOFOLLOW)
+    {
+        dentry = Path::resolve_symlink_through(dentry)?;
+        if dentry.is_negative() {
+            return Err(SysError::ENOENT);
+        }
+    }
+
+    // File permissions are not implemented yet, so any access to an existing file is allowed.
     Ok(0)
 }
 

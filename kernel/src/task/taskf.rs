@@ -1,3 +1,28 @@
+use alloc::collections::btree_map::BTreeMap;
+use alloc::string::String;
+use alloc::string::ToString;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
+use core::cell::SyncUnsafeCell;
+use core::sync::atomic::AtomicUsize;
+use core::time::Duration;
+
+use riscv::asm::sfence_vma_all;
+
+use arch::riscv64::time::get_time_duration;
+use config::process::CloneFlags;
+use config::vfs::AtFd;
+use mutex::SpinNoIrqLock;
+use mutex::new_share_mutex;
+use mutex::optimistic_mutex::new_optimistic_mutex;
+use osfs::sys_root_dentry;
+use systype::SysResult;
+use time::TaskTimeStat;
+use timer::{TIMER_MANAGER, Timer};
+use vfs::dentry::Dentry;
+use vfs::file::File;
+use vfs::path::Path;
+
 use super::future::{self};
 use super::manager::TASK_MANAGER;
 use super::process_manager::PROCESS_GROUP_MANAGER;
@@ -6,35 +31,7 @@ use super::task::*;
 use super::threadgroup::ThreadGroup;
 use super::tid::TidAddress;
 use super::tid::tid_alloc;
-
 use crate::vm::addr_space::{AddrSpace, switch_to};
-use alloc::collections::btree_map::BTreeMap;
-use alloc::string::String;
-use alloc::string::ToString;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-
-use arch::riscv64::time::get_time_duration;
-use config::inode::InodeType;
-use config::process::CloneFlags;
-use config::vfs::AtFd;
-use config::vfs::OpenFlags;
-
-use core::cell::SyncUnsafeCell;
-use core::sync::atomic::AtomicUsize;
-use core::time::Duration;
-use mutex::SpinNoIrqLock;
-use mutex::new_share_mutex;
-use mutex::optimistic_mutex::new_optimistic_mutex;
-
-use osfs::sys_root_dentry;
-use riscv::asm::sfence_vma_all;
-use systype::SysResult;
-use time::TaskTimeStat;
-use timer::{TIMER_MANAGER, Timer};
-use vfs::dentry::Dentry;
-use vfs::file::File;
-use vfs::path::Path;
 
 impl Task {
     /// Switches Task to User
@@ -141,11 +138,6 @@ impl Task {
 
         let pgid;
 
-        let sig_mask;
-        let sig_handlers;
-        let sig_manager;
-        let sig_stack;
-        let sig_cx_ptr;
         let cwd = new_share_mutex(self.cwd_mut());
 
         let elf = SyncUnsafeCell::new((*self.elf_mut()).clone());
@@ -168,11 +160,11 @@ impl Task {
             pgid = new_share_mutex(self.get_pgid());
         }
 
-        sig_mask = SyncUnsafeCell::new(self.get_sig_mask());
-        sig_handlers = (*self.sig_handlers_mut()).clone();
-        sig_manager = SyncUnsafeCell::new(SigManager::new());
-        sig_stack = SyncUnsafeCell::new(self.sig_stack_mut().clone());
-        sig_cx_ptr = AtomicUsize::new(0);
+        let sig_mask = SyncUnsafeCell::new(self.get_sig_mask());
+        let sig_handlers = (*self.sig_handlers_mut()).clone();
+        let sig_manager = SyncUnsafeCell::new(SigManager::new());
+        let sig_stack = SyncUnsafeCell::new(*self.sig_stack_mut());
+        let sig_cx_ptr = AtomicUsize::new(0);
 
         let addr_space;
         if cloneflags.contains(CloneFlags::VM) {
@@ -235,31 +227,44 @@ impl Task {
         waker.as_ref().unwrap().wake_by_ref();
     }
 
-    pub fn resolve_path(
-        &self,
-        dirfd: AtFd,
-        pathname: String,
-        flags: OpenFlags,
-    ) -> SysResult<Arc<dyn Dentry>> {
-        let dentry = if pathname.starts_with("/") {
-            Path::new(sys_root_dentry(), pathname).walk()?
+    /// Performs path resolution for a given path relative to a directory file
+    /// descriptor of the current process.
+    ///
+    /// This function performs path resolution as `*at` syscalls do. It takes a file
+    /// descriptor as the base directory and a path string, and returns the dentry
+    /// corresponding to the path.
+    ///
+    /// This function returns the target dentry itself, even if the path is a
+    /// symbolic link. The caller is responsible for resolving the symbolic link
+    /// if it needs to do so.
+    ///
+    /// This function returns an invalid dentry if the target file does not exist.
+    /// The caller should check the dentry's validity if it requires the target file
+    /// to exist.
+    ///
+    /// If the path is absolute (starts with `/`), it is resolved from the root
+    /// directory. If the path is relative, it is resolved from the directory
+    /// specified by the file descriptor. In the latter case, the parameter `dirfd`
+    /// specifies which directory to use as the base. If `dirfd` is `FdCwd`,
+    /// the current working directory is used. If `dirfd` is `Normal(fd)`, the file
+    /// associated with the file descriptor `fd` is used as the base directory.
+    ///
+    /// # Errors
+    /// Returns an `EBADF` error if `dirfd` is invalid.
+    ///
+    /// See [`Path::walk`] for more details on what errors may be returned.
+    pub fn walk_at(&self, dirfd: AtFd, path: String) -> SysResult<Arc<dyn Dentry>> {
+        let base_dir = if path.starts_with("/") {
+            sys_root_dentry()
         } else {
             match dirfd {
-                AtFd::FdCwd => Path::new(self.cwd_mut(), pathname).walk()?,
+                AtFd::FdCwd => self.cwd_mut(),
                 AtFd::Normal(fd) => {
-                    let file = self.with_mut_fdtable(|table| table.get_file(fd))?;
-                    Path::new(file.dentry(), pathname).walk()?
+                    self.with_mut_fdtable(|table| table.get_file(fd))?.dentry()
                 }
             }
         };
-
-        if flags.contains(OpenFlags::O_NOFOLLOW) || dentry.is_negative() {
-            Ok(dentry)
-        } else if dentry.inode().unwrap().inotype() == InodeType::SymLink {
-            Path::resolve_symlink_through(dentry)
-        } else {
-            Ok(dentry)
-        }
+        Path::new(base_dir, path).walk()
     }
 
     pub fn exit(&self) {

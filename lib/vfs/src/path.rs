@@ -39,6 +39,10 @@ impl Path {
     /// resolved as an absolute path. Otherwise, it is resolved as a relative path
     /// from the `start` dentry.
     ///
+    /// See [`Self::walk`] for more details on how the path is resolved and what errors
+    /// may be returned. Note that `start` may be a negative dentry or not a directory,
+    /// in which case corresponding errors will be returned when calling [`Self::walk`].
+    ///
     /// This function does not check the validity of the path. If there are illegal
     /// characters in `path`, or if `path` is empty, the behavior is undefined. The
     /// caller must ensure that `path` is a valid path string.
@@ -52,8 +56,9 @@ impl Path {
     ///
     /// Returns a valid dentry if the target file exists.
     /// Returns an invalid dentry if the target file does not exist but its parent
-    /// directory does. Returns an
-    /// `ENOENT` error if any directory in the middle of the path does not exist.
+    /// directory does.
+    /// Returns an `ENOENT` error if any directory in the middle of the path does not
+    /// exist.
     /// Returns an `ENOTDIR` error if any directory in the middle of the path is not a
     /// directory.
     /// Returns an `ELOOP` error if it encounters too many symlinks.

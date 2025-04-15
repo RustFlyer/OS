@@ -122,10 +122,10 @@ pub fn mmap(
     )
 }
 
-pub fn open(dirfd: usize, pathname: &str, flags: OpenFlags, mode: InodeMode) -> isize {
+pub fn open(dirfd: i32, pathname: &str, flags: OpenFlags, mode: InodeMode) -> isize {
     let pathname = CString::new(pathname).unwrap();
     sys_openat(
-        dirfd,
+        dirfd as usize,
         pathname.as_ptr(),
         flags.bits() as usize,
         mode.bits() as usize,
