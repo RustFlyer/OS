@@ -61,7 +61,7 @@ pub struct Task {
     addr_space: OptimisticLock<AddrSpace>,
 
     parent: ShareMutex<Option<Weak<Task>>>,
-    children: ShareMutex<BTreeMap<Tid, Weak<Task>>>,
+    children: ShareMutex<BTreeMap<Tid, Arc<Task>>>,
 
     pgid: ShareMutex<PGid>,
     exit_code: SpinNoIrqLock<i32>,
@@ -134,7 +134,7 @@ impl Task {
         addr_space: OptimisticLock<AddrSpace>,
 
         parent: ShareMutex<Option<Weak<Task>>>,
-        children: ShareMutex<BTreeMap<Tid, Weak<Task>>>,
+        children: ShareMutex<BTreeMap<Tid, Arc<Task>>>,
 
         pgid: ShareMutex<PGid>,
         exit_code: SpinNoIrqLock<i32>,
@@ -260,7 +260,7 @@ impl Task {
         &self.parent
     }
 
-    pub fn children_mut(&self) -> &ShareMutex<BTreeMap<Tid, Weak<Task>>> {
+    pub fn children_mut(&self) -> &ShareMutex<BTreeMap<Tid, Arc<Task>>> {
         &self.children
     }
 
@@ -368,9 +368,7 @@ impl Task {
     }
     // ========== This Part You Can Change the Member of Task  ===========
     pub fn add_child(&self, child: Arc<Task>) {
-        self.children
-            .lock()
-            .insert(child.tid(), Arc::downgrade(&child));
+        self.children.lock().insert(child.tid(), child);
     }
 
     pub fn remove_child(&self, child: Arc<Task>) {

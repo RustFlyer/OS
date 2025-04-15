@@ -4,6 +4,7 @@ extern crate alloc;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::sync::Weak;
+use driver::println;
 use mutex::SpinNoIrqLock;
 
 use crate::task::tid::Tid;
@@ -24,10 +25,12 @@ impl TaskManager {
     }
 
     pub fn add_task(&self, task: &Arc<Task>) {
+        println!("[add_task] {}", task.tid());
         self.0.lock().insert(task.tid(), Arc::downgrade(task));
     }
 
     pub fn remove_task(&self, tid: Tid) {
+        println!("[remove_task] {tid}");
         self.0.lock().remove(&tid);
     }
 

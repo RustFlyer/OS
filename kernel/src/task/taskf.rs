@@ -290,11 +290,12 @@ impl Task {
         }
 
         if self.is_process() {
-            log::error!("{}", guard.len());
+            // log::error!("{}", guard.len());
             assert!(guard.len() == 1);
         } else {
             assert!(guard.len() == 2);
             // NOTE: leader will be removed by parent calling `sys_wait4`
+            log::error!("[exit] remove1 {}", self.tid());
             guard.remove(self);
             TASK_MANAGER.remove_task(self.tid());
         }
@@ -308,8 +309,7 @@ impl Task {
         let mut children = self.children_mut().lock().clone();
         if !children.is_empty() {
             let root = TASK_MANAGER.get_task(INIT_PROC_ID).unwrap();
-            for c in children.values() {
-                let child = c.upgrade().unwrap();
+            for child in children.values() {
                 log::debug!(
                     "[Task::do_eixt] reparent child process pid {} to init",
                     child.pid()

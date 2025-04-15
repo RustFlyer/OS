@@ -71,7 +71,7 @@ impl Hart {
         new_task: &mut Arc<Task>,
         pps: &mut ProcessorPrivilegeState,
     ) {
-        log::trace!("[user_switch_in] switch to [{}]", new_task.get_name());
+        // log::trace!("[user_switch_in] switch to [{}]", new_task.get_name());
         disable_interrupt();
         core::mem::swap(self.get_mut_pps(), pps);
         pps.auto_sum();
