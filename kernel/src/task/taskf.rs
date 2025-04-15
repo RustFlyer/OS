@@ -106,7 +106,7 @@ impl Task {
             elf_file,
             name.to_string(),
         ));
-
+        task.with_thread_group(|tg| tg.push(task.clone()));
         PROCESS_GROUP_MANAGER.add_group(&task);
         TASK_MANAGER.add_task(&task);
         future::spawn_user_task(task);
@@ -219,6 +219,8 @@ impl Task {
             name,
         ));
 
+        new.with_thread_group(|tg| tg.push(new.clone()));
+
         if !cloneflags.contains(CloneFlags::THREAD) {
             self.add_child(new.clone());
         }
@@ -288,6 +290,7 @@ impl Task {
         }
 
         if self.is_process() {
+            log::error!("{}", guard.len());
             assert!(guard.len() == 1);
         } else {
             assert!(guard.len() == 2);
@@ -304,7 +307,7 @@ impl Task {
         //Question: Is mut safe here?
         let mut children = self.children_mut().lock().clone();
         if children.is_empty() {
-            return;
+            // return;
         }
         let root = TASK_MANAGER.get_task(INIT_PROC_ID).unwrap();
         for c in children.values() {
@@ -316,13 +319,11 @@ impl Task {
             if child.get_state() == TaskState::Zombie {
                 // NOTE: self has not called wait to clear zombie children, we need to notify
                 // init to clear these zombie children.
-                root.receive_siginfo(
-                    SigInfo {
-                        sig: Sig::SIGCHLD,
-                        code: SigInfo::CLD_EXITED,
-                        details: SigDetails::None,
-                    }
-                )
+                root.receive_siginfo(SigInfo {
+                    sig: Sig::SIGCHLD,
+                    code: SigInfo::CLD_EXITED,
+                    details: SigDetails::None,
+                })
             }
             // Question: Why Deref doesn't work here
             *child.parent_mut().lock() = Some(Arc::downgrade(&root));
@@ -332,13 +333,11 @@ impl Task {
 
         if let Some(parent) = self.parent_mut().lock().as_ref() {
             if let Some(parent) = parent.upgrade() {
-                parent.receive_siginfo(
-                    SigInfo {
-                        sig: Sig::SIGCHLD,
-                        code: SigInfo::CLD_EXITED,
-                        details: SigDetails::None,
-                    },
-                )
+                parent.receive_siginfo(SigInfo {
+                    sig: Sig::SIGCHLD,
+                    code: SigInfo::CLD_EXITED,
+                    details: SigDetails::None,
+                })
             } else {
                 log::error!("no arc parent");
             }

@@ -43,6 +43,7 @@ impl Task {
         let manager = self.sig_manager_mut();
         manager.should_wake = except | SigSet::SIGKILL | SigSet::SIGSTOP
     }
+
     pub fn notify_parent(self: &Arc<Self>, code: i32, _signum: Sig) {
         let parent = self.parent_mut().lock().as_ref().and_then(|p| p.upgrade());
         let Some(parent) = parent else {

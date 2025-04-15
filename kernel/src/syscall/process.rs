@@ -1,17 +1,13 @@
 use crate::task::TaskState;
 use crate::task::future::{suspend_now, yield_now};
 use crate::task::signal::sig_info::SigSet;
+use crate::task::{
+    manager::TASK_MANAGER,
+    process_manager::PROCESS_GROUP_MANAGER,
+    tid::{PGid, Pid},
+};
 use crate::vm::user_ptr::{UserReadPtr, UserWritePtr};
 use crate::{processor::current_task, task::future::spawn_user_task};
-use crate::{
-    syscall::signal::sys_kill,
-    task::{
-        manager::TASK_MANAGER,
-        process_manager::PROCESS_GROUP_MANAGER,
-        signal::sig_info::Sig,
-        tid::{PGid, Pid},
-    },
-};
 use alloc::vec::Vec;
 use bitflags::*;
 use config::process::CloneFlags;
@@ -43,13 +39,10 @@ pub fn sys_getppid() -> SyscallResult {
 /// _exit() system call terminates only the calling thread, and actions such as
 /// reparenting child processes or sending SIGCHLD to the parent process are
 /// performed only if this is the last thread in the thread group.
-pub fn sys_exit(exit_code: i32) -> SyscallResult {
+pub fn sys_exit(_exit_code: i32) -> SyscallResult {
     let task = current_task();
-        task.set_state(TaskState::Zombie);
-        if task.is_process() {
-            task.set_exit_code((exit_code & 0xFF) << 8);
-        }
-        Ok(0)
+    task.set_state(TaskState::Zombie);
+    Ok(0)
 }
 
 pub async fn sys_sched_yield() -> SyscallResult {
@@ -60,9 +53,7 @@ pub async fn sys_sched_yield() -> SyscallResult {
 pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult {
     log::error!("[sys_wait4] in");
     let task = current_task();
-
     let option = WaitOptions::from_bits_truncate(options);
-
     let target = match pid {
         -1 => WaitFor::AnyChild,
         0 => WaitFor::AnyChildInGroup,
@@ -152,6 +143,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
                                 && t.with_thread_group(|tg| tg.len() == 1)
                         })
                     }),
+
                     WaitFor::Pid(pid) => {
                         let child = children.get(&pid).unwrap();
                         if child.upgrade().map_or(false, |t| {
@@ -163,7 +155,9 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
                             None
                         }
                     }
+
                     WaitFor::PGid(_) => unimplemented!(),
+
                     WaitFor::AnyChildInGroup => unimplemented!(),
                 };
                 log::info!("siginfo get child: {child:?}");
@@ -197,6 +191,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
                 status.write(exit_code)?;
             }
         }
+
         log::info!("write success");
         let child = TASK_MANAGER.get_task(child_pid).unwrap();
         task.remove_child(child);
