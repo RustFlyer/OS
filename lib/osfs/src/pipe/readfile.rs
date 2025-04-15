@@ -22,10 +22,10 @@ impl File for PipeReadFile {
             .inode()
             .downcast_arc::<PipeInode>()
             .unwrap_or_else(|_| unreachable!());
-        log::info!(
-            "[PipeReadFile::base_read_at] read pipe ino {}",
-            pipe.get_meta().ino
-        );
+        // log::info!(
+        //     "[PipeReadFile::base_read_at] read pipe ino {}",
+        //     pipe.get_meta().ino
+        // );
         let events = PollEvents::IN;
         let revents = PipeReadPollFuture::new(pipe.clone(), events).await;
         if revents.contains(PollEvents::HUP) {

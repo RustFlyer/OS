@@ -1,5 +1,6 @@
 use alloc::{ffi::CString, string::ToString};
 
+use simdebug::stop;
 use strum::FromRepr;
 
 use config::{
@@ -381,5 +382,6 @@ pub async fn sys_pipe2(pipefd: usize, flags: i32) -> SyscallResult {
     unsafe {
         pipefd.write_array(&pipe)?;
     }
+    stop();
     Ok(0)
 }

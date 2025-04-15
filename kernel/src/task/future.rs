@@ -1,5 +1,5 @@
 use alloc::sync::Arc;
-use osfuture::block_on;
+use osfuture::{block_on, block_on_with_result};
 
 use core::future::Future;
 use core::pin::Pin;
@@ -40,8 +40,17 @@ impl<F: Future + Send + 'static> Future for UserFuture<F> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let future = unsafe { Pin::get_unchecked_mut(self) };
         let hart = current_hart();
-        block_on(async { hart.user_switch_in(&mut future.task, &mut future.pps).await });
-        let ret = unsafe { Pin::new_unchecked(&mut future.future).poll(cx) };
+        let r = block_on_with_result(async {
+            hart.user_switch_in(&mut future.task, &mut future.pps).await
+        });
+
+        let ret = if r.is_ok() {
+            unsafe { Pin::new_unchecked(&mut future.future).poll(cx) }
+        } else {
+            cx.waker().wake_by_ref();
+            Poll::Pending
+        };
+
         hart.user_switch_out(&mut future.pps);
         ret
     }

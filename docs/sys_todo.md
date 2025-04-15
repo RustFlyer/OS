@@ -20,7 +20,7 @@
 
 - [x] mmap   
 - [x] munmap  
-- [?] brk  
+- [x] brk  
 
 - [x] chdir
 - [x] mkdir_ 
@@ -30,11 +30,11 @@
 
 - [x] mount 
 - [x] umount
-- [ ] pipe  
+- [x] pipe  
 
-- [ ] clone  
-- [ ] exit      - wait
-- [ ] waitpid
-- [ ] wait
+- [x] clone  
+- [x] exit      - wait
+- [x] waitpid
+- [x] wait
 
 # src-code link: https://github.com/oscomp/testsuits-for-oskernel/tree/pre-2025/basic/user/src/oscomp

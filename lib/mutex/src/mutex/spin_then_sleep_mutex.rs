@@ -111,7 +111,6 @@ impl<'a, T: ?Sized, S: MutexSupport> Future for SleepMutexCasFuture<'a, T, S> {
     type Output = SleepMutexCasGuard<'a, T, S>;
     #[inline(always)]
     fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
-        stop();
         let granted = unsafe { &*self.grant.inner.get() }
             .0
             .load(Ordering::Acquire);

@@ -124,3 +124,26 @@ pub fn block_on<T>(fut: impl Future<Output = T>) -> T {
         }
     }
 }
+
+pub fn block_on_with_result<T>(fut: impl Future<Output = T>) -> Result<T, ()> {
+    // Pin the future so it can be polled.
+    let mut fut = Box::pin(fut);
+    let mut cnt = 0;
+
+    let waker = Arc::new(BlockWaker).into();
+    let mut cx = Context::from_waker(&waker);
+
+    // Run the future to completion.
+    loop {
+        match fut.as_mut().poll(&mut cx) {
+            Poll::Ready(res) => return Ok(res),
+            Poll::Pending => {
+                cnt = cnt + 1;
+                if cnt > 10000 {
+                    return Err(());
+                }
+                continue;
+            }
+        }
+    }
+}
