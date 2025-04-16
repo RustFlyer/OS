@@ -142,8 +142,8 @@ pub async fn sys_sigreturn() -> SyscallResult {
     let trap_cx = task.trap_context_mut();
     let mask = task.sig_mask_mut();
     let sig_cx_ptr = task.get_sig_cx_ptr();
-    let mut addr_space = task.addr_space_mut().lock().await;
-    let mut sig_cx_ptr = UserReadPtr::<SigContext>::new(sig_cx_ptr, &mut *addr_space);
+    let addr_space = task.addr_space();
+    let mut sig_cx_ptr = UserReadPtr::<SigContext>::new(sig_cx_ptr, &addr_space);
     log::trace!("[sys_rt_sigreturn] sig_cx_ptr: {sig_cx_ptr:?}");
     unsafe {
         let sig_cx = sig_cx_ptr.read()?;
