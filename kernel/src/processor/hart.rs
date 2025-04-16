@@ -73,8 +73,8 @@ impl Hart {
     ) {
         // log::trace!("[user_switch_in] switch to [{}]", new_task.get_name());
         disable_interrupt();
-        core::mem::swap(self.get_mut_pps(), pps);
         pps.auto_sum();
+        core::mem::swap(self.get_mut_pps(), pps);
 
         new_task.switch_addr_space();
         new_task.timer_mut().record_switch_in();

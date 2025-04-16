@@ -401,7 +401,7 @@ impl VmArea {
     /// # Errors
     /// Returns [`SysError::EFAULT`] if the access permission is not allowed.
     /// Otherwise, returns [`SysError::ENOMEM`] if a new frame cannot be allocated.
-    pub fn handle_page_fault(&mut self, mut info: PageFaultInfo) -> SysResult<()> {
+    pub fn handle_page_fault(&mut self, info: PageFaultInfo) -> SysResult<()> {
         let &mut VmArea {
             pte_flags, prot, ..
         } = self;
