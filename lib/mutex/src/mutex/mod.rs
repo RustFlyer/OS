@@ -42,6 +42,7 @@ pub trait MutexSupport {
 }
 
 /// Spin MutexSupport
+#[derive(Debug)]
 pub struct Spin;
 
 impl MutexSupport for Spin {

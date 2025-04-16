@@ -8,11 +8,9 @@ use crate::task::{
 };
 use crate::vm::user_ptr::{UserReadPtr, UserWritePtr};
 use crate::{processor::current_task, task::future::spawn_user_task};
-use alloc::string::ToString;
 use alloc::vec::Vec;
 use bitflags::*;
 use config::process::CloneFlags;
-use driver::println;
 use osfs::sys_root_dentry;
 use systype::{SysError, SyscallResult};
 use vfs::file::File;
@@ -101,8 +99,8 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
     };
 
     if let Some(res_task) = res_task {
-        let mut addr_space_lock = task.addr_space_mut().lock().await;
-        let mut status = UserWritePtr::<i32>::new(wstatus, &mut addr_space_lock);
+        let addr_space= task.addr_space();
+        let mut status = UserWritePtr::<i32>::new(wstatus, &addr_space);
         let zombie_task = res_task;
         task.timer_mut().update_child_time((
             zombie_task.timer_mut().user_time(),
@@ -179,8 +177,8 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
             .update_child_time((child_utime, child_stime));
 
         // log::info!("addrspace get and write status");
-        let mut addr_space_lock = task.addr_space_mut().lock().await;
-        let mut status = UserWritePtr::<i32>::new(wstatus, &mut addr_space_lock);
+        let addr_space = task.addr_space();
+        let mut status = UserWritePtr::<i32>::new(wstatus, &addr_space);
         if !status.is_null() {
             // status stores signal in the lowest 8 bits and exit code in higher 8 bits
             // status macros can be found in <bits/waitstatus.h>
@@ -240,8 +238,8 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
     let task = current_task();
 
     let read_string = async |addr| {
-        let mut addr_space_lock = task.addr_space_mut().lock().await;
-        let mut user_ptr = UserReadPtr::<u8>::new(addr, &mut addr_space_lock);
+        let addr_space= task.addr_space();
+        let mut user_ptr = UserReadPtr::<u8>::new(addr, &addr_space);
         user_ptr
             .read_c_string(256)?
             .into_string()
@@ -250,11 +248,11 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
 
     let read_string_array = async |addr| {
         let mut strings = Vec::new();
-        let mut addr_space_lock = task.addr_space_mut().lock().await;
-        let mut user_ptr = UserReadPtr::<usize>::new(addr, &mut addr_space_lock);
+        let addr_space= task.addr_space();
+        let mut user_ptr = UserReadPtr::<usize>::new(addr, &addr_space);
         let pointers = user_ptr.read_ptr_array(256)?;
         for ptr in pointers {
-            let mut user_ptr = UserReadPtr::<u8>::new(ptr, &mut addr_space_lock);
+            let mut user_ptr = UserReadPtr::<u8>::new(ptr, &addr_space);
             let string = user_ptr
                 .read_c_string(256)?
                 .into_string()

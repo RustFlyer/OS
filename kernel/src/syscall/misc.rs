@@ -39,8 +39,8 @@ impl UtsName {
 pub async fn sys_uname(buf: usize) -> SyscallResult {
     info!("uname buf: {buf:#x}");
     let task = current_task();
-    let mut addr_space_lock = task.addr_space_mut().lock().await;
-    let mut ubuf = UserWritePtr::<UtsName>::new(buf, &mut addr_space_lock);
+    let addr_space= task.addr_space();
+    let mut ubuf = UserWritePtr::<UtsName>::new(buf, &addr_space);
     if !ubuf.is_null() {
         unsafe {
             info!("uname write");

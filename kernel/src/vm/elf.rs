@@ -45,7 +45,7 @@ impl AddrSpace {
     /// # Errors
     /// Returns an error if the loading fails. This can happen if the file is not a valid
     /// ELF file.
-    pub fn load_elf(&mut self, elf_file: Arc<dyn File>) -> SysResult<(VirtAddr, Vec<AuxHeader>)> {
+    pub fn load_elf(&self, elf_file: Arc<dyn File>) -> SysResult<(VirtAddr, Vec<AuxHeader>)> {
         let elf_stream: ElfStream<LittleEndian, _> = ElfStream::open_stream(elf_file.as_ref())
             .map_err(|e| match e {
                 ElfParseError::IOError(_) => SysError::EIO,
@@ -134,7 +134,7 @@ impl AddrSpace {
     /// Returns an error if the loading fails. This can happen if the file is not a valid
     /// ELF file.
     fn load_segments(
-        &mut self,
+        &self,
         elf_file: Arc<dyn File>,
         elf_stream: &ElfStream<LittleEndian, &dyn File>,
         base_offset: usize,
@@ -209,7 +209,7 @@ impl AddrSpace {
     /// the stack.
     ///
     /// Current implementation hardcodes the stack size and position in [`config::mm`] module.
-    pub fn map_stack(&mut self) -> SysResult<VirtAddr> {
+    pub fn map_stack(&self) -> SysResult<VirtAddr> {
         let stack = VmArea::new_stack(
             VirtAddr::new(USER_STACK_LOWER),
             VirtAddr::new(USER_STACK_UPPER),
@@ -239,7 +239,7 @@ impl AddrSpace {
     /// command line arguments, the pointer to the array of command line arguments, and
     /// the pointer to the array of environment variables.
     pub fn init_stack(
-        &mut self,
+        &self,
         mut sp: usize,
         args: Vec<String>,
         envs: Vec<String>,
@@ -319,7 +319,7 @@ impl AddrSpace {
     }
 
     /// Maps a heap into the address space.
-    pub fn map_heap(&mut self) -> SysResult<()> {
+    pub fn map_heap(&self) -> SysResult<()> {
         let length = 1 << 20; // 1 MiB
         let start = self
             .find_vacant_memory(

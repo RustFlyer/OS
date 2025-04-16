@@ -7,15 +7,12 @@ use core::cell::SyncUnsafeCell;
 use core::sync::atomic::AtomicUsize;
 use core::time::Duration;
 
-use riscv::asm::sfence_vma_all;
-
 use arch::riscv64::time::get_time_duration;
 use config::process::CloneFlags;
 use config::process::INIT_PROC_ID;
 use config::vfs::AtFd;
 use mutex::SpinNoIrqLock;
 use mutex::new_share_mutex;
-use mutex::optimistic_mutex::new_optimistic_mutex;
 use osfs::sys_root_dentry;
 use systype::SysResult;
 use time::TaskTimeStat;
@@ -69,15 +66,19 @@ impl Task {
         envs: Vec<String>,
         name: String,
     ) -> SysResult<()> {
-        let mut addrspace = AddrSpace::build_user()?;
+        let addrspace = AddrSpace::build_user()?;
         let (entry_point, auxv) = addrspace.load_elf(elf_file.clone())?;
         let stack_top = addrspace.map_stack()?;
         addrspace.map_heap()?;
 
-        self.set_addrspace(addrspace).await;
-        self.switch_addr_space().await;
+        // SAFETY: We should destroy other threads of this process before,
+        // but multi-threading is not supported now, so this is safe.
+        unsafe {
+            self.set_addrspace(addrspace);
+        }
+        self.switch_addr_space();
 
-        let mut addrspace = self.addr_space_mut().lock().await;
+        let addrspace = self.addr_space();
         let (sp, argc, argv, envp) =
             addrspace.init_stack(stack_top.to_usize(), args, envs, auxv)?;
 
@@ -93,7 +94,7 @@ impl Task {
 
     /// Spawns from Elf
     pub fn spawn_from_elf(elf_file: Arc<dyn File>, name: &str) {
-        let mut addrspace = AddrSpace::build_user().unwrap();
+        let addrspace = AddrSpace::build_user().unwrap();
         let (entry_point, _) = addrspace.load_elf(elf_file.clone()).unwrap();
         log::debug!("[spawn_from_elf] entry: {:#x}", entry_point.to_usize());
         let stack = addrspace.map_stack().unwrap();
@@ -116,9 +117,9 @@ impl Task {
     /// # Safety
     /// This function must be called before the current page table is dropped, or the kernel
     /// may lose its memory mappings.
-    pub async fn switch_addr_space(&self) {
+    pub fn switch_addr_space(&self) {
         unsafe {
-            let addrspace = self.addr_space_mut().lock().await;
+            let addrspace = self.addr_space();
             switch_to(&addrspace);
         }
     }
@@ -169,15 +170,13 @@ impl Task {
         let sig_stack = SyncUnsafeCell::new(*self.sig_stack_mut());
         let sig_cx_ptr = AtomicUsize::new(0);
 
-        let addr_space;
-        if cloneflags.contains(CloneFlags::VM) {
-            addr_space = (*self.addr_space_mut()).clone();
+        let addr_space = if cloneflags.contains(CloneFlags::VM) {
             name += "(thread)";
+            self.addr_space()
         } else {
-            let cow_address_space = self.addr_space_mut().lock().await.clone_cow().unwrap();
-            addr_space = new_optimistic_mutex(cow_address_space);
-            sfence_vma_all();
-        }
+            let cow_address_space = self.addr_space().clone_cow().unwrap();
+            Arc::new(cow_address_space)
+        };
 
         let fd_table = if cloneflags.contains(CloneFlags::FILES) {
             self.fdtable_mut().clone()
@@ -196,7 +195,7 @@ impl Task {
             SyncUnsafeCell::new(TaskTimeStat::new()),
             SyncUnsafeCell::new(None),
             state,
-            addr_space,
+            SyncUnsafeCell::new(addr_space),
             parent,
             children,
             pgid,

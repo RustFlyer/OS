@@ -78,7 +78,7 @@ impl AddrSpace {
     /// # Attention
     /// - If `va` is 0, the system automatically finds a suitable virtual address range
     pub fn map_file(
-        &mut self,
+        &self,
         file: Option<Arc<dyn File>>,
         flags: MmapFlags,
         prot: MmapProt,
