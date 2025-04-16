@@ -71,7 +71,9 @@ impl Task {
         name: String,
     ) -> SysResult<()> {
         let mut addrspace = AddrSpace::build_user()?;
+        log::debug!("[execve] load elf: front");
         let (entry_point, auxv) = addrspace.load_elf(elf_file.clone())?;
+        log::debug!("[execve] load elf: over");
         let stack_top = addrspace.map_stack()?;
         addrspace.map_heap()?;
 

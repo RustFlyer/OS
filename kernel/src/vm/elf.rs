@@ -46,11 +46,13 @@ impl AddrSpace {
     /// Returns an error if the loading fails. This can happen if the file is not a valid
     /// ELF file.
     pub fn load_elf(&mut self, elf_file: Arc<dyn File>) -> SysResult<(VirtAddr, Vec<AuxHeader>)> {
+        log::error!("pass");
         let elf_stream: ElfStream<LittleEndian, _> = ElfStream::open_stream(elf_file.as_ref())
             .map_err(|e| match e {
                 ElfParseError::IOError(_) => SysError::EIO,
                 _ => SysError::ENOEXEC,
             })?;
+        log::error!("pass");
 
         let mut auxv = aux::construct_init_auxv();
         auxv.push(AuxHeader::new(
@@ -58,6 +60,7 @@ impl AddrSpace {
             elf_stream.ehdr.e_phentsize as usize,
         ));
         auxv.push(AuxHeader::new(AT_PHNUM, elf_stream.ehdr.e_phnum as usize));
+        log::error!("pass1");
 
         let first_segment_addr = elf_stream
             .segments()
@@ -70,10 +73,12 @@ impl AddrSpace {
             AT_PHDR,
             first_segment_addr + elf_stream.ehdr.e_phoff as usize,
         ));
+        log::error!("pass2");
 
         // Load loadable segments (PT_LOAD).
         let mut entry = self.load_segments(Arc::clone(&elf_file), &elf_stream, 0)?;
         auxv.push(AuxHeader::new(AT_ENTRY, entry.to_usize()));
+        log::error!("pass3");
 
         // Load the dynamic linker if needed.
         let interp = {
