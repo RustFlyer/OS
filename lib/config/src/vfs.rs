@@ -3,67 +3,106 @@ use core::fmt::Display;
 use bitflags::bitflags;
 
 bitflags::bitflags! {
-    // Defined in <bits/fcntl-linux.h>.
-    // File access mode (O_RDONLY, O_WRONLY, O_RDWR).
-    // The file creation flags are O_CLOEXEC, O_CREAT, O_DIRECTORY, O_EXCL,
-    // O_NOCTTY, O_NOFOLLOW, O_TMPFILE, and O_TRUNC.
+    /// This is a bitmask of flags that can be passed to the `open` syscall as parameter
+    /// `flags`. It modifies the behavior when accessing and creating the file it opens.
+    ///
+    /// There are 3 types of flags:
+    ///
+    /// - File access modes are O_RDONLY, O_WRONLY, and O_RDWR.
+    /// - File creation flags are O_CLOEXEC, O_CREAT, O_DIRECTORY, O_EXCL, O_NOCTTY,
+    ///   O_NOFOLLOW, O_TMPFILE, and O_TRUNC.
+    /// - Other flags are file status flags.
+    ///
+    /// Constants `ACCESS_MODE`, `CREATION_FLAGS`, and `STATUS_FLAGS` are bitmasks
+    /// of the corresponding flags.
+    ///
+    /// Defined in <bits/fcntl-linux.h>. See `man 2 open` for more information.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct OpenFlags: i32 {
-        // reserve 3 bits for the access mode
-        // NOTE: bitflags do not encourage zero bit flag, we should not directly check `O_RDONLY`
+        /* File access modes. */
+
+        // Note: `bitflags` crate do not encourage zero bit flag, we should not directly
+        // check `O_RDONLY`. Call `readable()` instead.
         const O_RDONLY      = 0;
         const O_WRONLY      = 1;
         const O_RDWR        = 2;
-        const O_ACCMODE     = 3;
-        /// If pathname does not exist, create it as a regular file.
+
+        /* File creation flags. */
         const O_CREAT       = 0o100;
         const O_EXCL        = 0o200;
         const O_NOCTTY      = 0o400;
         const O_TRUNC       = 0o1000;
-        const O_APPEND      = 0o2000;
-        const O_NONBLOCK    = 0o4000;
-        const O_DSYNC       = 0o10000;
-        const O_SYNC        = 0o4010000;
-        const O_RSYNC       = 0o4010000;
         const O_DIRECTORY   = 0o200000;
         const O_NOFOLLOW    = 0o400000;
         const O_CLOEXEC     = 0o2000000;
+        const O_TMPFILE     = 0o20200000;
 
+        /* File status flags. */
+        const O_APPEND      = 0o2000;
+        const O_NONBLOCK    = 0o4000;
+        const O_DSYNC       = 0o10000;
         const O_ASYNC       = 0o20000;
         const O_DIRECT      = 0o40000;
         const O_LARGEFILE   = 0o100000;
         const O_NOATIME     = 0o1000000;
+        const O_SYNC        = 0o4010000;
+        const O_RSYNC       = 0o4010000;
         const O_PATH        = 0o10000000;
-        const O_TMPFILE     = 0o20200000;
     }
 }
 
 impl OpenFlags {
-    pub const CREATION_FLAGS: Self = Self::O_CLOEXEC
-        .union(Self::O_CREAT)
-        .union(Self::O_DIRECTORY)
+    /// Bitmask of access modes.
+    pub const ACCESS_MODE: Self =
+        Self::O_RDONLY.union(Self::O_WRONLY).union(Self::O_RDWR);
+
+    /// Bitmask of file creation flags.
+    pub const CREATION_FLAGS: Self = Self::O_CREAT
         .union(Self::O_EXCL)
         .union(Self::O_NOCTTY)
+        .union(Self::O_TRUNC)
+        .union(Self::O_DIRECTORY)
         .union(Self::O_NOFOLLOW)
-        .union(Self::O_TMPFILE)
-        .union(Self::O_TRUNC);
+        .union(Self::O_CLOEXEC)
+        .union(Self::O_TMPFILE);
 
+    /// Bitmask of file status flags.
+    pub const STATUS_FLAGS: Self = Self::O_APPEND
+        .union(Self::O_NONBLOCK)
+        .union(Self::O_DSYNC)
+        .union(Self::O_ASYNC)
+        .union(Self::O_DIRECT)
+        .union(Self::O_LARGEFILE)
+        .union(Self::O_NOATIME)
+        .union(Self::O_SYNC)
+        .union(Self::O_RSYNC)
+        .union(Self::O_PATH);
+
+    /// A file `open`ed with this flags can be read.
     pub fn readable(&self) -> bool {
-        !self.contains(Self::O_WRONLY) || self.contains(Self::O_RDWR)
+        // Not being write-only means it is readable.
+        !self.contains(Self::O_WRONLY)
     }
 
+    /// A file `open`ed with this flags can be written.
     pub fn writable(&self) -> bool {
-        self.contains(Self::O_WRONLY) || self.contains(Self::O_RDWR)
+        // Not being read-only means it is writable.
+        !self.contains(Self::O_RDONLY)
     }
 
+    /// Returns the access mode of the file.
     pub fn access_mode(&self) -> Self {
-        self.intersection(Self::O_ACCMODE)
+        self.intersection(Self::ACCESS_MODE)
     }
 
-    pub fn status(&self) -> Self {
-        let mut ret = self.difference(Self::O_ACCMODE);
-        ret.remove(Self::CREATION_FLAGS);
-        ret
+    /// Returns the status flags of the file.
+    pub fn creation_flags(&self) -> Self {
+        self.intersection(Self::CREATION_FLAGS)
+    }
+
+    /// Returns the status flags of the file.
+    pub fn status_flags(&self) -> Self {
+        self.intersection(Self::STATUS_FLAGS)
     }
 }
 
@@ -279,15 +318,36 @@ impl From<usize> for AtFd {
     }
 }
 
-/// Special value used to indicate the *at functions should use the current
-/// working directory.
-pub const AT_FDCWD: isize = -100;
-/// Do not follow symbolic links.
-pub const AT_SYMLINK_NOFOLLOW: i32 = 0x100;
-/// Remove directory instead of unlinking file.
-pub const AT_REMOVEDIR: i32 = 0x200;
-/// Follow symbolic links.
-pub const AT_SYMLINK_FOLLOW: i32 = 0x400;
+bitflags! {
+    /// `AT_*` flags for `*at` functions such as `faccessat`, `fstatat`, and `unlinkat`.
+    pub struct AtFlags: i32 {
+        /// Use the current working directory to determine the target of relative file
+        /// paths.
+        const AT_FDCWD = -100;
+        /// Check access using effective user and group ID.
+        const AT_EACCESS = 0x200;
+        /// Do not follow symbolic links.
+        const AT_SYMLINK_NOFOLLOW = 0x100;
+        /// Follow symbolic link.
+        const AT_SYMLINK_FOLLOW = 0x400;
+        /// Remove directory instead of file.
+        const AT_REMOVEDIR = 0x200;
+    }
+}
+
+bitflags! {
+    /// Test flags for `faccessat` syscall.
+    pub struct AccessFlags: i32 {
+        /// Test for read permission.
+        const R_OK = 0x4;
+        /// Test for write permission.
+        const W_OK = 0x2;
+        /// Test for execute permission.
+        const X_OK = 0x1;
+        /// Test for existence of file.
+        const F_OK = 0x0;
+    }
+}
 
 bitflags! {
     pub struct FileSystemFlags:u32{

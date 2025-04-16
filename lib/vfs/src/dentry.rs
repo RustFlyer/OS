@@ -264,7 +264,7 @@ impl dyn Dentry {
         self.base_unlink(dentry)
     }
 
-    /// Removes the child directory `dentry` from directory `self`.
+    /// Removes the child directory `dentry` recursively from directory `self`.
     ///
     /// `self` must be a valid directory. `dentry` must be a valid dentry and a child of
     /// `self`. After this call, `dentry` will become invalid. `dentry` must be a directory.
