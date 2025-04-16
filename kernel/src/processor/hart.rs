@@ -71,9 +71,8 @@ impl Hart {
         new_task: &mut Arc<Task>,
         pps: &mut ProcessorPrivilegeState,
     ) {
-        // log::trace!("[user_switch_in] switch to [{}]", new_task.get_name());
         disable_interrupt();
-        pps.auto_sum();
+        pps.auto_sum(); // `pps` is the user task's PPS which is to be enabled.
         core::mem::swap(self.get_mut_pps(), pps);
 
         new_task.switch_addr_space();
@@ -84,7 +83,7 @@ impl Hart {
 
     pub fn user_switch_out(&mut self, pps: &mut ProcessorPrivilegeState) {
         disable_interrupt();
-        pps.auto_sum();
+        pps.auto_sum(); // `pps` is the hart's original PPS which is to be enabled.
         core::mem::swap(self.get_mut_pps(), pps);
         let _task = self.get_task();
         unsafe {
