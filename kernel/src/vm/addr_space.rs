@@ -23,6 +23,7 @@ use core::{cmp, ops::Bound};
 
 use arch::riscv64::mm::{fence, tlb_shootdown_all};
 use mm::address::VirtAddr;
+use mutex::SpinLock;
 use systype::{SysError, SysResult};
 
 use crate::vm::vm_area::VmaFlags;
@@ -40,9 +41,9 @@ use super::{
 #[derive(Debug)]
 pub struct AddrSpace {
     /// Page table of the address space.
-    page_table: PageTable,
+    pub page_table: PageTable,
     /// VMAs of the address space.
-    vm_areas: BTreeMap<VirtAddr, VmArea>,
+    vm_areas: SpinLock<BTreeMap<VirtAddr, VmArea>>,
 }
 
 impl AddrSpace {
@@ -57,7 +58,7 @@ impl AddrSpace {
     fn build() -> SysResult<Self> {
         Ok(Self {
             page_table: PageTable::build()?,
-            vm_areas: BTreeMap::new(),
+            vm_areas: SpinLock::new(BTreeMap::new()),
         })
     }
 
@@ -68,7 +69,7 @@ impl AddrSpace {
     /// # Errors
     /// Returns [`ENOMEM`] if memory allocation needed for the address space fails.
     pub fn build_user() -> SysResult<Self> {
-        let mut addr_space = Self::build()?;
+        let addr_space = Self::build()?;
         addr_space.page_table.map_kernel();
         Ok(addr_space)
     }
@@ -82,8 +83,9 @@ impl AddrSpace {
     ///
     /// # Errors
     /// Returns [`SysError::EINVAL`] if the VMA to be added overlaps with any existing VMA.
-    pub fn add_area(&mut self, area: VmArea) -> SysResult<()> {
-        let lower_gap = self.vm_areas.upper_bound(Bound::Included(&area.start_va()));
+    pub fn add_area(&self, area: VmArea) -> SysResult<()> {
+        let mut vm_areas_lock = self.vm_areas.lock();
+        let lower_gap = vm_areas_lock.upper_bound(Bound::Included(&area.start_va()));
         if lower_gap
             .peek_prev()
             .map(|(_, vma)| vma.end_va() > area.start_va())
@@ -99,7 +101,7 @@ impl AddrSpace {
             return Err(SysError::EINVAL);
         }
 
-        self.vm_areas.insert(area.start_va(), area);
+        vm_areas_lock.insert(area.start_va(), area);
         Ok(())
     }
 
@@ -122,12 +124,13 @@ impl AddrSpace {
     ) -> Option<VirtAddr> {
         let start_va = start_va.round_up();
         let length = VirtAddr::new(length).round_up().to_usize();
+        let vm_areas_lock = self.vm_areas.lock();
 
         // Check if the specified range is vacant.
         if start_va.to_usize() >= find_from.to_usize()
             && start_va.to_usize() + length <= find_to.to_usize()
         {
-            let gap = self.vm_areas.upper_bound(Bound::Included(&start_va));
+            let gap = vm_areas_lock.upper_bound(Bound::Included(&start_va));
             let vma_prev = gap.peek_prev().map(|(_, vma)| vma);
             let vma_next = gap.peek_next().map(|(_, vma)| vma);
             if vma_prev.map(|vma| vma.end_va() <= start_va).unwrap_or(true)
@@ -141,8 +144,7 @@ impl AddrSpace {
 
         // Find a vacant region after `start_va`.
         let start_va = cmp::max(find_from, start_va);
-        let mut iter = self
-            .vm_areas
+        let mut iter = vm_areas_lock
             .iter()
             .skip_while(|&(_, vma)| vma.end_va() <= start_va)
             .peekable();
@@ -181,18 +183,17 @@ impl AddrSpace {
     /// However, the range to be removed is rounded up to page size, which
     /// means more than `length` bytes will be removed if `length` is not
     /// page-aligned. `addr + length` should be a valid address.
-    pub fn remove_mapping(&mut self, addr: VirtAddr, length: usize) {
+    pub fn remove_mapping(&self, addr: VirtAddr, length: usize) {
         let length = VirtAddr::new(length).round_up().to_usize();
         let end_addr = VirtAddr::new(addr.to_usize() + length);
+        let mut vm_areas_lock = self.vm_areas.lock();
 
         // Find VMAs that overlap with the specified range.
-        let mut keys = self
-            .vm_areas
+        let mut keys = vm_areas_lock
             .range(addr..end_addr)
             .map(|(&va, _)| va)
             .collect::<Vec<_>>();
-        match self
-            .vm_areas
+        match vm_areas_lock
             .upper_bound(Bound::Excluded(&addr))
             .peek_prev()
         {
@@ -204,13 +205,13 @@ impl AddrSpace {
 
         // Remove mappings for these VMAs.
         for key in keys {
-            let vma = self.vm_areas.remove(&key).unwrap();
-            let (vma1, vma2) = vma.unmap_range(&mut self.page_table, addr, end_addr);
+            let vma = vm_areas_lock.remove(&key).unwrap();
+            let (vma1, vma2) = vma.unmap_range(&self.page_table, addr, end_addr);
             if let Some(vma_low) = vma1 {
-                self.vm_areas.insert(vma_low.start_va(), vma_low);
+                vm_areas_lock.insert(vma_low.start_va(), vma_low);
             }
             if let Some(vma_high) = vma2 {
-                self.vm_areas.insert(vma_high.start_va(), vma_high);
+                vm_areas_lock.insert(vma_high.start_va(), vma_high);
             }
         }
     }
@@ -225,12 +226,11 @@ impl AddrSpace {
     /// memory pages between the original address space and the new address space. When
     /// one of them writes to a shared page, the page is copied and the writer gets a
     /// new physical page elsewhere.
-    pub fn clone_cow(&mut self) -> SysResult<Self> {
+    pub fn clone_cow(&self) -> SysResult<Self> {
         let mut new_space = Self::build_user()?;
+        let new_vm_areas = self.vm_areas.lock().clone();
 
-        new_space.vm_areas = self.vm_areas.clone();
-
-        for &vpn in self.vm_areas.values().flat_map(|vma| vma.pages().keys()) {
+        for &vpn in new_vm_areas.values().flat_map(|vma| vma.pages().keys()) {
             let old_pte = self.page_table.find_entry(vpn).unwrap();
             let new_pte = new_space
                 .page_table
@@ -243,6 +243,8 @@ impl AddrSpace {
             }
             *new_pte = pte;
         }
+        new_space.vm_areas = SpinLock::new(new_vm_areas);
+
         // Because the permission of PTEs is downgraded, we need to do a TLB shootdown.
         fence();
         tlb_shootdown_all();
@@ -260,13 +262,14 @@ impl AddrSpace {
     ///
     /// # Errors
     /// Returns [`SysError::ENOMEM`] if it is impossible to change the heap size as specified.
-    pub fn change_heap_size(&mut self, mut addr: usize, incr: isize) -> SysResult<usize> {
+    pub fn change_heap_size(&self, mut addr: usize, incr: isize) -> SysResult<usize> {
         if addr != 0 && (!VirtAddr::check_validity(addr) || !VirtAddr::new(addr).in_user_space()) {
             return Err(SysError::ENOMEM);
         }
 
         // Find the heap area
-        let mut vma_iter = self.vm_areas.iter_mut();
+        let mut vm_areas_lock = self.vm_areas.lock();
+        let mut vma_iter = vm_areas_lock.iter_mut();
         let heap_area = vma_iter.find(|(_, vma)| vma.is_heap()).unwrap().1;
         let heap_start = heap_area.start_va().to_usize();
         let heap_end = heap_area.end_va().to_usize();
@@ -305,15 +308,9 @@ impl AddrSpace {
     /// Returns [`SysError::EFAULT`] if the fault address is invalid or the access permission
     /// is not allowed. Otherwise, returns [`SysError::ENOMEM`] if memory allocation fails
     /// when handling the page fault.
-    pub fn handle_page_fault(&mut self, fault_addr: VirtAddr, access: MemPerm) -> SysResult<()> {
-        // log::trace!(
-        //     "Page fault when accessing {:#x}, type: {:?}",
-        //     fault_addr.to_usize(),
-        //     access
-        // );
-        let page_table = &mut self.page_table;
-        let vma = self
-            .vm_areas
+    pub fn handle_page_fault(&self, fault_addr: VirtAddr, access: MemPerm) -> SysResult<()> {
+        let mut vm_areas_lock = self.vm_areas.lock();
+        let vma = vm_areas_lock
             .range_mut(..=fault_addr)
             .next_back()
             .filter(|(_, vma)| vma.contains(fault_addr))
@@ -322,7 +319,7 @@ impl AddrSpace {
 
         let page_fault_info = PageFaultInfo {
             fault_addr,
-            page_table,
+            page_table: &self.page_table,
             access,
         };
         vma.handle_page_fault(page_fault_info)
@@ -344,7 +341,7 @@ pub unsafe fn switch_to(new_space: &AddrSpace) {
 }
 
 pub fn test_find_vacant_memory() {
-    let mut addr_space = AddrSpace::build_user().unwrap();
+    let addr_space = AddrSpace::build_user().unwrap();
 
     static MEMORY_1: &[u8] = &[0u8; 0x2000];
     static MEMORY_2: &[u8] = &[1u8; 0x3000];
@@ -418,7 +415,7 @@ pub fn test_find_vacant_memory() {
 }
 
 pub fn test_clone_cow() {
-    let mut old_space = AddrSpace::build_user().unwrap();
+    let old_space = AddrSpace::build_user().unwrap();
 
     static MEMORY_1: &[u8] = &[0u8; 0x2000];
     static MEMORY_2: &[u8] = &[1u8; 0x3000];
@@ -446,7 +443,7 @@ pub fn test_clone_cow() {
         .handle_page_fault(VirtAddr::new(0x2100), MemPerm::W)
         .unwrap();
 
-    let mut new_space = old_space.clone_cow().unwrap();
+    let new_space = old_space.clone_cow().unwrap();
     // Now the two address spaces share the same physical page, which is marked as read-only.
     let old_pte = old_space
         .page_table

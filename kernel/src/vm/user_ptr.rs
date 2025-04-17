@@ -100,7 +100,7 @@ where
     ptr: *mut T,
 
     /// The address space the pointer is in.
-    addr_space: &'a mut AddrSpace,
+    addr_space: &'a AddrSpace,
 
     /// Guard to ensure the `SUM` bit of `sstatus` register is set when accessing
     /// the memory.
@@ -119,10 +119,7 @@ where
     ///
     /// This function may construct a valid or invalid `UserPtr` depending on the
     /// address provided.
-    ///
-    /// A mutable reference to `AddrSpace` is needed because we may need to handle
-    /// page faults when accessing the memory, which may mutate the page table.
-    pub fn new(addr: usize, addr_space: &'a mut AddrSpace) -> Self {
+    pub fn new(addr: usize, addr_space: &'a AddrSpace) -> Self {
         Self {
             ptr: addr as *mut T,
             addr_space,
@@ -486,7 +483,7 @@ where
 ///
 /// Returns `Ok(())` if the access is allowed, otherwise returns an `EFAULT` error.
 fn check_user_access(
-    addr_space: &mut AddrSpace,
+    addr_space: &AddrSpace,
     mut addr: usize,
     len: usize,
     perm: MemPerm,
@@ -557,7 +554,7 @@ fn check_user_access(
 /// # Safety
 /// The values that the closure operates on must be valid and properly aligned.
 unsafe fn access_with_checking<F, T>(
-    addr_space: &mut AddrSpace,
+    addr_space: &AddrSpace,
     mut addr: usize,
     len: usize,
     perm: MemPerm,

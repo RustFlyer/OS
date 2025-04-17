@@ -1,10 +1,15 @@
-use arch::riscv64::time::{get_time_duration, set_nx_timer_irq};
 use riscv::{ExceptionNumber, InterruptNumber};
 use riscv::{
     interrupt::{Exception, Interrupt, Trap},
-    register::{scause, sepc, stval},
+    register::{satp, scause, sepc, stval},
 };
+
+use arch::riscv64::mm::sfence_vma_all;
+use arch::riscv64::time::{get_time_duration, set_nx_timer_irq};
+use mm::address::{PhysPageNum, VirtAddr};
 use timer::TIMER_MANAGER;
+
+use crate::vm::trace_page_table_lookup;
 
 /// Kernel trap handler
 #[unsafe(no_mangle)]
@@ -20,10 +25,11 @@ pub fn kernel_trap_handler() {
 pub fn kernel_exception_handler(e: Exception, stval: usize) {
     simdebug::stop();
     log::error!(
-        "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}",
+        "[kernel] {:?} in kernel, bad addr = {:#x}, bad instruction = {:#x}, satp = {:#x}",
         e,
         stval,
         sepc::read(),
+        satp::read().bits(),
     );
     kernel_panic();
 }
@@ -43,7 +49,7 @@ pub fn kernel_interrupt_handler(i: Interrupt, _stval: usize) {
 
 pub fn kernel_panic() -> ! {
     panic!(
-        "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, kernel panicked!!",
+        "[kernel] {:?} in kernel, bad addr = {:#x}, bad instruction = {:#x}, kernel panicked!!",
         scause::read().cause(),
         stval::read(),
         sepc::read(),

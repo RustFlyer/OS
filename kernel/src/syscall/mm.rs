@@ -34,26 +34,17 @@ pub async fn sys_mmap(
         return Err(SysError::EINVAL);
     }
 
-    task.addr_space_mut()
-        .lock()
-        .await
+    task.addr_space()
         .map_file(file, flags, prot, va, length, offset)
 }
 
 pub async fn sys_munmap(addr: usize, length: usize) -> SyscallResult {
     let task = current_task();
     let addr = VirtAddr::new(addr);
-    task.addr_space_mut()
-        .lock()
-        .await
-        .remove_mapping(addr, length);
+    task.addr_space().remove_mapping(addr, length);
     Ok(0)
 }
 
 pub async fn sys_brk(addr: usize) -> SyscallResult {
-    current_task()
-        .addr_space_mut()
-        .lock()
-        .await
-        .change_heap_size(addr, 0)
+    current_task().addr_space().change_heap_size(addr, 0)
 }

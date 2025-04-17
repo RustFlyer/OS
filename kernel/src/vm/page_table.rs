@@ -18,6 +18,7 @@ use mm::{
     address::{PhysPageNum, VirtAddr, VirtPageNum},
     page_cache::page::Page,
 };
+use mutex::SpinLock;
 use simdebug::when_debug;
 use systype::SysResult;
 
@@ -48,7 +49,7 @@ pub struct PageTable {
     /// Physical page number of the root page table.
     root: PhysPageNum,
     /// Frames allocated for user-used tables
-    frames: Vec<FrameTracker>,
+    frames: SpinLock<Vec<FrameTracker>>,
 }
 
 lazy_static! {
@@ -69,7 +70,7 @@ impl PageTable {
         }
         Ok(PageTable {
             root: root_frame.ppn(),
-            frames: vec![root_frame],
+            frames: SpinLock::new(vec![root_frame]),
         })
     }
 
@@ -156,7 +157,7 @@ impl PageTable {
     /// Returns an [`ENOMEM`] error if the method needs to allocate a frame but fails
     /// to do so.
     pub fn find_entry_force(
-        &mut self,
+        &self,
         vpn: VirtPageNum,
         inner_flags: PteFlags,
     ) -> SysResult<(&mut PageTableEntry, bool)> {
@@ -195,7 +196,7 @@ impl PageTable {
     /// entry may be invalid.
     ///
     /// This function only support 4 KiB pages, 3-level page tables.
-    pub fn find_entry(&mut self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
+    pub fn find_entry(&self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
         let mut ppn = self.root;
         for (i, index) in vpn.indices().into_iter().enumerate().rev() {
             let mut page_table = unsafe { PageTableMem::new(ppn) };
@@ -232,7 +233,7 @@ impl PageTable {
     /// provides a lower granularity of control over intermediate entries, but it is
     /// sufficient for the current address space layout.
     pub fn map_page(
-        &mut self,
+        &self,
         vpn: VirtPageNum,
         flags: PteFlags,
     ) -> SysResult<Result<Page, &mut PageTableEntry>> {
@@ -267,7 +268,7 @@ impl PageTable {
     /// provides a lower granularity of control over intermediate entries, but it is
     /// sufficient for the current address space layout.
     pub fn map_page_to(
-        &mut self,
+        &self,
         vpn: VirtPageNum,
         ppn: PhysPageNum,
         flags: PteFlags,
@@ -288,7 +289,7 @@ impl PageTable {
     /// mapping in the page table. The caller should deallocate the frame and clear
     /// the mapping by calling this method. Calling this method to clear an unmapped
     /// page is safe.
-    pub fn unmap_page(&mut self, vpn: VirtPageNum) {
+    pub fn unmap_page(&self, vpn: VirtPageNum) {
         if let Some(entry) = self.find_entry(vpn) {
             *entry = PageTableEntry::default();
             // Flush TLB entries for the page for all harts.
@@ -315,7 +316,7 @@ impl PageTable {
     /// `G` bit as the leaf entries. This design is sufficient for the current
     /// address space layout.
     pub fn map_range_to(
-        &mut self,
+        &self,
         start_vpn: VirtPageNum,
         ppns: &[PhysPageNum],
         flags: PteFlags,
@@ -348,7 +349,7 @@ impl PageTable {
     /// mappings in the page table. The caller should deallocate the frames and clear the
     /// mappings by calling this method. Calling this method to clear any unmapped range
     /// is safe.
-    pub fn unmap_range(&mut self, start_vpn: VirtPageNum, count: usize) {
+    pub fn unmap_range(&self, start_vpn: VirtPageNum, count: usize) {
         for i in 0..count {
             let vpn = VirtPageNum::new(start_vpn.to_usize() + i);
             self.unmap_page(vpn);
@@ -364,7 +365,7 @@ impl PageTable {
     ///
     /// This method is used to map the kernel space into a new page table for a user process.
     /// This method does not allocate any frame or make this page table own any frame.
-    pub fn map_kernel(&mut self) {
+    pub fn map_kernel(&self) {
         // Map the kernel areas.
         let kernel_vpn_start = VirtAddr::new(kernel_start()).page_number();
         let kernel_vpn_end = VirtAddr::new(kernel_end()).page_number();
@@ -392,8 +393,8 @@ impl PageTable {
     /// Adds a `FrameTracker` to the page table so that the frame can be deallocated
     /// when the `PageTable` is dropped. Any page table frame in the page itself
     /// table must be tracked by calling this method.
-    fn track_frame(&mut self, frame: FrameTracker) {
-        self.frames.push(frame);
+    fn track_frame(&self, frame: FrameTracker) {
+        self.frames.lock().push(frame);
     }
 }
 
@@ -482,16 +483,17 @@ pub unsafe fn switch_page_table(page_table: &PageTable) {
 /// Prints the lookup process of a virtual address in the specific page table.
 ///
 /// For debugging purposes.
-pub fn trace_page_table_lookup(page_table: &PageTable, va: VirtAddr) {
-    let mut ppn = page_table.root();
+pub fn trace_page_table_lookup(root: PhysPageNum, va: VirtAddr) {
+    let mut ppn = root;
     for (i, index) in va.page_number().indices().into_iter().enumerate().rev() {
         let page_table = unsafe { PageTableMem::new(ppn) };
         let entry = page_table.get_entry(index);
-        log::debug!(
-            "Level {}: page table at {:#x}, entry at offset {:#x}, entry: {:#x?}",
+        log::error!(
+            "Level {}: page table at {:#x}, entry at offset {:#x} * 64 = {:#x}, entry: {:#x?}",
             i,
             ppn.address().to_usize(),
             index,
+            index * size_of::<PageTableEntry>(),
             entry
         );
         if !entry.is_valid() {
@@ -505,5 +507,5 @@ pub fn trace_page_table_lookup(page_table: &PageTable, va: VirtAddr) {
 ///
 /// For debugging purposes.
 pub fn trace_kernel_page_table_lookup(va: VirtAddr) {
-    trace_page_table_lookup(&KERNEL_PAGE_TABLE, va);
+    trace_page_table_lookup(KERNEL_PAGE_TABLE.root(), va);
 }

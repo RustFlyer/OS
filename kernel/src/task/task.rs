@@ -11,7 +11,6 @@ use alloc::{
 use core::cell::SyncUnsafeCell;
 use core::sync::atomic::{AtomicUsize, Ordering};
 use core::task::Waker;
-use mutex::optimistic_mutex::{OptimisticLock, new_optimistic_mutex};
 use mutex::{ShareMutex, SpinNoIrqLock, new_share_mutex};
 use vfs::{dentry::Dentry, file::File};
 
@@ -58,7 +57,7 @@ pub struct Task {
     timer: SyncUnsafeCell<TaskTimeStat>,
     waker: SyncUnsafeCell<Option<Waker>>,
     state: SpinNoIrqLock<TaskState>,
-    addr_space: OptimisticLock<AddrSpace>,
+    addr_space: SyncUnsafeCell<Arc<AddrSpace>>,
 
     parent: ShareMutex<Option<Weak<Task>>>,
     children: ShareMutex<BTreeMap<Tid, Arc<Task>>>,
@@ -85,7 +84,7 @@ impl Task {
     pub fn new(
         entry: usize,
         sp: usize,
-        addrspace: AddrSpace,
+        addr_space: AddrSpace,
         elf_file: Arc<dyn File>,
         name: String,
     ) -> Self {
@@ -100,7 +99,7 @@ impl Task {
             timer: SyncUnsafeCell::new(TaskTimeStat::new()),
             waker: SyncUnsafeCell::new(None),
             state: SpinNoIrqLock::new(TaskState::Running),
-            addr_space: new_optimistic_mutex(addrspace),
+            addr_space: SyncUnsafeCell::new(Arc::new(addr_space)),
             parent: new_share_mutex(None),
             children: new_share_mutex(BTreeMap::new()),
             pgid: new_share_mutex(pgid),
@@ -131,7 +130,7 @@ impl Task {
         timer: SyncUnsafeCell<TaskTimeStat>,
         waker: SyncUnsafeCell<Option<Waker>>,
         state: SpinNoIrqLock<TaskState>,
-        addr_space: OptimisticLock<AddrSpace>,
+        addr_space: SyncUnsafeCell<Arc<AddrSpace>>,
 
         parent: ShareMutex<Option<Weak<Task>>>,
         children: ShareMutex<BTreeMap<Tid, Arc<Task>>>,
@@ -238,8 +237,8 @@ impl Task {
         unsafe { &mut *self.sig_stack.get() }
     }
 
-    pub fn addr_space_mut(&self) -> &OptimisticLock<AddrSpace> {
-        &self.addr_space
+    pub fn addr_space(&self) -> Arc<AddrSpace> {
+        unsafe { Arc::clone(&*self.addr_space.get()) }
     }
 
     pub fn elf_mut(&self) -> &mut Arc<dyn File> {
@@ -363,8 +362,12 @@ impl Task {
         *self.cwd.lock() = dentry;
     }
 
-    pub async fn set_addrspace(&self, addrspace: AddrSpace) {
-        *self.addr_space.lock().await = addrspace;
+    /// Set the address space of the task
+    ///
+    /// # Safety
+    /// The caller must ensure that no other hart is accessing the address space
+    pub unsafe fn set_addrspace(&self, addrspace: AddrSpace) {
+        unsafe { *self.addr_space.get() = Arc::new(addrspace); }
     }
     // ========== This Part You Can Change the Member of Task  ===========
     pub fn add_child(&self, child: Arc<Task>) {

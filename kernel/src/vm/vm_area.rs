@@ -25,7 +25,6 @@
 
 use alloc::{collections::btree_map::BTreeMap, sync::Arc, vec::Vec};
 use core::{fmt::Debug, mem};
-use osfuture::block_on;
 
 use bitflags::bitflags;
 
@@ -35,6 +34,7 @@ use mm::{
     address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum},
     page_cache::page::Page,
 };
+use osfuture::block_on;
 use systype::{SysError, SysResult};
 use vfs::file::File;
 
@@ -109,12 +109,12 @@ type PageFaultHandler = fn(&mut VmArea, PageFaultInfo) -> SysResult<()>;
 /// Data passed to a page fault handler.
 ///
 /// This struct is used to pass data to a page fault handler registered in a [`VmArea`].
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct PageFaultInfo<'a> {
     /// Faulting virtual address.
     pub fault_addr: VirtAddr,
     /// Page table.
-    pub page_table: &'a mut PageTable,
+    pub page_table: &'a PageTable,
     /// How the address was accessed when the fault occurred. Only one bit should be set.
     pub access: MemPerm,
 }
@@ -333,7 +333,7 @@ impl VmArea {
     /// the whole VMA, so the original VMA is totally removed.
     pub fn unmap_range(
         mut self,
-        page_table: &mut PageTable,
+        page_table: &PageTable,
         remove_from: VirtAddr,
         remove_to: VirtAddr,
     ) -> (Option<Self>, Option<Self>) {
@@ -401,13 +401,13 @@ impl VmArea {
     /// # Errors
     /// Returns [`SysError::EFAULT`] if the access permission is not allowed.
     /// Otherwise, returns [`SysError::ENOMEM`] if a new frame cannot be allocated.
-    pub fn handle_page_fault(&mut self, mut info: PageFaultInfo) -> SysResult<()> {
+    pub fn handle_page_fault(&mut self, info: PageFaultInfo) -> SysResult<()> {
         let &mut VmArea {
             pte_flags, prot, ..
         } = self;
         let PageFaultInfo {
             fault_addr,
-            ref mut page_table,
+            page_table,
             access,
         } = info;
 
@@ -943,7 +943,7 @@ pub fn test_unmap_range() {
             VirtAddr::new(0x8000),
             MemPerm::empty(),
         );
-        let mut page_table = PageTable::build().unwrap();
+        let page_table = PageTable::build().unwrap();
 
         for vpn in vma.start_va().page_number().to_usize()..vma.end_va().page_number().to_usize() {
             let vpn = VirtPageNum::new(vpn);
@@ -951,11 +951,8 @@ pub fn test_unmap_range() {
             vma.pages.insert(vpn, Arc::new(page));
         }
 
-        let (vma_low, vma_high) = vma.unmap_range(
-            &mut page_table,
-            VirtAddr::new(0x1000),
-            VirtAddr::new(0x5000),
-        );
+        let (vma_low, vma_high) =
+            vma.unmap_range(&page_table, VirtAddr::new(0x1000), VirtAddr::new(0x5000));
 
         assert!(vma_low.is_none());
         assert!(vma_high.is_some());
@@ -973,7 +970,7 @@ pub fn test_unmap_range() {
             VirtAddr::new(0x8000),
             MemPerm::empty(),
         );
-        let mut page_table = PageTable::build().unwrap();
+        let page_table = PageTable::build().unwrap();
 
         for vpn in vma.start_va().page_number().to_usize()..vma.end_va().page_number().to_usize() {
             let vpn = VirtPageNum::new(vpn);
@@ -981,11 +978,8 @@ pub fn test_unmap_range() {
             vma.pages.insert(vpn, Arc::new(page));
         }
 
-        let (vma_low, vma_high) = vma.unmap_range(
-            &mut page_table,
-            VirtAddr::new(0x3000),
-            VirtAddr::new(0x6000),
-        );
+        let (vma_low, vma_high) =
+            vma.unmap_range(&page_table, VirtAddr::new(0x3000), VirtAddr::new(0x6000));
 
         assert!(vma_low.is_some());
         let vma_low = vma_low.unwrap();
@@ -1011,7 +1005,7 @@ pub fn test_unmap_range() {
             VirtAddr::new(0x8000),
             MemPerm::empty(),
         );
-        let mut page_table = PageTable::build().unwrap();
+        let page_table = PageTable::build().unwrap();
 
         for vpn in vma.start_va().page_number().to_usize()..vma.end_va().page_number().to_usize() {
             let vpn = VirtPageNum::new(vpn);
@@ -1019,11 +1013,8 @@ pub fn test_unmap_range() {
             vma.pages.insert(vpn, Arc::new(page));
         }
 
-        let (vma_low, vma_high) = vma.unmap_range(
-            &mut page_table,
-            VirtAddr::new(0x0000),
-            VirtAddr::new(0x9000),
-        );
+        let (vma_low, vma_high) =
+            vma.unmap_range(&page_table, VirtAddr::new(0x0000), VirtAddr::new(0x9000));
 
         assert!(vma_low.is_none());
         assert!(vma_high.is_none());
@@ -1034,7 +1025,7 @@ pub fn test_unmap_range() {
             VirtAddr::new(0x8000),
             MemPerm::empty(),
         );
-        let mut page_table = PageTable::build().unwrap();
+        let page_table = PageTable::build().unwrap();
 
         for vpn in vma.start_va().page_number().to_usize()..vma.end_va().page_number().to_usize() {
             let vpn = VirtPageNum::new(vpn);
@@ -1042,11 +1033,8 @@ pub fn test_unmap_range() {
             vma.pages.insert(vpn, Arc::new(page));
         }
 
-        let (vma_low, vma_high) = vma.unmap_range(
-            &mut page_table,
-            VirtAddr::new(0x1000),
-            VirtAddr::new(0x4000),
-        );
+        let (vma_low, vma_high) =
+            vma.unmap_range(&page_table, VirtAddr::new(0x1000), VirtAddr::new(0x4000));
 
         assert!(vma_low.is_some());
         let vma_low = vma_low.unwrap();
