@@ -51,7 +51,7 @@ impl AddrSpace {
                 ElfParseError::IOError(_) => SysError::EIO,
                 _ => SysError::ENOEXEC,
             })?;
-        log::error!("pass");
+        log::error!("[load_elf] pass open_stream");
 
         let mut auxv = aux::construct_init_auxv();
         auxv.push(AuxHeader::new(
@@ -59,7 +59,7 @@ impl AddrSpace {
             elf_stream.ehdr.e_phentsize as usize,
         ));
         auxv.push(AuxHeader::new(AT_PHNUM, elf_stream.ehdr.e_phnum as usize));
-        log::error!("pass1");
+        log::error!("[load_elf] pass auxv load");
 
         let first_segment_addr = elf_stream
             .segments()
@@ -72,12 +72,11 @@ impl AddrSpace {
             AT_PHDR,
             first_segment_addr + elf_stream.ehdr.e_phoff as usize,
         ));
-        log::error!("pass2");
+        log::error!("[load_elf] pass load first_segment_addr");
 
         // Load loadable segments (PT_LOAD).
         let mut entry = self.load_segments(Arc::clone(&elf_file), &elf_stream, 0)?;
         auxv.push(AuxHeader::new(AT_ENTRY, entry.to_usize()));
-        log::error!("pass3");
 
         // Load the dynamic linker if needed.
         let interp = {
@@ -95,6 +94,9 @@ impl AddrSpace {
                 None
             }
         };
+
+        log::error!("[load_elf] pass load the interp");
+
         if let Some(interp) = interp {
             // Load the dynamic linker.
             let interp_name = {
@@ -108,19 +110,24 @@ impl AddrSpace {
                     .into_string()
                     .map_err(|_| SysError::ENOENT)?
             };
+            log::debug!("[load_elf] pass load the interp_name");
             let interp_file = {
                 let dentry = Path::new(sys_root_dentry(), interp_name).walk()?;
                 <dyn File>::open(dentry)?
             };
+            log::debug!("[load_elf] pass load the interp_file");
             let interp_stream: ElfStream<LittleEndian, _> =
                 ElfStream::open_stream(interp_file.as_ref()).map_err(|e| match e {
                     ElfParseError::IOError(_) => SysError::EIO,
                     _ => SysError::ENOEXEC,
                 })?;
+            log::debug!("[load_elf] pass load the interp_stream");
             entry =
                 self.load_segments(Arc::clone(&interp_file), &interp_stream, USER_INTERP_BASE)?;
             auxv.push(AuxHeader::new(AT_BASE, USER_INTERP_BASE));
         }
+
+        log::error!("[load_elf] pass load the dynamic linker");
 
         Ok((entry, auxv))
     }

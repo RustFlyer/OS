@@ -275,11 +275,17 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
         path.walk()?
     };
 
-    log::info!("[sys_execve]: open");
+    log::info!("[sys_execve]: open file");
     let file = <dyn File>::open(dentry)?;
-    log::info!("[sys_execve]: execve");
+    {
+        let mut inode = file.meta().dentry.get_meta().inode.lock();
+        log::info!(
+            "[sys_execve]: execve the file with size {}",
+            inode.as_mut().unwrap().size()
+        );
+    }
     task.execve(file, args, envs, path).await?;
-    log::info!("[sys_execve]: over");
+    log::info!("[sys_execve]: finish execve and convert to a new task");
     Ok(0)
 }
 
