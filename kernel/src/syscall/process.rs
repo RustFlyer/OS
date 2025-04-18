@@ -8,6 +8,7 @@ use crate::task::{
 };
 use crate::vm::user_ptr::{UserReadPtr, UserWritePtr};
 use crate::{processor::current_task, task::future::spawn_user_task};
+use alloc::string::String;
 use alloc::vec::Vec;
 use bitflags::*;
 use config::process::CloneFlags;
@@ -120,9 +121,9 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
         // log::error!("[sys_wait4] remove tid {}", tid);
         TASK_MANAGER.remove_task(tid);
         PROCESS_GROUP_MANAGER.remove(&zombie_task);
-        return Ok(tid);
+        Ok(tid)
     } else if option.contains(WaitOptions::WNOHANG) {
-        return Ok(0);
+        Ok(0)
     } else {
         log::info!("[sys_wait4] waiting for sigchld");
         // 如果等待的进程还不是zombie，那么本进程进行await，
@@ -194,7 +195,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
         TASK_MANAGER.remove_task(child_pid);
         PROCESS_GROUP_MANAGER.remove(&task);
         // log::error!("[sys_wait4] out");
-        return Ok(child_pid);
+        Ok(child_pid)
     }
 }
 
@@ -238,7 +239,7 @@ pub async fn sys_clone(
 pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult {
     let task = current_task();
 
-    let read_string = async |addr| {
+    let read_string = |addr| {
         let addr_space = task.addr_space();
         let mut user_ptr = UserReadPtr::<u8>::new(addr, &addr_space);
         user_ptr
@@ -247,8 +248,9 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
             .map_err(|_| SysError::EINVAL)
     };
 
-    let read_string_array = async |addr| {
-        let mut strings = Vec::new();
+    // Reads strings from a null-terminated array of pointers to strings, adding them to
+    // the specified vector.
+    let read_string_array = |addr: usize, vec: &mut Vec<String>| {
         let addr_space = task.addr_space();
         let mut user_ptr = UserReadPtr::<usize>::new(addr, &addr_space);
         let pointers = user_ptr.read_ptr_array(256)?;
@@ -258,14 +260,16 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
                 .read_c_string(256)?
                 .into_string()
                 .map_err(|_| SysError::EINVAL)?;
-            strings.push(string);
+            vec.push(string);
         }
-        Ok(strings)
+        Ok(())
     };
 
-    let path = read_string(path).await?;
-    let args = read_string_array(argv).await?;
-    let envs = read_string_array(envp).await?;
+    let path = read_string(path)?;
+    let mut args = vec![path.clone()];
+    read_string_array(argv, &mut args)?;
+    let mut envs = Vec::new();
+    read_string_array(envp, &mut envs)?;
 
     println!("args: {:?}", args);
     println!("envs: {:?}", envs);
@@ -284,7 +288,7 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
             inode.as_mut().unwrap().size()
         );
     }
-    task.execve(file, args, envs, path).await?;
+    task.execve(file, args, envs, path)?;
     log::info!("[sys_execve]: finish execve and convert to a new task");
     Ok(0)
 }

@@ -3,6 +3,8 @@ use alloc::string::String;
 use alloc::string::ToString;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use arch::riscv64::time::get_time_ms;
+use arch::riscv64::time::get_time_us;
 use core::cell::SyncUnsafeCell;
 use core::sync::atomic::AtomicUsize;
 use core::time::Duration;
@@ -59,7 +61,7 @@ impl Task {
         }
     }
 
-    pub async fn execve(
+    pub fn execve(
         &self,
         elf_file: Arc<dyn File>,
         args: Vec<String>,
@@ -79,9 +81,15 @@ impl Task {
         }
         self.switch_addr_space();
 
+        // Use current time as random seed
+        let mut random = Vec::new();
+        random.extend(get_time_us().to_le_bytes());
+        random.extend(get_time_ms().to_le_bytes());
+        let random: [u8; 16] = random.as_slice().try_into().unwrap();
+
         let addrspace = self.addr_space();
         let (sp, argc, argv, envp) =
-            addrspace.init_stack(stack_top.to_usize(), args, envs, auxv)?;
+            addrspace.init_stack(stack_top.to_usize(), args, envs, auxv, &random)?;
 
         self.trap_context_mut()
             .init_user(sp, entry_point.to_usize(), argc, argv, envp);

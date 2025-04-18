@@ -51,7 +51,6 @@ impl AddrSpace {
                 ElfParseError::IOError(_) => SysError::EIO,
                 _ => SysError::ENOEXEC,
             })?;
-        log::error!("[load_elf] pass open_stream");
 
         let mut auxv = aux::construct_init_auxv();
         auxv.push(AuxHeader::new(
@@ -59,7 +58,6 @@ impl AddrSpace {
             elf_stream.ehdr.e_phentsize as usize,
         ));
         auxv.push(AuxHeader::new(AT_PHNUM, elf_stream.ehdr.e_phnum as usize));
-        log::error!("[load_elf] pass auxv load");
 
         let first_segment_addr = elf_stream
             .segments()
@@ -72,7 +70,6 @@ impl AddrSpace {
             AT_PHDR,
             first_segment_addr + elf_stream.ehdr.e_phoff as usize,
         ));
-        log::error!("[load_elf] pass load first_segment_addr");
 
         // Load loadable segments (PT_LOAD).
         let mut entry = self.load_segments(Arc::clone(&elf_file), &elf_stream, 0)?;
@@ -95,8 +92,6 @@ impl AddrSpace {
             }
         };
 
-        log::error!("[load_elf] pass load the interp");
-
         if let Some(interp) = interp {
             // Load the dynamic linker.
             let interp_name = {
@@ -110,24 +105,19 @@ impl AddrSpace {
                     .into_string()
                     .map_err(|_| SysError::ENOENT)?
             };
-            log::debug!("[load_elf] pass load the interp_name");
             let interp_file = {
                 let dentry = Path::new(sys_root_dentry(), interp_name).walk()?;
                 <dyn File>::open(dentry)?
             };
-            log::debug!("[load_elf] pass load the interp_file");
             let interp_stream: ElfStream<LittleEndian, _> =
                 ElfStream::open_stream(interp_file.as_ref()).map_err(|e| match e {
                     ElfParseError::IOError(_) => SysError::EIO,
                     _ => SysError::ENOEXEC,
                 })?;
-            log::debug!("[load_elf] pass load the interp_stream");
             entry =
                 self.load_segments(Arc::clone(&interp_file), &interp_stream, USER_INTERP_BASE)?;
             auxv.push(AuxHeader::new(AT_BASE, USER_INTERP_BASE));
         }
-
-        log::error!("[load_elf] pass load the dynamic linker");
 
         Ok((entry, auxv))
     }
@@ -233,98 +223,115 @@ impl AddrSpace {
     /// Initializes the user stack.
     ///
     /// This function initializes the user stack with the given arguments, environment
-    /// variables, auxiliary vector, and other necessary data.
-    ///
-    /// The stack pointer is aligned to 16 bytes.
-    ///
-    /// `sp` is the stack pointer, which should points to the upper bound of the user
-    /// stack.
-    /// `args` is the vector of command line arguments.
-    /// `envs` is the vector of environment variables.
-    /// `auxv` is the vector of auxiliary headers.
-    ///
-    /// All of the above vectors should not include the null terminator. The function
-    /// will add the null terminator to each of them.
+    /// variables, auxiliary vector, and other necessary data. The caller should call
+    /// [`map_stack`] first to get the stack pointer.
     ///
     /// Returns the new stack pointer (which points to the stack top), the number of
-    /// command line arguments, the pointer to the array of command line arguments, and
-    /// the pointer to the array of environment variables.
+    /// command line arguments (`argc`), a pointer to the array of command line arguments
+    /// (`argv`), and a pointer to the array of environment variables (`envp`).
+    ///
+    /// # Parameters
+    /// - `sp` is the stack pointer, which should points to the upper bound of the user
+    ///   stack.
+    /// - `args` is the vector of command line arguments.
+    /// - `envs` is the vector of environment variables.
+    /// - `auxv` is the vector of auxiliary headers. It must not include an `AT_RANDOM`
+    ///   entry.
+    /// - `random` is 16 random bytes used as the stack canary, which is pushed to the
+    ///   stack. This function will push an `AT_RANDOM` auxiliary vector entry to the
+    ///   stack, which contains a pointer to the random bytes.
+    ///
+    /// All of the above vectors should not include the null terminator. This function
+    /// will push null terminators to the stack appropriately.
     pub fn init_stack(
         &self,
         mut sp: usize,
         args: Vec<String>,
         envs: Vec<String>,
-        auxv: Vec<AuxHeader>,
+        mut auxv: Vec<AuxHeader>,
+        random: &[u8; 16],
     ) -> SysResult<(usize, usize, usize, usize)> {
+        /* Helper closures to push data to the stack. */
+        // These closures updates the stack pointer and returns the value of
+        // the new stack pointer.
+
+        // Pushes a string to the stack.
+        let push_str = |string: String, sp: &mut usize| -> SysResult<usize> {
+            let string = CString::new(string).unwrap();
+            let bytes = string.as_bytes_with_nul();
+            *sp -= bytes.len();
+            unsafe {
+                UserWritePtr::<u8>::new(*sp, self).write_array(bytes)?;
+            }
+            Ok(*sp)
+        };
+        // Pushes an auxiliary header to the stack.
+        let push_aux = |aux: AuxHeader, sp: &mut usize| -> SysResult<usize> {
+            *sp -= core::mem::size_of::<AuxHeader>();
+            unsafe { UserWritePtr::<AuxHeader>::new(*sp, self).write(aux)? }
+            Ok(*sp)
+        };
+        // Pushes a byte array to the stack.
+        let push_bytes = |bytes: &[u8], sp: &mut usize| -> SysResult<usize> {
+            *sp -= bytes.len();
+            unsafe { UserWritePtr::<u8>::new(*sp, self).write_array(bytes)? }
+            Ok(*sp)
+        };
+        // Pushes a `usize` to the stack.
+        let push_usize = |ptr: usize, sp: &mut usize| -> SysResult<usize> {
+            *sp -= core::mem::size_of::<usize>();
+            unsafe { UserWritePtr::<usize>::new(*sp, self).write(ptr)? }
+            Ok(*sp)
+        };
+
         let argc = args.len();
 
         // Align the stack pointer to 16 bytes.
         sp &= !0xf;
 
-        // Helper closure to push a string to the stack.
-        // Updates the stack pointer and returns the new stack pointer.
-        let mut push_str = |string: String| -> SysResult<usize> {
-            let string = CString::new(string).unwrap();
-            let bytes = string.as_bytes_with_nul();
-            sp -= bytes.len();
-            unsafe {
-                UserWritePtr::<u8>::new(sp, self).write_array(bytes)?;
-            }
-            Ok(sp)
-        };
-
-        // Push the environment variables and command line arguments to the stack,
-        // and get pointers to them.
+        // Push the environment variables and command line arguments, and get pointers
+        // to them.
         let mut env_ptrs: Vec<usize> = Vec::with_capacity(envs.len() + 1);
         env_ptrs.push(0);
         for env in envs.into_iter().rev() {
-            env_ptrs.push(push_str(env)?);
+            env_ptrs.push(push_str(env, &mut sp)?);
         }
 
         let mut arg_ptrs: Vec<usize> = Vec::with_capacity(args.len() + 1);
         arg_ptrs.push(0);
         for arg in args.into_iter().rev() {
-            arg_ptrs.push(push_str(arg)?);
+            arg_ptrs.push(push_str(arg, &mut sp)?);
         }
 
-        sp &= !0xf;
+        // Random interval after arguments and environment variables.
+        let random_num = usize::from_le_bytes(random[0..8].try_into().unwrap());
+        sp = (sp - random_num % 8192) & !0xf;
 
-        // Helper closure to push an auxiliary header to the stack.
-        // Updates the stack pointer and returns the new stack pointer.
-        let mut push_aux = |aux: AuxHeader| -> SysResult<usize> {
-            sp -= core::mem::size_of::<AuxHeader>();
-            unsafe { UserWritePtr::<AuxHeader>::new(sp, self).write(aux)? }
-            Ok(sp)
-        };
+        // Push the platform identifier string and random bytes.
+        push_str(String::from("OS (temp name)"), &mut sp)?;
+        push_bytes(random, &mut sp)?;
+        auxv.push(AuxHeader::new(aux::AT_RANDOM, sp));
 
         // Push the auxiliary vector to the stack.
         let null_aux = AuxHeader::new(aux::AT_NULL, 0);
-        push_aux(null_aux)?;
+        push_aux(null_aux, &mut sp)?;
         for aux in auxv.into_iter().rev() {
-            push_aux(aux)?;
+            push_aux(aux, &mut sp)?;
         }
-
-        // Helper closure to push a `usize` to the stack.
-        // Updates the stack pointer and returns the new stack pointer.
-        let mut push_usize = |ptr: usize| -> SysResult<usize> {
-            sp -= core::mem::size_of::<usize>();
-            unsafe { UserWritePtr::<usize>::new(sp, self).write(ptr)? }
-            Ok(sp)
-        };
 
         // Push pointers to the environment variables and command line arguments to the stack.
-        let mut env_ptr_ptr = 0;
         for ptr in env_ptrs {
-            env_ptr_ptr = push_usize(ptr)?;
+            push_usize(ptr, &mut sp)?;
         }
+        let env_ptr_ptr = sp;
 
-        let mut arg_ptr_ptr = 0;
         for ptr in arg_ptrs {
-            arg_ptr_ptr = push_usize(ptr)?;
+            push_usize(ptr, &mut sp)?;
         }
+        let arg_ptr_ptr = sp;
 
         // Push `argc` to the stack.
-        push_usize(argc)?;
+        push_usize(argc, &mut sp)?;
 
         Ok((sp, argc, arg_ptr_ptr, env_ptr_ptr))
     }
