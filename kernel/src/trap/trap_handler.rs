@@ -19,7 +19,6 @@ use crate::vm::user_ptr::UserReadPtr;
 /// __trap_from_user saved TrapContext, then jump to
 /// the middle of trap_return(), and then return to
 /// task_executor_unit(), which calls this trap_handler() function.
-#[allow(unused)]
 #[unsafe(no_mangle)]
 pub async fn trap_handler(task: &Task) -> bool {
     let stval = register::stval::read();
@@ -27,6 +26,11 @@ pub async fn trap_handler(task: &Task) -> bool {
 
     unsafe { load_trap_handler() };
 
+    // Here task updates global timer manager and checks if there
+    // are any expired timer. If there is, the task will wake up
+    // the relevant thread.
+    // to ensure that timer check is stably called, the kernel
+    // spawns a timer kernel thread [`time_init`] to do this.
     let current = get_time_duration();
     TIMER_MANAGER.check(current);
 
@@ -44,12 +48,8 @@ pub async fn trap_handler(task: &Task) -> bool {
 pub async fn user_exception_handler(task: &Task, e: Exception, stval: usize) {
     let mut cx = task.trap_context_mut();
     match e {
-        // 系统调用
         Exception::UserEnvCall => {
             let syscall_no = cx.syscall_no();
-            simdebug::when_debug!({
-                log::trace!("[trap_handler] user env call: syscall_no = {}", syscall_no);
-            });
             cx.sepc_forward();
 
             let sys_ret = syscall(syscall_no, cx.syscall_args()).await;
@@ -57,7 +57,6 @@ pub async fn user_exception_handler(task: &Task, e: Exception, stval: usize) {
             cx = task.trap_context_mut();
             cx.set_user_a0(sys_ret);
         }
-        // 内存错误
         Exception::StorePageFault | Exception::InstructionPageFault | Exception::LoadPageFault => {
             let access = match e {
                 Exception::InstructionPageFault => MemPerm::X,
@@ -79,7 +78,6 @@ pub async fn user_exception_handler(task: &Task, e: Exception, stval: usize) {
                 unimplemented!();
             }
         }
-        // 非法指令
         Exception::IllegalInstruction => {
             log::warn!("[trap_handler] illegal instruction at {:#x}", stval);
             let addr_space = task.addr_space();
@@ -97,7 +95,6 @@ pub async fn user_exception_handler(task: &Task, e: Exception, stval: usize) {
             log::warn!("The illegal instruction is {:#x}", inst);
             task.set_state(TaskState::Zombie);
         }
-        // 其他异常
         e => {
             log::warn!("Unknown user exception: {:?}", e);
         }
@@ -106,8 +103,9 @@ pub async fn user_exception_handler(task: &Task, e: Exception, stval: usize) {
 
 pub async fn user_interrupt_handler(task: &Task, i: Interrupt) {
     match i {
-        // 时钟中断
         Interrupt::SupervisorTimer => {
+            // in fact, this branch is never used. The kernel now only
+            // use the global timer to schedule.
             log::trace!("[trap_handler] timer interrupt");
             let current = get_time_duration();
             TIMER_MANAGER.check(current);
@@ -116,12 +114,10 @@ pub async fn user_interrupt_handler(task: &Task, i: Interrupt) {
                 yield_now().await;
             }
         }
-        // 外部中断
         Interrupt::SupervisorExternal => {
             log::info!("[kernel] receive externel interrupt");
             // driver::get_device_manager_mut().handle_irq();
         }
-        // 其他中断
         _ => {
             panic!("[trap_handler] Unsupported interrupt {:?}", i);
         }
