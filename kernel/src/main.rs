@@ -24,11 +24,7 @@ use core::ptr;
 
 use config::mm::{DTB_END, DTB_START};
 use mm::{self, frame, heap};
-use mutex::optimistic_mutex::optimistic_mutex_test;
-use osfuture::block_on;
 use processor::hart;
-use simdebug::when_debug;
-use vm::test_unmap_range;
 
 #[macro_use]
 extern crate alloc;

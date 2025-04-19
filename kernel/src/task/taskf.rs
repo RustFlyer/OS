@@ -8,6 +8,7 @@ use arch::riscv64::time::get_time_us;
 use core::cell::SyncUnsafeCell;
 use core::sync::atomic::AtomicUsize;
 use core::time::Duration;
+use osfuture::suspend_now;
 
 use arch::riscv64::time::get_time_duration;
 use config::process::CloneFlags;
@@ -52,7 +53,7 @@ impl Task {
         let mut timer = Timer::new(expire);
         timer.set_callback(self.get_waker().clone());
         TIMER_MANAGER.add_timer(timer);
-        future::suspend_now().await;
+        suspend_now().await;
         let now = get_time_duration();
         if expire > now {
             expire - now

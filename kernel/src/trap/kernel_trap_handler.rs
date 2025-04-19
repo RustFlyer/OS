@@ -4,12 +4,8 @@ use riscv::{
     register::{satp, scause, sepc, stval},
 };
 
-use arch::riscv64::mm::sfence_vma_all;
 use arch::riscv64::time::{get_time_duration, set_nx_timer_irq};
-use mm::address::{PhysPageNum, VirtAddr};
 use timer::TIMER_MANAGER;
-
-use crate::vm::trace_page_table_lookup;
 
 /// Kernel trap handler
 #[unsafe(no_mangle)]

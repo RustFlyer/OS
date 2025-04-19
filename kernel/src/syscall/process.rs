@@ -1,5 +1,4 @@
 use crate::task::TaskState;
-use crate::task::future::{suspend_now, yield_now};
 use crate::task::signal::sig_info::SigSet;
 use crate::task::{
     manager::TASK_MANAGER,
@@ -13,6 +12,7 @@ use alloc::vec::Vec;
 use bitflags::*;
 use config::process::CloneFlags;
 use osfs::sys_root_dentry;
+use osfuture::{suspend_now, yield_now};
 use systype::{SysError, SyscallResult};
 use vfs::file::File;
 use vfs::path::Path;

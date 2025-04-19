@@ -1,3 +1,4 @@
+use osfuture::yield_now;
 use riscv::{ExceptionNumber, InterruptNumber};
 use riscv::{
     interrupt::{Exception, Interrupt, Trap},
@@ -9,7 +10,7 @@ use mm::address::VirtAddr;
 use timer::TIMER_MANAGER;
 
 use crate::syscall::syscall;
-use crate::task::{Task, TaskState, yield_now};
+use crate::task::{Task, TaskState};
 use crate::trap::load_trap_handler;
 use crate::vm::mem_perm::MemPerm;
 use crate::vm::user_ptr::UserReadPtr;

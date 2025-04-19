@@ -7,28 +7,23 @@ use alloc::sync::Weak;
 use mutex::SpinNoIrqLock;
 
 use crate::task::tid::Tid;
-use lazy_static::lazy_static;
 
-lazy_static! {
-/// Task Manager
-///
-/// Task Manager takes control of all the user tasks in the kernel, using a BTreeMap
+/// `TASK_MANAGER` takes control of all the user tasks in the kernel, using a BTreeMap
 /// struct as the tid is the key and the weak point to task is the value.
 /// Task Manager is a global struct which is shared with all harts. Therefore, it's
 /// guarded by a spin lock that disables the interrupt.
 ///
-/// When a task is spawned, it should be added into the Task Manager. Also, the task should
+/// When a task is spawned, it should be added into the `TASK_MANAGER`. Also, the task should
 /// be removed when it is terminated.
 ///
-/// Task Manager should not disturb the life of a task so it does not ensure whether the task
+/// `TASK_MANAGER` should not disturb the life of a task so it does not ensure whether the task
 /// is alive or not. When the task is terminated, `get_task` will return none.
-    pub static ref TASK_MANAGER: TaskManager = TaskManager::new();
-}
+pub static TASK_MANAGER: TaskManager = TaskManager::new();
 
 pub struct TaskManager(SpinNoIrqLock<BTreeMap<Tid, Weak<Task>>>);
 
 impl TaskManager {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self(SpinNoIrqLock::new(BTreeMap::new()))
     }
 
