@@ -571,7 +571,7 @@ where
         return Err(SysError::EFAULT);
     }
 
-    debug_assert!(addr % size_of::<T>() == 0);
+    debug_assert!(addr % align_of::<T>() == 0);
     debug_assert!(len % size_of::<T>() == 0);
 
     let end_addr = usize::min(addr + len, USER_END);

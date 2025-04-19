@@ -8,7 +8,7 @@
 # Kernel package/output name
 # Bootloader selection (default BIOS for QEMU)
 # Target architecture specification
-DOCKER_NAME = my-os
+DOCKER_NAME = os
 PACKAGE_NAME = kernel
 BOOTLOADER = default
 TARGET = riscv64gc-unknown-none-elf

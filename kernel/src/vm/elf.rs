@@ -251,10 +251,10 @@ impl AddrSpace {
         mut auxv: Vec<AuxHeader>,
         random: &[u8; 16],
     ) -> SysResult<(usize, usize, usize, usize)> {
+        log::error!("[init_stack] start");
         /* Helper closures to push data to the stack. */
         // These closures updates the stack pointer and returns the value of
         // the new stack pointer.
-
         // Pushes a string to the stack.
         let push_str = |string: String, sp: &mut usize| -> SysResult<usize> {
             let string = CString::new(string).unwrap();
@@ -296,13 +296,11 @@ impl AddrSpace {
         for env in envs.into_iter().rev() {
             env_ptrs.push(push_str(env, &mut sp)?);
         }
-
         let mut arg_ptrs: Vec<usize> = Vec::with_capacity(args.len() + 1);
         arg_ptrs.push(0);
         for arg in args.into_iter().rev() {
             arg_ptrs.push(push_str(arg, &mut sp)?);
         }
-
         // Random interval after arguments and environment variables.
         let random_num = usize::from_le_bytes(random[0..8].try_into().unwrap());
         sp = (sp - random_num % 8192) & !0xf;
@@ -311,6 +309,7 @@ impl AddrSpace {
         push_str(String::from("OS (temp name)"), &mut sp)?;
         push_bytes(random, &mut sp)?;
         auxv.push(AuxHeader::new(aux::AT_RANDOM, sp));
+        sp &= !0xf;
 
         // Push the auxiliary vector to the stack.
         let null_aux = AuxHeader::new(aux::AT_NULL, 0);
@@ -318,20 +317,18 @@ impl AddrSpace {
         for aux in auxv.into_iter().rev() {
             push_aux(aux, &mut sp)?;
         }
-
         // Push pointers to the environment variables and command line arguments to the stack.
         for ptr in env_ptrs {
             push_usize(ptr, &mut sp)?;
         }
         let env_ptr_ptr = sp;
-
         for ptr in arg_ptrs {
             push_usize(ptr, &mut sp)?;
         }
         let arg_ptr_ptr = sp;
-
         // Push `argc` to the stack.
         push_usize(argc, &mut sp)?;
+        log::error!("[init_stack] end");
 
         Ok((sp, argc, arg_ptr_ptr, env_ptr_ptr))
     }
