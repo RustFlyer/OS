@@ -12,12 +12,16 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use bitflags::*;
 use config::process::CloneFlags;
-use driver::println;
 use osfs::sys_root_dentry;
 use systype::{SysError, SyscallResult};
 use vfs::file::File;
 use vfs::path::Path;
 
+/// `gettid()` returns the caller's thread ID (TID).  
+///
+/// # Type
+/// - In a single-threaded process, the thread ID is equal to the process ID (PID, as returned by getpid(2)).
+/// - In a multi-threaded process, all threads have the same PID, but each one has a unique TID.
 pub fn sys_gettid() -> SyscallResult {
     Ok(current_task().tid())
 }
@@ -27,19 +31,23 @@ pub fn sys_getpid() -> SyscallResult {
     Ok(current_task().pid())
 }
 
-/// sys_exit() system call terminates only the calling thread
-/// the return value (zero) should be discarded
-/// TODO: reparenting child processes
-/// TODO: send SIGCHLD to the parent process are performed only if this is the last thread in the thread group.
+/// `getppid()` returns the process ID of the parent of the calling process. This will be either the
+/// ID of the process that created this process using `fork()`, or, if that process has already terminated,
+/// the ID of the process to which this process has been reparented.
+///
+/// # Tips
+/// - If the caller's parent is in a different PID namespace, `getppid()` returns 0.
+/// - From a kernel perspective, the PID is sometimes also known as the thread group ID (TGID).
+///   This contrasts with the kernel thread ID (TID), which is unique for each thread.
 pub fn sys_getppid() -> SyscallResult {
     let r = current_task().ppid();
     log::info!("[sys_getppid] ppid: {r:?}");
     Ok(r)
 }
 
-/// _exit() system call terminates only the calling thread, and actions such as
-/// reparenting child processes or sending SIGCHLD to the parent process are
-/// performed only if this is the last thread in the thread group.
+/// `exit()` system call terminates only the calling thread, and actions such as
+/// reparenting child processes or sending SIGCHLD to the parent process are performed
+/// only if this is the last thread in the thread group.
 pub fn sys_exit(_exit_code: i32) -> SyscallResult {
     let task = current_task();
     task.set_state(TaskState::Zombie);
@@ -49,6 +57,12 @@ pub fn sys_exit(_exit_code: i32) -> SyscallResult {
     Ok(0)
 }
 
+/// `sched_yield()`  causes the calling thread to relinquish the CPU.  The thread is moved to the end
+/// of the queue for its static priority and a new thread gets to run.
+///
+/// # Tips
+/// - If the calling thread is the only thread in the highest priority list at that time, it will continue
+///   to run after a call to `sched_yield()`.
 pub async fn sys_sched_yield() -> SyscallResult {
     yield_now().await;
     Ok(0)
@@ -199,6 +213,24 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
     }
 }
 
+/// `clone()` create a new ("child") process.
+/// The system call provides more precise control over what pieces of execution
+/// context are shared between the calling process and the child process.
+///
+/// # CloneFlag
+/// - `CLONE_CHILD_CLEARTID`: Clear  (zero)  the  child thread ID at the location pointed to by child_tid
+///   (clone()) in child memory when the child exits, and do a wakeup on the futex at that address.
+///   The address involved may be changed by the `set_tid_address` system call.This is used by threading
+///   libraries.
+/// - `CLONE_CHILD_SETTID`: Store the child thread ID at the location pointed to by child_tid(clone())
+///   in the child's memory. The store operation completes before the clone call returns control to
+///   user space in the child process.
+/// - `CLONE_SETTLS`: The TLS (Thread Local Storage) descriptor is set to tls.
+///   The interpretation of tls and the resulting effect is architecture dependent.
+///   On architectures with a dedicated TLS register, it is the new value of that register.
+/// - `CLONE_PARENT_SETTID`: Store the child thread ID at the location pointed to by parent_tid (clone())
+///   in the parent's memory. The store operation completes before the clone call returns
+///   control to user space.
 pub async fn sys_clone(
     flags: usize,
     stack: usize,
@@ -236,6 +268,35 @@ pub async fn sys_clone(
     Ok(new_tid)
 }
 
+/// `execve()` executes the program referred to by `path`. This causes the program that is
+/// being run by the calling process to be replaced with a new program, with new stack, heap
+/// and (initialized and uninitialized) data segments.
+/// # Args
+/// - `path` must be either a binary executable, or a script starting with a line of the form:
+///   #!interpreter \[optional-arg\]
+/// - `argv` is an array of argument strings passed to the new program.
+/// - `envp` is an array of strings, conventionally of the form key=value, which are passed as
+///   environment to the new program.
+///
+/// # Tips
+/// - The argv and envp arrays must each include a null pointer at the end of the array.
+/// - If the current program is being ptraced, a SIGTRAP signal is sent to it after a successful `execve()`.
+///
+/// # Type
+/// - If the executable is an a.out dynamically linked binary executable containing shared-library
+///   stubs, the Linux dynamic linker ld.so(8) is called at the start of execution to bring needed
+///   shared objects into memory and link the executable with them.
+/// - If the executable is a dynamically linked ELF executable, the interpreter named in the PT_INTERP
+///   segment is used to load the needed shared objects. This interpreter is typically /lib/ld-linux.so.2
+///   for binaries linked with glibc
+///
+/// # Interpreter scripts
+/// An interpreter script is a text file that has execute permission enabled and whose first line
+/// is of the form:
+/// > #!interpreter \[optional-arg\]
+///
+/// The interpreter must be a valid pathname for an executable file.
+/// For portable use, optional-arg should either be absent, or be specified as a single word
 pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult {
     let task = current_task();
 
@@ -271,25 +332,19 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
     let mut envs = Vec::new();
     read_string_array(envp, &mut envs)?;
 
-    println!("args: {:?}", args);
-    println!("envs: {:?}", envs);
-    log::info!("[sys_execve]: path: {path:?}",);
+    log::info!("[sys_execve] args: {args:?}");
+    log::info!("[sys_execve] envs: {envs:?}");
+    log::info!("[sys_execve] path: {path:?}");
+
     let dentry = {
         let path = Path::new(sys_root_dentry(), path.clone());
         path.walk()?
     };
 
-    log::info!("[sys_execve]: open file");
+    // log::info!("[sys_execve]: open file");
     let file = <dyn File>::open(dentry)?;
-    {
-        let mut inode = file.meta().dentry.get_meta().inode.lock();
-        log::info!(
-            "[sys_execve]: execve the file with size {}",
-            inode.as_mut().unwrap().size()
-        );
-    }
     task.execve(file, args, envs, path)?;
-    log::info!("[sys_execve]: finish execve and convert to a new task");
+    // log::info!("[sys_execve]: finish execve and convert to a new task");
     Ok(0)
 }
 
@@ -318,6 +373,26 @@ enum WaitFor {
     Pid(Pid),
 }
 
+/// `sys_set_tid_address()` set pointer to thread ID.
+///  For each thread, the kernel maintains two attributes (addresses) called `set_child_tid` and
+///  `clear_child_tid`. These two attributes contain the value **NULL** by default.
+///
+/// # Type
+/// - **set_child_tid**: If a thread is started using `clone`(2) with the `CLONE_CHILD_SETTID` flag,
+///   `set_child_tid` is set to the value passed in the `ctid` argument of that system call.
+///   When `set_child_tid` is set, the very first thing the new thread does is to write its
+///   thread ID at this `address`.
+/// - **clear_child_tid**: If a thread is started using clone(2) with the `CLONE_CHILD_CLEARTID` flag,
+///   `clear_child_tid` is set to the value passed in the `ctid` argument of that system call.
+///
+/// # Tips
+/// When a thread whose `clear_child_tid` is **not NULL** terminates, then, if the thread is sharing memory
+/// with other threads, then 0 is written at the address specified in clear_child_tid and the kernel
+/// performs the following operation:
+/// > futex(clear_child_tid, FUTEX_WAKE, 1, NULL, NULL, 0);
+///  
+/// The effect of this operation is to wake a single thread that is performing a `futex` wait on  the
+/// memory location. Errors from the futex wake operation are ignored.
 pub fn sys_set_tid_address(tidptr: usize) -> SyscallResult {
     let task = current_task();
     // log::info!("[sys_set_tid_address] tidptr:{tidptr:#x}");
