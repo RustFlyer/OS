@@ -105,7 +105,6 @@ impl Dentry for ExtDentry {
 
     fn base_open(self: Arc<Self>) -> SysResult<Arc<dyn File>> {
         let inode = self.inode().unwrap();
-        log::debug!("{:?}", inode.inotype());
         match inode.inotype() {
             InodeType::File => {
                 let inode = inode

@@ -251,7 +251,6 @@ impl AddrSpace {
         mut auxv: Vec<AuxHeader>,
         random: &[u8; 16],
     ) -> SysResult<(usize, usize, usize, usize)> {
-        log::error!("[init_stack] start");
         /* Helper closures to push data to the stack. */
         // These closures updates the stack pointer and returns the value of
         // the new stack pointer.
@@ -328,7 +327,6 @@ impl AddrSpace {
         let arg_ptr_ptr = sp;
         // Push `argc` to the stack.
         push_usize(argc, &mut sp)?;
-        log::error!("[init_stack] end");
 
         Ok((sp, argc, arg_ptr_ptr, env_ptr_ptr))
     }

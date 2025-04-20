@@ -446,7 +446,6 @@ impl dyn File {
                 d_reclen: rec_len as u16,
             };
 
-            log::debug!("[sys_getdents64] linux dirent {linux_dirent:?}");
             if writen_len + rec_len > buf_len {
                 break;
             }
@@ -459,8 +458,6 @@ impl dyn File {
             buf_it[LEN_BEFORE_NAME..LEN_BEFORE_NAME + c_name_len - 1]
                 .copy_from_slice(dentry.name().as_bytes());
             buf_it[LEN_BEFORE_NAME + c_name_len - 1] = b'\0';
-
-            log::debug!("[sys_getdents64] linux dirent name {}", dentry.name());
 
             buf_it = &mut buf_it[rec_len..];
             writen_len += rec_len;

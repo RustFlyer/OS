@@ -32,6 +32,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         CLONE => sys_clone(args[0], args[1], args[2], args[3], args[4]).await,
         OPENAT => sys_openat(args[0], args[1], args[2] as i32, args[3] as u32).await,
         READ => sys_read(args[0], args[1], args[2]).await,
+        READLINKAT => sys_readlinkat(args[0], args[1], args[2], args[3]),
         LSEEK => sys_lseek(args[0], args[1] as isize, args[2]),
         EXECVE => sys_execve(args[0], args[1], args[2]).await,
         GETPID => sys_getpid(),
