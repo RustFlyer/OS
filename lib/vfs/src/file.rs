@@ -69,7 +69,7 @@ pub trait File: Send + Sync + DowncastSync {
     /// files should implement this function to write data to a regular file, and a file
     /// system that supports null files should implement this function to always discard
     /// the data in the buffer (i.e., do nothing).
-    async fn base_write(&self, _buf: &[u8], _offset: usize) -> SysResult<usize> {
+    async fn base_write(&self, _buf: &[u8], _pos: usize) -> SysResult<usize> {
         panic!(
             "`base_write` is not supported for this file: {}",
             self.dentry().path()
@@ -88,6 +88,13 @@ pub trait File: Send + Sync + DowncastSync {
         );
     }
 
+    fn base_readlink(&self, _buf: &mut [u8]) -> SysResult<usize> {
+        panic!(
+            "`base_readlink` is not supported for this file: {}",
+            self.dentry().path()
+        );
+    }
+
     /// Load all dentry and inodes in a directory. Will not advance dir offset.
     #[deprecated = "Legacy function from Phoenix OS."]
     fn base_load_dir(&self) -> SysResult<()> {
@@ -98,26 +105,19 @@ pub trait File: Send + Sync + DowncastSync {
     }
 
     #[deprecated = "Legacy function from Phoenix OS."]
-    fn base_ls(&self, path: String) {
-        todo!()
-    }
-
     fn flush(&self) -> SysResult<usize> {
         todo!()
     }
 
+    #[deprecated = "Legacy function from Phoenix OS."]
     fn ioctl(&self, _cmd: usize, _arg: usize) -> SysResult<()> {
         Err(SysError::ENOTTY)
     }
 
-    fn readlink(&self, buf: &mut [u8]) -> SysResult<usize> {
-        todo!()
-    }
-
     /// Given interested events, keep track of these events and return events
     /// that is ready.
+    #[deprecated = "Legacy function from Phoenix OS."]
     async fn base_poll(&self, events: PollEvents) -> PollEvents {
-        unimplemented!();
         let mut res = PollEvents::empty();
         if events.contains(PollEvents::IN) {
             res |= PollEvents::IN;
@@ -455,42 +455,25 @@ impl dyn File {
         Ok(writen_len)
     }
 
-    /// Reads all data from this file and returns them as a vector of bytes.
-    ///
-    /// `self` must not be a directory file.
-    #[deprecated = "Legacy function from Phoenix OS."]
-    pub async fn read_all(&self) -> SysResult<Vec<u8>> {
-        let size = self.size();
-        let mut buf = vec![0; size];
-
-        let _ulen = self.read(&mut buf).await?;
-        Ok(buf)
-    }
-
     #[deprecated = "Legacy function from Phoenix OS."]
     pub fn readlink_string(&self) -> SysResult<String> {
         let mut path_buf: Vec<u8> = vec![0; 512];
-        let len = self.readlink(&mut path_buf)?;
+        let len = self.base_readlink(&mut path_buf)?;
         path_buf.truncate(len + 1);
         let path = CString::from_vec_with_nul(path_buf)
             .unwrap()
             .into_string()
             .unwrap();
-        log::debug!("[File::readlink_string] read link returns {path}");
         Ok(path)
-    }
-
-    #[deprecated = "Legacy function from Phoenix OS."]
-    pub fn ls(&self, path: String) {
-        self.base_ls(path);
     }
 }
 
 impl_downcast!(sync File);
 
-/// This module contains implementations of the `elf::io::Read` and `elf::io::Seek` traits
-/// for the `File` trait. It allows the `elf` crate to read from a `File` as an `ElfStream`.
 mod elf_impls {
+    //! This module contains implementations of the [`elf::io::Read`] and [`elf::io::Seek`]
+    //! traits for the [`File`] trait. It allows the [`elf`] crate to create an [`ElfStream`]
+    //! which reads ELF file data from an underlying [`File`].
     use elf::io::{Read, Seek, SeekFrom as ElfSeekFrom};
     use elf::parse::IOError;
     use elf::parse::ParseError;

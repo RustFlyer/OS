@@ -64,7 +64,8 @@ pub trait Dentry: Send + Sync {
     ///
     /// `self` must be a valid directory. `dentry` must be a negative dentry and a child of `self`.
     /// After this call, `dentry` will become valid if the dentry exists (and the function returns
-    /// `Ok(())`), or invalid if the dentry does not exist (and the function returns `Err(ENOENT)`).
+    /// `Ok(())`), or remains invalid if the dentry does not exist (and the function returns
+    /// `Err(ENOENT)`).
     ///
     /// # Errors
     /// Returns `ENOENT` if the dentry does not exist. Other errors may be returned if the
@@ -105,6 +106,10 @@ pub trait Dentry: Send + Sync {
     /// Sets the inode of this dentry.
     fn set_inode(&self, inode: Arc<dyn Inode>) {
         *self.get_meta().inode.lock() = Some(inode);
+    }
+
+    fn unset_inode(&self) {
+        *self.get_meta().inode.lock() = None;
     }
 
     /// Returns whether this dentry is a negative dentry.
@@ -224,10 +229,7 @@ impl dyn Dentry {
                 let dentry = self.new_neg_child(name);
                 match self.base_lookup(dentry.as_ref()) {
                     Ok(_) | Err(SysError::ENOENT) => Ok(dentry),
-                    Err(e) => {
-                        log::warn!("Failed to lookup dentry: {:?}", e);
-                        Err(e)
-                    }
+                    Err(e) => Err(e),
                 }
             }
         }

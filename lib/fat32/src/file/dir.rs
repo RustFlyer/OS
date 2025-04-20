@@ -1,4 +1,5 @@
 use alloc::sync::Arc;
+
 use config::vfs::SeekFrom;
 use mutex::{ShareMutex, new_share_mutex};
 use systype::{SysError, SysResult};
@@ -66,8 +67,8 @@ impl File for FatDirFile {
     }
 
     fn base_load_dir(&self) -> SysResult<()> {
-        let mut iter = self.dir.lock().iter();
-        while let Some(entry) = iter.next() {
+        let iter = self.dir.lock().iter();
+        for entry in iter {
             let Ok(entry) = entry else {
                 return Err(SysError::EIO);
             };

@@ -7,17 +7,16 @@ use mutex::ShareMutex;
 use systype::SysResult;
 use vfs::file::{File, FileMeta};
 
-use crate::{dentry::ExtDentry, ext::file::ExtFile, inode::link::ExtLinkInode};
-pub struct ExtLinkFile {
+use crate::{dentry::ExtDentry, ext::file::ExtFile, inode::file::ExtFileInode};
+
+/// A [`File`] implementation for an ext4 regular file.
+pub struct ExtRegFile {
     meta: FileMeta,
     file: ShareMutex<ExtFile>,
 }
 
-unsafe impl Send for ExtLinkFile {}
-unsafe impl Sync for ExtLinkFile {}
-
-impl ExtLinkFile {
-    pub fn new(dentry: Arc<ExtDentry>, inode: Arc<ExtLinkInode>) -> Arc<Self> {
+impl ExtRegFile {
+    pub fn new(dentry: Arc<ExtDentry>, inode: Arc<ExtFileInode>) -> Arc<Self> {
         Arc::new(Self {
             meta: FileMeta::new(dentry.clone()),
             file: inode.file.clone(),
@@ -26,7 +25,7 @@ impl ExtLinkFile {
 }
 
 #[async_trait]
-impl File for ExtLinkFile {
+impl File for ExtRegFile {
     fn meta(&self) -> &FileMeta {
         &self.meta
     }

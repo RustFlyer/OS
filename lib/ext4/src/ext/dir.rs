@@ -1,23 +1,32 @@
-use alloc::{ffi::CString, vec::Vec};
-use core::mem::MaybeUninit;
+//! Module for wrapping `ext4_dir` struct from `lwext4_rust` crate, which represents a
+//! directory file in the ext4 filesystem.
+//!
+//! This module provides functions to open, create, and remove directories, and read
+//! directory entries, along with other directory-related operations.
 
-use lwext4_rust::{
-    InodeTypes,
-    bindings::{
-        ext4_dir, ext4_dir_close, ext4_dir_entry_next, ext4_dir_entry_rewind, ext4_dir_mk,
-        ext4_dir_open,
-    },
-};
+use core::{ffi::CStr, mem::MaybeUninit, panic};
 
-/// Wrapper for C-interface `ext4_dir` struct which represents a directory.
+use alloc::{ffi::CString, string::String};
+use config::inode::InodeType;
+use lwext4_rust::{bindings::{
+    ext4_dir, ext4_dir_close, ext4_dir_entry_next, ext4_dir_entry_rewind, ext4_dir_mk, ext4_dir_mv,
+    ext4_dir_open, ext4_direntry,
+}, InodeTypes};
+
+use systype::{SysError, SysResult};
+
+/// Wrapper for `lwext4_rust` crate's `ext4_dir` struct which represents a directory
+/// file which can reads and writes directory entries.
 pub struct ExtDir(ext4_dir);
 
-/// A directory entry in Ext4 filesystem.
-pub struct ExtDirEntry<'a> {
-    pub inode: u32,
-    pub name: &'a str,
-    pub type_: u8,
-}
+/// Wrapper for `lwext4_rust` crate's `ext4_direntry` struct which represents a directory
+/// entry.
+///
+/// This struct wraps a shared reference to `ext4_direntry`, which points into a
+/// [`ExtDir`] instance. The user can get an [`ExtDirEntry`] by calling
+/// [`ExtDir::next()`], and Rust's borrow checker will ensure that the [`ExtDirEntry`]
+/// is valid.
+pub struct ExtDirEntry<'a>(&'a ext4_direntry);
 
 impl Drop for ExtDir {
     fn drop(&mut self) {
@@ -28,88 +37,120 @@ impl Drop for ExtDir {
 }
 
 impl ExtDir {
-    /// Opens a directory at the given path and returns a handle to it.
-    pub fn open(path: &str) -> Result<Self, i32> {
-        let c_path = CString::new(path).unwrap();
+    /// Opens a directory file at the given path and returns a handle to it.
+    ///
+    /// `path` is the absolute path to the file to be opened.
+    pub fn open(path: &CStr) -> SysResult<Self> {
         let mut dir = MaybeUninit::uninit();
-        let err = unsafe { ext4_dir_open(dir.as_mut_ptr(), c_path.as_ptr()) };
-
+        let err = unsafe { ext4_dir_open(dir.as_mut_ptr(), path.as_ptr()) };
         match err {
             0 => unsafe { Ok(Self(dir.assume_init())) },
-            e => {
-                log::warn!("ext4_dir_open failed: {}, error = {}", path, err);
-                Err(e)
+            _ => {
+                let err = SysError::from_i32(err);
+                log::warn!(
+                    "ext4_dir_open failed: path = {}, error = {:?}",
+                    path.to_str().unwrap(),
+                    err
+                );
+                Err(err)
             }
         }
     }
 
-    /// Creates a new directory at the given path, opens it, and returns a handle to it.
-    pub fn create(path: &str) -> Result<Self, i32> {
-        let c_path = CString::new(path).unwrap();
-        let err = unsafe { ext4_dir_mk(c_path.as_ptr()) };
-        if err != 0 {
-            log::warn!("ext4_dir_mk failed: {}, error = {}", path, err);
-            return Err(err);
+    /// Creates a directory at the given path.
+    pub fn create(path: &CStr) -> SysResult<()> {
+        let err = unsafe { ext4_dir_mk(path.as_ptr()) };
+        match err {
+            0 => Ok(()),
+            _ => {
+                let err = SysError::from_i32(err);
+                log::warn!(
+                    "ext4_dir_mk failed: path = {}, error = {:?}",
+                    path.to_str().unwrap(),
+                    err
+                );
+                return Err(err);
+            }
         }
-        ExtDir::open(path)
     }
 
-    /// Returns the next directory entry in the directory.
+    /// Returns a shared reference to the next directory entry in the directory.
     /// Returns `None` if there are no more entries.
     pub fn next(&mut self) -> Option<ExtDirEntry> {
-        unsafe {
-            if ext4_dir_entry_next(&mut self.0).is_null() {
-                return None;
-            }
-        };
-        let name = &self.0.de.name[..self.0.de.name_length as usize];
-        Some(ExtDirEntry {
-            inode: self.0.de.inode,
-            name: core::str::from_utf8(&name).unwrap(),
-            type_: self.0.de.inode_type,
-        })
+        unsafe { ext4_dir_entry_next(&mut self.0).as_ref() }.map(|entry| ExtDirEntry(entry))
     }
 
-    /// Rewinds the directory to the beginning. When calling `next()` after this,
-    /// it will return directory entries from the beginning again.
+    /// Rewinds the directory entry offset to the beginning of the directory file. When
+    /// calling [`Self::next()`] after this, it will return directory entries from the
+    /// beginning again.
     pub fn rewind(&mut self) {
         unsafe {
             ext4_dir_entry_rewind(&mut self.0);
         }
     }
 
-    pub fn lwext4_dir_entries(&self, path: &str) -> Result<(Vec<Vec<u8>>, Vec<InodeTypes>), i32> {
-        let c_path = CString::new(path).unwrap();
-        let mut d: ext4_dir = unsafe { core::mem::zeroed() };
-
-        let mut name: Vec<Vec<u8>> = Vec::new();
-        let mut inode_type: Vec<InodeTypes> = Vec::new();
-
-        unsafe {
-            ext4_dir_open(&mut d, c_path.as_ptr());
-
-            let mut de = ext4_dir_entry_next(&mut d);
-            while !de.is_null() {
-                let dentry = &(*de);
-                let len = dentry.name_length as usize;
-
-                let mut sss: [u8; 255] = [0; 255];
-                sss[..len].copy_from_slice(&dentry.name[..len]);
-                sss[len] = 0;
-
-                // debug!(
-                //     "  {} {}",
-                //     dentry.inode_type,
-                //     core::str::from_utf8(&sss).unwrap()
-                // );
-                name.push(sss[..(len + 1)].to_vec());
-                inode_type.push((dentry.inode_type as usize).into());
-
-                de = ext4_dir_entry_next(&mut d);
+    /// Recursively removes a directory and all its contents.
+    pub fn remove_recursively(path: &CStr) -> SysResult<()> {
+        let err = unsafe { ext4_dir_mk(path.as_ptr()) };
+        match err {
+            0 => Ok(()),
+            _ => {
+                let err = SysError::from_i32(err);
+                log::warn!(
+                    "ext4_dir_rm failed: path = {}, error = {:?}",
+                    path.to_str().unwrap(),
+                    err
+                );
+                return Err(err);
             }
-            ext4_dir_close(&mut d);
         }
+    }
 
-        Ok((name, inode_type))
+    /// Change the name or location of a directory.
+    pub fn rename(path: &CStr, new_path: &CStr) -> SysResult<()> {
+        let err = unsafe { ext4_dir_mv(path.as_ptr(), new_path.as_ptr()) };
+        match err {
+            0 => Ok(()),
+            _ => {
+                let err = SysError::from_i32(err);
+                log::warn!(
+                    "ext4_dir_mv failed: old_path = {}, new_path = {}, error = {:?}",
+                    path.to_str().unwrap(),
+                    new_path.to_str().unwrap(),
+                    err
+                );
+                return Err(err);
+            }
+        }
+    }
+}
+
+impl ExtDirEntry<'_> {
+    /// Returns the inode number of the directory entry.
+    pub fn ino(&self) -> u32 {
+        (*self.0).inode
+    }
+
+    /// Returns the inode type of the directory entry.
+    pub fn file_type(&self) -> InodeType {
+        match InodeTypes::from((*self.0).inode_type as usize) {
+            InodeTypes::EXT4_DE_BLKDEV => InodeType::BlockDevice,
+            InodeTypes::EXT4_DE_CHRDEV => InodeType::CharDevice,
+            InodeTypes::EXT4_DE_DIR => InodeType::Dir,
+            InodeTypes::EXT4_DE_FIFO => InodeType::Fifo,
+            InodeTypes::EXT4_DE_SYMLINK => InodeType::SymLink,
+            InodeTypes::EXT4_DE_REG_FILE => InodeType::File,
+            InodeTypes::EXT4_DE_SOCK => InodeType::Socket,
+            InodeTypes::EXT4_DE_UNKNOWN => InodeType::Unknown,
+            // `InodeTypes` enum in `lwext4_rust` crate is badly designed; some variants
+            // are duplicated and we just ignore them here.
+            _ => panic!(),
+        }
+    }
+
+    /// Returns the name of the directory entry.
+    pub fn name(&self) -> SysResult<String> {
+        let name_bytes = self.0.name[..self.0.name_length as usize].to_vec();
+        String::from_utf8(name_bytes).map_err(|_| SysError::EUTFFAIL)
     }
 }

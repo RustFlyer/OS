@@ -1,4 +1,4 @@
-use alloc::{string::String, sync::Arc};
+use alloc::sync::Arc;
 
 use mutex::ShareMutex;
 use vfs::file::{File, FileMeta};
@@ -34,13 +34,9 @@ impl File for ExtDirFile {
         dir.next();
 
         while let Some(dentry) = dir.next() {
-            let _ = self.dentry().lookup(dentry.name);
+            let _ = self.dentry().lookup(&dentry.name()?);
         }
 
         Ok(())
-    }
-
-    fn base_ls(&self, path: String) {
-        self.dir.lock().lwext4_dir_entries(&path).unwrap();
     }
 }
