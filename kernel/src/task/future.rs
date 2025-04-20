@@ -153,10 +153,7 @@ pub async fn task_executor_unit(task: Arc<Task>) {
         task.get_name()
     );
     task.set_waker(take_waker().await);
-    unsafe {
-        set_timer_irq(1);
-    }
-    log::debug!("timer set");
+    set_nx_timer_irq();
 
     loop {
         // trap_return connects user and kernel.
@@ -170,24 +167,11 @@ pub async fn task_executor_unit(task: Arc<Task>) {
             _ => {}
         }
 
-        // log::error!("loop");
-
         // handle user trap, not for kernel trap. Therefore, there should not
         // be some instructions with risks between trap_return and trap_handle.
         trap::trap_handler(&task);
 
         async_syscall(&task).await;
-
-        // if executor does not have other tasks, it is no need to yield.
-        // if task.timer_mut().schedule_time_out()
-        //     && executor::has_waiting_task_alone(current_hart().id)
-        // {
-        //     yield_now().await;
-        // }
-
-        if task.is_yield() {
-            yield_now().await;
-        }
 
         match task.get_state() {
             TaskState::Zombie => break,

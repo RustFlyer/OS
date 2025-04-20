@@ -5,7 +5,7 @@ use core::{
     time::Duration,
 };
 
-use crate::core::{TIMER_MANAGER, Timer};
+use crate::{timer::Timer, timer_manager::TIMER_MANAGER};
 use arch::riscv64::time::get_time_duration;
 
 #[derive(Debug)]

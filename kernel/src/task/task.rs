@@ -341,6 +341,10 @@ impl Task {
         f(&mut self.fd_table.lock())
     }
 
+    pub fn with_mut_sig_manager<T>(&self, f: impl FnOnce(&mut SigManager) -> T) -> T {
+        f(&mut self.sig_manager_mut())
+    }
+
     pub fn cwd_mut(&self) -> Arc<dyn Dentry> {
         self.cwd.lock().clone()
     }

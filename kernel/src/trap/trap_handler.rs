@@ -8,6 +8,7 @@ use arch::riscv64::time::{get_time_duration, set_nx_timer_irq};
 use mm::address::VirtAddr;
 use timer::TIMER_MANAGER;
 
+use crate::processor::current_hart;
 use crate::task::{Task, TaskState};
 use crate::trap::load_trap_handler;
 use crate::vm::mem_perm::MemPerm;
@@ -99,7 +100,10 @@ pub fn user_interrupt_handler(task: &Task, i: Interrupt) {
             log::error!("[trap_handler] timer interrupt");
             set_nx_timer_irq();
 
-            if executor::has_waiting_task() {
+            // if executor does not have other tasks, it is no need to yield.
+            if task.timer_mut().schedule_time_out()
+                && executor::has_waiting_task_alone(current_hart().id)
+            {
                 task.set_is_yield(true);
             }
         }

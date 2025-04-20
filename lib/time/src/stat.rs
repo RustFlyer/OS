@@ -3,7 +3,7 @@ use config::time::TIME_SLICE_DUATION;
 use core::time::Duration;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum TaskState {
+enum TaskState {
     KernelMode,
     UserMode,
 }

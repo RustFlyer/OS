@@ -69,6 +69,7 @@ impl SieGuard {
         })
     }
 }
+
 impl Drop for SieGuard {
     fn drop(&mut self) {
         if self.0 {

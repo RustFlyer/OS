@@ -1,12 +1,6 @@
-extern crate alloc;
-
-use alloc::collections::BinaryHeap;
 use arch::riscv64::time::get_time_duration;
-use core::cmp::Reverse;
 use core::task::Waker;
 use core::time::Duration;
-use mutex::SpinNoIrqLock;
-use spin::Lazy;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TimerState {
@@ -17,11 +11,11 @@ pub enum TimerState {
 
 #[derive(Debug, Clone)]
 pub struct Timer {
-    expire: Duration,
-    callback: Option<Waker>,
-    state: TimerState,
-    periodic: bool,
-    period: Option<Duration>,
+    pub(crate) expire: Duration,
+    pub(crate) callback: Option<Waker>,
+    pub(crate) state: TimerState,
+    pub(crate) periodic: bool,
+    pub(crate) period: Option<Duration>,
 }
 
 impl Timer {
@@ -61,7 +55,7 @@ impl Timer {
         self.periodic
     }
 
-    fn reset_periodic(&mut self) {
+    pub(crate) fn reset_periodic(&mut self) {
         if let Some(period) = self.period {
             self.expire += period;
             self.state = TimerState::Active;
@@ -92,43 +86,3 @@ impl PartialEq for Timer {
         self.expire == other.expire
     }
 }
-
-pub struct TimerManager {
-    timers: SpinNoIrqLock<BinaryHeap<Reverse<Timer>>>,
-}
-
-impl TimerManager {
-    pub fn new() -> Self {
-        Self {
-            timers: SpinNoIrqLock::new(BinaryHeap::new()),
-        }
-    }
-
-    pub fn add_timer(&self, timer: Timer) {
-        self.timers.lock().push(Reverse(timer));
-    }
-
-    pub fn check(&self, current: Duration) {
-        let mut timers = self.timers.lock();
-        while let Some(Reverse(mut timer)) = timers.peek().cloned() {
-            if current < timer.expire || !timer.is_active() {
-                break;
-            }
-
-            timers.pop();
-
-            if timer.is_periodic() {
-                timer.reset_periodic();
-                timers.push(Reverse(timer.clone()));
-            } else {
-                timer.state = TimerState::Expired;
-            }
-
-            if let Some(waker) = timer.callback.take() {
-                waker.wake();
-            }
-        }
-    }
-}
-
-pub static TIMER_MANAGER: Lazy<TimerManager> = Lazy::new(TimerManager::new);

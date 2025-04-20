@@ -1,6 +1,12 @@
+use osfuture::yield_now;
+
 use crate::{syscall::syscall, task::Task};
 
 pub async fn async_syscall(task: &Task) {
+    if task.is_yield() {
+        yield_now().await;
+    }
+
     if !task.is_syscall() {
         return;
     }

@@ -1,5 +1,5 @@
-use core::cmp;
 use alloc::{ffi::CString, string::ToString};
+use core::cmp;
 
 use simdebug::stop;
 use strum::FromRepr;
@@ -40,13 +40,11 @@ use crate::{
 /// # Tips
 ///
 /// - The `file offset` is set to the beginning of the file (see `lseek`(2)).
-///
 /// - A call to `open()` creates a new open file description, an entry in the system-wide table of  open
-/// files.  The open file description records the file offset and the file status flags.
-///        
+///   files.  The open file description records the file offset and the file status flags.
 /// - A file descriptor is a reference to an open file description; this reference  is  unaffected  if
-/// `pathname`  is subsequently removed or modified to refer to a different file.  For further details
-/// on open file descriptions, see `man 2 openat`.
+///   `pathname`  is subsequently removed or modified to refer to a different file.  For further details
+///   on open file descriptions, see `man 2 openat`.
 ///
 /// # Flags
 /// The argument `flags` must include one of  the  following  access  modes:  `O_RDONLY`,  `O_WRONLY`,  or
@@ -67,7 +65,7 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
     let task = current_task();
     let flags = OpenFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
     // `mode` is not supported yet.
-    // The  mode  argument  specifies  the file mode bits be applied when a new file is created.
+    // The mode argument specifies the file mode bits be applied when a new file is created.
     // This argument must be supplied when O_CREAT or O_TMPFILE is specified in flags;
     // Note that this mode applies only to future accesses of the newly created file;
     let _mode = InodeMode::from_bits_truncate(mode);
@@ -174,7 +172,8 @@ pub fn sys_readlinkat(dirfd: usize, pathname: usize, buf: usize, bufsiz: usize) 
     let mut buf_ptr = UserWritePtr::<u8>::new(buf, &addr_space);
     let len = cmp::min(link_path.len(), bufsiz);
     unsafe {
-        buf_ptr.try_into_mut_slice(len)?
+        buf_ptr
+            .try_into_mut_slice(len)?
             .copy_from_slice(&link_path.as_bytes()[..len]);
     }
     Ok(len)

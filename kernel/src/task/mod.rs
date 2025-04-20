@@ -26,7 +26,7 @@ pub fn init() {
 
     Task::spawn_from_elf(init_proc, "init_proc");
     timer_init();
-    elf_test();
+    // elf_test();
 }
 
 /// `timer_init` spawns a global timer update kernel thread.
