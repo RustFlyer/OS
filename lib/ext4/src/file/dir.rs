@@ -30,11 +30,12 @@ impl File for ExtDirFile {
     fn base_load_dir(&self) -> systype::SysResult<()> {
         let mut dir = self.dir.lock();
 
+        dir.rewind();
         dir.next();
         dir.next();
 
         while let Some(dentry) = dir.next() {
-            let _ = self.dentry().lookup(&dentry.name()?);
+            self.dentry().lookup(&dentry.name()?)?;
         }
 
         Ok(())

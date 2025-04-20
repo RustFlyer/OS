@@ -88,6 +88,9 @@ pub trait File: Send + Sync + DowncastSync {
         );
     }
 
+    /// Reads the content of a symbolic link.
+    ///
+    /// Returns the number of bytes read.
     fn base_readlink(&self, _buf: &mut [u8]) -> SysResult<usize> {
         panic!(
             "`base_readlink` is not supported for this file: {}",
@@ -95,8 +98,9 @@ pub trait File: Send + Sync + DowncastSync {
         );
     }
 
-    /// Load all dentry and inodes in a directory. Will not advance dir offset.
-    #[deprecated = "Legacy function from Phoenix OS."]
+    /// Reads directory entries of this file, and creates child [`Dentry`]s for them.
+    ///
+    /// `self` must be a directory file.
     fn base_load_dir(&self) -> SysResult<()> {
         panic!(
             "`base_load_dir` is not supported for this file: {}",
@@ -213,7 +217,7 @@ impl dyn File {
 
     /// Reads data from the file.
     ///
-    /// This function will read data from the file starting at the current position,
+    /// This function reads data from the file starting at the current position,
     /// tring to read as much data as possible into the provided buffer.
     ///
     /// This function will update the file position to the end of the data read.
@@ -267,11 +271,11 @@ impl dyn File {
         Ok(page)
     }
 
-    /// A helper function which reads data starting from the given position from a file that
-    /// has a page cache.
+    /// A helper function which reads data starting from the given position from a file
+    /// that has a page cache.
     ///
-    /// This function will try to read data by page from the page cache. If the page is
-    /// not cached, it will create a new [`Page`] in the page cache and try to read data from
+    /// This function tries to read data by page from the page cache. If the page is not
+    /// cached, it will create a new [`Page`] in the page cache and try to read data from
     /// the underlying file system into the page.
     ///
     /// This function does not update the file position.
@@ -305,14 +309,14 @@ impl dyn File {
 
     /// Writes data to the file.
     ///
-    /// This function will write data to the file starting at the current position,
-    /// trying to write as much data as possible from the provided buffer. If `O_APPEND`
-    /// is set for the file, the file position will be set to the end of the file before
+    /// This function writes data to the file starting at the current position, trying to
+    /// write as much data as possible from the provided buffer. If `O_APPEND` is set
+    /// for the file, the file position will be set to the end of the file before
     /// writing.
     ///
-    /// This function will update the file position to the end of the data written,
-    /// and will update the file size if the data written extends beyond the current end
-    /// of the file.
+    /// This function updates the file position to the end of the data written, and
+    /// updates the file size if the data written extends beyond the current end of the
+    /// file.
     ///
     /// `self` must not be a directory file. Instead, call [`File::todo`] to
     /// write data to a directory file.
@@ -342,12 +346,12 @@ impl dyn File {
         Ok(bytes_written)
     }
 
-    /// A helper function which writes data starting from the given position to a file that
-    /// has a page cache.
+    /// A helper function which writes data starting from the given position to a file
+    /// that has a page cache.
     ///
-    /// This function will try to write data by page to the page cache. If the page is
-    /// not cached, it will create a new [`Page`] in the page cache and try to write data
-    /// to the underlying file system into the page. If the page does not exist, it will
+    /// This function tries to write data by page to the page cache. If the page is not
+    /// cached, it will create a new [`Page`] in the page cache and try to write data to
+    /// the underlying file system into the page. If the page does not exist, it will
     /// create a new zeroed page and write data to it.
     ///
     /// This function does not update the file position and the file size.
@@ -386,10 +390,13 @@ impl dyn File {
         self.base_poll(events).await
     }
 
-    #[deprecated = "Legacy function from Phoenix OS."]
+    /// Reads directory entries of this file, and creates child [`Dentry`]s for them.
+    /// If the directory is already loaded, this function does nothing.
+    ///
+    /// `self` must be a directory file.
     pub fn load_dir(&self) -> SysResult<()> {
+        debug_assert!(self.inode().inotype() == InodeType::Dir);
         let inode = self.inode();
-        log::debug!("inode state: {:?}", inode.state());
         if inode.state() == InodeState::Uninit {
             self.base_load_dir()?;
             inode.set_state(InodeState::Synced)
@@ -397,7 +404,7 @@ impl dyn File {
         Ok(())
     }
 
-    #[deprecated = "Legacy function from Phoenix OS."]
+    /// Reads directory entries from this file into the provided buffer.
     pub fn read_dir(&self, buf: &mut [u8]) -> SysResult<usize> {
         self.load_dir()?;
 
@@ -406,18 +413,24 @@ impl dyn File {
         struct LinuxDirent64 {
             d_ino: u64,
             d_off: u64,
-
             d_reclen: u16,
             d_type: u8,
             // d_name follows here, which will be written later
         }
         let buf_len = buf.len();
-        // NOTE: Considering C struct align, we can not use `size_of` directly, because
+        // NOTE: We can not use `size_of` directly, because
         // `size_of::<LinuxDirent64>` equals 24, which is not what we want.
         const LEN_BEFORE_NAME: usize = 19;
         let mut writen_len = 0;
         let mut buf_it = buf;
-        for dentry in self.dentry().children().values().skip(self.pos()) {
+        for dentry in self
+            .dentry()
+            .get_meta()
+            .children
+            .lock()
+            .values()
+            .skip(self.pos())
+        {
             if dentry.is_negative() {
                 self.seek(SeekFrom::Current(1))?;
                 continue;
@@ -455,8 +468,10 @@ impl dyn File {
         Ok(writen_len)
     }
 
-    #[deprecated = "Legacy function from Phoenix OS."]
-    pub fn readlink_string(&self) -> SysResult<String> {
+    /// Reads the content of a symbolic link.
+    ///
+    /// Returns the number of bytes read.
+    pub fn readlink(&self) -> SysResult<String> {
         let mut path_buf: Vec<u8> = vec![0; 512];
         let len = self.base_readlink(&mut path_buf)?;
         path_buf.truncate(len + 1);

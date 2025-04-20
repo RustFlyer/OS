@@ -4,7 +4,7 @@ use async_trait::async_trait;
 
 use config::vfs::SeekFrom;
 use mutex::ShareMutex;
-use systype::SysResult;
+use systype::{SysError, SysResult};
 use vfs::file::{File, FileMeta};
 
 use crate::{dentry::ExtDentry, ext::file::ExtFile, inode::link::ExtLinkInode};
@@ -41,5 +41,16 @@ impl File for ExtLinkFile {
         let mut file = self.file.lock();
         file.seek(SeekFrom::Start(pos as u64))?;
         file.write(buf)
+    }
+
+    fn base_readlink(&self, mut buf: &mut [u8]) -> SysResult<usize> {
+        let mut ext4_file = self.file.lock();
+        let file_size = ext4_file.size() as usize;
+        if buf.len() < file_size {
+            return Err(SysError::EINVAL);
+        }
+        buf = &mut buf[..file_size];
+        ext4_file.seek(SeekFrom::Start(0))?;
+        ext4_file.read(buf)
     }
 }

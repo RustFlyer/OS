@@ -41,7 +41,7 @@ impl Inode for ExtFileInode {
             st_dev: 0,
             st_ino: self.meta.ino as u64,
             st_mode: inner.mode.bits(),
-            st_nlink: 0,
+            st_nlink: 1,
             st_uid: 0,
             st_gid: 0,
             st_rdev: 0,

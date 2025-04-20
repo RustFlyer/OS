@@ -148,12 +148,6 @@ pub trait Dentry: Send + Sync {
         self.get_meta().children.lock().get(name).cloned()
     }
 
-    /// Returns a clone of the map of child dentries of this dentry.
-    #[deprecated = "Legacy from Phoenix OS, called in `file.rs:read_dir`"]
-    fn children(&self) -> BTreeMap<String, Arc<dyn Dentry>> {
-        self.get_meta().children.lock().clone()
-    }
-
     /// Adds a child dentry to this dentry.
     fn add_child(&self, child: Arc<dyn Dentry>) {
         self.get_meta()

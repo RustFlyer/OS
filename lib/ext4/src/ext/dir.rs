@@ -5,14 +5,17 @@
 //! directory entries, along with other directory-related operations.
 
 use core::{ffi::CStr, mem::MaybeUninit, panic};
+use alloc::string::String;
 
-use alloc::{ffi::CString, string::String};
+use lwext4_rust::{
+    InodeTypes,
+    bindings::{
+        ext4_dir, ext4_dir_close, ext4_dir_entry_next, ext4_dir_entry_rewind, ext4_dir_mk,
+        ext4_dir_mv, ext4_dir_open, ext4_direntry,
+    },
+};
+
 use config::inode::InodeType;
-use lwext4_rust::{bindings::{
-    ext4_dir, ext4_dir_close, ext4_dir_entry_next, ext4_dir_entry_rewind, ext4_dir_mk, ext4_dir_mv,
-    ext4_dir_open, ext4_direntry,
-}, InodeTypes};
-
 use systype::{SysError, SysResult};
 
 /// Wrapper for `lwext4_rust` crate's `ext4_dir` struct which represents a directory
@@ -69,7 +72,7 @@ impl ExtDir {
                     path.to_str().unwrap(),
                     err
                 );
-                return Err(err);
+                Err(err)
             }
         }
     }
@@ -77,7 +80,7 @@ impl ExtDir {
     /// Returns a shared reference to the next directory entry in the directory.
     /// Returns `None` if there are no more entries.
     pub fn next(&mut self) -> Option<ExtDirEntry> {
-        unsafe { ext4_dir_entry_next(&mut self.0).as_ref() }.map(|entry| ExtDirEntry(entry))
+        unsafe { ext4_dir_entry_next(&mut self.0).as_ref() }.map(ExtDirEntry)
     }
 
     /// Rewinds the directory entry offset to the beginning of the directory file. When
@@ -101,7 +104,7 @@ impl ExtDir {
                     path.to_str().unwrap(),
                     err
                 );
-                return Err(err);
+                Err(err)
             }
         }
     }
@@ -119,7 +122,7 @@ impl ExtDir {
                     new_path.to_str().unwrap(),
                     err
                 );
-                return Err(err);
+                Err(err)
             }
         }
     }
@@ -128,12 +131,12 @@ impl ExtDir {
 impl ExtDirEntry<'_> {
     /// Returns the inode number of the directory entry.
     pub fn ino(&self) -> u32 {
-        (*self.0).inode
+        self.0.inode
     }
 
     /// Returns the inode type of the directory entry.
     pub fn file_type(&self) -> InodeType {
-        match InodeTypes::from((*self.0).inode_type as usize) {
+        match InodeTypes::from(self.0.inode_type as usize) {
             InodeTypes::EXT4_DE_BLKDEV => InodeType::BlockDevice,
             InodeTypes::EXT4_DE_CHRDEV => InodeType::CharDevice,
             InodeTypes::EXT4_DE_DIR => InodeType::Dir,
