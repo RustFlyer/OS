@@ -23,6 +23,8 @@ impl Drop for TidHandle {
     }
 }
 
+/// `tid_alloc()` can look for an unused id from [`INIT_PROC_ID`]
+/// and allocate it for a new thread.
 pub fn tid_alloc() -> TidHandle {
     match TID_ALLOCATOR.lock().alloc() {
         Some(tid) => TidHandle(tid),

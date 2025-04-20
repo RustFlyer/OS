@@ -13,12 +13,22 @@ use riscv::register::sstatus::FS;
 use arch::riscv64::interrupt::{disable_interrupt, enable_interrupt};
 
 const HART_ONE: Hart = Hart::new(0);
+
+/// `HARTS` is a global variable vector which controls all hart objects.
+///
+/// # Use
+/// A hart is used in UserFuture/KernelFuture poll and switches the CPU
+/// environment.
 pub static mut HARTS: [Hart; MAX_HARTS] = [HART_ONE; MAX_HARTS];
 
-/// Hart
+/// `Hart` is used to manage the state of each CPU.
 ///
-/// Used to Manage the State of CPU.
-/// One CPU has One Hart.
+/// # Args
+/// - `id` distinguishes different cpu.
+/// - `task` is a option.
+///   - when hart is running user task, `task` will point to it.
+///   - when hart is running kernel task, `task` will be set as None.
+/// - `pps` is a specified environment with processor privilege state.
 pub struct Hart {
     pub id: usize,
     task: Option<Arc<Task>>,

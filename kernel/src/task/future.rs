@@ -1,5 +1,6 @@
 use alloc::sync::Arc;
-use osfuture::{block_on, block_on_with_result};
+use arch::riscv64::time::{set_nx_timer_irq, set_timer_irq};
+use osfuture::{block_on_with_result, suspend_now, take_waker, yield_now};
 
 use core::future::Future;
 use core::pin::Pin;
@@ -10,19 +11,34 @@ use crate::processor::hart::current_hart;
 use crate::task::signal::sig_exec::sig_check;
 use crate::task::task::TaskState;
 use crate::trap;
-use core::task::Waker;
+use crate::trap::trap_syscall::async_syscall;
 
 use pps::ProcessorPrivilegeState;
 
-/// UserFuture
+/// `UserFuture` is a schedule unit for a task in the kernel. It's built up
+/// with user-task, env-processor privilege state and action-future.
 ///
-/// Wrap user tasks and their associated futures to manage privilege state switching
+/// User-task is the control unit of the thread/process. It stores the states
+/// of all aspects, such as tid, task state, memory-space and so on.
+/// Processor Privilege State is the environment of a user-future. Also, it's
+/// the environment of a hart which is running the future. It stores sum_cnt, sstatus,
+/// sepc and satp. When the user-future is hung up, the privilege state is stored.Then
+/// the state is loaded as the user-future is scheduled.
+/// Action-future refers to the main loop of a task, `task_executor_unit`.
+///
+///
+/// `UserFuture` has implemented Future trait, which means it can be scheduled by
+/// async-runtime.
 pub struct UserFuture<F: Future + Send + 'static> {
     task: Arc<Task>,
     pps: ProcessorPrivilegeState,
     future: F,
 }
 
+/// UserFuture Impl provices `new` function to create a UserFuture.
+/// Its pps(processor privilege state) will be initialized when the future
+/// suspend or yield and then hart will store its states in pps during
+/// its `user_switch_out`.
 impl<F: Future + Send + 'static> UserFuture<F> {
     #[inline]
     pub fn new(task: Arc<Task>, future: F) -> Self {
@@ -37,6 +53,14 @@ impl<F: Future + Send + 'static> UserFuture<F> {
 impl<F: Future + Send + 'static> Future for UserFuture<F> {
     type Output = F::Output;
 
+    /// When User Future is scheduled by executor, it will call this function.
+    /// Hart calls user switch in to load the state and environment of user-future.
+    /// Then user-future will call action-future and return to the address where it
+    /// is left in its last schedule.
+    ///
+    /// When it finds task addrspace is locked(borrowed by other threads), it will try to
+    /// wait for some time. If it can not get addrspace-lock after waiting, it will give up
+    /// running and yield.
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let future = unsafe { Pin::get_unchecked_mut(self) };
         let hart = current_hart();
@@ -56,11 +80,27 @@ impl<F: Future + Send + 'static> Future for UserFuture<F> {
     }
 }
 
+/// `KernelFuture` is also a schedule unit like `UserFuture`. But differrnt from
+/// `UserFuture`, it does not consist of task.
+///
+/// `KernelFuture` controls simple events in the kernel. These tasks do not
+/// require user memory-space, user-stack, tid and so on. Therefore, it can
+/// directly spawn with impl Fn.
+///
+/// Attention: kernel future function should not be a loop without yield. Because
+/// kernel future function does not rely on `task_executor_unit`, it does not
+/// have timer and yield to others when it runs for a long time. The schedule of
+/// KernelFuture is the duty of KernelFuture User. User should ensure running time of
+/// the future.
 pub struct KernelFuture<F: Future + Send + 'static> {
     pps: ProcessorPrivilegeState,
     future: F,
 }
 
+/// KernelFuture Impl provices `new` function to create a KernelFuture.
+/// Its pps(processor privilege state) will be initialized when the future
+/// suspend or yield and then hart will store its states in pps during
+/// its `kernel_switch_out`.
 impl<F: Future + Send + 'static> KernelFuture<F> {
     pub fn new(future: F) -> Self {
         Self {
@@ -73,6 +113,12 @@ impl<F: Future + Send + 'static> KernelFuture<F> {
 impl<F: Future + Send + 'static> Future for KernelFuture<F> {
     type Output = F::Output;
 
+    /// Compared with UserFuture poll, KernelFuture poll does not switch user addrspace
+    /// and not have record timer. It can be implemented more simplily without considering
+    /// async problems.
+    ///
+    /// In other aspects, KernelFuture poll performs similarly to UserFuture. When future is polled
+    /// again, kernel will enter from this function and continue in the position where it last left.  
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let future = unsafe { Pin::get_unchecked_mut(self) };
         let hart = current_hart();
@@ -83,9 +129,23 @@ impl<F: Future + Send + 'static> Future for KernelFuture<F> {
     }
 }
 
-/// Top-Level of Task
+/// `task_executor_unit` is a basic user unit used to schedule by the global executor.
+/// When a `UserFuture` is spawned by `spawn_user_task`, it will catch a new `task` and
+/// become a UserFuture stored in executor's TaskLine.
 ///
-/// Task will run in this loop in the kernel all the time
+/// When global executor executes a UserFuture, task will catch the waker of future from
+/// its context in the first time that `task_executor_unit` is executed. The Waker is used
+/// to wake the future as it's sleeping which means that the UserFuture is not in the
+/// TaskLine.
+///
+/// Then the program counter will advance in and get into a loop of user task. The loop mainly
+/// consists of trap_return, trap_handle and sig_check. The application returns to the user
+/// space and execute user instructions through trap_return. When trapped in user space, it returns
+/// to kernel space through trap_return and handle exceptional traps by trap_handle. If there are
+/// some signals received by the thread, thread can handle them in the sig_check.
+///
+/// Finally, the application will break from loop when it is set as Zombie. Then it will call
+/// exit() and wait parent process to recycle it and clean remained rubbish.
 pub async fn task_executor_unit(task: Arc<Task>) {
     log::debug!(
         "hart {}: run task [{}] in first time!",
@@ -93,13 +153,11 @@ pub async fn task_executor_unit(task: Arc<Task>) {
         task.get_name()
     );
     task.set_waker(take_waker().await);
+    set_nx_timer_irq();
 
     loop {
-        // log::debug!("try to step into user!");
-
+        // trap_return connects user and kernel.
         trap::trap_return(&task);
-
-        // log::debug!("return from user!");
 
         match task.get_state() {
             TaskState::Zombie => break,
@@ -109,12 +167,11 @@ pub async fn task_executor_unit(task: Arc<Task>) {
             _ => {}
         }
 
-        trap::trap_handler(&task).await;
+        // handle user trap, not for kernel trap. Therefore, there should not
+        // be some instructions with risks between trap_return and trap_handle.
+        trap::trap_handler(&task);
 
-        let id = current_hart().id;
-        if task.timer_mut().schedule_time_out() && executor::has_waiting_task_alone(id) {
-            yield_now().await;
-        }
+        async_syscall(&task).await;
 
         match task.get_state() {
             TaskState::Zombie => break,
@@ -126,14 +183,25 @@ pub async fn task_executor_unit(task: Arc<Task>) {
 
         // param "intr" always false for now
         sig_check(task.clone(), false).await;
+
+        // threads may be killed or stopped in sig_check.
+        match task.get_state() {
+            TaskState::Zombie => break,
+            TaskState::Waiting => {
+                suspend_now().await;
+            }
+            _ => {}
+        }
     }
 
     task.exit();
 }
 
-/// spawn user task
+/// `spawn_user_task` wraps task control unit and create a schedule unit by `task_executor_unit`
+/// to spawn a UserFuture for executor to schedule.
 ///
-/// Wrap the user task as a UserFuture and submit it to the scheduler
+/// When a task is initialized, it can be passed in this function and spawn a future
+/// to schedule.
 pub fn spawn_user_task(task: Arc<Task>) {
     log::info!("New Task [{}] spawns!", task.get_name());
     let future = UserFuture::new(task.clone(), task_executor_unit(task));
@@ -142,100 +210,13 @@ pub fn spawn_user_task(task: Arc<Task>) {
     handle.detach();
 }
 
-/// spawn kernel task
+/// `spawn_kernel_task` wraps a future(impl async Fn) and spawn a KernelFuture.
 ///
-/// Wrap the Future as a KernelFuture and submit it to the scheduler
+/// It can be used for creating some simple or single kernel tasks such as a timer
+/// update kernel thread.
 pub fn spawn_kernel_task<F: Future<Output = ()> + Send + 'static>(future: F) {
     let future = KernelFuture::new(future);
     let (task, handle) = executor::spawn(future);
     task.schedule();
     handle.detach();
-}
-
-/// Gets the current context waker  
-#[inline(always)]
-pub async fn take_waker() -> Waker {
-    TakeWakerFuture.await
-}
-
-/// Take Waker Future
-///
-/// Returns a Waker clone of the current context directly on the first poll
-struct TakeWakerFuture;
-
-impl Future for TakeWakerFuture {
-    type Output = Waker;
-    #[inline(always)]
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        Poll::Ready(cx.waker().clone())
-    }
-}
-
-/// Suspend Future
-///
-/// Relinquishes the execution of the current task
-struct SuspendFuture {
-    has_suspended: bool,
-}
-
-impl SuspendFuture {
-    const fn new() -> Self {
-        Self {
-            has_suspended: false,
-        }
-    }
-}
-
-impl Future for SuspendFuture {
-    type Output = ();
-
-    /// Suspend logic:
-    /// - The first poll returns Pending (triggers pending)
-    /// - Subsequent polls return to Ready (Resume Execution)
-    fn poll(mut self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Self::Output> {
-        match self.has_suspended {
-            true => Poll::Ready(()),
-            false => {
-                self.has_suspended = true;
-                Poll::Pending
-            }
-        }
-    }
-}
-
-/// Suspend the current task Immediately
-///
-/// With the await function, the current task will be relinquished
-/// to the processor until it is scheduled again
-pub async fn suspend_now() {
-    SuspendFuture::new().await
-}
-
-struct YieldFuture {
-    has_yielded: bool,
-}
-
-impl YieldFuture {
-    const fn new() -> Self {
-        Self { has_yielded: false }
-    }
-}
-
-impl Future for YieldFuture {
-    type Output = ();
-
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
-        match self.has_yielded {
-            true => Poll::Ready(()),
-            false => {
-                self.has_yielded = true;
-                cx.waker().wake_by_ref();
-                Poll::Pending
-            }
-        }
-    }
-}
-
-pub async fn yield_now() {
-    YieldFuture::new().await;
 }

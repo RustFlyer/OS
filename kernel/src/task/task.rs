@@ -9,7 +9,7 @@ use alloc::{
     sync::{Arc, Weak},
 };
 use core::cell::SyncUnsafeCell;
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use core::task::Waker;
 use mutex::{ShareMutex, SpinNoIrqLock, new_share_mutex};
 use vfs::{dentry::Dentry, file::File};
@@ -25,17 +25,12 @@ use crate::{trap::trap_context::TrapContext, vm::addr_space::AddrSpace};
 
 /// State of Task
 ///
-/// Running: When the task is running, in task_executor_unit loop
-///
-/// Zombie:  When the task exits and wait for the initproc to recycle it
-///
-/// Waiting: When the waiting syscall reaches, the task will be set and suspended
-///
-/// Sleeping: As Waiting. The difference is that its waiting time is longer
-///
-/// Interruptable: When the task is waiting for an long-time event such as I/O
-///
-/// UnInterruptable: As Interruptable. The difference is that it can not be interrupted by signal
+/// - Running: When the task is running, in task_executor_unit loop
+/// - Zombie:  When the task exits and wait for the initproc to recycle it
+/// - Waiting: When the waiting syscall reaches, the task will be set and suspended
+/// - Sleeping: As Waiting. The difference is that its waiting time is longer
+/// - Interruptable: When the task is waiting for an long-time event such as I/O
+/// - UnInterruptable: As Interruptable. The difference is that it can not be interrupted by signal
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TaskState {
     Running,
@@ -47,35 +42,98 @@ pub enum TaskState {
 }
 
 pub struct Task {
+    // Three members below are decided as birth and
+    // can not be changed during the lifetime.
+
+    // tid is the id of this thread. If is_process is
+    // true, tid is also pid.
     tid: TidHandle,
     process: Option<Weak<Task>>,
     is_process: bool,
 
+    // thread group takes control of tasks as threads
+    // (include the task itself)
     threadgroup: ShareMutex<ThreadGroup>,
 
+    // trap_context record context when the task switch
+    // between kernel space and user space.
     trap_context: SyncUnsafeCell<TrapContext>,
+
+    // timer records task time stat, such as kernel time
+    // and user time. Further, it can affect task schedule
+    // by its the rate cpu-time in all-time.
     timer: SyncUnsafeCell<TaskTimeStat>,
+
+    // waker can wake up the user future that task belongs to
+    // and affect task schedule.
     waker: SyncUnsafeCell<Option<Waker>>,
+
+    // state refers to task state and control the direction of
+    // a task.
     state: SpinNoIrqLock<TaskState>,
+
+    // addr_space is task memory space, which is mapping
+    // and organizing virtual address of a task.
     addr_space: SyncUnsafeCell<Arc<AddrSpace>>,
 
+    // parent is task spawner. It spawn the task by fork or
+    // clone and then parent is set as it.
     parent: ShareMutex<Option<Weak<Task>>>,
+
+    // children controls all the task spawned by this task.
+    // Attention: the pointer to children task is Arc. It's
+    // because parent task should recycle children and free
+    // them in wait4 at last.
     children: ShareMutex<BTreeMap<Tid, Arc<Task>>>,
 
+    // pgid is the id of a process group if existed.
     pgid: ShareMutex<PGid>,
+
+    // when task exits, it will set exit_code and wait for
+    // parent task to clean it and receive exit_code.
     exit_code: SpinNoIrqLock<i32>,
 
+    // sigmask is signal mask of task. When it is set
+    // signal check will ignore its relevant signals.
     sig_mask: SyncUnsafeCell<SigSet>,
+
+    // sig_handlers can handle signals by pre-set functions
+    // when sig_check discovers new unmasked signals, it will
+    // call relevant sig_handler functions and handles signals.
+    // If sig_handlers are unset, signals will be handled by
+    // default handlers in kernel.
     sig_handlers: ShareMutex<SigHandlers>,
+
+    // sig_manager organizes signals received by task.
     sig_manager: SyncUnsafeCell<SigManager>,
+
+    // sig_stack is the stack set specifically for signal-handlers.
+    // It stores signal handler context and relevant signal infos.
     sig_stack: SyncUnsafeCell<Option<SignalStack>>,
+
+    // sig_cx_ptr is ptr to sig_stack.
     sig_cx_ptr: AtomicUsize,
 
+    // tid_address is the pointer to thread ID.
     tid_address: SyncUnsafeCell<TidAddress>,
+
+    // fd_table stores open files fd and kernel can
+    // find file by its fd and write or read it.
     fd_table: ShareMutex<FdTable>,
+
+    // cwd is current working dentry. When AtFd::FdCwd is set,
+    // task should use relative path with cwd.
     cwd: ShareMutex<Arc<dyn Dentry>>,
+
+    // elf refers to the elf-file in disk and the task is running
+    // with loading elf-file datas.
     elf: SyncUnsafeCell<Arc<dyn File>>,
 
+    is_syscall: AtomicBool,
+
+    is_yield: AtomicBool,
+
+    // name, used for debug
     name: SyncUnsafeCell<String>,
 }
 
@@ -114,6 +172,8 @@ impl Task {
             fd_table: new_share_mutex(FdTable::new()),
             cwd: new_share_mutex(sys_root_dentry()),
             elf: SyncUnsafeCell::new(elf_file),
+            is_syscall: AtomicBool::new(false),
+            is_yield: AtomicBool::new(false),
             name: SyncUnsafeCell::new(name),
         };
         task
@@ -179,6 +239,8 @@ impl Task {
             fd_table,
             cwd,
             elf,
+            is_syscall: AtomicBool::new(false),
+            is_yield: AtomicBool::new(false),
             name,
         }
     }
@@ -279,6 +341,10 @@ impl Task {
         f(&mut self.fd_table.lock())
     }
 
+    pub fn with_mut_sig_manager<T>(&self, f: impl FnOnce(&mut SigManager) -> T) -> T {
+        f(&mut self.sig_manager_mut())
+    }
+
     pub fn cwd_mut(&self) -> Arc<dyn Dentry> {
         self.cwd.lock().clone()
     }
@@ -324,6 +390,13 @@ impl Task {
         self.sig_cx_ptr.load(Ordering::Relaxed)
     }
 
+    pub fn is_syscall(&self) -> bool {
+        self.is_syscall.load(Ordering::Relaxed)
+    }
+
+    pub fn is_yield(&self) -> bool {
+        self.is_yield.load(Ordering::Relaxed)
+    }
     // ========== This Part You Can Check the State of Task  ===========
     pub fn is_process(&self) -> bool {
         self.is_process
@@ -358,6 +431,14 @@ impl Task {
         self.sig_cx_ptr.store(new_ptr, Ordering::Relaxed);
     }
 
+    pub fn set_is_syscall(&self, is_syscall: bool) {
+        self.is_syscall.store(is_syscall, Ordering::Relaxed);
+    }
+
+    pub fn set_is_yield(&self, is_yield: bool) {
+        self.is_yield.store(is_yield, Ordering::Relaxed);
+    }
+
     pub fn set_cwd(&self, dentry: Arc<dyn Dentry>) {
         *self.cwd.lock() = dentry;
     }
@@ -367,7 +448,9 @@ impl Task {
     /// # Safety
     /// The caller must ensure that no other hart is accessing the address space
     pub unsafe fn set_addrspace(&self, addrspace: AddrSpace) {
-        unsafe { *self.addr_space.get() = Arc::new(addrspace); }
+        unsafe {
+            *self.addr_space.get() = Arc::new(addrspace);
+        }
     }
     // ========== This Part You Can Change the Member of Task  ===========
     pub fn add_child(&self, child: Arc<Task>) {

@@ -6,10 +6,10 @@ use arch::riscv64::{
 };
 use riscv::register::sstatus::{FS, SPP};
 
-/*when sp points to user stack of a task/process,
-sscratch(in RISCV) points to the start
-of the TrapContext of this task/process in user address space,
-until they switch when __trap_from_user, and the context begin to be saved*/
+/// when sp points to user stack of a task/process,
+/// sscratch(in RISCV) points to the start
+/// of the TrapContext of this task/process in user address space,
+/// until they switch when __trap_from_user, and the context begin to be saved
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub struct TrapContext {
@@ -38,24 +38,39 @@ pub struct TrapContext {
 
     // float register to be saved, useless for now
     pub user_fx: [f64; 32], // 50 - 81
-    // 这是RISC-V浮点控制和状态寄存器(Floating-point Control and Status Register)。
-    // 它用于控制浮点运算的行为和存储浮点运算的状态标志，比如舍入模式、异常标志等。
-    pub fcsr: u32, // 32bit
-    // 当浮点状态为"脏"(Dirty)时，即浮点寄存器的内容被修改过，
-    // 这个标志位会被设置为1，表明需要保存浮点寄存器的内容。
+
+    // This is RISC-V Floating-point Control and Status Register
+    // It can control the behaviour about floating-point number operation
+    pub fcsr: u32,
+
+    // This bit mark whether floating point number is dirty.
+    // When it is marked as 1, it means that float reg has been modified.
     pub is_dirty: u8,
-    // 当任务切换或者从信号处理返回时，如果之前保存了浮点寄存器的状态，
-    // 这个标志位会被设置为1，表明需要恢复浮点寄存器的内容。
+
+    // When task switch or application returns from sig-handle,
+    // this bit will be marked as 1, meaning that float reg needs to be restored.
     pub is_need_restore: u8,
-    // 当处理信号时，如果浮点状态为脏，
-    // 这个标志位会被设置，以确保正确保存和恢复浮点状态。
+
+    // when handle signals with a dirty float mode,
+    // this bit is marked as 1 to ensure that floating state is set correctly.
     pub is_signal_dirty: u8,
 
     pub last_a0: usize,
 }
 
 impl TrapContext {
-    /// 创建TrapContext
+    /// Initializes user trap context
+    ///
+    /// The application control stream starts from kernel space. Therefore,
+    /// it's important to set correct trap context to guarantee that appication
+    /// can return to user space from kernel space.
+    ///
+    /// Here `TrapContext` can catch application entry in the user memory space
+    /// and store user stack top in sp, which ensure user application can have
+    /// enough stack space to run.
+    ///
+    /// Due to a task spawned without any args passed in, `new()` function does
+    /// not provide any argv_ptr or envp_ptr here.
     pub fn new(entry: usize, sp: usize) -> Self {
         disable_interrupt();
         // disable Interrupt until trap handling
@@ -88,7 +103,15 @@ impl TrapContext {
         context
     }
 
-    /// 初始化trap context
+    /// initializes user trap context
+    ///
+    /// unlike `new()`, this function is called in the `execve()`. Therefore,
+    /// argv, envp and argc are provided by caller thread. Also, this thread
+    /// will have a new user stack and pass it into `init_user()` to initializes
+    /// it.
+    ///
+    /// Then `init_user()` call `clear_fx()` to clean its float environment and
+    /// initializes float regs for `execve()` function.
     pub fn init_user(
         &mut self,
         user_sp: usize,
@@ -104,13 +127,27 @@ impl TrapContext {
         self.sepc = sepc;
 
         // self.sstatus = sstatus::read();
+        self.clear_fx();
     }
 
+    /// clear float regs and set relevant privilege regs.
+    pub fn clear_fx(&mut self) {
+        self.user_fx.fill(0.0);
+        self.fcsr = 0;
+        self.is_dirty = 0;
+        self.is_need_restore = 0;
+        self.is_signal_dirty = 0;
+    }
+
+    /// this function can be called to get syscall number
+    /// when trapped
     pub fn syscall_no(&self) -> usize {
         // a7 == x17
         self.user_reg[17]
     }
 
+    /// this function can be called to get syscall args
+    /// when trapped
     pub fn syscall_args(&self) -> [usize; 6] {
         [
             self.user_reg[10],
@@ -137,12 +174,14 @@ impl TrapContext {
         self.user_reg[4] = val;
     }
 
-    /// 设置用户态trap pc
+    /// set entry to user space.
+    /// when the application temps to return from trap_return, it will
+    /// step in `entry` address in user space.
     pub fn set_entry_point(&mut self, entry: usize) {
         self.sepc = entry;
     }
 
-    /// pc 指向下一条指令
+    /// pc points to the next instruction.
     pub fn sepc_forward(&mut self) {
         self.sepc += 4;
     }

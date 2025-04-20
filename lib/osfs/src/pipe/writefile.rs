@@ -1,5 +1,5 @@
-use crate::pipe::{inode::PipeInode, write::PipeWritePollFuture};
 use alloc::boxed::Box;
+
 use async_trait::async_trait;
 use config::vfs::PollEvents;
 use osfuture::take_waker;
@@ -10,6 +10,7 @@ use vfs::{
 };
 
 use super::write::PipeWriteFile;
+use crate::pipe::{inode::PipeInode, write::PipeWritePollFuture};
 
 #[async_trait]
 impl File for PipeWriteFile {

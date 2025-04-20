@@ -53,8 +53,7 @@ bitflags::bitflags! {
 
 impl OpenFlags {
     /// Bitmask of access modes.
-    pub const ACCESS_MODE: Self =
-        Self::O_RDONLY.union(Self::O_WRONLY).union(Self::O_RDWR);
+    pub const ACCESS_MODE: Self = Self::O_RDONLY.union(Self::O_WRONLY).union(Self::O_RDWR);
 
     /// Bitmask of file creation flags.
     pub const CREATION_FLAGS: Self = Self::O_CREAT

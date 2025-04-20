@@ -1,4 +1,5 @@
 use alloc::{ffi::CString, string::ToString};
+use core::cmp;
 
 use simdebug::stop;
 use strum::FromRepr;
@@ -24,6 +25,38 @@ use crate::{
     vm::user_ptr::{UserReadPtr, UserWritePtr},
 };
 
+/// The `open`() system call opens the file specified by `pathname`.  If the specified file does not ex‐
+/// ist, it may optionally (if `O_CREAT` is specified in flags) be created by `open`().
+///
+/// # Returns
+/// The return value of open() is a file descriptor, a small, nonnegative integer that  is  used  in
+/// subsequent system calls (`read`(2), `write`(2), `lseek`(2), `fcntl`(2), etc.) to refer to the open file.
+/// The file descriptor returned by a successful call will be the  lowest-numbered  file  descriptor
+/// not currently open for the process.
+/// - default,  the  new  file  descriptor  is  set  to remain open across an `execve`(2) (i.e., the
+/// `FD_CLOEXEC` file descriptor flag described in `fcntl`(2)  is  initially  disabled);  the  `O_CLOEXEC`
+/// flag, described in `man 2 openat`, can be used to change this default.  
+///
+/// # Tips
+///
+/// - The `file offset` is set to the beginning of the file (see `lseek`(2)).
+/// - A call to `open()` creates a new open file description, an entry in the system-wide table of  open
+///   files.  The open file description records the file offset and the file status flags.
+/// - A file descriptor is a reference to an open file description; this reference  is  unaffected  if
+///   `pathname`  is subsequently removed or modified to refer to a different file.  For further details
+///   on open file descriptions, see `man 2 openat`.
+///
+/// # Flags
+/// The argument `flags` must include one of  the  following  access  modes:  `O_RDONLY`,  `O_WRONLY`,  or
+/// `O_RDWR`.  These request opening the file read-only, write-only, or read/write, respectively.
+///        
+/// In  addition,  zero  or  more  file  creation flags and file status flags can be bitwise-or'd in
+/// flags.  
+///
+/// The file creation flags are `O_CLOEXEC`, `O_CREAT`, `O_DIRECTORY`, `O_EXCL`, `O_NOCTTY`,  `O_NOFOLLOW`
+/// , `O_TMPFILE`, and `O_TRUNC`.  
+///
+/// The file status flags are all of the remaining flags listed in `man 2 openat`.
 pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) -> SyscallResult {
     log::trace!(
         "[sys_openat] dirfd: {dirfd}, pathname: {pathname:#x}, flags: {flags:#x}, mode: {mode:#x}"
@@ -32,6 +65,9 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
     let task = current_task();
     let flags = OpenFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
     // `mode` is not supported yet.
+    // The mode argument specifies the file mode bits be applied when a new file is created.
+    // This argument must be supplied when O_CREAT or O_TMPFILE is specified in flags;
+    // Note that this mode applies only to future accesses of the newly created file;
     let _mode = InodeMode::from_bits_truncate(mode);
 
     let path = {
@@ -51,6 +87,7 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
         dentry = Path::resolve_symlink_through(dentry)?;
     }
 
+    // If pathname does not exist, create it as a regular file.
     if dentry.is_negative() {
         if flags.contains(OpenFlags::O_CREAT) {
             let parent = dentry.parent().unwrap();
@@ -74,9 +111,22 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
     task.with_mut_fdtable(|ft| ft.alloc(file, flags))
 }
 
+/// `write()`  writes up to `len` bytes from the `addr`(the address of data in memory) to the file
+/// referred to by the file descriptor `fd`.
+///
+/// # Returns
+/// On success, the `number` of bytes written is returned.  On error, -1 is returned, and errno is set
+/// to indicate the cause of the error.
+///
+/// # Tips
+/// - `write()` allows user to write messages from `addr` to any accessed file, including real and virtual
+/// files such as stdout. When user calls `printf` in user space without `close(STDOUT)` + `dup`, the `fd` is STDOUT
+/// by default.
+/// - This is a `async` syscall, which means that it likely `yield` or `suspend` when called. Therefore, use
+/// `lock` carefully and do not pass the `lock` across `await` as possible.
 pub async fn sys_write(fd: usize, addr: usize, len: usize) -> SyscallResult {
     let task = current_task();
-    let addr_space= task.addr_space();
+    let addr_space = task.addr_space();
     let mut data_ptr = UserReadPtr::<u8>::new(addr, &addr_space);
 
     let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
@@ -84,6 +134,18 @@ pub async fn sys_write(fd: usize, addr: usize, len: usize) -> SyscallResult {
     file.write(buf).await
 }
 
+/// `read()`  attempts  to  read up to `count` bytes from file descriptor `fd` into the buffer starting at
+/// `buf`.
+///
+/// # Returns
+/// On  success, the `number` of bytes read is returned (zero indicates end of file), and the file `offset`
+/// is advanced by this number.
+///
+/// # Tips
+/// - `read()` allows user to read messages from any accessed file to `addr` , including real and virtual
+/// files such as stdin. When user calls `getchar` in user space without `close(STDIN)` + `dup`, the `fd` is STDIN by default.
+/// - This is a `async` syscall, which means that it likely `yield` or `suspend` when called. Therefore, use
+/// `lock` carefully and do not pass the `lock` across `await` as possible.
 pub async fn sys_read(fd: usize, buf: usize, count: usize) -> SyscallResult {
     let task = current_task();
     let addr_space = task.addr_space();
@@ -94,6 +156,39 @@ pub async fn sys_read(fd: usize, buf: usize, count: usize) -> SyscallResult {
     file.read(buf_ptr).await
 }
 
+pub fn sys_readlinkat(dirfd: usize, pathname: usize, buf: usize, bufsiz: usize) -> SyscallResult {
+    let task = current_task();
+    let addr_space = task.addr_space();
+    let path = UserReadPtr::<u8>::new(pathname, &addr_space).read_c_string(256)?;
+    let path = path.into_string().map_err(|_| SysError::EINVAL)?;
+
+    let dentry = task.walk_at(AtFd::from(dirfd), path)?;
+    let inode = dentry.inode().ok_or(SysError::ENOENT)?;
+    if !inode.inotype().is_symlink() {
+        return Err(SysError::EINVAL);
+    }
+    let file = <dyn File>::open(dentry).unwrap();
+    let link_path = file.readlink()?;
+    let mut buf_ptr = UserWritePtr::<u8>::new(buf, &addr_space);
+    let len = cmp::min(link_path.len(), bufsiz);
+    unsafe {
+        buf_ptr
+            .try_into_mut_slice(len)?
+            .copy_from_slice(&link_path.as_bytes()[..len]);
+    }
+    Ok(len)
+}
+
+/// `lseek()`  repositions  the  file `offset` of the open file description associated with the file
+/// descriptor `fd` to the argument `offset` according to the directive `whence` as follows:
+/// # Whence
+/// - SEEK_SET: The file offset is set to `offset` bytes.
+/// - SEEK_CUR: The file offset is set to its `current` location plus `offset` bytes.
+/// - SEEK_END: The file offset is set to the `size` of the file plus `offset` bytes.
+/// # Tips
+/// - `lseek()` allows the file offset to be set **beyond** the `end` of the file (but this does **not change**
+/// the `size` of the file).  If data is **later written** at this point, **subsequent reads** of the data in
+/// the gap (a "hole") return `null` bytes ('\0') until data is actually written into the gap.
 pub fn sys_lseek(fd: usize, offset: isize, whence: usize) -> SyscallResult {
     #[derive(FromRepr)]
     #[repr(usize)]
@@ -113,6 +208,12 @@ pub fn sys_lseek(fd: usize, offset: isize, whence: usize) -> SyscallResult {
     }
 }
 
+/// `getcwd()` get current working directory and push it into a `len`-size space `buf`.
+///
+/// # Returns
+/// On success, these functions return a `pointer` to a string containing the `pathname` of the current
+/// working directory.
+/// On  failure,  these functions return NULL, and `errno` is set to indicate the error.
 pub async fn sys_getcwd(buf: usize, len: usize) -> SyscallResult {
     let task = current_task();
     let addr_space = task.addr_space();
@@ -130,6 +231,32 @@ pub async fn sys_getcwd(buf: usize, len: usize) -> SyscallResult {
     Ok(ret)
 }
 
+/// `fstat()` get file status.
+/// These functions return information about a file, in the buffer pointed to by statbuf.
+///
+/// # Tips
+/// - No permmissions are required on the file itself.
+///
+/// # Returns
+/// return information about a file as a stat struct
+/// ```c
+/// [rept(C)]
+/// struct stat {
+///     dev_t     st_dev;         /* ID of device containing file */
+///     ino_t     st_ino;         /* Inode number */
+///     mode_t    st_mode;        /* File type and mode */
+///     nlink_t   st_nlink;       /* Number of hard links */
+///     uid_t     st_uid;         /* User ID of owner */
+///     gid_t     st_gid;         /* Group ID of owner */
+///     dev_t     st_rdev;        /* Device ID (if special file) */
+///     off_t     st_size;        /* Total size, in bytes */
+///     blksize_t st_blksize;     /* Block size for filesystem I/O */
+///     blkcnt_t  st_blocks;      /* Number of 512B blocks allocated */
+///     struct timespec st_atim;  /* Time of last access */
+///     struct timespec st_mtim;  /* Time of last modification */
+///     struct timespec st_ctim;  /* Time of last status change */
+/// };
+/// ```
 pub async fn sys_fstat(fd: usize, stat_buf: usize) -> SyscallResult {
     let task = current_task();
     let addr_space = task.addr_space();
@@ -141,25 +268,68 @@ pub async fn sys_fstat(fd: usize, stat_buf: usize) -> SyscallResult {
     Ok(0)
 }
 
+/// `close()` close a file descriptor `fd`.
+/// So that the `fd` no longer refers to any file and may be reused.
+///
+/// # Returns
+/// `close()` returns zero on success.  On error, -1 is returned, and errno is set appropriately.
+///
+/// # Tips
+/// - A successful close does not guarantee that the data has been successfully saved to disk,
+/// as the kernel uses the buffer cache to defer writes. filesystems do **not flush** buffers when
+/// a file is closed.(If wanted, use `fsync` [Not implemented]).
+/// - It is probably unwise to close file descriptors while they may be in use by system calls in
+/// other threads in the same process, since a file descriptor may be reused.
 pub fn sys_close(fd: usize) -> SyscallResult {
     let task = current_task();
     task.with_mut_fdtable(|table| table.remove(fd))?;
     Ok(0)
 }
 
+/// `dup()` creates a copy of the file descriptor oldfd, using the lowest-numbered unused
+/// file descriptor for the new descriptor.
+///
+/// # Tips
+/// - The OpenFlag is the same between old and new fd.
 pub fn sys_dup(fd: usize) -> SyscallResult {
     log::info!("[sys_dup] oldfd: {fd}");
     let task = current_task();
     task.with_mut_fdtable(|table| table.dup(fd))
 }
 
+/// `dup3()` creates a copy of the file descriptor `oldfd`, using the file descriptor number
+/// specified in `newfd` as new fd.
+///
+/// # Tips
+/// - If the file descriptor newfd was previously open, it is silently closed before being reused.
+///   The steps of closing and reusing the file descriptor newfd are performed atomically.
+///   - If oldfd is not a valid file descriptor, then the call fails, and newfd is not closed.
+///   - If oldfd is a valid file descriptor, and newfd has the same value as oldfd, then dup3() does
+///     fail with the error EINVAL.
+/// - The caller can force the close-on-exec flag to be set for the new file descriptor. The flag
+///   can close the fd automatically when `sys_execve` is called. It can prevent the fd leaked in
+///   the env of multi-threads.
 pub fn sys_dup3(oldfd: usize, newfd: usize, flags: i32) -> SyscallResult {
+    if oldfd.eq(&newfd) {
+        return Err(SysError::EINVAL);
+    }
     let task = current_task();
     let flags = OpenFlags::from_bits_truncate(flags);
-    assert!(oldfd != newfd);
     task.with_mut_fdtable(|table| table.dup3(oldfd, newfd, flags))
 }
 
+/// `mkdirat()` attempts to create a directory named `pathname`.
+///
+/// # Returns
+/// `mkdirat()` return zero on success, or -1 if an error occurred.
+///
+/// # Dirfd
+/// - If `pathname` is relative and `dirfd` is the special value `AT_FDCWD`, then pathname is interpreted
+///   relative to the current working directory of the calling process.
+/// - If `pathname` is absolute, then `dirfd` is ignored.
+///
+/// # Todo
+/// - Mode Control
 pub async fn sys_mkdirat(dirfd: usize, pathname: usize, mode: u32) -> SyscallResult {
     let task = current_task();
     let addr_space = task.addr_space();
@@ -177,6 +347,15 @@ pub async fn sys_mkdirat(dirfd: usize, pathname: usize, mode: u32) -> SyscallRes
     Ok(0)
 }
 
+/// `chdir()` changes the current working directory of the calling process to the directory specified
+/// in `path`.
+///
+/// # Returns
+/// On success, zero is returned.  On error, -1 is returned, and errno is set appropriately.
+///
+/// # Tips
+/// - A child process created via `fork()` inherits its parent's current working directory. The
+/// current working directory is left unchanged by `execve()`.
 pub async fn sys_chdir(path: usize) -> SyscallResult {
     let task = current_task();
     let addr_space = task.addr_space();
@@ -191,6 +370,23 @@ pub async fn sys_chdir(path: usize) -> SyscallResult {
     Ok(0)
 }
 
+/// `unlinkat()` deletes  a name from the filesystem. If that name was the last link to a file and no
+/// processes have the file open, the file is deleted and the space it was using is made  available
+/// for reuse.
+///
+/// # Type
+/// - If the name was the last link to a file but any **processes** still have the file open, the file
+///   will remain in existence until the last file descriptor referring to it is closed.
+/// - If the name referred to a `symbolic` link, the link is removed.
+/// - If the name referred to a socket, FIFO, or device, the name for it is removed but processes
+///   which have the object open may continue to use it.
+///
+/// # Dirfd
+/// - If the `pathname` given in pathname is relative, then it is interpreted relative to the directory
+///   referred to by the file descriptor `dirfd`.
+/// - If  the  `pathname`  given  in pathname is relative and dirfd is the special value `AT_FDCWD`, then
+///   `pathname` is interpreted relative to the current working directory of the calling process.
+/// - If the `pathname` given in pathname is absolute, then dirfd is ignored.
 pub async fn sys_unlinkat(dirfd: usize, pathname: usize, flags: i32) -> SyscallResult {
     let task = current_task();
     let flags = AtFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
@@ -219,21 +415,47 @@ pub async fn sys_unlinkat(dirfd: usize, pathname: usize, flags: i32) -> SyscallR
     parent.unlink(dentry.as_ref()).map(|_| 0)
 }
 
+/// `getdents64()` get directory entries.
+/// The system call getdents() reads several `linux_dirent` structures from the directory referred to
+/// by  the  open file descriptor `fd` into the `buf` pointed to by dirp.  The argument `len` specifies
+/// the size of the buffer.
+/// # linux_dirent
+/// ```c
+/// #[rept(C)]
+/// struct linux_dirent {
+///     unsigned long  d_ino;     /* Inode number */
+///     unsigned long  d_off;     /* Offset to next linux_dirent */
+///     unsigned short d_reclen;  /* Length of this linux_dirent */
+///     unsigned char  d_type;    /* File type */
+///     char           d_name[];  /* Filename (null-terminated) */
+/// }
+/// ```
+/// # Example
+///```md
+/// $ ./a.out /testfs/
+/// --------------- nread=120 ---------------
+/// inode#    file type  d_reclen  d_off   d_name
+///        2  directory    16         12  .
+///        2  directory    16         24  ..
+///       11  directory    24         44  lost+found
+///       12  regular      16         56  a
+///   228929  directory    16         68  sub
+///    16353  directory    16         80  sub2
+///   130817  directory    16       4096  sub3
+/// ```
 pub async fn sys_getdents64(fd: usize, buf: usize, len: usize) -> SyscallResult {
     log::debug!("[sys_getdents64] fd {fd}, buf {buf:#x}, len {len:#x}");
     let task = current_task();
     let addr_space = task.addr_space();
     let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
     let mut ptr = UserWritePtr::<u8>::new(buf, &addr_space);
-    log::debug!("[sys_getdents64] try to get buf");
-    let mut buf = unsafe { ptr.try_into_mut_slice(len) }?;
-    log::debug!("[sys_getdents64] try to read dir");
-    file.read_dir(&mut buf)
+    let buf = unsafe { ptr.try_into_mut_slice(len) }?;
+    file.read_dir(buf)
 }
 
 /// Implements the `mount` syscall for attaching a filesystem.
 ///
-/// # Arguments (User-space Perspective)
+/// # Arguments
 /// - `source`: Pointer to a null-terminated string (C-style) in user memory:
 ///   - For **device-backed** filesystems (e.g., ext4): Path to block device (e.g., `/dev/sda1`).
 ///   - For **virtual** filesystems (e.g., procfs): May be empty or a dummy string (e.g., `"none"`).
@@ -330,6 +552,10 @@ pub async fn sys_mount(
     Ok(0)
 }
 
+/// `umount()` remove the attachment of the (topmost) filesystem mounted on target with
+/// additional flags controlling the behavior of the operation.
+/// # Flags
+/// - to write when the basic functions are implemented...
 pub async fn sys_umount2(target: usize, flags: u32) -> SyscallResult {
     let task = current_task();
     let addr_space = task.addr_space();
@@ -391,6 +617,15 @@ pub fn sys_set_robust_list(_robust_list_head: usize, _len: usize) -> SyscallResu
     Ok(0)
 }
 
+/// `pipe2()` creates a `pipe`, a unidirectional data channel that can be used for interprocess
+/// communication with OpenFlags `flags`.
+///
+/// # Flags
+/// - **O_CLOEXEC**: Set the close-on-exec (FD_CLOEXEC) flag on the two new file descriptors.
+/// - **O_DIRECT**: Create a pipe that performs I/O in "`packet`" mode.  Each `write(2)` to the pipe is dealt
+///   with as a separate packet, and read(2)s from the pipe will read one packet at a time.
+/// - **O_NONBLOCK**: Set the O_NONBLOCK file status flag on the open file descriptions referred to by the new
+///   file descriptors.  Using this flag saves extra calls to `fcntl(2)` to achieve the same result.
 pub async fn sys_pipe2(pipefd: usize, flags: i32) -> SyscallResult {
     let task = current_task();
     let flags = OpenFlags::from_bits(flags)

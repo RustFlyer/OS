@@ -1,4 +1,8 @@
-use core::fmt::Debug;
+use core::{
+    fmt::Debug,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use alloc::collections::vec_deque::VecDeque;
 use bitflags::bitflags;
@@ -15,6 +19,10 @@ impl Task {
         self.recv(si)
     }
 
+    /// `recv()` can add signal to task signal manager. If
+    /// the relevant signal is `should wake` and task is in
+    /// Interrupt state, task will be waken and handle the
+    /// signal.
     fn recv(&self, si: SigInfo) {
         log::info!(
             "[Task::recv] tid {} recv {si:?} {:?}",
@@ -38,12 +46,23 @@ impl Task {
         }
     }
 
+    /// `set_wake_up_signal` can set which signals can wake threads when
+    /// threads receive these signals.
+    ///
+    /// Attention
+    /// - task should be in `Interrupt` State when this function is called.
+    /// - this function is set, not add. Old setting will be overwritten.
+    /// - except for `except` signals, `SIGKILL` and `SIGSTOP` are in should_wake
+    ///   by default.
     pub fn set_wake_up_signal(&self, except: SigSet) {
         debug_assert!(self.get_state() == TaskState::Interruptable);
         let manager = self.sig_manager_mut();
         manager.should_wake = except | SigSet::SIGKILL | SigSet::SIGSTOP
     }
 
+    /// `notify_parent` can notify the parent task through signal mechanism.
+    /// If caller thread has parent thread(yes, by default), caller can pass
+    /// its state `code` to parent, telling it what happened.
     pub fn notify_parent(self: &Arc<Self>, code: i32, _signum: Sig) {
         let parent = self.parent_mut().lock().as_ref().and_then(|p| p.upgrade());
         let Some(parent) = parent else {
@@ -323,4 +342,25 @@ pub struct SigContext {
     pub user_reg: [usize; 32],
     //
     pub fpstate: [usize; 66],
+}
+
+pub struct IntrBySignalFuture {
+    pub task: Arc<Task>,
+    pub mask: SigSet,
+}
+
+impl Future for IntrBySignalFuture {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let has_signal = self
+            .task
+            .with_mut_sig_manager(|pending| pending.has_expect_signals(!self.mask));
+        if has_signal {
+            log::warn!("[IntrBySignalFuture] received interupt signal");
+            Poll::Ready(())
+        } else {
+            Poll::Pending
+        }
+    }
 }

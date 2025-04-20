@@ -4,12 +4,8 @@ use riscv::{
     register::{satp, scause, sepc, stval},
 };
 
-use arch::riscv64::mm::sfence_vma_all;
 use arch::riscv64::time::{get_time_duration, set_nx_timer_irq};
-use mm::address::{PhysPageNum, VirtAddr};
 use timer::TIMER_MANAGER;
-
-use crate::vm::trace_page_table_lookup;
 
 /// Kernel trap handler
 #[unsafe(no_mangle)]
@@ -23,7 +19,6 @@ pub fn kernel_trap_handler() {
 }
 
 pub fn kernel_exception_handler(e: Exception, stval: usize) {
-    simdebug::stop();
     log::error!(
         "[kernel] {:?} in kernel, bad addr = {:#x}, bad instruction = {:#x}, satp = {:#x}",
         e,
@@ -40,6 +35,7 @@ pub fn kernel_interrupt_handler(i: Interrupt, _stval: usize) {
             log::info!("[kernel] receive externel interrupt");
         }
         Interrupt::SupervisorTimer => {
+            // log::info!("kernel SupervisorTimer enter");
             TIMER_MANAGER.check(get_time_duration());
             set_nx_timer_irq();
         }

@@ -10,6 +10,12 @@ use alloc::boxed::Box;
 use core::{future::Future, pin::Pin, str::Utf8Error};
 use strum::FromRepr;
 
+pub mod rlimit;
+pub mod rusage;
+
+pub use rlimit::*;
+pub use rusage::*;
+
 /// Type alias for syscall result. A syscall returns an `usize` if successful.
 pub type SyscallResult = Result<usize, SysError>;
 /// Type alias for result of general functions.

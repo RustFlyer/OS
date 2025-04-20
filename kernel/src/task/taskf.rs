@@ -3,9 +3,12 @@ use alloc::string::String;
 use alloc::string::ToString;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use arch::riscv64::time::get_time_ms;
+use arch::riscv64::time::get_time_us;
 use core::cell::SyncUnsafeCell;
 use core::sync::atomic::AtomicUsize;
 use core::time::Duration;
+use osfuture::suspend_now;
 
 use arch::riscv64::time::get_time_duration;
 use config::process::CloneFlags;
@@ -50,7 +53,7 @@ impl Task {
         let mut timer = Timer::new(expire);
         timer.set_callback(self.get_waker().clone());
         TIMER_MANAGER.add_timer(timer);
-        future::suspend_now().await;
+        suspend_now().await;
         let now = get_time_duration();
         if expire > now {
             expire - now
@@ -59,7 +62,40 @@ impl Task {
         }
     }
 
-    pub async fn execve(
+    /// `execve()` executes the program with `elf_file`. `execve()` can extract
+    /// elf data from `elf_file`. Then `execve()` builds a new user memory space
+    /// and maps new stack and new heap. After setting addrspace, `evecve()`
+    /// switches its addrspace(switch current pagetable in satp).
+    ///
+    /// Then this function initializes user stack, pushing argvs, envs and some
+    /// relevant infos into stack. And it initializes trap context to get ready
+    /// for switching from user space from kernel space.
+    ///
+    /// there is no new process; many attributes of the calling process remain
+    /// unchanged. All that `execve()` does is arrange for an existing process
+    /// (the calling process) to execute a new program.
+    ///
+    /// Attention: all threads other than the calling thread need to be destroyed
+    /// during an `execve()`. Mutexes, condition variables, and other pthreads are
+    /// not preserved.
+    ///
+    /// By default, file descriptors remain open across an `execve()`. File descriptors
+    /// that are marked close-on-exec are closed.
+    ///
+    /// # Attributes Not Preserved
+    /// - [ ] The dispositions of any `signals` that are `being caught` are reset to the default.
+    /// - [ ] Any alternative `signal stack` is not preserved.
+    /// - [x] `Memory mappings` are not preserved.
+    /// - [ ] Attached System V `shared memory segments` are detached.
+    /// - [x] POSIX `timers` are not preserved.
+    /// - [ ] POSIX `shared memory regions` are unmapped.
+    /// - [ ] open POSIX message queue `descriptors`.
+    /// - [ ] Any open POSIX named `semaphores` are closed.
+    /// - [ ] Any open `directory` streams are closed.
+    /// - [ ] `Memorylocks` are not preserved.
+    /// - [ ] `Exit handlers` are not preserved.
+    /// - [x] The `floating-point environment` is reset to the default.
+    pub fn execve(
         &self,
         elf_file: Arc<dyn File>,
         args: Vec<String>,
@@ -68,6 +104,7 @@ impl Task {
     ) -> SysResult<()> {
         let addrspace = AddrSpace::build_user()?;
         let (entry_point, auxv) = addrspace.load_elf(elf_file.clone())?;
+        log::debug!("[execve] load elf: over");
         let stack_top = addrspace.map_stack()?;
         addrspace.map_heap()?;
 
@@ -78,13 +115,20 @@ impl Task {
         }
         self.switch_addr_space();
 
+        // Use current time as random seed
+        let mut random = Vec::new();
+        random.extend(get_time_us().to_le_bytes());
+        random.extend(get_time_ms().to_le_bytes());
+        let random: [u8; 16] = random.as_slice().try_into().unwrap();
+
         let addrspace = self.addr_space();
         let (sp, argc, argv, envp) =
-            addrspace.init_stack(stack_top.to_usize(), args, envs, auxv)?;
+            addrspace.init_stack(stack_top.to_usize(), args, envs, auxv, &random)?;
 
         self.trap_context_mut()
             .init_user(sp, entry_point.to_usize(), argc, argv, envp);
 
+        *self.timer_mut() = TaskTimeStat::new();
         *self.elf_mut() = elf_file;
         *self.name_mut() = name;
         self.with_mut_fdtable(|table| table.close());

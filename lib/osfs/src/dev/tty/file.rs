@@ -3,6 +3,7 @@ use async_trait::async_trait;
 use driver::{print, sbi::getchar};
 use mutex::SpinNoIrqLock;
 
+use osfuture::yield_now;
 use systype::SysResult;
 use vfs::{
     dentry::Dentry,
@@ -44,17 +45,13 @@ impl File for TtyFile {
                     todo!();
                 }
             }
-            // log::debug!(
-            //     "[TtyFuture::poll] recv ch {ch}, cnt {cnt}, len {}",
-            //     buf.len()
-            // );
             buf[cnt] = ch;
 
             cnt += 1;
 
             if cnt < buf.len() {
                 log::warn!("can not async yield");
-                // yield_now().await;
+                yield_now().await;
                 continue;
             } else {
                 return Ok(buf.len());

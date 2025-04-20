@@ -24,11 +24,7 @@ use core::ptr;
 
 use config::mm::{DTB_END, DTB_START};
 use mm::{self, frame, heap};
-use mutex::optimistic_mutex::optimistic_mutex_test;
-use osfuture::block_on;
 use processor::hart;
-use simdebug::when_debug;
-use vm::test_unmap_range;
 
 #[macro_use]
 extern crate alloc;
@@ -103,6 +99,9 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         // boot::start_harts(hart_id);
 
         loader::init();
+
+        trap::init();
+
         task::init();
     } else {
         log::info!("hart {}: enabling page table", hart_id);

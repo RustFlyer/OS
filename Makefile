@@ -8,7 +8,7 @@
 # Kernel package/output name
 # Bootloader selection (default BIOS for QEMU)
 # Target architecture specification
-DOCKER_NAME = my-os
+DOCKER_NAME = os
 PACKAGE_NAME = kernel
 BOOTLOADER = default
 TARGET = riscv64gc-unknown-none-elf
@@ -151,6 +151,7 @@ fs-img: user
 	@sudo mount -t ext4 -o loop $(FS_IMG) emnt
 	@sudo cp -r $(USER_ELFS) emnt/
 	@sudo cp -r testcase/basic/* emnt/
+	@sudo cp -r testcase/busybox emnt/
 	@sudo cp -r img-data/* emnt/
 	@sudo chmod -R 755 emnt/
 	@sudo umount emnt

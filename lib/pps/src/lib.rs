@@ -7,10 +7,20 @@ use riscv::register::{
     sstatus::{self, Sstatus},
 };
 
-/// 处理器特权状态结构体
+/// `ProcessorPrivilegeState` records processor privilege state in `RISCV` of a task.
+/// when a task is scheduled(poll in or poll out), the hart will switch pps and
+/// set its processor privilege to a correct state for task running.
 ///
-/// 表示一个处理器的特权状态，包含保护块计数、sstatus、sepc和satp
-/// 每个CPU核心持有一个，也可额外存储，用于保存与恢复状态
+/// # Member
+/// - sum_cnt: it counts for sum. When SumGuard is created, it increases
+///   by one. When SumGuard is drop, it subtract one by itself. When
+///   `auto_sum()` is called, the state of sum will changed really.
+///   sum is a bit in sstatus, which decides whether kernel can access
+///   user space.
+/// - sstatus: it stores current state in S mode.
+/// - sepc: when kernel finish handling trap or interrupt, application
+///   can return `sepc` address in user space.
+/// - satp: a pagetable for mapping virtual address.
 #[derive(Debug, Clone, Copy)]
 pub struct ProcessorPrivilegeState {
     sum_cnt: usize,

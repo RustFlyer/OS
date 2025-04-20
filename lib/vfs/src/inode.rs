@@ -41,7 +41,7 @@ pub struct InodeMetaInner {
     pub mtime: TimeSpec,
     /// Last status change time.
     pub ctime: TimeSpec,
-    /// State of the inode, i.e., dirty or clean.
+    /// State of the inode.
     pub state: InodeState,
 }
 

@@ -8,8 +8,8 @@ use arch::riscv64::time::{get_time_duration, set_nx_timer_irq};
 use mm::address::VirtAddr;
 use timer::TIMER_MANAGER;
 
-use crate::syscall::syscall;
-use crate::task::{Task, TaskState, yield_now};
+use crate::processor::current_hart;
+use crate::task::{Task, TaskState};
 use crate::trap::load_trap_handler;
 use crate::vm::mem_perm::MemPerm;
 use crate::vm::user_ptr::UserReadPtr;
@@ -18,45 +18,37 @@ use crate::vm::user_ptr::UserReadPtr;
 /// __trap_from_user saved TrapContext, then jump to
 /// the middle of trap_return(), and then return to
 /// task_executor_unit(), which calls this trap_handler() function.
-#[allow(unused)]
 #[unsafe(no_mangle)]
-pub async fn trap_handler(task: &Task) -> bool {
+pub fn trap_handler(task: &Task) -> bool {
     let stval = register::stval::read();
     let cause = register::scause::read().cause();
 
     unsafe { load_trap_handler() };
 
+    // log::info!("[trap_handler] enter");
+
+    // Here task updates global timer manager and checks if there
+    // are any expired timer. If there is, the task will wake up
+    // the relevant thread.
+    // to ensure that timer check is stably called, the kernel
+    // spawns a timer kernel thread [`time_init`] to do this.
     let current = get_time_duration();
     TIMER_MANAGER.check(current);
 
     match cause {
         Trap::Exception(e) => {
-            user_exception_handler(task, Exception::from_number(e).unwrap(), stval).await
+            user_exception_handler(task, Exception::from_number(e).unwrap(), stval)
         }
-        Trap::Interrupt(i) => {
-            user_interrupt_handler(task, Interrupt::from_number(i).unwrap()).await
-        }
+        Trap::Interrupt(i) => user_interrupt_handler(task, Interrupt::from_number(i).unwrap()),
     }
     true
 }
 
-pub async fn user_exception_handler(task: &Task, e: Exception, stval: usize) {
-    let mut cx = task.trap_context_mut();
+pub fn user_exception_handler(task: &Task, e: Exception, stval: usize) {
     match e {
-        // 系统调用
         Exception::UserEnvCall => {
-            let syscall_no = cx.syscall_no();
-            simdebug::when_debug!({
-                log::trace!("[trap_handler] user env call: syscall_no = {}", syscall_no);
-            });
-            cx.sepc_forward();
-
-            let sys_ret = syscall(syscall_no, cx.syscall_args()).await;
-
-            cx = task.trap_context_mut();
-            cx.set_user_a0(sys_ret);
+            task.set_is_syscall(true);
         }
-        // 内存错误
         Exception::StorePageFault | Exception::InstructionPageFault | Exception::LoadPageFault => {
             let access = match e {
                 Exception::InstructionPageFault => MemPerm::X,
@@ -78,7 +70,6 @@ pub async fn user_exception_handler(task: &Task, e: Exception, stval: usize) {
                 unimplemented!();
             }
         }
-        // 非法指令
         Exception::IllegalInstruction => {
             log::warn!("[trap_handler] illegal instruction at {:#x}", stval);
             let addr_space = task.addr_space();
@@ -96,31 +87,30 @@ pub async fn user_exception_handler(task: &Task, e: Exception, stval: usize) {
             log::warn!("The illegal instruction is {:#x}", inst);
             task.set_state(TaskState::Zombie);
         }
-        // 其他异常
         e => {
             log::warn!("Unknown user exception: {:?}", e);
         }
     }
 }
 
-pub async fn user_interrupt_handler(task: &Task, i: Interrupt) {
+pub fn user_interrupt_handler(task: &Task, i: Interrupt) {
+    // log::error!("[trap_handler] user_interrupt_handler");
     match i {
-        // 时钟中断
         Interrupt::SupervisorTimer => {
-            log::trace!("[trap_handler] timer interrupt");
-            let current = get_time_duration();
-            TIMER_MANAGER.check(current);
+            log::error!("[trap_handler] timer interrupt");
             set_nx_timer_irq();
-            if task.timer_mut().schedule_time_out() && executor::has_waiting_task() {
-                yield_now().await;
+
+            // if executor does not have other tasks, it is no need to yield.
+            if task.timer_mut().schedule_time_out()
+                && executor::has_waiting_task_alone(current_hart().id)
+            {
+                task.set_is_yield(true);
             }
         }
-        // 外部中断
         Interrupt::SupervisorExternal => {
             log::info!("[kernel] receive externel interrupt");
             // driver::get_device_manager_mut().handle_irq();
         }
-        // 其他中断
         _ => {
             panic!("[trap_handler] Unsupported interrupt {:?}", i);
         }

@@ -1,5 +1,3 @@
 pub mod dir;
-pub mod file;
+pub mod reg;
 pub mod link;
-
-extern crate alloc;
