@@ -160,7 +160,7 @@ impl Path {
             return Err(SysError::ELOOP);
         }
 
-        let target_path = <dyn File>::open(Arc::clone(&dentry))?.readlink_string()?;
+        let target_path = <dyn File>::open(Arc::clone(&dentry))?.readlink()?;
         Path::new(dentry, target_path).walk_recursive(counter)
     }
 

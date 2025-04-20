@@ -1,3 +1,4 @@
+use core::cmp;
 use alloc::{ffi::CString, string::ToString};
 
 use simdebug::stop;
@@ -155,6 +156,28 @@ pub async fn sys_read(fd: usize, buf: usize, count: usize) -> SyscallResult {
     let buf_ptr = unsafe { buf.try_into_mut_slice(count) }?;
     let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
     file.read(buf_ptr).await
+}
+
+pub fn sys_readlinkat(dirfd: usize, pathname: usize, buf: usize, bufsiz: usize) -> SyscallResult {
+    let task = current_task();
+    let addr_space = task.addr_space();
+    let path = UserReadPtr::<u8>::new(pathname, &addr_space).read_c_string(256)?;
+    let path = path.into_string().map_err(|_| SysError::EINVAL)?;
+
+    let dentry = task.walk_at(AtFd::from(dirfd), path)?;
+    let inode = dentry.inode().ok_or(SysError::ENOENT)?;
+    if !inode.inotype().is_symlink() {
+        return Err(SysError::EINVAL);
+    }
+    let file = <dyn File>::open(dentry).unwrap();
+    let link_path = file.readlink()?;
+    let mut buf_ptr = UserWritePtr::<u8>::new(buf, &addr_space);
+    let len = cmp::min(link_path.len(), bufsiz);
+    unsafe {
+        buf_ptr.try_into_mut_slice(len)?
+            .copy_from_slice(&link_path.as_bytes()[..len]);
+    }
+    Ok(len)
 }
 
 /// `lseek()`  repositions  the  file `offset` of the open file description associated with the file
@@ -427,10 +450,8 @@ pub async fn sys_getdents64(fd: usize, buf: usize, len: usize) -> SyscallResult 
     let addr_space = task.addr_space();
     let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
     let mut ptr = UserWritePtr::<u8>::new(buf, &addr_space);
-    log::debug!("[sys_getdents64] try to get buf");
-    let mut buf = unsafe { ptr.try_into_mut_slice(len) }?;
-    log::debug!("[sys_getdents64] try to read dir");
-    file.read_dir(&mut buf)
+    let buf = unsafe { ptr.try_into_mut_slice(len) }?;
+    file.read_dir(buf)
 }
 
 /// Implements the `mount` syscall for attaching a filesystem.

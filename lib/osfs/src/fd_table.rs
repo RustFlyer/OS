@@ -1,12 +1,12 @@
-use core::fmt::{Debug, write};
-
 use alloc::{sync::Arc, vec::Vec};
+use core::fmt::Debug;
+
 use config::{fs::MAX_FDS, vfs::OpenFlags};
-use log::{debug, info};
+use log::info;
 use systype::{SysError, SysResult};
 use vfs::file::File;
 
-use crate::{dev::tty::TTY, simplefile::SFile};
+use crate::dev::tty::TTY;
 
 pub type Fd = usize;
 

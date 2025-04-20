@@ -205,7 +205,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
         }
         let child = TASK_MANAGER.get_task(child_pid).unwrap();
         task.remove_child(child);
-        log::error!("[sys_wait4] remove child_pid {}", child_pid);
+        log::info!("[sys_wait4] remove child_pid {}", child_pid);
         TASK_MANAGER.remove_task(child_pid);
         PROCESS_GROUP_MANAGER.remove(&task);
         // log::error!("[sys_wait4] out");

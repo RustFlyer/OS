@@ -1,7 +1,7 @@
-use alloc::sync::Arc;
+use alloc::{ffi::CString, sync::Arc};
 
 use config::{inode::InodeType, vfs::MountFlags};
-use systype::{SysError, SysResult};
+use systype::SysResult;
 use vfs::{
     dentry::Dentry,
     fstype::{FileSystemType, FileSystemTypeMeta},
@@ -41,7 +41,7 @@ impl FileSystemType for ExtFsType {
         log::debug!("[base_mount] run");
         let meta = SuperBlockMeta::new(dev, self.clone());
         let superblock = ExtSuperBlock::new(meta);
-        let root_dir = ExtDir::open("/").map_err(SysError::from_i32)?;
+        let root_dir = ExtDir::open(CString::new("/").unwrap().as_c_str())?;
         let root_inode = ExtDirInode::new(superblock.clone(), root_dir);
         root_inode.set_inotype(InodeType::Dir);
 
