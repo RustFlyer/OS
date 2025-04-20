@@ -433,7 +433,7 @@ impl VmArea {
         let old_prot = self.prot;
         self.prot = new_prot;
         self.pte_flags = PteFlags::from(new_prot);
-        for (&vpn, _) in &self.pages {
+        for &vpn in self.pages.keys() {
             let pte = page_table.find_entry(vpn).unwrap();
             pte.set_flags(self.pte_flags);
         }

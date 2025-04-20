@@ -16,7 +16,7 @@ use crate::{
 ///
 /// # Addr
 /// - If `addr` is NULL, then the kernel chooses the (page-aligned) address at which to create the mapping;
-/// this is the most portable method of creating a new mapping.
+///   this is the most portable method of creating a new mapping.
 /// - If `addr` is not NULL, then the kernel takes it as a hint about where to place the mapping;
 ///   on Linux, the kernel will pick a nearby page boundary and attempt to create the mapping there.
 ///   If another mapping already exists there, the kernel picks a new address that may or may not
