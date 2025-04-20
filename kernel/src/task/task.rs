@@ -9,7 +9,7 @@ use alloc::{
     sync::{Arc, Weak},
 };
 use core::cell::SyncUnsafeCell;
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use core::task::Waker;
 use mutex::{ShareMutex, SpinNoIrqLock, new_share_mutex};
 use vfs::{dentry::Dentry, file::File};
@@ -129,6 +129,10 @@ pub struct Task {
     // with loading elf-file datas.
     elf: SyncUnsafeCell<Arc<dyn File>>,
 
+    is_syscall: AtomicBool,
+
+    is_yield: AtomicBool,
+
     // name, used for debug
     name: SyncUnsafeCell<String>,
 }
@@ -168,6 +172,8 @@ impl Task {
             fd_table: new_share_mutex(FdTable::new()),
             cwd: new_share_mutex(sys_root_dentry()),
             elf: SyncUnsafeCell::new(elf_file),
+            is_syscall: AtomicBool::new(false),
+            is_yield: AtomicBool::new(false),
             name: SyncUnsafeCell::new(name),
         };
         task
@@ -233,6 +239,8 @@ impl Task {
             fd_table,
             cwd,
             elf,
+            is_syscall: AtomicBool::new(false),
+            is_yield: AtomicBool::new(false),
             name,
         }
     }
@@ -378,6 +386,13 @@ impl Task {
         self.sig_cx_ptr.load(Ordering::Relaxed)
     }
 
+    pub fn is_syscall(&self) -> bool {
+        self.is_syscall.load(Ordering::Relaxed)
+    }
+
+    pub fn is_yield(&self) -> bool {
+        self.is_yield.load(Ordering::Relaxed)
+    }
     // ========== This Part You Can Check the State of Task  ===========
     pub fn is_process(&self) -> bool {
         self.is_process
@@ -410,6 +425,14 @@ impl Task {
 
     pub fn set_sig_cx_ptr(&self, new_ptr: usize) {
         self.sig_cx_ptr.store(new_ptr, Ordering::Relaxed);
+    }
+
+    pub fn set_is_syscall(&self, is_syscall: bool) {
+        self.is_syscall.store(is_syscall, Ordering::Relaxed);
+    }
+
+    pub fn set_is_yield(&self, is_yield: bool) {
+        self.is_yield.store(is_yield, Ordering::Relaxed);
     }
 
     pub fn set_cwd(&self, dentry: Arc<dyn Dentry>) {

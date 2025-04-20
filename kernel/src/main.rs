@@ -99,6 +99,9 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         // boot::start_harts(hart_id);
 
         loader::init();
+
+        trap::init();
+
         task::init();
     } else {
         log::info!("hart {}: enabling page table", hart_id);

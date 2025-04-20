@@ -11,6 +11,7 @@ use crate::processor::hart::current_hart;
 use crate::task::signal::sig_exec::sig_check;
 use crate::task::task::TaskState;
 use crate::trap;
+use crate::trap::trap_syscall::async_syscall;
 
 use pps::ProcessorPrivilegeState;
 
@@ -169,14 +170,22 @@ pub async fn task_executor_unit(task: Arc<Task>) {
             _ => {}
         }
 
+        // log::error!("loop");
+
         // handle user trap, not for kernel trap. Therefore, there should not
         // be some instructions with risks between trap_return and trap_handle.
-        trap::trap_handler(&task).await;
+        trap::trap_handler(&task);
+
+        async_syscall(&task).await;
 
         // if executor does not have other tasks, it is no need to yield.
-        if task.timer_mut().schedule_time_out()
-            && executor::has_waiting_task_alone(current_hart().id)
-        {
+        // if task.timer_mut().schedule_time_out()
+        //     && executor::has_waiting_task_alone(current_hart().id)
+        // {
+        //     yield_now().await;
+        // }
+
+        if task.is_yield() {
             yield_now().await;
         }
 

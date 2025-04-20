@@ -26,10 +26,12 @@ pub fn trap_return(task: &Arc<Task>) {
     assert!(!(task.is_in_state(TaskState::Zombie) || task.is_in_state(TaskState::Waiting)));
 
     task.timer_mut().switch_to_user();
+    // log::info!("[trap_return] go to user space");
     unsafe {
         let ptr = trap_context_mut as *mut TrapContext;
         __return_to_user(ptr);
     }
+    // log::info!("[trap_return] return from user space");
     task.timer_mut().switch_to_kernel();
 
     trap_context_mut = task.trap_context_mut();

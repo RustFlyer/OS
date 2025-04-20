@@ -26,6 +26,7 @@ pub fn init() {
 
     Task::spawn_from_elf(init_proc, "init_proc");
     timer_init();
+    elf_test();
 }
 
 /// `timer_init` spawns a global timer update kernel thread.
@@ -65,4 +66,27 @@ pub fn static_elf_test() {
     // Task::spawn_from_elf(add2, "add2");
     // Task::spawn_from_elf(file_test, "file_test");
     // Task::spawn_from_elf(elf_data2);
+}
+
+#[allow(unused)]
+pub fn elf_test() {
+    let open_file = |path: &str| {
+        let root = sys_root_dentry();
+        let dentry = root.lookup(path).unwrap();
+        <dyn File>::open(dentry)
+    };
+
+    let hello_world = open_file("hello_world").unwrap();
+    let time_test = open_file("time_test").unwrap();
+    let add = open_file("add").unwrap();
+    let add1 = open_file("add1").unwrap();
+    let add2 = open_file("add2").unwrap();
+    let file_test = open_file("file_test").unwrap();
+
+    // Task::spawn_from_elf(hello_world, "hello_world");
+    // Task::spawn_from_elf(time_test, "time_test");
+    // Task::spawn_from_elf(add, "add");
+    // Task::spawn_from_elf(add1, "add1");
+    // Task::spawn_from_elf(add2, "add2");
+    // Task::spawn_from_elf(file_test, "file_test");
 }
