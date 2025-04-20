@@ -1,3 +1,4 @@
+use config::mm::PAGE_SIZE;
 use mm::address::VirtAddr;
 use systype::{SysError, SyscallResult};
 
@@ -47,4 +48,15 @@ pub async fn sys_munmap(addr: usize, length: usize) -> SyscallResult {
 
 pub async fn sys_brk(addr: usize) -> SyscallResult {
     current_task().addr_space().change_heap_size(addr, 0)
+}
+
+pub fn sys_mprotect(addr: usize, len: usize, prot: i32) -> SyscallResult {
+    if addr == 0 || addr % PAGE_SIZE != 0 {
+        return Err(SysError::EINVAL);
+    }
+    let task = current_task();
+    let addr_space = task.addr_space();
+    let prot = MmapProt::from_bits(prot).ok_or(SysError::EINVAL)?;
+    addr_space.change_prot(VirtAddr::new(addr), len, MemPerm::from_mmapprot(prot));
+    Ok(0)
 }

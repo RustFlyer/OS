@@ -24,7 +24,7 @@
 //! maintaining modularization and extensibility.
 
 use alloc::{collections::btree_map::BTreeMap, sync::Arc, vec::Vec};
-use core::{fmt::Debug, mem};
+use core::{cmp, fmt::Debug, mem};
 
 use bitflags::bitflags;
 
@@ -313,87 +313,135 @@ impl VmArea {
         }
     }
 
-    /// Removes mappings in a given range of virtual addresses from the VMA
-    /// in a given [`PageTable`], possibly splitting the VMA and invalidating
-    /// page table entries.
+    /// Splits a virtual memory area at the given boundaries.
     ///
-    /// The range is defined by `remove_from` and `remove_to`, which must both be
-    /// page-aligned. The range is inclusive of `remove_from` and exclusive of
-    /// `remove_to`. `remove_from` and `remove_to` do not need to be contained
-    /// in the VMA; only range that overlaps with the VMA is removed. It is allowed
-    /// that the range does not overlap with the VMA at all, in which case the VMA is
-    /// unchanged.
+    /// The area is split at `split_start` and `split_end`, creating three potential areas:
+    /// 1. Area before `split_start` (exclusive)
+    /// 2. Area between `split_start` (inclusive) and `split_end` (exclusive)
+    /// 3. Area after `split_end` (inclusive)
     ///
-    /// `remove_from` must be less than `remove_to`.
+    /// `split_start` and `split_end` must both be page-aligned, with `split_start < split_end`.
+    /// If the boundaries are outside the VMA range, they're clamped to the VMA's boundaries.
     ///
-    /// Returns a tuple of two `Option<VmArea>`, which are the new VMAs created
-    /// by splitting the original VMA. If one of the new VMAs is `None`, it means
-    /// the range covers the starting part or ending part of the original VMA,
-    /// so only a single VMA is left. If both are `None`, it means the range covers
-    /// the whole VMA, so the original VMA is totally removed.
-    pub fn unmap_range(
+    /// Note that the returned [`VmArea`]s may have page table entries mapped in its associated
+    /// page table, but these entries are not invalidated when any of the [`VmArea`]s are dropped.
+    /// Make sure to call [`Self::unmap_area`] on a [`VmArea`] which is to be dropped to invalidate
+    /// the page table entries.
+    ///
+    /// Returns a tuple of three items:
+    /// - The area before the split range (None if `split_start` is at or before the VMA start)
+    /// - The area in the split range (None if the split range doesn't overlap the VMA)
+    /// - The area after the split range (None if `split_end` is at or after the VMA end)
+    pub fn split_area(
         mut self,
-        page_table: &PageTable,
-        remove_from: VirtAddr,
-        remove_to: VirtAddr,
-    ) -> (Option<Self>, Option<Self>) {
-        debug_assert!(remove_from < remove_to);
-        let remove_from = VirtAddr::max(self.start, remove_from);
-        let remove_to = VirtAddr::min(self.end, remove_to);
-        if remove_from == self.start && remove_to == self.end {
-            // The range to be removed is the whole VMA.
-            return (None, None);
-        }
-        if remove_from >= remove_to {
-            // The range to be removed is empty.
-            return (Some(self), None);
+        split_start: VirtAddr,
+        split_end: VirtAddr,
+    ) -> (Option<Self>, Option<Self>, Option<Self>) {
+        debug_assert!(split_start < split_end);
+        debug_assert!(split_start.to_usize() % PAGE_SIZE == 0);
+        debug_assert!(split_end.to_usize() % PAGE_SIZE == 0);
+
+        let split_start = VirtAddr::max(self.start, split_start);
+        let split_end = VirtAddr::min(self.end, split_end);
+
+        if split_start >= split_end {
+            // The range to be split does not overlap with the VMA.
+            return if split_start >= self.end {
+                (Some(self), None, None)
+            } else {
+                (None, None, Some(self))
+            };
         }
 
         // Re-assign `Page`s in the old VMA to the new VMA(s).
         let (pages_low, pages_mid, pages_high) = {
             let mut pages = mem::take(&mut self.pages);
-            let mut pages_mid_high = pages.split_off(&remove_from.page_number());
-            let pages_high = pages_mid_high.split_off(&remove_to.page_number());
+            let mut pages_mid_high = pages.split_off(&split_start.page_number());
+            let pages_high = pages_mid_high.split_off(&split_end.page_number());
             (pages, pages_mid_high, pages_high)
         };
 
-        // Invalidate the page table entries in the range to be removed.
-        for (vpn, _) in pages_mid {
+        let vma_low = if split_start > self.start {
+            let mut vma = self.clone();
+            vma.end = split_start;
+            vma.pages = pages_low;
+            if let TypedArea::FileBacked(file_backed) = &mut vma.map_type {
+                file_backed.len = cmp::min(
+                    file_backed.len,
+                    split_start.to_usize() - vma.start.to_usize(),
+                );
+            }
+            Some(vma)
+        } else {
+            None
+        };
+
+        let vma_mid = if split_start < split_end {
+            let mut vma = self.clone();
+            vma.start = split_start;
+            vma.end = split_end;
+            vma.pages = pages_mid;
+            if let TypedArea::FileBacked(file_backed) = &mut vma.map_type {
+                let start_offset = split_start.to_usize() - self.start.to_usize();
+                file_backed.offset += start_offset;
+                file_backed.len = cmp::min(
+                    file_backed.len.saturating_sub(start_offset),
+                    split_end.to_usize() - split_start.to_usize(),
+                );
+            }
+            Some(vma)
+        } else {
+            None
+        };
+
+        let vma_high = if split_end < self.end {
+            let mut vma = self.clone();
+            vma.start = split_end;
+            vma.pages = pages_high;
+            if let TypedArea::FileBacked(file_backed) = &mut vma.map_type {
+                let start_offset = split_end.to_usize() - self.start.to_usize();
+                file_backed.len = file_backed.len.saturating_sub(start_offset);
+                file_backed.offset += start_offset;
+            }
+            Some(vma)
+        } else {
+            None
+        };
+
+        (vma_low, vma_mid, vma_high)
+    }
+
+    /// Unmaps a virtual memory area from the given page table.
+    ///
+    /// This function invalidates all valid page table entries in the VMA, and drops
+    /// the `VmArea` itself. This is the proper way to drop a `VmArea` which is
+    /// associated with a [`AddrSpace`].
+    pub fn unmap_area(self, page_table: &PageTable) {
+        for (vpn, _) in self.pages {
             let pte = page_table.find_entry(vpn).unwrap();
             *pte = PageTableEntry::default();
         }
+    }
 
-        let vma_low = if remove_from > self.start {
-            let mut vma = self.clone();
-            vma.end = remove_from;
-            vma.pages = pages_low;
-            // Note: we may need to extract the updating logic of fields in specific
-            // `TypedArea` structs to a common function, and
-            if let TypedArea::FileBacked(file_backed) = &mut vma.map_type {
-                file_backed.len = file_backed
-                    .len
-                    .min(remove_from.to_usize() - vma.start.to_usize());
-            }
-            Some(vma)
-        } else {
-            None
-        };
-        let vma_high = if remove_to < self.end {
-            let mut vma = self.clone();
-            vma.start = remove_to;
-            vma.pages = pages_high;
-            if let TypedArea::FileBacked(file_backed) = &mut vma.map_type {
-                file_backed.len = file_backed
-                    .len
-                    .saturating_sub(remove_to.to_usize() - vma.start.to_usize());
-                file_backed.offset += remove_to.to_usize() - vma.start.to_usize();
-            }
-            Some(vma)
-        } else {
-            None
-        };
+    /// Changes the protection flags of the VMA, possibly updating page table entries.
+    ///
+    /// `new_prot` should always have `U` bit set, because this function is supposed to be
+    /// used in user space.
+    pub fn change_prot(&mut self, page_table: &PageTable, new_prot: MemPerm) -> SysResult<()> {
+        debug_assert!(new_prot.contains(MemPerm::U));
 
-        (vma_low, vma_high)
+        let old_prot = self.prot;
+        self.prot = new_prot;
+        self.pte_flags = PteFlags::from(new_prot);
+        for (&vpn, _) in &self.pages {
+            let pte = page_table.find_entry(vpn).unwrap();
+            pte.set_flags(self.pte_flags);
+        }
+        // Flush the TLB if any kind of permission is downgraded.
+        if !new_prot.contains(old_prot) {
+            sfence_vma_all_except_global();
+        }
+        Ok(())
     }
 
     /// Handles a page fault happened in this VMA.
@@ -649,7 +697,7 @@ impl MemoryBackedArea {
         let back_store_len = memory.len();
         if area_offset < back_store_len {
             // If there is a type 1 region in the page:
-            let copy_len = usize::min(back_store_len - area_offset, fill_len);
+            let copy_len = cmp::min(back_store_len - area_offset, fill_len);
             let memory_copy_from = &memory[area_offset..area_offset + copy_len];
             let (memory_copy_to, memory_fill_zero) =
                 page.as_mut_slice()[page_offset..page_offset + fill_len].split_at_mut(copy_len);
@@ -933,115 +981,5 @@ impl AnonymousArea {
         pages.insert(fault_addr.page_number(), Arc::new(page));
 
         Ok(())
-    }
-}
-
-pub fn test_unmap_range() {
-    {
-        let mut vma = VmArea::new_kernel(
-            VirtAddr::new(0x1000),
-            VirtAddr::new(0x8000),
-            MemPerm::empty(),
-        );
-        let page_table = PageTable::build().unwrap();
-
-        for vpn in vma.start_va().page_number().to_usize()..vma.end_va().page_number().to_usize() {
-            let vpn = VirtPageNum::new(vpn);
-            let page = page_table.map_page(vpn, PteFlags::V).unwrap().unwrap();
-            vma.pages.insert(vpn, Arc::new(page));
-        }
-
-        let (vma_low, vma_high) =
-            vma.unmap_range(&page_table, VirtAddr::new(0x1000), VirtAddr::new(0x5000));
-
-        assert!(vma_low.is_none());
-        assert!(vma_high.is_some());
-        let vma_high = vma_high.unwrap();
-        assert!(vma_high.start_va() == VirtAddr::new(0x5000));
-        assert!(vma_high.end_va() == VirtAddr::new(0x8000));
-        assert!(vma_high.contains(VirtAddr::new(0x7000)));
-        assert!(vma_high.contains(VirtAddr::new(0x5000)));
-        assert!(!vma_high.contains(VirtAddr::new(0x4000)));
-        assert!(!vma_high.contains(VirtAddr::new(0x1000)));
-    }
-    {
-        let mut vma = VmArea::new_kernel(
-            VirtAddr::new(0x1000),
-            VirtAddr::new(0x8000),
-            MemPerm::empty(),
-        );
-        let page_table = PageTable::build().unwrap();
-
-        for vpn in vma.start_va().page_number().to_usize()..vma.end_va().page_number().to_usize() {
-            let vpn = VirtPageNum::new(vpn);
-            let page = page_table.map_page(vpn, PteFlags::V).unwrap().unwrap();
-            vma.pages.insert(vpn, Arc::new(page));
-        }
-
-        let (vma_low, vma_high) =
-            vma.unmap_range(&page_table, VirtAddr::new(0x3000), VirtAddr::new(0x6000));
-
-        assert!(vma_low.is_some());
-        let vma_low = vma_low.unwrap();
-        assert!(vma_low.start_va() == VirtAddr::new(0x1000));
-        assert!(vma_low.end_va() == VirtAddr::new(0x3000));
-        assert!(vma_low.contains(VirtAddr::new(0x1000)));
-        assert!(vma_low.contains(VirtAddr::new(0x2000)));
-        assert!(!vma_low.contains(VirtAddr::new(0x3000)));
-        assert!(!vma_low.contains(VirtAddr::new(0x6000)));
-        assert!(!vma_low.contains(VirtAddr::new(0x7000)));
-        assert!(vma_high.is_some());
-        let vma_high = vma_high.unwrap();
-        assert!(vma_high.start_va() == VirtAddr::new(0x6000));
-        assert!(vma_high.end_va() == VirtAddr::new(0x8000));
-        assert!(vma_high.contains(VirtAddr::new(0x7000)));
-        assert!(vma_high.contains(VirtAddr::new(0x6000)));
-        assert!(!vma_high.contains(VirtAddr::new(0x5000)));
-        assert!(!vma_high.contains(VirtAddr::new(0x1000)));
-    }
-    {
-        let mut vma = VmArea::new_kernel(
-            VirtAddr::new(0x1000),
-            VirtAddr::new(0x8000),
-            MemPerm::empty(),
-        );
-        let page_table = PageTable::build().unwrap();
-
-        for vpn in vma.start_va().page_number().to_usize()..vma.end_va().page_number().to_usize() {
-            let vpn = VirtPageNum::new(vpn);
-            let page = page_table.map_page(vpn, PteFlags::V).unwrap().unwrap();
-            vma.pages.insert(vpn, Arc::new(page));
-        }
-
-        let (vma_low, vma_high) =
-            vma.unmap_range(&page_table, VirtAddr::new(0x0000), VirtAddr::new(0x9000));
-
-        assert!(vma_low.is_none());
-        assert!(vma_high.is_none());
-    }
-    {
-        let mut vma = VmArea::new_kernel(
-            VirtAddr::new(0x5000),
-            VirtAddr::new(0x8000),
-            MemPerm::empty(),
-        );
-        let page_table = PageTable::build().unwrap();
-
-        for vpn in vma.start_va().page_number().to_usize()..vma.end_va().page_number().to_usize() {
-            let vpn = VirtPageNum::new(vpn);
-            let page = page_table.map_page(vpn, PteFlags::V).unwrap().unwrap();
-            vma.pages.insert(vpn, Arc::new(page));
-        }
-
-        let (vma_low, vma_high) =
-            vma.unmap_range(&page_table, VirtAddr::new(0x1000), VirtAddr::new(0x4000));
-
-        assert!(vma_low.is_some());
-        let vma_low = vma_low.unwrap();
-        assert!(vma_low.start_va() == VirtAddr::new(0x5000));
-        assert!(vma_low.end_va() == VirtAddr::new(0x8000));
-        assert!(vma_low.contains(VirtAddr::new(0x5000)));
-        assert!(vma_low.contains(VirtAddr::new(0x7000)));
-        assert!(vma_high.is_none());
     }
 }

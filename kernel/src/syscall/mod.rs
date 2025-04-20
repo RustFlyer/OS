@@ -67,6 +67,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         UMOUNT2 => sys_umount2(args[0], args[1] as u32).await,
         MUNMAP => sys_munmap(args[0], args[1]).await,
         PIPE2 => sys_pipe2(args[0], args[1] as i32).await,
+        MPROTECT => sys_mprotect(args[0], args[1], args[2] as i32),
         _ => {
             log::error!("Syscall not implemented: {syscall_no}");
             unimplemented!()
