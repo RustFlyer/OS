@@ -206,11 +206,63 @@ impl AddrSpace {
         // Remove mappings for these VMAs.
         for key in keys {
             let vma = vm_areas_lock.remove(&key).unwrap();
-            let (vma1, vma2) = vma.unmap_range(&self.page_table, addr, end_addr);
-            if let Some(vma_low) = vma1 {
+            let (vma_low, vma_mid, vma_high) = vma.split_area(addr, end_addr);
+            if let Some(vma_low) = vma_low {
                 vm_areas_lock.insert(vma_low.start_va(), vma_low);
             }
-            if let Some(vma_high) = vma2 {
+            if let Some(vma_mid) = vma_mid {
+                vma_mid.unmap_area(&self.page_table);
+            }
+            if let Some(vma_high) = vma_high {
+                vm_areas_lock.insert(vma_high.start_va(), vma_high);
+            }
+        }
+    }
+
+    /// Changes the protection of a memory region.
+    ///
+    /// This function changes the protection of a memory region in the address space.
+    /// The region to be changed is specified by the starting address and the length.
+    /// If the region is not mapped, this function does nothing. If the region covers
+    /// only part of any VMA, the VMA may split.
+    ///
+    /// `addr` must be a multiple of the page size. `length` need not to be. However,
+    /// the range to be changed is rounded up to page size, which means more than
+    /// `length` bytes will be changed if `length` is not page-aligned. `addr + length`
+    /// should be a valid address.
+    pub fn change_prot(&self, addr: VirtAddr, length: usize, prot: MemPerm) {
+        let length = VirtAddr::new(length).round_up().to_usize();
+        let end_addr = VirtAddr::new(addr.to_usize() + length);
+        let mut vm_areas_lock = self.vm_areas.lock();
+
+        // Find VMAs that overlap with the specified range.
+        let mut keys = vm_areas_lock
+            .range(addr..end_addr)
+            .map(|(&va, _)| va)
+            .collect::<Vec<_>>();
+        match vm_areas_lock
+            .upper_bound(Bound::Excluded(&addr))
+            .peek_prev()
+        {
+            Some((&va, vma)) if vma.end_va() > addr => {
+                keys.push(va);
+            }
+            _ => {}
+        }
+
+        // Change protection for these VMAs.
+        for key in keys {
+            let vma = vm_areas_lock.remove(&key).unwrap();
+            // let (vma1, vma2) = vma.change_prot(&self.page_table, addr, end_addr, prot);
+            let (vma_low, vma_mid, vma_high) = vma.split_area(addr, end_addr);
+            if let Some(vma_low) = vma_low {
+                vm_areas_lock.insert(vma_low.start_va(), vma_low);
+            }
+            if let Some(mut vma_mid) = vma_mid {
+                vma_mid.change_prot(&self.page_table, prot);
+                vm_areas_lock.insert(vma_mid.start_va(), vma_mid);
+            }
+            if let Some(vma_high) = vma_high {
                 vm_areas_lock.insert(vma_high.start_va(), vma_high);
             }
         }
