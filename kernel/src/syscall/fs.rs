@@ -162,6 +162,8 @@ pub fn sys_readlinkat(dirfd: usize, pathname: usize, buf: usize, bufsiz: usize) 
     let path = UserReadPtr::<u8>::new(pathname, &addr_space).read_c_string(256)?;
     let path = path.into_string().map_err(|_| SysError::EINVAL)?;
 
+    log::info!("[sys_readlinkat] path: {path}");
+
     let dentry = task.walk_at(AtFd::from(dirfd), path)?;
     let inode = dentry.inode().ok_or(SysError::ENOENT)?;
     if !inode.inotype().is_symlink() {
@@ -257,11 +259,32 @@ pub async fn sys_getcwd(buf: usize, len: usize) -> SyscallResult {
 ///     struct timespec st_ctim;  /* Time of last status change */
 /// };
 /// ```
-pub async fn sys_fstat(fd: usize, stat_buf: usize) -> SyscallResult {
+pub fn sys_fstat(fd: usize, stat_buf: usize) -> SyscallResult {
     let task = current_task();
     let addr_space = task.addr_space();
     let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
     let kstat = Kstat::from_vfs_file(file.inode())?;
+    unsafe {
+        UserWritePtr::<Kstat>::new(stat_buf, &addr_space).write(kstat)?;
+    }
+    Ok(0)
+}
+
+pub fn sys_fstatat(dirfd: usize, pathname: usize, stat_buf: usize, _flags: i32) -> SyscallResult {
+    let task = current_task();
+    let addr_space = task.addr_space();
+    let path = UserReadPtr::<u8>::new(pathname, &addr_space).read_c_string(256)?;
+    let path = path.into_string().map_err(|_| SysError::EINVAL)?;
+
+    log::info!("[sys_fstat_at] dirfd: {dirfd}, path: {path}, flags: {_flags}");
+    assert!(
+        _flags == 0 || _flags == AtFlags::AT_SYMLINK_NOFOLLOW.bits(),
+        "Other flags are not supported"
+    );
+
+    let dentry = task.walk_at(AtFd::from(dirfd), path)?;
+    let inode = dentry.inode().ok_or(SysError::ENOENT)?;
+    let kstat = Kstat::from_vfs_file(inode)?;
     unsafe {
         UserWritePtr::<Kstat>::new(stat_buf, &addr_space).write(kstat)?;
     }

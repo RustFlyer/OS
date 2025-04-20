@@ -5,6 +5,7 @@ mod mm;
 mod process;
 mod signal;
 mod time;
+mod user;
 
 use consts::SyscallNo::{self, *};
 use fs::*;
@@ -12,6 +13,7 @@ use misc::sys_uname;
 use mm::*;
 use process::*;
 use time::*;
+use user::sys_getuid;
 
 pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
     let Some(syscall_no) = SyscallNo::from_repr(syscall_no) else {
@@ -38,7 +40,8 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         GETPID => sys_getpid(),
         GETTID => sys_gettid(),
         GETCWD => sys_getcwd(args[0], args[1]).await,
-        FSTAT => sys_fstat(args[0], args[1]).await,
+        FSTAT => sys_fstat(args[0], args[1]),
+        FSTATAT => sys_fstatat(args[0], args[1], args[2], args[3] as i32),
         CLOSE => sys_close(args[0]),
         GETPPID => sys_getppid(),
         UNAME => sys_uname(args[0]).await,
@@ -68,6 +71,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         MUNMAP => sys_munmap(args[0], args[1]).await,
         PIPE2 => sys_pipe2(args[0], args[1] as i32).await,
         MPROTECT => sys_mprotect(args[0], args[1], args[2] as i32),
+        GETUID => sys_getuid(),
         _ => {
             log::error!("Syscall not implemented: {syscall_no}");
             unimplemented!()
