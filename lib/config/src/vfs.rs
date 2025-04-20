@@ -319,6 +319,7 @@ impl From<usize> for AtFd {
 
 bitflags! {
     /// `AT_*` flags for `*at` functions such as `faccessat`, `fstatat`, and `unlinkat`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct AtFlags: i32 {
         /// Use the current working directory to determine the target of relative file
         /// paths.
@@ -336,6 +337,7 @@ bitflags! {
 
 bitflags! {
     /// Test flags for `faccessat` syscall.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct AccessFlags: i32 {
         /// Test for read permission.
         const R_OK = 0x4;

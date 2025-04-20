@@ -60,7 +60,7 @@ pub async fn sys_mmap(
     let perm = MemPerm::from_mmapprot(prot);
     let va = VirtAddr::new(addr);
 
-    log::info!("[sys_mmap] addr:{addr:?} prot:{prot:?}, flags:{flags:?}, perm:{perm:?}");
+    log::info!("[sys_mmap] addr: {addr:#x} prot: {prot:?}, flags: {flags:?}, perm: {perm:?}");
 
     if addr == 0 && flags.contains(MmapFlags::MAP_FIXED) {
         return Err(SysError::EINVAL);
@@ -82,6 +82,8 @@ pub async fn sys_mmap(
 /// to these pages will generate `SIGSEGV`. It is not an error if the indicated range does
 /// not contain any mapped pages.
 pub async fn sys_munmap(addr: usize, length: usize) -> SyscallResult {
+    log::info!("[sys_munmap] addr: {addr:#x}, length: {length:#x}");
+
     let task = current_task();
     let addr = VirtAddr::new(addr);
     task.addr_space().remove_mapping(addr, length);
@@ -95,6 +97,8 @@ pub async fn sys_munmap(addr: usize, length: usize) -> SyscallResult {
 /// is reasonable, the system has enough memory, and the process does not exceed its
 /// maximum data size.
 pub async fn sys_brk(addr: usize) -> SyscallResult {
+    log::info!("[sys_brk] addr: {addr:#x}");
+
     current_task().addr_space().change_heap_size(addr, 0)
 }
 
@@ -105,6 +109,9 @@ pub fn sys_mprotect(addr: usize, len: usize, prot: i32) -> SyscallResult {
     let task = current_task();
     let addr_space = task.addr_space();
     let prot = MmapProt::from_bits(prot).ok_or(SysError::EINVAL)?;
+
+    log::info!("[sys_mprotect] addr: {addr:#x}, len: {len:#x}, prot: {prot:?}");
+
     addr_space.change_prot(VirtAddr::new(addr), len, MemPerm::from_mmapprot(prot));
     Ok(0)
 }

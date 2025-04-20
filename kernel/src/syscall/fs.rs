@@ -34,8 +34,8 @@ use crate::{
 /// The file descriptor returned by a successful call will be the  lowest-numbered  file  descriptor
 /// not currently open for the process.
 /// - default,  the  new  file  descriptor  is  set  to remain open across an `execve`(2) (i.e., the
-/// `FD_CLOEXEC` file descriptor flag described in `fcntl`(2)  is  initially  disabled);  the  `O_CLOEXEC`
-/// flag, described in `man 2 openat`, can be used to change this default.  
+///   `FD_CLOEXEC` file descriptor flag described in `fcntl`(2)  is  initially  disabled);  the  `O_CLOEXEC`
+///   flag, described in `man 2 openat`, can be used to change this default.  
 ///
 /// # Tips
 ///
@@ -58,10 +58,6 @@ use crate::{
 ///
 /// The file status flags are all of the remaining flags listed in `man 2 openat`.
 pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) -> SyscallResult {
-    log::trace!(
-        "[sys_openat] dirfd: {dirfd}, pathname: {pathname:#x}, flags: {flags:#x}, mode: {mode:#x}"
-    );
-
     let task = current_task();
     let flags = OpenFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
     // `mode` is not supported yet.
@@ -76,7 +72,9 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
         let cstring = data_ptr.read_c_string(256)?;
         cstring.into_string().map_err(|_| SysError::EINVAL)?
     };
-    log::trace!("[sys_openat] path: {path}");
+    log::info!(
+        "[sys_openat] dirfd: {dirfd}, pathname: {pathname}, flags: {flags:?}, mode: {_mode:?}"
+    );
 
     let mut dentry = task.walk_at(AtFd::from(dirfd), path)?;
     // Handle symlinks early here to simplify the logic.
@@ -120,11 +118,13 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
 ///
 /// # Tips
 /// - `write()` allows user to write messages from `addr` to any accessed file, including real and virtual
-/// files such as stdout. When user calls `printf` in user space without `close(STDOUT)` + `dup`, the `fd` is STDOUT
-/// by default.
+///   files such as stdout. When user calls `printf` in user space without `close(STDOUT)` + `dup`, the `fd` is STDOUT
+///   by default.
 /// - This is a `async` syscall, which means that it likely `yield` or `suspend` when called. Therefore, use
-/// `lock` carefully and do not pass the `lock` across `await` as possible.
+///   `lock` carefully and do not pass the `lock` across `await` as possible.
 pub async fn sys_write(fd: usize, addr: usize, len: usize) -> SyscallResult {
+    log::info!("[sys_write] fd: {fd}, addr: {addr:#x}, len: {len:#x}");
+
     let task = current_task();
     let addr_space = task.addr_space();
     let mut data_ptr = UserReadPtr::<u8>::new(addr, &addr_space);
@@ -134,7 +134,7 @@ pub async fn sys_write(fd: usize, addr: usize, len: usize) -> SyscallResult {
     file.write(buf).await
 }
 
-/// `read()`  attempts  to  read up to `count` bytes from file descriptor `fd` into the buffer starting at
+/// `read()`  attempts  to  read up to `len` bytes from file descriptor `fd` into the buffer starting at
 /// `buf`.
 ///
 /// # Returns
@@ -143,15 +143,17 @@ pub async fn sys_write(fd: usize, addr: usize, len: usize) -> SyscallResult {
 ///
 /// # Tips
 /// - `read()` allows user to read messages from any accessed file to `addr` , including real and virtual
-/// files such as stdin. When user calls `getchar` in user space without `close(STDIN)` + `dup`, the `fd` is STDIN by default.
+///   files such as stdin. When user calls `getchar` in user space without `close(STDIN)` + `dup`, the `fd` is STDIN by default.
 /// - This is a `async` syscall, which means that it likely `yield` or `suspend` when called. Therefore, use
-/// `lock` carefully and do not pass the `lock` across `await` as possible.
-pub async fn sys_read(fd: usize, buf: usize, count: usize) -> SyscallResult {
+///   `lock` carefully and do not pass the `lock` across `await` as possible.
+pub async fn sys_read(fd: usize, buf: usize, len: usize) -> SyscallResult {
+    log::info!("[sys_read] fd: {fd}, buf: {buf:#x}, len: {len:#x}");
+
     let task = current_task();
     let addr_space = task.addr_space();
     let mut buf = UserWritePtr::<u8>::new(buf, &addr_space);
 
-    let buf_ptr = unsafe { buf.try_into_mut_slice(count) }?;
+    let buf_ptr = unsafe { buf.try_into_mut_slice(len) }?;
     let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
     file.read(buf_ptr).await
 }
@@ -162,7 +164,7 @@ pub fn sys_readlinkat(dirfd: usize, pathname: usize, buf: usize, bufsiz: usize) 
     let path = UserReadPtr::<u8>::new(pathname, &addr_space).read_c_string(256)?;
     let path = path.into_string().map_err(|_| SysError::EINVAL)?;
 
-    log::info!("[sys_readlinkat] path: {path}");
+    log::info!("[sys_readlinkat] dirfd: {dirfd}, pathname: {pathname}, bufsiz: {bufsiz:#x}");
 
     let dentry = task.walk_at(AtFd::from(dirfd), path)?;
     let inode = dentry.inode().ok_or(SysError::ENOENT)?;
@@ -189,9 +191,11 @@ pub fn sys_readlinkat(dirfd: usize, pathname: usize, buf: usize, bufsiz: usize) 
 /// - SEEK_END: The file offset is set to the `size` of the file plus `offset` bytes.
 /// # Tips
 /// - `lseek()` allows the file offset to be set **beyond** the `end` of the file (but this does **not change**
-/// the `size` of the file).  If data is **later written** at this point, **subsequent reads** of the data in
-/// the gap (a "hole") return `null` bytes ('\0') until data is actually written into the gap.
+///   the `size` of the file).  If data is **later written** at this point, **subsequent reads** of the data in
+///   the gap (a "hole") return `null` bytes ('\0') until data is actually written into the gap.
 pub fn sys_lseek(fd: usize, offset: isize, whence: usize) -> SyscallResult {
+    log::info!("[sys_lseek] fd: {fd}, offset: {offset}, whence: {whence}");
+
     #[derive(FromRepr)]
     #[repr(usize)]
     enum Whence {
@@ -217,6 +221,8 @@ pub fn sys_lseek(fd: usize, offset: isize, whence: usize) -> SyscallResult {
 /// working directory.
 /// On  failure,  these functions return NULL, and `errno` is set to indicate the error.
 pub async fn sys_getcwd(buf: usize, len: usize) -> SyscallResult {
+    log::info!("[sys_getcwd] len: {len:#x}");
+
     let task = current_task();
     let addr_space = task.addr_space();
     let mut buf = { UserWritePtr::<u8>::new(buf, &addr_space) };
@@ -260,6 +266,7 @@ pub async fn sys_getcwd(buf: usize, len: usize) -> SyscallResult {
 /// };
 /// ```
 pub fn sys_fstat(fd: usize, stat_buf: usize) -> SyscallResult {
+    log::info!("[sys_fstat] fd: {fd}");
     let task = current_task();
     let addr_space = task.addr_space();
     let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
@@ -279,7 +286,7 @@ pub fn sys_fstatat(dirfd: usize, pathname: usize, stat_buf: usize, _flags: i32) 
     log::info!("[sys_fstat_at] dirfd: {dirfd}, path: {path}, flags: {_flags}");
     assert!(
         _flags == 0 || _flags == AtFlags::AT_SYMLINK_NOFOLLOW.bits(),
-        "Other flags are not supported"
+        "Flags {_flags} is not supported",
     );
 
     let dentry = task.walk_at(AtFd::from(dirfd), path)?;
@@ -299,11 +306,12 @@ pub fn sys_fstatat(dirfd: usize, pathname: usize, stat_buf: usize, _flags: i32) 
 ///
 /// # Tips
 /// - A successful close does not guarantee that the data has been successfully saved to disk,
-/// as the kernel uses the buffer cache to defer writes. filesystems do **not flush** buffers when
-/// a file is closed.(If wanted, use `fsync` [Not implemented]).
+///   as the kernel uses the buffer cache to defer writes. filesystems do **not flush** buffers when
+///   a file is closed.(If wanted, use `fsync` [Not implemented]).
 /// - It is probably unwise to close file descriptors while they may be in use by system calls in
-/// other threads in the same process, since a file descriptor may be reused.
+///   other threads in the same process, since a file descriptor may be reused.
 pub fn sys_close(fd: usize) -> SyscallResult {
+    log::info!("[sys_close] fd: {fd}");
     let task = current_task();
     task.with_mut_fdtable(|table| table.remove(fd))?;
     Ok(0)
@@ -315,7 +323,7 @@ pub fn sys_close(fd: usize) -> SyscallResult {
 /// # Tips
 /// - The OpenFlag is the same between old and new fd.
 pub fn sys_dup(fd: usize) -> SyscallResult {
-    log::info!("[sys_dup] oldfd: {fd}");
+    log::info!("[sys_dup] fd: {fd}");
     let task = current_task();
     task.with_mut_fdtable(|table| table.dup(fd))
 }
@@ -338,6 +346,9 @@ pub fn sys_dup3(oldfd: usize, newfd: usize, flags: i32) -> SyscallResult {
     }
     let task = current_task();
     let flags = OpenFlags::from_bits_truncate(flags);
+
+    log::info!("[sys_dup3] oldfd: {oldfd}, newfd: {newfd}, flags: {flags:?}");
+
     task.with_mut_fdtable(|table| table.dup3(oldfd, newfd, flags))
 }
 
@@ -359,6 +370,8 @@ pub async fn sys_mkdirat(dirfd: usize, pathname: usize, mode: u32) -> SyscallRes
     let path = UserReadPtr::<u8>::new(pathname, &addr_space).read_c_string(256)?;
     let path = path.into_string().map_err(|_| SysError::EINVAL)?;
 
+    log::info!("[sys_mkdirat] dirfd: {dirfd}, path: {path}, mode: {mode}");
+
     let dentry = task.walk_at(AtFd::from(dirfd), path)?;
     if !dentry.is_negative() {
         return Err(SysError::EEXIST);
@@ -378,13 +391,15 @@ pub async fn sys_mkdirat(dirfd: usize, pathname: usize, mode: u32) -> SyscallRes
 ///
 /// # Tips
 /// - A child process created via `fork()` inherits its parent's current working directory. The
-/// current working directory is left unchanged by `execve()`.
+///   current working directory is left unchanged by `execve()`.
 pub async fn sys_chdir(path: usize) -> SyscallResult {
     let task = current_task();
     let addr_space = task.addr_space();
     let path = UserReadPtr::<u8>::new(path, &addr_space).read_c_string(256)?;
     let path = path.into_string().map_err(|_| SysError::EINVAL)?;
-    log::debug!("[sys_chdir] path: {path}");
+
+    log::info!("[sys_chdir] path: {path}");
+
     let dentry = task.walk_at(AtFd::FdCwd, path)?;
     if !dentry.inode().ok_or(SysError::ENOENT)?.inotype().is_dir() {
         return Err(SysError::ENOTDIR);
@@ -420,7 +435,7 @@ pub async fn sys_unlinkat(dirfd: usize, pathname: usize, flags: i32) -> SyscallR
         let cstring = data_ptr.read_c_string(256)?;
         cstring.into_string().map_err(|_| SysError::EINVAL)?
     };
-    log::debug!("[sys_unlinkat] path: {path}");
+    log::info!("[sys_unlinkat] dirfd: {dirfd}, path: {path}, flags: {flags:?}");
 
     let dentry = task.walk_at(AtFd::from(dirfd), path)?;
     let parent = dentry.parent().expect("can not remove root directory");
@@ -467,7 +482,7 @@ pub async fn sys_unlinkat(dirfd: usize, pathname: usize, flags: i32) -> SyscallR
 ///   130817  directory    16       4096  sub3
 /// ```
 pub async fn sys_getdents64(fd: usize, buf: usize, len: usize) -> SyscallResult {
-    log::debug!("[sys_getdents64] fd {fd}, buf {buf:#x}, len {len:#x}");
+    log::info!("[sys_getdents64] fd {fd}, len {len:#x}");
     let task = current_task();
     let addr_space = task.addr_space();
     let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
@@ -526,7 +541,7 @@ pub async fn sys_mount(
     let flags = MountFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
     // let data = read_c_str(data)?;
 
-    log::debug!(
+    log::info!(
         "[sys_mount] source:{source:?}, target:{target:?}, fstype:{fstype:?}, flags:{flags:?}, data:{data:?}",
     );
 
@@ -611,6 +626,10 @@ pub async fn sys_faccessat(dirfd: usize, pathname: usize, mode: i32, flags: i32)
         cstring.into_string().map_err(|_| SysError::EINVAL)?
     };
 
+    log::info!(
+        "[sys_faccessat] dirfd: {dirfd}, pathname: {pathname}, mode: {_mode:?}, flags: {flags:?}"
+    );
+
     let mut dentry = task.walk_at(AtFd::from(dirfd), path)?;
     if dentry.is_negative() {
         return Err(SysError::ENOENT);
@@ -660,6 +679,14 @@ pub async fn sys_pipe2(pipefd: usize, flags: i32) -> SyscallResult {
         log::info!("[sys_pipe2] read_fd: {fd_read}, write_fd: {fd_write}, flags: {flags:?}");
         Ok([fd_read as u32, fd_write as u32])
     })?;
+
+    log::info!(
+        "[sys_pipe2] pipefd: {:#x}, read_fd: {}, write_fd: {}, flags: {:?}",
+        pipefd,
+        pipe[0],
+        pipe[1],
+        flags
+    );
 
     let addr_space = task.addr_space();
     let mut pipefd = UserWritePtr::<u32>::new(pipefd, &addr_space);
