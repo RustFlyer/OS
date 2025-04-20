@@ -20,6 +20,7 @@ systype = { path = "../lib/systype/" }
 vfs = { path = "../lib/vfs/" }
 osfs = { path = "../lib/osfs" }
 osfuture = { path = "../lib/osfuture" }
+polyhal = { path = "../lib/polyhal" }
 
 bitflags = { workspace = true }
 elf = { workspace = true }

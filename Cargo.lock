@@ -395,6 +395,7 @@ dependencies = [
  "mutex",
  "osfs",
  "osfuture",
+ "polyhal",
  "pps",
  "riscv 0.13.0",
  "riscv-rt",
@@ -602,8 +603,6 @@ dependencies = [
 [[package]]
 name = "polyhal-macro"
 version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8445234620fa3a0886b9cae5d5fa568a6124efb916041628eb9c4011d1a3e8b"
 dependencies = [
  "proc-macro2",
  "quote",
