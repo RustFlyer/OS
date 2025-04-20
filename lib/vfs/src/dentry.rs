@@ -64,7 +64,8 @@ pub trait Dentry: Send + Sync {
     ///
     /// `self` must be a valid directory. `dentry` must be a negative dentry and a child of `self`.
     /// After this call, `dentry` will become valid if the dentry exists (and the function returns
-    /// `Ok(())`), or invalid if the dentry does not exist (and the function returns `Err(ENOENT)`).
+    /// `Ok(())`), or remains invalid if the dentry does not exist (and the function returns
+    /// `Err(ENOENT)`).
     ///
     /// # Errors
     /// Returns `ENOENT` if the dentry does not exist. Other errors may be returned if the
@@ -107,6 +108,10 @@ pub trait Dentry: Send + Sync {
         *self.get_meta().inode.lock() = Some(inode);
     }
 
+    fn unset_inode(&self) {
+        *self.get_meta().inode.lock() = None;
+    }
+
     /// Returns whether this dentry is a negative dentry.
     fn is_negative(&self) -> bool {
         self.get_meta().inode.lock().is_none()
@@ -141,12 +146,6 @@ pub trait Dentry: Send + Sync {
     /// the dentry tree.
     fn get_child(&self, name: &str) -> Option<Arc<dyn Dentry>> {
         self.get_meta().children.lock().get(name).cloned()
-    }
-
-    /// Returns a clone of the map of child dentries of this dentry.
-    #[deprecated = "Legacy from Phoenix OS, called in `file.rs:read_dir`"]
-    fn children(&self) -> BTreeMap<String, Arc<dyn Dentry>> {
-        self.get_meta().children.lock().clone()
     }
 
     /// Adds a child dentry to this dentry.
@@ -224,10 +223,7 @@ impl dyn Dentry {
                 let dentry = self.new_neg_child(name);
                 match self.base_lookup(dentry.as_ref()) {
                     Ok(_) | Err(SysError::ENOENT) => Ok(dentry),
-                    Err(e) => {
-                        log::warn!("Failed to lookup dentry: {:?}", e);
-                        Err(e)
-                    }
+                    Err(e) => Err(e),
                 }
             }
         }

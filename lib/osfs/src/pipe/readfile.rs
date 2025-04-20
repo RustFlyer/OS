@@ -1,15 +1,13 @@
-use crate::pipe::{inode::PipeInode, read::PipeReadPollFuture};
 use alloc::boxed::Box;
+
 use async_trait::async_trait;
 use config::vfs::PollEvents;
 use osfuture::take_waker;
 use systype::SysResult;
-use vfs::{
-    file::{File, FileMeta},
-    inode::Inode,
-};
+use vfs::file::{File, FileMeta};
 
 use super::read::PipeReadFile;
+use crate::pipe::{inode::PipeInode, read::PipeReadPollFuture};
 
 #[async_trait]
 impl File for PipeReadFile {
@@ -17,7 +15,7 @@ impl File for PipeReadFile {
         &self.meta
     }
 
-    async fn base_read(&self, buf: &mut [u8], _offset: usize) -> SysResult<usize> {
+    async fn base_read(&self, buf: &mut [u8], _pos: usize) -> SysResult<usize> {
         let pipe = self
             .inode()
             .downcast_arc::<PipeInode>()

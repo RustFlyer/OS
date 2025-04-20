@@ -427,10 +427,8 @@ pub async fn sys_getdents64(fd: usize, buf: usize, len: usize) -> SyscallResult 
     let addr_space = task.addr_space();
     let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
     let mut ptr = UserWritePtr::<u8>::new(buf, &addr_space);
-    log::debug!("[sys_getdents64] try to get buf");
-    let mut buf = unsafe { ptr.try_into_mut_slice(len) }?;
-    log::debug!("[sys_getdents64] try to read dir");
-    file.read_dir(&mut buf)
+    let buf = unsafe { ptr.try_into_mut_slice(len) }?;
+    file.read_dir(buf)
 }
 
 /// Implements the `mount` syscall for attaching a filesystem.
