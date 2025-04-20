@@ -38,17 +38,21 @@ pub struct TrapContext {
 
     // float register to be saved, useless for now
     pub user_fx: [f64; 32], // 50 - 81
-    // 这是RISC-V浮点控制和状态寄存器(Floating-point Control and Status Register)。
-    // 它用于控制浮点运算的行为和存储浮点运算的状态标志，比如舍入模式、异常标志等。
-    pub fcsr: u32, // 32bit
-    // 当浮点状态为"脏"(Dirty)时，即浮点寄存器的内容被修改过，
-    // 这个标志位会被设置为1，表明需要保存浮点寄存器的内容。
+
+    // This is RISC-V Floating-point Control and Status Register
+    // It can control the behaviour about floating-point number operation
+    pub fcsr: u32,
+
+    // This bit mark whether floating point number is dirty.
+    // When it is marked as 1, it means that float reg has been modified.
     pub is_dirty: u8,
-    // 当任务切换或者从信号处理返回时，如果之前保存了浮点寄存器的状态，
-    // 这个标志位会被设置为1，表明需要恢复浮点寄存器的内容。
+
+    // When task switch or application returns from sig-handle,
+    // this bit will be marked as 1, meaning that float reg needs to be restored.
     pub is_need_restore: u8,
-    // 当处理信号时，如果浮点状态为脏，
-    // 这个标志位会被设置，以确保正确保存和恢复浮点状态。
+
+    // when handle signals with a dirty float mode,
+    // this bit is marked as 1 to ensure that floating state is set correctly.
     pub is_signal_dirty: u8,
 
     pub last_a0: usize,
@@ -135,11 +139,15 @@ impl TrapContext {
         self.is_signal_dirty = 0;
     }
 
+    /// this function can be called to get syscall number
+    /// when trapped
     pub fn syscall_no(&self) -> usize {
         // a7 == x17
         self.user_reg[17]
     }
 
+    /// this function can be called to get syscall args
+    /// when trapped
     pub fn syscall_args(&self) -> [usize; 6] {
         [
             self.user_reg[10],
