@@ -1,4 +1,5 @@
 use alloc::sync::Arc;
+use arch::riscv64::time::{set_nx_timer_irq, set_timer_irq};
 use osfuture::{block_on_with_result, suspend_now, take_waker, yield_now};
 
 use core::future::Future;
@@ -151,6 +152,10 @@ pub async fn task_executor_unit(task: Arc<Task>) {
         task.get_name()
     );
     task.set_waker(take_waker().await);
+    unsafe {
+        set_timer_irq(1);
+    }
+    log::debug!("timer set");
 
     loop {
         // trap_return connects user and kernel.

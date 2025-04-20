@@ -120,7 +120,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
         let zombie_task = res_task;
         task.timer_mut().update_child_time((
             zombie_task.timer_mut().user_time(),
-            zombie_task.timer_mut().sys_time(),
+            zombie_task.timer_mut().kernel_time(),
         ));
         if !status.is_null() {
             // status stores signal in the lowest 8 bits and exit code in higher 8 bits
@@ -179,7 +179,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
                         child.tid(),
                         child.get_exit_code(),
                         child.timer_mut().user_time(),
-                        child.timer_mut().sys_time(),
+                        child.timer_mut().kernel_time(),
                     );
                 }
                 // log::info!("siginfo end");

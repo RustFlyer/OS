@@ -62,6 +62,39 @@ impl Task {
         }
     }
 
+    /// `execve()` executes the program with `elf_file`. `execve()` can extract
+    /// elf data from `elf_file`. Then `execve()` builds a new user memory space
+    /// and maps new stack and new heap. After setting addrspace, `evecve()`
+    /// switches its addrspace(switch current pagetable in satp).
+    ///
+    /// Then this function initializes user stack, pushing argvs, envs and some
+    /// relevant infos into stack. And it initializes trap context to get ready
+    /// for switching from user space from kernel space.
+    ///
+    /// there is no new process; many attributes of the calling process remain
+    /// unchanged. All that `execve()` does is arrange for an existing process
+    /// (the calling process) to execute a new program.
+    ///
+    /// Attention: all threads other than the calling thread need to be destroyed
+    /// during an `execve()`. Mutexes, condition variables, and other pthreads are
+    /// not preserved.
+    ///
+    /// By default, file descriptors remain open across an `execve()`. File descriptors
+    /// that are marked close-on-exec are closed.
+    ///
+    /// # Attributes Not Preserved
+    /// - [ ] The dispositions of any `signals` that are `being caught` are reset to the default.
+    /// - [ ] Any alternative `signal stack` is not preserved.
+    /// - [x] `Memory mappings` are not preserved.
+    /// - [ ] Attached System V `shared memory segments` are detached.
+    /// - [x] POSIX `timers` are not preserved.
+    /// - [ ] POSIX `shared memory regions` are unmapped.
+    /// - [ ] open POSIX message queue `descriptors`.
+    /// - [ ] Any open POSIX named `semaphores` are closed.
+    /// - [ ] Any open `directory` streams are closed.
+    /// - [ ] `Memorylocks` are not preserved.
+    /// - [ ] `Exit handlers` are not preserved.
+    /// - [x] The `floating-point environment` is reset to the default.
     pub fn execve(
         &self,
         elf_file: Arc<dyn File>,
@@ -95,6 +128,7 @@ impl Task {
         self.trap_context_mut()
             .init_user(sp, entry_point.to_usize(), argc, argv, envp);
 
+        *self.timer_mut() = TaskTimeStat::new();
         *self.elf_mut() = elf_file;
         *self.name_mut() = name;
         self.with_mut_fdtable(|table| table.close());

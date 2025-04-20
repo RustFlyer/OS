@@ -8,14 +8,12 @@ use core::{
 use crate::core::{TIMER_MANAGER, Timer};
 use arch::riscv64::time::get_time_duration;
 
-/// 时间限制任务结果类型
 #[derive(Debug)]
 pub enum TimedTaskResult<T> {
     Completed(T),
     Timeout,
 }
 
-/// 一个包装了另一个未来任务的定时器
 pub struct TimeoutFuture<F: Future + Send + 'static> {
     future: F,
     timer: Timer,
@@ -61,7 +59,6 @@ impl<F: Future + Send + 'static> Future for TimeoutFuture<F> {
     }
 }
 
-/// 一个在未来任务完成后等待指定时间后完成的任务
 pub struct SleepFuture {
     timer: Timer,
     registered: bool,
@@ -97,12 +94,10 @@ impl Future for SleepFuture {
     }
 }
 
-/// 异步睡眠函数，等待指定毫秒数
 pub async fn sleep_ms(ms: u64) {
     SleepFuture::new(Duration::from_millis(ms)).await
 }
 
-/// 运行一个在未来任务完成后等待指定时间后完成的任务
 pub async fn run_with_timeout<F: Future + Send + 'static>(
     timeout: Duration,
     future: F,
@@ -110,7 +105,6 @@ pub async fn run_with_timeout<F: Future + Send + 'static>(
     TimeoutFuture::new(timeout, future).await
 }
 
-/// 周期性定时器任务，定期触发
 pub struct IntervalFuture {
     timer: Timer,
     registered: bool,

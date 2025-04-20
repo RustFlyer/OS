@@ -6,10 +6,10 @@ use arch::riscv64::{
 };
 use riscv::register::sstatus::{FS, SPP};
 
-/*when sp points to user stack of a task/process,
-sscratch(in RISCV) points to the start
-of the TrapContext of this task/process in user address space,
-until they switch when __trap_from_user, and the context begin to be saved*/
+/// when sp points to user stack of a task/process,
+/// sscratch(in RISCV) points to the start
+/// of the TrapContext of this task/process in user address space,
+/// until they switch when __trap_from_user, and the context begin to be saved
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub struct TrapContext {
@@ -55,7 +55,18 @@ pub struct TrapContext {
 }
 
 impl TrapContext {
-    /// 创建TrapContext
+    /// Initializes user trap context
+    ///
+    /// The application control stream starts from kernel space. Therefore,
+    /// it's important to set correct trap context to guarantee that appication
+    /// can return to user space from kernel space.
+    ///
+    /// Here `TrapContext` can catch application entry in the user memory space
+    /// and store user stack top in sp, which ensure user application can have
+    /// enough stack space to run.
+    ///
+    /// Due to a task spawned without any args passed in, `new()` function does
+    /// not provide any argv_ptr or envp_ptr here.
     pub fn new(entry: usize, sp: usize) -> Self {
         disable_interrupt();
         // disable Interrupt until trap handling
@@ -88,7 +99,15 @@ impl TrapContext {
         context
     }
 
-    /// 初始化trap context
+    /// initializes user trap context
+    ///
+    /// unlike `new()`, this function is called in the `execve()`. Therefore,
+    /// argv, envp and argc are provided by caller thread. Also, this thread
+    /// will have a new user stack and pass it into `init_user()` to initializes
+    /// it.
+    ///
+    /// Then `init_user()` call `clear_fx()` to clean its float environment and
+    /// initializes float regs for `execve()` function.
     pub fn init_user(
         &mut self,
         user_sp: usize,
@@ -104,6 +123,16 @@ impl TrapContext {
         self.sepc = sepc;
 
         // self.sstatus = sstatus::read();
+        self.clear_fx();
+    }
+
+    /// clear float regs and set relevant privilege regs.
+    pub fn clear_fx(&mut self) {
+        self.user_fx.fill(0.0);
+        self.fcsr = 0;
+        self.is_dirty = 0;
+        self.is_need_restore = 0;
+        self.is_signal_dirty = 0;
     }
 
     pub fn syscall_no(&self) -> usize {
@@ -137,12 +166,14 @@ impl TrapContext {
         self.user_reg[4] = val;
     }
 
-    /// 设置用户态trap pc
+    /// set entry to user space.
+    /// when the application temps to return from trap_return, it will
+    /// step in `entry` address in user space.
     pub fn set_entry_point(&mut self, entry: usize) {
         self.sepc = entry;
     }
 
-    /// pc 指向下一条指令
+    /// pc points to the next instruction.
     pub fn sepc_forward(&mut self) {
         self.sepc += 4;
     }

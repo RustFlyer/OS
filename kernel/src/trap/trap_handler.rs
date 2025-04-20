@@ -26,6 +26,8 @@ pub async fn trap_handler(task: &Task) -> bool {
 
     unsafe { load_trap_handler() };
 
+    // log::info!("trap handle enter");
+
     // Here task updates global timer manager and checks if there
     // are any expired timer. If there is, the task will wake up
     // the relevant thread.
@@ -102,15 +104,14 @@ pub async fn user_exception_handler(task: &Task, e: Exception, stval: usize) {
 }
 
 pub async fn user_interrupt_handler(task: &Task, i: Interrupt) {
+    log::error!("[trap_handler] user_interrupt_handler");
     match i {
         Interrupt::SupervisorTimer => {
             // in fact, this branch is never used. The kernel now only
             // use the global timer to schedule.
-            log::trace!("[trap_handler] timer interrupt");
-            let current = get_time_duration();
-            TIMER_MANAGER.check(current);
+            log::error!("[trap_handler] timer interrupt");
             set_nx_timer_irq();
-            if task.timer_mut().schedule_time_out() && executor::has_waiting_task() {
+            if executor::has_waiting_task() {
                 yield_now().await;
             }
         }

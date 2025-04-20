@@ -6,10 +6,8 @@ use core::cmp::Reverse;
 use core::task::Waker;
 use core::time::Duration;
 use mutex::SpinNoIrqLock;
-use simdebug::when_debug;
 use spin::Lazy;
 
-/// 定时器状态枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TimerState {
     Active,
@@ -17,7 +15,6 @@ pub enum TimerState {
     Cancelled,
 }
 
-/// 一个带有回调功能的定时器
 #[derive(Debug, Clone)]
 pub struct Timer {
     expire: Duration,
@@ -111,23 +108,15 @@ impl TimerManager {
         self.timers.lock().push(Reverse(timer));
     }
 
-    /// 检查定时器是否到期
-    ///
-    /// current: 当前时间
     pub fn check(&self, current: Duration) {
         let mut timers = self.timers.lock();
         while let Some(Reverse(mut timer)) = timers.peek().cloned() {
             if current < timer.expire || !timer.is_active() {
-                when_debug!({
-                    log::info!("{} < {}", current.as_nanos(), timer.expire.as_nanos());
-                });
                 break;
             }
 
-            // Remove the timer from heap
             timers.pop();
 
-            // Handle periodic timer
             if timer.is_periodic() {
                 timer.reset_periodic();
                 timers.push(Reverse(timer.clone()));
@@ -135,13 +124,7 @@ impl TimerManager {
                 timer.state = TimerState::Expired;
             }
 
-            // Wake up the task
             if let Some(waker) = timer.callback.take() {
-                // log::debug!(
-                //     "[Timer Manager] Timer expired at {:?}, scheduled for {:?}",
-                //     current,
-                //     timer.expire
-                // );
                 waker.wake();
             }
         }

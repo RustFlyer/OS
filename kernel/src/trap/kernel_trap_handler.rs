@@ -19,7 +19,6 @@ pub fn kernel_trap_handler() {
 }
 
 pub fn kernel_exception_handler(e: Exception, stval: usize) {
-    simdebug::stop();
     log::error!(
         "[kernel] {:?} in kernel, bad addr = {:#x}, bad instruction = {:#x}, satp = {:#x}",
         e,
@@ -36,6 +35,7 @@ pub fn kernel_interrupt_handler(i: Interrupt, _stval: usize) {
             log::info!("[kernel] receive externel interrupt");
         }
         Interrupt::SupervisorTimer => {
+            log::info!("kernel SupervisorTimer enter");
             TIMER_MANAGER.check(get_time_duration());
             set_nx_timer_irq();
         }

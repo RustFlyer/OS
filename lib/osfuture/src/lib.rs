@@ -8,15 +8,16 @@ use core::{
     task::{Context, Poll, Waker},
 };
 
-/// Gets the current context waker  
+/// `take_waker()` gets future waker in current context. when future temps to
+/// be waken, it can call this waker to wake it up and rejoin
+/// the hart queue.
 #[inline(always)]
 pub async fn take_waker() -> Waker {
     TakeWakerFuture.await
 }
 
-/// Take Waker Future
-///
-/// Returns a Waker clone of the current context directly on the first poll
+/// `TakeWakerFuture` is created just to assist to implement
+/// Future trait and get waker from its context.
 struct TakeWakerFuture;
 
 impl Future for TakeWakerFuture {
@@ -27,9 +28,7 @@ impl Future for TakeWakerFuture {
     }
 }
 
-/// Suspend Future
-///
-/// Relinquishes the execution of the current task
+/// `SuspendFuture` relinquishes the execution of the current task.
 struct SuspendFuture {
     has_suspended: bool,
 }
@@ -59,10 +58,9 @@ impl Future for SuspendFuture {
     }
 }
 
-/// Suspend the current task Immediately
-///
-/// With the await function, the current task will be relinquished
-/// to the processor until it is scheduled again
+/// the caller task will suspend and give cpu to other tasks.
+/// If the task temps to rejoin the hart TaskLine again, its
+/// waker should be called by other tasks.
 pub async fn suspend_now() {
     SuspendFuture::new().await
 }
@@ -92,11 +90,18 @@ impl Future for YieldFuture {
     }
 }
 
+/// the caller task will suspend and give cpu to other tasks.
+/// Unlike [`suspend_now()`], this function will call waker before
+/// it is suspended. Therefore, it will join the end of the queue.
+/// When the previous tasks are executed, it will run again.
 pub async fn yield_now() {
     YieldFuture::new().await;
 }
 
-/// A waker that wakes up the current thread when called.
+/// `BlockWaker` is a structure which implements Wake trait.
+/// It means that this waker can be passed in context as a
+/// waker and when it is called, it can act as its pre-set
+/// action and not act by default.
 struct BlockWaker;
 
 impl Wake for BlockWaker {
@@ -125,6 +130,9 @@ pub fn block_on<T>(fut: impl Future<Output = T>) -> T {
     }
 }
 
+/// Like [`block_on`], this function can wrap a async function in a sync function.
+/// But different from `block_on`, it will loop for a certain number. If the async task can
+/// return Ready during loop, it can return Ok. Otherwise, it will return Err.
 pub fn block_on_with_result<T>(fut: impl Future<Output = T>) -> Result<T, ()> {
     // Pin the future so it can be polled.
     let mut fut = Box::pin(fut);

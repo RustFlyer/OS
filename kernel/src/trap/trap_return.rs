@@ -12,15 +12,8 @@ unsafe extern "C" {
 /// Trap return to user mode.
 #[unsafe(no_mangle)]
 pub fn trap_return(task: &Arc<Task>) {
-    simdebug::when_debug!({
-        log::info!("[kernel] trap return to user...");
-    });
-
     arch::riscv64::interrupt::disable_interrupt();
     trap_env::set_user_stvec();
-
-    let mut timer = task.timer_mut();
-    timer.record_trap_return();
 
     // restore registers situations:
     // 1. current task yields after last trap.
@@ -28,15 +21,18 @@ pub fn trap_return(task: &Arc<Task>) {
     let mut trap_context_mut = task.trap_context_mut();
     trap_context_mut.restore_fx();
     trap_context_mut.sstatus.set_fs(FS::Clean);
+
     assert!(!(trap_context_mut.sstatus.sie()));
     assert!(!(task.is_in_state(TaskState::Zombie) || task.is_in_state(TaskState::Waiting)));
+
+    task.timer_mut().switch_to_user();
     unsafe {
         let ptr = trap_context_mut as *mut TrapContext;
         __return_to_user(ptr);
     }
+    task.timer_mut().switch_to_kernel();
+
     trap_context_mut = task.trap_context_mut();
     let new_sstatus = trap_context_mut.sstatus;
     trap_context_mut.mark_dirty(new_sstatus);
-    timer = task.timer_mut();
-    timer.record_trap();
 }

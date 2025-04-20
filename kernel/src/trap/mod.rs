@@ -18,6 +18,10 @@ pub use trap_return::trap_return;
     2. enables interrupt in case of it is a interrupt type trap
 */
 pub unsafe fn load_trap_handler() {
+    // unsafe {
+    //     riscv::register::sie::set_stimer();
+    //     riscv::register::sstatus::set_sie();
+    // }
     trap_env::set_kernel_stvec();
     enable_interrupt();
 }

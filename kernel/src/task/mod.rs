@@ -28,7 +28,7 @@ pub fn init() {
     timer_init();
 }
 
-/// `timer_init` spawn a global timer update kernel thread.
+/// `timer_init` spawns a global timer update kernel thread.
 /// It is spawned to prevent all threads are blocked and then no
 /// timer is updated. The kernel thread can update timer all the time
 /// and wake up sleeping future if its timer has expired whether

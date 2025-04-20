@@ -16,7 +16,7 @@ use crate::task::tid::Tid;
 /// When a task is spawned, it should be added into the `TASK_MANAGER`. Also, the task should
 /// be removed when it is terminated.
 ///
-/// `TASK_MANAGER` should not disturb the life of a task so it does not ensure whether the task
+/// `TASK_MANAGER` should not affect lifetime of a task so it does not ensure whether the task
 /// is alive or not. When the task is terminated, `get_task` will return none.
 pub static TASK_MANAGER: TaskManager = TaskManager::new();
 
