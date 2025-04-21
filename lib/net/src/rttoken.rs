@@ -9,14 +9,17 @@ use smoltcp::phy::{RxToken, TxToken};
 /// when kernel receive the packet.
 ///
 /// kernel should consume the packet to get raw data slice.
-pub(crate) struct NetRxToken<'a>(&'a RefCell<Box<dyn NetDevice>>, Box<dyn NetBufPtrOps>);
+pub(crate) struct NetRxToken<'a>(
+    pub(crate) &'a RefCell<Box<dyn NetDevice>>,
+    pub(crate) Box<dyn NetBufPtrOps>,
+);
 
 /// `NetTxToken` implement `TxToken` trait, which means that
 /// you can have a chance to send the packet and this is the
 /// only chance that you can write something into the packet.
 ///
 /// user can write sth to f closure and send it out.
-pub(crate) struct NetTxToken<'a>(&'a RefCell<Box<dyn NetDevice>>);
+pub(crate) struct NetTxToken<'a>(pub(crate) &'a RefCell<Box<dyn NetDevice>>);
 
 impl RxToken for NetRxToken<'_> {
     /// receive net data and then pass raw data as bytes

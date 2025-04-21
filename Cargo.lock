@@ -542,9 +542,12 @@ version = "0.1.0"
 dependencies = [
  "arch",
  "driver",
+ "log",
  "mutex",
+ "osfuture",
  "smoltcp",
  "spin",
+ "systype",
  "timer",
 ]
 

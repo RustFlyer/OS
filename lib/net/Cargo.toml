@@ -8,9 +8,12 @@ mutex = { path = "../mutex" }
 driver = { path = "../driver" }
 arch = { path = "../arch" }
 timer = { path = "../timer" }
+systype = { path = "../systype" }
+osfuture = { path = "../osfuture" }
 
 smoltcp = { workspace = true }
 spin = { workspace = true }
+log = { workspace = true }
 
 
 [features]

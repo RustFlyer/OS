@@ -64,7 +64,7 @@ impl InterfaceWrapper {
     }
 
     /// get current time, just wrap microseconds from `get_time_us()` with `Instant`.
-    fn current_time() -> SmolInstant {
+    pub(crate) fn current_time() -> SmolInstant {
         SmolInstant::from_micros_const(get_time_us() as i64)
     }
 

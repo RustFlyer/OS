@@ -11,12 +11,16 @@ use spin::{lazy::Lazy, once::Once};
 extern crate alloc;
 
 pub mod addr;
+pub mod bench;
 pub mod device;
 pub mod interface;
 pub mod portmap;
 pub mod rttoken;
 pub mod socketset;
+pub mod udp;
 
+/// Some meaningless parameters. They will be parsed as bytes
+/// and mix with `RANDOM_SEED` to create ips and gateway address.
 const IP: &str = "IP";
 const GATEWAY: &str = "GATEWAY";
 const IP_PREFIX: u8 = 24;
@@ -51,4 +55,15 @@ pub fn init_network(net_dev: Box<dyn NetDevice>, is_loopback: bool) {
     eth0.setup_gateway(gateway);
 
     ETH0.call_once(|| eth0);
+}
+
+/// net poll results, used for referring udp/tcp poll state.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct NetPollState {
+    /// Object can be read now.
+    pub readable: bool,
+    /// Object can be writen now.
+    pub writable: bool,
+    /// Object is hang up now.
+    pub hangup: bool,
 }
