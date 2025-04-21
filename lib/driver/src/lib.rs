@@ -9,6 +9,7 @@ use alloc::sync::Arc;
 use core::fmt::{self};
 use qemu::{UartDevice, VirtBlkDevice};
 use spin::Once;
+pub mod net;
 pub mod qemu;
 pub mod sbi;
 

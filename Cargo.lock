@@ -245,6 +245,7 @@ dependencies = [
  "log",
  "mm",
  "mutex",
+ "smoltcp",
  "spin",
  "uart_16550",
  "virtio-drivers",
@@ -539,8 +540,12 @@ dependencies = [
 name = "net"
 version = "0.1.0"
 dependencies = [
+ "arch",
+ "driver",
  "mutex",
  "smoltcp",
+ "spin",
+ "timer",
 ]
 
 [[package]]

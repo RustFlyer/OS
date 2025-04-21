@@ -2,7 +2,7 @@ use core::net::Ipv6Addr;
 
 use smoltcp::wire::{IpAddress, IpEndpoint, IpListenEndpoint};
 
-/// checks whether a ip address is unspecified, which means that
+/// `is_unspecified()` checks whether a ip address is unspecified, which means that
 /// ip is filled with 0.
 ///
 /// - ipv4 == \[0, 0, 0, 0\]

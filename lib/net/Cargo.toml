@@ -5,8 +5,12 @@ edition = "2024"
 
 [dependencies]
 mutex = { path = "../mutex" }
+driver = { path = "../driver" }
+arch = { path = "../arch" }
+timer = { path = "../timer" }
 
 smoltcp = { workspace = true }
+spin = { workspace = true }
 
 
 [features]

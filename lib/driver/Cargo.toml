@@ -13,3 +13,9 @@ spin = { workspace = true }
 virtio-drivers ={ workspace = true }
 uart_16550 = { workspace = true }
 log = { workspace = true }
+smoltcp = { workspace = true }
+
+
+[features]
+smoltcp = []
+default = ["smoltcp"]
