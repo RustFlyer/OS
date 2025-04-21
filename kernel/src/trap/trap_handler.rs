@@ -97,7 +97,7 @@ pub fn user_interrupt_handler(task: &Task, i: Interrupt) {
     // log::error!("[trap_handler] user_interrupt_handler");
     match i {
         Interrupt::SupervisorTimer => {
-            log::error!("[trap_handler] timer interrupt");
+            log::trace!("[trap_handler] timer interrupt");
             set_nx_timer_irq();
 
             // if executor does not have other tasks, it is no need to yield.

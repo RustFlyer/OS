@@ -13,7 +13,7 @@ use misc::sys_uname;
 use mm::*;
 use process::*;
 use time::*;
-use user::sys_getuid;
+use user::{sys_getgid, sys_getuid};
 
 pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
     let Some(syscall_no) = SyscallNo::from_repr(syscall_no) else {
@@ -26,6 +26,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
     let result = match syscall_no {
         GETTIMEOFDAY => sys_gettimeofday(args[0], args[1]).await,
         EXIT => sys_exit(args[0] as i32),
+        EXIT_GROUP => sys_exit_group(args[0] as i32),
         SCHED_YIELD => sys_sched_yield().await,
         WRITE => sys_write(args[0], args[1], args[2]).await,
         TIMES => sys_times(args[0]).await,
@@ -72,6 +73,8 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         PIPE2 => sys_pipe2(args[0], args[1] as i32).await,
         MPROTECT => sys_mprotect(args[0], args[1], args[2] as i32),
         GETUID => sys_getuid(),
+        GETGID => sys_getgid(),
+        IOCTL => sys_ioctl(args[0], args[1], args[2]),
         _ => {
             log::error!("Syscall not implemented: {syscall_no}");
             unimplemented!()

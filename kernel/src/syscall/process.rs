@@ -17,7 +17,7 @@ use systype::{SysError, SyscallResult};
 use vfs::file::File;
 use vfs::path::Path;
 
-/// `gettid()` returns the caller's thread ID (TID).  
+/// `gettid` returns the caller's thread ID (TID).  
 ///
 /// # Type
 /// - In a single-threaded process, the thread ID is equal to the process ID (PID, as returned by getpid(2)).
@@ -26,17 +26,17 @@ pub fn sys_gettid() -> SyscallResult {
     Ok(current_task().tid())
 }
 
-/// getpid() returns the process ID (PID) of the calling process.
+/// `getpid` returns the process ID (PID) of the calling process.
 pub fn sys_getpid() -> SyscallResult {
     Ok(current_task().pid())
 }
 
-/// `getppid()` returns the process ID of the parent of the calling process. This will be either the
-/// ID of the process that created this process using `fork()`, or, if that process has already terminated,
+/// `getppid` returns the process ID of the parent of the calling process. This will be either the
+/// ID of the process that created this process using `fork`, or, if that process has already terminated,
 /// the ID of the process to which this process has been reparented.
 ///
 /// # Tips
-/// - If the caller's parent is in a different PID namespace, `getppid()` returns 0.
+/// - If the caller's parent is in a different PID namespace, `getppid` returns 0.
 /// - From a kernel perspective, the PID is sometimes also known as the thread group ID (TGID).
 ///   This contrasts with the kernel thread ID (TID), which is unique for each thread.
 pub fn sys_getppid() -> SyscallResult {
@@ -48,21 +48,29 @@ pub fn sys_getppid() -> SyscallResult {
 /// `exit()` system call terminates only the calling thread, and actions such as
 /// reparenting child processes or sending SIGCHLD to the parent process are performed
 /// only if this is the last thread in the thread group.
-pub fn sys_exit(_exit_code: i32) -> SyscallResult {
+pub fn sys_exit(status: i32) -> SyscallResult {
     let task = current_task();
     task.set_state(TaskState::Zombie);
     if task.is_process() {
-        task.set_exit_code((_exit_code & 0xFF) << 8);
+        task.set_exit_code((status & 0xFF) << 8);
     }
     Ok(0)
 }
 
-/// `sched_yield()`  causes the calling thread to relinquish the CPU.  The thread is moved to the end
+/// `exit_group` system call terminates all threads in the calling thread group.
+///
+/// # Note
+/// The current implementation does not support multi-threading.
+pub fn sys_exit_group(status: i32) -> SyscallResult {
+    sys_exit(status)
+}
+
+/// `sched_yield`  causes the calling thread to relinquish the CPU.  The thread is moved to the end
 /// of the queue for its static priority and a new thread gets to run.
 ///
 /// # Tips
 /// - If the calling thread is the only thread in the highest priority list at that time, it will continue
-///   to run after a call to `sched_yield()`.
+///   to run after a call to `sched_yield`.
 pub async fn sys_sched_yield() -> SyscallResult {
     yield_now().await;
     Ok(0)
@@ -213,7 +221,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
     }
 }
 
-/// `clone()` create a new ("child") process.
+/// `clone` create a new ("child") process.
 /// The system call provides more precise control over what pieces of execution
 /// context are shared between the calling process and the child process.
 ///
@@ -268,7 +276,7 @@ pub async fn sys_clone(
     Ok(new_tid)
 }
 
-/// `execve()` executes the program referred to by `path`. This causes the program that is
+/// `execve` executes the program referred to by `path`. This causes the program that is
 /// being run by the calling process to be replaced with a new program, with new stack, heap
 /// and (initialized and uninitialized) data segments.
 /// # Args
@@ -280,7 +288,7 @@ pub async fn sys_clone(
 ///
 /// # Tips
 /// - The argv and envp arrays must each include a null pointer at the end of the array.
-/// - If the current program is being ptraced, a SIGTRAP signal is sent to it after a successful `execve()`.
+/// - If the current program is being ptraced, a SIGTRAP signal is sent to it after a successful `execve`.
 ///
 /// # Type
 /// - If the executable is an a.out dynamically linked binary executable containing shared-library
@@ -373,7 +381,7 @@ enum WaitFor {
     Pid(Pid),
 }
 
-/// `sys_set_tid_address()` set pointer to thread ID.
+/// `sys_set_tid_address` set pointer to thread ID.
 ///  For each thread, the kernel maintains two attributes (addresses) called `set_child_tid` and
 ///  `clear_child_tid`. These two attributes contain the value **NULL** by default.
 ///
