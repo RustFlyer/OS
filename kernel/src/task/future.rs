@@ -26,7 +26,6 @@ use pps::ProcessorPrivilegeState;
 /// the state is loaded as the user-future is scheduled.
 /// Action-future refers to the main loop of a task, `task_executor_unit`.
 ///
-///
 /// `UserFuture` has implemented Future trait, which means it can be scheduled by
 /// async-runtime.
 pub struct UserFuture<F: Future + Send + 'static> {
@@ -200,7 +199,7 @@ pub async fn task_executor_unit(task: Arc<Task>) {
 /// `spawn_user_task` wraps task control unit and create a schedule unit by `task_executor_unit`
 /// to spawn a UserFuture for executor to schedule.
 ///
-/// When a task is initialized, it can be passed in this function and spawn a future
+/// When a task is initialized, it can be passed into this function and spawn a future
 /// to schedule.
 pub fn spawn_user_task(task: Arc<Task>) {
     log::info!("New Task [{}] spawns!", task.get_name());
@@ -214,6 +213,9 @@ pub fn spawn_user_task(task: Arc<Task>) {
 ///
 /// It can be used for creating some simple or single kernel tasks such as a timer
 /// update kernel thread.
+///
+/// Attention: `future` should implement yield at regular intervals(or by certain step).
+/// Otherwise, this `future` will occupy the cpu without giving it up.
 pub fn spawn_kernel_task<F: Future<Output = ()> + Send + 'static>(future: F) {
     let future = KernelFuture::new(future);
     let (task, handle) = executor::spawn(future);

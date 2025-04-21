@@ -31,10 +31,10 @@ use crate::{
 /// # Returns
 /// The return value of open() is a file descriptor, a small, nonnegative integer that  is  used  in
 /// subsequent system calls (`read`(2), `write`(2), `lseek`(2), `fcntl`(2), etc.) to refer to the open file.
-/// The file descriptor returned by a successful call will be the  lowest-numbered  file  descriptor
+/// The file descriptor returned by a successful call will be the lowest-numbered file descriptor
 /// not currently open for the process.
-/// - default,  the  new  file  descriptor  is  set  to remain open across an `execve`(2) (i.e., the
-///   `FD_CLOEXEC` file descriptor flag described in `fcntl`(2)  is  initially  disabled);  the  `O_CLOEXEC`
+/// - default,  the new file descriptor is set to remain open across an `execve`(2) (i.e., the
+///   `FD_CLOEXEC` file descriptor flag described in `fcntl`(2) is initially  disabled); the `O_CLOEXEC`
 ///   flag, described in `man 2 openat`, can be used to change this default.  
 ///
 /// # Tips
@@ -42,15 +42,15 @@ use crate::{
 /// - The `file offset` is set to the beginning of the file (see `lseek`(2)).
 /// - A call to `open()` creates a new open file description, an entry in the system-wide table of  open
 ///   files.  The open file description records the file offset and the file status flags.
-/// - A file descriptor is a reference to an open file description; this reference  is  unaffected  if
-///   `pathname`  is subsequently removed or modified to refer to a different file.  For further details
+/// - A file descriptor is a reference to an open file description; this reference is unaffected if
+///   `pathname` is subsequently removed or modified to refer to a different file. For further details
 ///   on open file descriptions, see `man 2 openat`.
 ///
 /// # Flags
-/// The argument `flags` must include one of  the  following  access  modes:  `O_RDONLY`,  `O_WRONLY`,  or
-/// `O_RDWR`.  These request opening the file read-only, write-only, or read/write, respectively.
+/// The argument `flags` must include one of the following access modes: `O_RDONLY`, `O_WRONLY`, or
+/// `O_RDWR`. These request opening the file read-only, write-only, or read/write, respectively.
 ///        
-/// In  addition,  zero  or  more  file  creation flags and file status flags can be bitwise-or'd in
+/// In addition, zero or more file creation flags and file status flags can be bitwise-or'd in
 /// flags.  
 ///
 /// The file creation flags are `O_CLOEXEC`, `O_CREAT`, `O_DIRECTORY`, `O_EXCL`, `O_NOCTTY`,  `O_NOFOLLOW`
@@ -186,9 +186,9 @@ pub fn sys_readlinkat(dirfd: usize, pathname: usize, buf: usize, bufsiz: usize) 
 /// `lseek()`  repositions  the  file `offset` of the open file description associated with the file
 /// descriptor `fd` to the argument `offset` according to the directive `whence` as follows:
 /// # Whence
-/// - SEEK_SET: The file offset is set to `offset` bytes.
-/// - SEEK_CUR: The file offset is set to its `current` location plus `offset` bytes.
-/// - SEEK_END: The file offset is set to the `size` of the file plus `offset` bytes.
+/// - `SEEK_SET`: The file offset is set to `offset` bytes.
+/// - `SEEK_CUR`: The file offset is set to its `current` location plus `offset` bytes.
+/// - `SEEK_END`: The file offset is set to the `size` of the file plus `offset` bytes.
 /// # Tips
 /// - `lseek()` allows the file offset to be set **beyond** the `end` of the file (but this does **not change**
 ///   the `size` of the file).  If data is **later written** at this point, **subsequent reads** of the data in
