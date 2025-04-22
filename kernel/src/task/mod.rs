@@ -7,6 +7,7 @@ pub mod task;
 pub mod taskf;
 pub mod threadgroup;
 pub mod tid;
+pub mod time;
 
 use arch::riscv64::time::get_time_duration;
 use future::spawn_kernel_task;

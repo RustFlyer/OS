@@ -75,8 +75,11 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         GETUID => sys_getuid(),
         GETGID => sys_getgid(),
         IOCTL => sys_ioctl(args[0], args[1], args[2]),
+        SETGID => sys_setgid(args[0]),
+        SETUID => sys_setuid(args[0]),
+        CLOCK_GETTIME => sys_clock_gettime(args[0], args[1]),
         _ => {
-            log::error!("Syscall not implemented: {syscall_no}");
+            log::error!("Syscall not implemented: {}", syscall_no.as_str());
             unimplemented!()
         }
     };

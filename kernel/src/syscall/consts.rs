@@ -73,6 +73,8 @@ pub enum SyscallNo {
     RT_SIGPROCMASK = 135,
     RT_SIGTIMEDWAIT = 137,
     RT_SIGRETURN = 139,
+    SETGID = 144,
+    SETUID = 146,
     TIMES = 153,
     SETPGID = 154,
     GETPGID = 155,
@@ -195,6 +197,8 @@ impl SyscallNo {
             RT_SIGPROCMASK => "rt_sigprocmask",
             RT_SIGTIMEDWAIT => "rt_sigtimedwait",
             RT_SIGRETURN => "rt_sigreturn",
+            SETGID => "setgid",
+            SETUID => "setuid",
             TIMES => "times",
             SETPGID => "setpgid",
             GETPGID => "getpgid",
@@ -242,6 +246,7 @@ impl SyscallNo {
             GETRANDOM => "getrandom",
             MEMBARRIER => "membarrier",
             COPY_FILE_RANGE => "copy_file_range",
+            _ => "this syscall name is not set",
         }
     }
 }

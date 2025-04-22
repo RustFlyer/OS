@@ -407,3 +407,32 @@ pub fn sys_set_tid_address(tidptr: usize) -> SyscallResult {
     task.tid_address_mut().clear_child_tid = Some(tidptr);
     Ok(task.tid())
 }
+
+/// `setgid` sets the effective group ID of the calling process.
+/// If the calling process is privileged, the real GID and saved set-group-ID are also set.
+///
+/// more precisely: has the CAP_SETGID capability in its user namespace.
+///
+/// In linux, every processes (tasks) has its own **real group ID (RGID), effective group ID (EGID)
+/// and saved set-group-ID (SGID)**.
+/// Therefore, any process is under its main group and this group's id is GID.
+///
+/// For threads, they will share the gid of their process.
+///
+/// Typical application: After the daemon process starts, it first starts as root,
+/// and then sets gid/gid to a regular user to reduce permissions and enhance system security.
+pub fn sys_setgid(_gid: usize) -> SyscallResult {
+    Ok(0)
+}
+
+/// `setuid` sets user id of current system account.
+/// `uid` is a number used by the operating system to uniquely identify a user.
+///
+/// Each process is running with a "UID" identity.
+///
+/// Typical application: A daemon process first performs sensitive tasks as root,
+/// and then setuid(1000) returns to a regular user to continue working stably
+/// and enhance security.
+pub fn sys_setuid(_uid: usize) -> SyscallResult {
+    Ok(0)
+}
