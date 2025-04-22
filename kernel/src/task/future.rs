@@ -153,7 +153,7 @@ pub async fn task_executor_unit(task: Arc<Task>) {
         task.get_name()
     );
     task.set_waker(take_waker().await);
-    set_nx_timer_irq();
+    // set_nx_timer_irq();
 
     loop {
         // trap_return connects user and kernel.
