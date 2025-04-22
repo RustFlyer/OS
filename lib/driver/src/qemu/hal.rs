@@ -2,10 +2,10 @@ use alloc::vec::Vec;
 use core::ptr::NonNull;
 use mm::address::{PhysAddr, PhysPageNum, VirtAddr};
 use mm::frame::FrameTracker;
-use mutex::SpinNoIrqLock;
+use mutex::SpinLock;
 use virtio_drivers;
 
-static FrameSpace: SpinNoIrqLock<Vec<FrameTracker>> = SpinNoIrqLock::new(Vec::new());
+static FrameSpace: SpinLock<Vec<FrameTracker>> = SpinLock::new(Vec::new());
 
 pub struct VirtHalImpl;
 

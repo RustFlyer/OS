@@ -2,7 +2,7 @@ use super::{CHAR_DEVICE, CharDevice};
 use config::sbi::*;
 use core::arch::asm;
 use core::fmt::{self, Write};
-use mutex::SpinNoIrqLock;
+use mutex::SpinLock;
 
 #[inline(always)]
 fn sbi_call(eid_fid: (usize, usize), arg0: usize, arg1: usize, arg2: usize) -> usize {
@@ -85,7 +85,7 @@ pub fn getchar() -> u8 {
 }
 
 pub fn sbi_print(args: fmt::Arguments<'_>) {
-    static PRINT_MUTEX: SpinNoIrqLock<()> = SpinNoIrqLock::new(());
+    static PRINT_MUTEX: SpinLock<()> = SpinLock::new(());
     let _lock = PRINT_MUTEX.lock();
     Stdout.write_fmt(args).unwrap();
 }
