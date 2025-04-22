@@ -73,7 +73,7 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
         cstring.into_string().map_err(|_| SysError::EINVAL)?
     };
     log::info!(
-        "[sys_openat] dirfd: {dirfd}, pathname: {pathname}, flags: {flags:?}, mode: {_mode:?}"
+        "[sys_openat] dirfd: {dirfd:#x}, pathname: {pathname}, flags: {flags:?}, mode: {_mode:?}"
     );
 
     let mut dentry = task.walk_at(AtFd::from(dirfd), path)?;
@@ -283,13 +283,14 @@ pub fn sys_fstatat(dirfd: usize, pathname: usize, stat_buf: usize, _flags: i32) 
     let path = UserReadPtr::<u8>::new(pathname, &addr_space).read_c_string(256)?;
     let path = path.into_string().map_err(|_| SysError::EINVAL)?;
 
-    log::info!("[sys_fstat_at] dirfd: {dirfd}, path: {path}, flags: {_flags}");
+    log::info!("[sys_fstat_at] dirfd: {dirfd:#x}, path: {path}, flags: {_flags}");
     assert!(
         _flags == 0 || _flags == AtFlags::AT_SYMLINK_NOFOLLOW.bits(),
         "Flags {_flags} is not supported",
     );
 
     let dentry = task.walk_at(AtFd::from(dirfd), path)?;
+    log::debug!("[sys_fstatat] find file here");
     let inode = dentry.inode().ok_or(SysError::ENOENT)?;
     let kstat = Kstat::from_vfs_file(inode)?;
     unsafe {
@@ -697,8 +698,51 @@ pub async fn sys_pipe2(pipefd: usize, flags: i32) -> SyscallResult {
     Ok(0)
 }
 
+/// The ioctl() system call manipulates the underlying device parameters of special files.
+/// In particular, many operating characteristics of character special files (e.g., terminals)
+/// may be controlled with ioctl() operations. The argument fd must be an open file descriptor.
 pub fn sys_ioctl(_fd: usize, _request: usize, _argp: usize) -> SyscallResult {
     log::info!("[sys_ioctl] fd: {_fd}, request: {_request:#x}, arg: {_argp:#x}");
     // Not implemented yet
-    Ok(0)
+    Err(SysError::ENODEV)
+}
+
+/// sendfile() copies data between one file descriptor and another.
+/// Because this copying is done within the kernel, sendfile() is more efficient than the combination
+/// of read(2) and write(2), which would require transferring data to and from user space.
+///
+/// in_fd should be a file descriptor opened for reading and out_fd should be a descriptor
+/// opened for writing.
+///
+/// If offset is not NULL, then it points to a variable holding the file offset from which
+/// sendfile() will start reading data from in_fd. When sendfile() returns, this variable
+/// will be set to the offset of the byte following the last byte that was read.
+///
+/// If offset is not NULL, then sendfile() does not modify the file offset of in_fd;
+/// otherwise the file offset is adjusted to reflect the number of bytes read from in_fd.
+pub async fn sys_sendfile64(
+    out_fd: usize,
+    in_fd: usize,
+    offset: usize,
+    mut count: usize,
+) -> SyscallResult {
+    let task = current_task();
+    let mut buf: [u8; 4096] = [0; 4096];
+    let in_file = task.with_mut_fdtable(|table| table.get_file(in_fd))?;
+    let out_file = task.with_mut_fdtable(|table| table.get_file(out_fd))?;
+
+    in_file.seek(SeekFrom::Current(offset as i64))?;
+
+    let mut write_bytes = 0;
+    while count > 0 {
+        let rlen = in_file.read(&mut buf).await?;
+        write_bytes += out_file.write(&buf).await?;
+        count -= rlen;
+
+        if rlen == 0 {
+            break;
+        }
+    }
+
+    Ok(write_bytes)
 }

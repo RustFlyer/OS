@@ -21,7 +21,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         unimplemented!()
     };
 
-    // log::trace!("[{}]", syscall_no.as_str());
+    // log::trace!("[{}] call function", syscall_no.as_str());
 
     let result = match syscall_no {
         GETTIMEOFDAY => sys_gettimeofday(args[0], args[1]).await,
@@ -78,6 +78,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         SETGID => sys_setgid(args[0]),
         SETUID => sys_setuid(args[0]),
         CLOCK_GETTIME => sys_clock_gettime(args[0], args[1]),
+        SENDFILE => sys_sendfile64(args[0], args[1], args[2], args[3]).await,
         _ => {
             log::error!("Syscall not implemented: {}", syscall_no.as_str());
             unimplemented!()

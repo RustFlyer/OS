@@ -272,6 +272,7 @@ pub async fn sys_clone(
     }
 
     spawn_user_task(new_task);
+    log::info!("[sys_clone] clone success",);
 
     Ok(new_tid)
 }
