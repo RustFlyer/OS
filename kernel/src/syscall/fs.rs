@@ -72,9 +72,7 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
         let cstring = data_ptr.read_c_string(256)?;
         cstring.into_string().map_err(|_| SysError::EINVAL)?
     };
-    log::info!(
-        "[sys_openat] dirfd: {dirfd:#x}, pathname: {pathname}, flags: {flags:?}, mode: {_mode:?}"
-    );
+    log::info!("[sys_openat] dirfd: {dirfd:#x}, path: {path}, flags: {flags:?}, mode: {_mode:?}");
 
     let mut dentry = task.walk_at(AtFd::from(dirfd), path)?;
     // Handle symlinks early here to simplify the logic.
@@ -164,7 +162,7 @@ pub fn sys_readlinkat(dirfd: usize, pathname: usize, buf: usize, bufsiz: usize) 
     let path = UserReadPtr::<u8>::new(pathname, &addr_space).read_c_string(256)?;
     let path = path.into_string().map_err(|_| SysError::EINVAL)?;
 
-    log::info!("[sys_readlinkat] dirfd: {dirfd}, pathname: {pathname}, bufsiz: {bufsiz:#x}");
+    log::info!("[sys_readlinkat] dirfd: {dirfd}, path: {path}, bufsiz: {bufsiz:#x}");
 
     let dentry = task.walk_at(AtFd::from(dirfd), path)?;
     let inode = dentry.inode().ok_or(SysError::ENOENT)?;
@@ -698,28 +696,31 @@ pub async fn sys_pipe2(pipefd: usize, flags: i32) -> SyscallResult {
     Ok(0)
 }
 
-/// The ioctl() system call manipulates the underlying device parameters of special files.
+/// The `ioctl()` system call manipulates the underlying device parameters of special files.
 /// In particular, many operating characteristics of character special files (e.g., terminals)
-/// may be controlled with ioctl() operations. The argument fd must be an open file descriptor.
+/// may be controlled with `ioctl()` operations. The argument fd must be an open file descriptor.
 pub fn sys_ioctl(_fd: usize, _request: usize, _argp: usize) -> SyscallResult {
     log::info!("[sys_ioctl] fd: {_fd}, request: {_request:#x}, arg: {_argp:#x}");
     // Not implemented yet
     Err(SysError::ENODEV)
 }
 
-/// sendfile() copies data between one file descriptor and another.
-/// Because this copying is done within the kernel, sendfile() is more efficient than the combination
+/// `sendfile()` copies data between one file descriptor and another.
+/// Because this copying is done within the kernel, `sendfile()` is more efficient than the combination
 /// of read(2) and write(2), which would require transferring data to and from user space.
 ///
-/// in_fd should be a file descriptor opened for reading and out_fd should be a descriptor
+/// `in_fd` should be a file descriptor opened for reading and `out_fd` should be a descriptor
 /// opened for writing.
 ///
-/// If offset is not NULL, then it points to a variable holding the file offset from which
-/// sendfile() will start reading data from in_fd. When sendfile() returns, this variable
-/// will be set to the offset of the byte following the last byte that was read.
+/// If `offset` is not NULL, then it points to a variable holding the file `offset` from which
+/// `sendfile()` will start reading data from in_fd. When `sendfile()` returns, this variable
+/// will be set to the `offset` of the byte following the last byte that was read.
 ///
-/// If offset is not NULL, then sendfile() does not modify the file offset of in_fd;
-/// otherwise the file offset is adjusted to reflect the number of bytes read from in_fd.
+/// If `offset` is not NULL, then `sendfile()` does not modify the file `offset` of in_fd;
+/// otherwise the file `offset` is adjusted to reflect the number of bytes read from in_fd.
+///
+/// If `offset` is NULL, then data will be read from in_fd starting at the file `offset`,
+/// and the file `offset` will be updated by the call.
 pub async fn sys_sendfile64(
     out_fd: usize,
     in_fd: usize,
@@ -727,18 +728,22 @@ pub async fn sys_sendfile64(
     mut count: usize,
 ) -> SyscallResult {
     let task = current_task();
-    let mut buf = vec![0; 4096];
     let in_file = task.with_mut_fdtable(|table| table.get_file(in_fd))?;
     let out_file = task.with_mut_fdtable(|table| table.get_file(out_fd))?;
 
-    in_file.seek(SeekFrom::Current(offset as i64))?;
+    if offset != 0 {
+        in_file.seek(SeekFrom::Start(offset as u64))?;
+    }
 
     let mut write_bytes = 0;
     while count > 0 {
+        let mlen = count.min(4096);
+        let mut buf = vec![0; mlen];
         let rlen = in_file.read(&mut buf).await?;
-        write_bytes += out_file.write(&buf).await?;
+        write_bytes += out_file.write(&buf[..rlen]).await?;
         count -= rlen;
 
+        log::info!("read bytes {}", rlen);
         if rlen == 0 {
             break;
         }
