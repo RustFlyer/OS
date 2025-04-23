@@ -1,4 +1,4 @@
-use alloc::{ffi::CString, string::ToString};
+use alloc::{ffi::CString, string::ToString, vec};
 use core::{cmp, error};
 
 use simdebug::stop;
@@ -727,7 +727,7 @@ pub async fn sys_sendfile64(
     mut count: usize,
 ) -> SyscallResult {
     let task = current_task();
-    let mut buf: [u8; 4096] = [0; 4096];
+    let mut buf = vec![0; 4096];
     let in_file = task.with_mut_fdtable(|table| table.get_file(in_fd))?;
     let out_file = task.with_mut_fdtable(|table| table.get_file(out_fd))?;
 
