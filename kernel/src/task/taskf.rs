@@ -14,7 +14,7 @@ use arch::riscv64::time::get_time_duration;
 use config::process::CloneFlags;
 use config::process::INIT_PROC_ID;
 use config::vfs::AtFd;
-use mutex::SpinLock;
+use mutex::SpinNoIrqLock;
 use mutex::new_share_mutex;
 use osfs::sys_root_dentry;
 use systype::SysResult;
@@ -175,7 +175,7 @@ impl Task {
     pub async fn fork(self: &Arc<Self>, cloneflags: CloneFlags) -> Arc<Self> {
         let tid = tid_alloc();
         let trap_context = SyncUnsafeCell::new(*self.trap_context_mut());
-        let state = SpinLock::new(self.get_state());
+        let state = SpinNoIrqLock::new(self.get_state());
 
         let process;
         let is_process;
@@ -243,7 +243,7 @@ impl Task {
             parent,
             children,
             pgid,
-            SpinLock::new(0),
+            SpinNoIrqLock::new(0),
             sig_mask,
             sig_handlers,
             sig_manager,

@@ -1,13 +1,13 @@
 use config::process::INIT_PROC_ID;
 use id_allocator::{IdAllocator, VecIdAllocator};
 use lazy_static::lazy_static;
-use mutex::SpinLock;
+use mutex::SpinNoIrqLock;
 
 type TidAllocator = VecIdAllocator;
 
 lazy_static! {
-    static ref TID_ALLOCATOR: SpinLock<TidAllocator> =
-        SpinLock::new(TidAllocator::new(INIT_PROC_ID, usize::MAX));
+    static ref TID_ALLOCATOR: SpinNoIrqLock<TidAllocator> =
+        SpinNoIrqLock::new(TidAllocator::new(INIT_PROC_ID, usize::MAX));
 }
 
 pub type Tid = usize;

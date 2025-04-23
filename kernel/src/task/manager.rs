@@ -4,7 +4,7 @@ extern crate alloc;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::sync::Weak;
-use mutex::SpinLock;
+use mutex::SpinNoIrqLock;
 
 use crate::task::tid::Tid;
 
@@ -20,11 +20,11 @@ use crate::task::tid::Tid;
 /// is alive or not. When the task is terminated, `get_task` will return none.
 pub static TASK_MANAGER: TaskManager = TaskManager::new();
 
-pub struct TaskManager(SpinLock<BTreeMap<Tid, Weak<Task>>>);
+pub struct TaskManager(SpinNoIrqLock<BTreeMap<Tid, Weak<Task>>>);
 
 impl TaskManager {
     pub const fn new() -> Self {
-        Self(SpinLock::new(BTreeMap::new()))
+        Self(SpinNoIrqLock::new(BTreeMap::new()))
     }
 
     pub fn add_task(&self, task: &Arc<Task>) {

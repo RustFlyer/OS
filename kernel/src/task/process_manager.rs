@@ -3,7 +3,7 @@ use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
-use mutex::SpinLock;
+use mutex::SpinNoIrqLock;
 
 use super::{Task, tid::PGid};
 
@@ -21,11 +21,11 @@ use super::{Task, tid::PGid};
 /// are valid.  
 pub static PROCESS_GROUP_MANAGER: ProcessGroupManager = ProcessGroupManager::new();
 
-pub struct ProcessGroupManager(SpinLock<BTreeMap<PGid, Vec<Weak<Task>>>>);
+pub struct ProcessGroupManager(SpinNoIrqLock<BTreeMap<PGid, Vec<Weak<Task>>>>);
 
 impl ProcessGroupManager {
     pub const fn new() -> Self {
-        Self(SpinLock::new(BTreeMap::new()))
+        Self(SpinNoIrqLock::new(BTreeMap::new()))
     }
 
     /// add group leader process and the `Pid` of leader process is

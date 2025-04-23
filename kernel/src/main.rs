@@ -100,7 +100,7 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
 
         loader::init();
 
-        // trap::init();
+        trap::init();
 
         task::init();
     } else {

@@ -7,7 +7,7 @@ use core::usize;
 use alloc::collections::VecDeque;
 use async_task::{Runnable, ScheduleInfo, Task, WithInfo};
 use lazy_static::lazy_static;
-use mutex::SpinLock;
+use mutex::SpinNoIrqLock;
 
 use config::device::MAX_HARTS;
 
@@ -24,13 +24,13 @@ lazy_static! {
 /// Tasks in line is the runnable for async schedule.
 /// Used to take control of async tasks.
 pub struct TaskLine {
-    tasks: SpinLock<VecDeque<Runnable>>,
+    tasks: SpinNoIrqLock<VecDeque<Runnable>>,
 }
 
 impl TaskLine {
     pub const fn new() -> Self {
         Self {
-            tasks: SpinLock::new(VecDeque::new()),
+            tasks: SpinNoIrqLock::new(VecDeque::new()),
         }
     }
 

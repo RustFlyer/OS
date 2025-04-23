@@ -1,13 +1,13 @@
 use super::hal::VirtHalImpl;
 use crate::BlockDevice;
 use config::device::{BLOCK_SIZE, DEV_SIZE, VIRTIO0};
-use mutex::SpinLock;
+use mutex::SpinNoIrqLock;
 use virtio_drivers::{
     device::blk::VirtIOBlk,
     transport::mmio::{MmioTransport, VirtIOHeader},
 };
 
-pub struct VirtBlkDevice(SpinLock<VirtIOBlk<VirtHalImpl, MmioTransport>>);
+pub struct VirtBlkDevice(SpinNoIrqLock<VirtIOBlk<VirtHalImpl, MmioTransport>>);
 
 unsafe impl Sync for VirtBlkDevice {}
 unsafe impl Send for VirtBlkDevice {}
@@ -64,7 +64,7 @@ impl VirtBlkDevice {
             let blk = VirtIOBlk::<VirtHalImpl, MmioTransport>::new(
                 MmioTransport::new(header.into()).unwrap(),
             );
-            Self(SpinLock::new(blk.unwrap()))
+            Self(SpinNoIrqLock::new(blk.unwrap()))
         }
     }
 }

@@ -11,7 +11,7 @@ use alloc::{
 use core::cell::SyncUnsafeCell;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use core::task::Waker;
-use mutex::{ShareMutex, SpinLock, new_share_mutex};
+use mutex::{ShareMutex, SpinNoIrqLock, new_share_mutex};
 use vfs::{dentry::Dentry, file::File};
 
 use osfs::{fd_table::FdTable, sys_root_dentry};
@@ -70,7 +70,7 @@ pub struct Task {
 
     // state refers to task state and control the direction of
     // a task.
-    state: SpinLock<TaskState>,
+    state: SpinNoIrqLock<TaskState>,
 
     // addr_space is task memory space, which is mapping
     // and organizing virtual address of a task.
@@ -91,7 +91,7 @@ pub struct Task {
 
     // when task exits, it will set exit_code and wait for
     // parent task to clean it and receive exit_code.
-    exit_code: SpinLock<i32>,
+    exit_code: SpinNoIrqLock<i32>,
 
     // sigmask is signal mask of task. When it is set
     // signal check will ignore its relevant signals.
@@ -156,12 +156,12 @@ impl Task {
             trap_context: SyncUnsafeCell::new(TrapContext::new(entry, sp)),
             timer: SyncUnsafeCell::new(TaskTimeStat::new()),
             waker: SyncUnsafeCell::new(None),
-            state: SpinLock::new(TaskState::Running),
+            state: SpinNoIrqLock::new(TaskState::Running),
             addr_space: SyncUnsafeCell::new(Arc::new(addr_space)),
             parent: new_share_mutex(None),
             children: new_share_mutex(BTreeMap::new()),
             pgid: new_share_mutex(pgid),
-            exit_code: SpinLock::new(0),
+            exit_code: SpinNoIrqLock::new(0),
             sig_manager: SyncUnsafeCell::new(SigManager::new()),
             sig_mask: SyncUnsafeCell::new(SigSet::empty()),
             sig_handlers: new_share_mutex(SigHandlers::new()),
@@ -189,14 +189,14 @@ impl Task {
         trap_context: SyncUnsafeCell<TrapContext>,
         timer: SyncUnsafeCell<TaskTimeStat>,
         waker: SyncUnsafeCell<Option<Waker>>,
-        state: SpinLock<TaskState>,
+        state: SpinNoIrqLock<TaskState>,
         addr_space: SyncUnsafeCell<Arc<AddrSpace>>,
 
         parent: ShareMutex<Option<Weak<Task>>>,
         children: ShareMutex<BTreeMap<Tid, Arc<Task>>>,
 
         pgid: ShareMutex<PGid>,
-        exit_code: SpinLock<i32>,
+        exit_code: SpinNoIrqLock<i32>,
 
         sig_mask: SyncUnsafeCell<SigSet>,
         sig_handlers: ShareMutex<SigHandlers>,
