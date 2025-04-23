@@ -499,6 +499,7 @@ dependencies = [
  "mutex",
  "osfuture",
  "spin",
+ "strum",
  "systype",
  "vfs",
 ]

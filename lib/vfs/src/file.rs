@@ -15,7 +15,7 @@ use config::{
 };
 use mm::page_cache::page::Page;
 use mutex::SpinNoIrqLock;
-use systype::{SysError, SysResult};
+use systype::{SysError, SysResult, SyscallResult};
 
 use crate::{dentry::Dentry, direntry::DirEntry, inode::Inode, superblock::SuperBlock};
 
@@ -113,11 +113,6 @@ pub trait File: Send + Sync + DowncastSync {
         todo!()
     }
 
-    #[deprecated = "Legacy function from Phoenix OS."]
-    fn ioctl(&self, _cmd: usize, _arg: usize) -> SysResult<()> {
-        Err(SysError::ENOTTY)
-    }
-
     /// Given interested events, keep track of these events and return events
     /// that is ready.
     #[deprecated = "Legacy function from Phoenix OS."]
@@ -201,6 +196,10 @@ pub trait File: Send + Sync + DowncastSync {
 
     fn set_flags(&self, flags: OpenFlags) {
         *self.meta().flags.lock() = flags;
+    }
+
+    fn ioctl(&self, _cmd: usize, _arg: usize) -> SyscallResult {
+        Err(SysError::ENOTTY)
     }
 }
 
@@ -462,6 +461,7 @@ impl dyn File {
             buf_it = &mut buf_it[rec_len..];
             writen_len += rec_len;
         }
+        log::debug!("[read_dir] read {writen_len} bytes");
         Ok(writen_len)
     }
 

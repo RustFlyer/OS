@@ -12,6 +12,7 @@ use fs::*;
 use misc::sys_uname;
 use mm::*;
 use process::*;
+use signal::sys_rt_sigaction;
 use time::*;
 use user::{sys_getgid, sys_getuid};
 
@@ -79,6 +80,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         SETUID => sys_setuid(args[0]),
         CLOCK_GETTIME => sys_clock_gettime(args[0], args[1]),
         SENDFILE => sys_sendfile64(args[0], args[1], args[2], args[3]).await,
+        RT_SIGACTION => sys_rt_sigaction(args[0] as i32, args[1], args[2], args[3]),
         _ => {
             log::error!("Syscall not implemented: {}", syscall_no.as_str());
             unimplemented!()

@@ -1,6 +1,7 @@
 pub mod dentry;
 pub mod file;
 pub mod inode;
+mod ioctl;
 pub mod queuebuffer;
 
 use alloc::{string::String, sync::Arc};

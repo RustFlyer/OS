@@ -65,6 +65,12 @@ impl CharDevice for SbiChar {
     fn handle_irq(&self) {
         todo!()
     }
+    fn read(&self, _buf: &mut [u8]) -> usize {
+        0
+    }
+    fn write(&self, _buf: &[u8]) -> usize {
+        0
+    }
 }
 
 struct Stdout;

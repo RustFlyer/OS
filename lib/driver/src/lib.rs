@@ -29,6 +29,9 @@ pub trait CharDevice: Send + Sync {
     fn puts(&self, datas: &[u8]);
     fn handle_irq(&self);
 
+    fn write(&self, buf: &[u8]) -> usize;
+    fn read(&self, buf: &mut [u8]) -> usize;
+
     fn waker(&self, _waker: Waker) {
         todo!()
     }

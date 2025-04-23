@@ -699,10 +699,11 @@ pub async fn sys_pipe2(pipefd: usize, flags: i32) -> SyscallResult {
 /// The `ioctl()` system call manipulates the underlying device parameters of special files.
 /// In particular, many operating characteristics of character special files (e.g., terminals)
 /// may be controlled with `ioctl()` operations. The argument fd must be an open file descriptor.
-pub fn sys_ioctl(_fd: usize, _request: usize, _argp: usize) -> SyscallResult {
-    log::info!("[sys_ioctl] fd: {_fd}, request: {_request:#x}, arg: {_argp:#x}");
-    // Not implemented yet
-    Err(SysError::ENODEV)
+pub fn sys_ioctl(fd: usize, request: usize, argp: usize) -> SyscallResult {
+    log::info!("[sys_ioctl] fd: {fd}, request: {request:#x}, arg: {argp:#x}");
+    let task = current_task();
+    let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
+    file.ioctl(request, argp)
 }
 
 /// `sendfile()` copies data between one file descriptor and another.

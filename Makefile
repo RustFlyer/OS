@@ -151,7 +151,7 @@ fs-img: user
 	@sudo mount -t ext4 -o loop $(FS_IMG) emnt
 	@sudo cp -r $(USER_ELFS) emnt/
 	@sudo cp -r testcase/basic/* emnt/
-	@sudo cp -r testcase/busybox emnt/
+	@sudo cp -r testcase/busybox/* emnt/
 	@sudo cp -r img-data/* emnt/
 	@sudo chmod -R 755 emnt/
 	@sudo umount emnt

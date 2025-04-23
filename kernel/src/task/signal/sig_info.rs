@@ -4,8 +4,6 @@ use bitflags::*;
 
 pub const NSIG: usize = 64;
 
-
-
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub struct SigInfo {
@@ -226,6 +224,27 @@ impl SigSet {
 
     pub fn remove_signal(&mut self, sig: Sig) {
         self.remove(SigSet::from_bits(1 << sig.index()).unwrap())
+    }
+
+    /// 从buf中读取（不足补0，超长丢弃），构造成Kernel内部的SigSet
+    pub fn from_bytes(bytes: &[u8]) -> Self {
+        let mut raw = [0u8; core::mem::size_of::<SigSet>()];
+        let to_copy = core::cmp::min(bytes.len(), raw.len());
+        raw[..to_copy].copy_from_slice(&bytes[..to_copy]);
+        unsafe { core::ptr::read(raw.as_ptr() as *const Self) }
+    }
+
+    /// 按要求把mask内容写到指定buf（多余buf位置不写）
+    pub fn write_bytes(&self, out: &mut [u8]) {
+        let src = unsafe {
+            core::slice::from_raw_parts(
+                (self as *const SigSet) as *const u8,
+                core::mem::size_of::<SigSet>(),
+            )
+        };
+        let to_copy = core::cmp::min(out.len(), src.len());
+        out[..to_copy].copy_from_slice(&src[..to_copy]);
+        // out多余部分用户态已清零，正常无需写
     }
 }
 
