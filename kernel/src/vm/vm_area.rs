@@ -427,7 +427,7 @@ impl VmArea {
     ///
     /// `new_prot` should always have `U` bit set, because this function is supposed to be
     /// used in user space.
-    pub fn change_prot(&mut self, page_table: &PageTable, new_prot: MemPerm) -> SysResult<()> {
+    pub fn change_prot(&mut self, page_table: &PageTable, new_prot: MemPerm) {
         debug_assert!(new_prot.contains(MemPerm::U));
 
         let old_prot = self.prot;
@@ -441,7 +441,6 @@ impl VmArea {
         if !new_prot.contains(old_prot) {
             sfence_vma_all_except_global();
         }
-        Ok(())
     }
 
     /// Handles a page fault happened in this VMA.

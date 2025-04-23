@@ -31,7 +31,7 @@
 //! - The caller must ensure that the memory location is valid and accessible,
 //!   for `read_unchecked` and `write_unchecked` functions.
 
-use core::{fmt::Debug, marker::PhantomData, ops::ControlFlow, slice};
+use core::{cmp, fmt::Debug, marker::PhantomData, ops::ControlFlow, slice};
 
 use alloc::{ffi::CString, vec::Vec};
 use config::mm::{PAGE_SIZE, USER_END};
@@ -574,7 +574,7 @@ where
     debug_assert!(addr % align_of::<T>() == 0);
     debug_assert!(len % size_of::<T>() == 0);
 
-    let end_addr = usize::min(addr + len, USER_END);
+    let end_addr = cmp::min(addr + len, USER_END);
     if addr >= end_addr {
         return Err(SysError::EFAULT);
     }
@@ -597,7 +597,7 @@ where
                 return Err(e);
             }
         }
-        let end_in_page = usize::min(VirtAddr::new(addr + 1).round_up().to_usize(), end_addr);
+        let end_in_page = cmp::min(VirtAddr::new(addr + 1).round_up().to_usize(), end_addr);
         for item_addr in (addr..end_in_page).step_by(size_of::<T>()) {
             let item = unsafe { *(item_addr as *const T) };
             match f(item) {
