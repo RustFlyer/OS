@@ -35,7 +35,7 @@ pub fn kernel_interrupt_handler(i: Interrupt, _stval: usize) {
             log::info!("[kernel] receive externel interrupt");
         }
         Interrupt::SupervisorTimer => {
-            // log::info!("kernel SupervisorTimer enter");
+            log::info!("kernel SupervisorTimer enter");
             TIMER_MANAGER.check(get_time_duration());
             set_nx_timer_irq();
         }

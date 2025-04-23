@@ -6,7 +6,7 @@ use alloc::{collections::btree_map::BTreeMap, string::String, sync::Arc};
 use config::vfs::MountFlags;
 use dev::DevFsType;
 use driver::{BLOCK_DEVICE, BlockDevice};
-use mutex::SpinNoIrqLock;
+use mutex::SpinLock;
 use systype::{SysError, SysResult};
 use vfs::{SYS_ROOT_DENTRY, file::File, fstype::FileSystemType};
 
@@ -20,8 +20,8 @@ pub mod simplefile;
 
 pub use vfs::sys_root_dentry;
 
-pub static FS_MANAGER: SpinNoIrqLock<BTreeMap<String, Arc<dyn FileSystemType>>> =
-    SpinNoIrqLock::new(BTreeMap::new());
+pub static FS_MANAGER: SpinLock<BTreeMap<String, Arc<dyn FileSystemType>>> =
+    SpinLock::new(BTreeMap::new());
 
 type DiskFsType = ext4::fs::ExtFsType;
 type DiskFsTypeFat = fat32::fs::FatFsType;

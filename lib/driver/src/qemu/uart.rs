@@ -1,17 +1,17 @@
 use crate::CharDevice;
 use config::device::MMIO_SERIAL_PORT_ADDR;
-use mutex::SpinNoIrqLock;
+use mutex::SpinLock;
 use uart_16550::MmioSerialPort;
 
 pub struct UartDevice {
-    device: SpinNoIrqLock<MmioSerialPort>,
+    device: SpinLock<MmioSerialPort>,
 }
 
 impl UartDevice {
     pub fn new() -> Self {
         let serialport = unsafe { MmioSerialPort::new(MMIO_SERIAL_PORT_ADDR) };
         Self {
-            device: SpinNoIrqLock::new(serialport),
+            device: SpinLock::new(serialport),
         }
     }
 }

@@ -1,9 +1,9 @@
 // use crate::sbi::console_putchar;
 use core::fmt::{self, Write};
 
-use mutex::SpinNoIrqLock;
+use mutex::SpinLock;
 
-static PRINT_LOCK: SpinNoIrqLock<()> = SpinNoIrqLock::new(());
+static PRINT_LOCK: SpinLock<()> = SpinLock::new(());
 
 struct Stdout;
 

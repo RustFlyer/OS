@@ -153,7 +153,7 @@ pub async fn task_executor_unit(task: Arc<Task>) {
         task.get_name()
     );
     task.set_waker(take_waker().await);
-    set_nx_timer_irq();
+    // set_nx_timer_irq();
 
     loop {
         // trap_return connects user and kernel.
@@ -203,14 +203,10 @@ pub async fn task_executor_unit(task: Arc<Task>) {
 /// When a task is initialized, it can be passed in this function and spawn a future
 /// to schedule.
 pub fn spawn_user_task(task: Arc<Task>) {
-    log::info!("New Task [{}] spawns!", task.get_name());
     let future = UserFuture::new(task.clone(), task_executor_unit(task));
-    log::debug!("[spawn_user_task] executor spawn");
     let (task, handle) = executor::spawn(future);
-    log::debug!("[spawn_user_task] task and handle detach");
     task.schedule();
     handle.detach();
-    log::debug!("[spawn_user_task] finish");
 }
 
 /// `spawn_kernel_task` wraps a future(impl async Fn) and spawn a KernelFuture.
