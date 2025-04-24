@@ -1,4 +1,8 @@
-use alloc::{ffi::CString, string::ToString, vec};
+use alloc::{
+    ffi::CString,
+    string::ToString,
+    vec::{self, Vec},
+};
 use core::{cmp, error};
 
 use simdebug::stop;
@@ -702,8 +706,13 @@ pub async fn sys_pipe2(pipefd: usize, flags: i32) -> SyscallResult {
 pub fn sys_ioctl(fd: usize, request: usize, argp: usize) -> SyscallResult {
     log::info!("[sys_ioctl] fd: {fd}, request: {request:#x}, arg: {argp:#x}");
     let task = current_task();
-    let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
-    file.ioctl(request, argp)
+    let addrspace = task.addr_space();
+    let mut arg = UserWritePtr::<u8>::new(argp, &addrspace);
+    unsafe {
+        let slice = arg.try_into_mut_slice(30)?;
+        let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
+        file.ioctl(request, slice.as_ptr() as usize)
+    }
 }
 
 /// `sendfile()` copies data between one file descriptor and another.
@@ -750,5 +759,90 @@ pub async fn sys_sendfile64(
         }
     }
 
+    Ok(write_bytes)
+}
+
+// Defined in <bits/fcntl-linux.h>
+#[derive(FromRepr, Debug, Eq, PartialEq, Clone, Copy, Default)]
+#[allow(non_camel_case_types)]
+#[repr(isize)]
+pub enum FcntlOp {
+    F_DUPFD = 0,
+    F_DUPFD_CLOEXEC = 1030,
+    F_GETFD = 1,
+    F_SETFD = 2,
+    F_GETFL = 3,
+    F_SETFL = 4,
+    #[default]
+    F_UNIMPL,
+}
+
+/// `fcntl()` performs one of the operations described below on the open file descriptor `fd`.
+/// The operation is determined by `op`.
+///
+/// `fcntl()` can take an optional third argument. Whether or not this argument is required
+/// is determined by `op`. The required argument type is indicated in parentheses after
+/// each `op` name (in most cases, the required type is int, and we identify the argument
+/// using the name arg), or void is specified if the argument is not required.
+///
+/// # Op
+/// - `F_DUPFD`: Duplicate the file descriptor `fd` using the lowest-numbered available
+///   file descriptor greater than or equal to arg. This is different from dup2,
+///   which uses exactly the file descriptor specified.
+/// - `F_DUPFD_CLOEXEC`: As `F_DUPFD`, but additionally set the close-on-exec flag for
+///   the duplicate file descriptor. Specifying this flag permits a program to avoid
+///   an additional `fcntl()` `F_SETFD` operation to set the FD_CLOEXEC flag.
+pub fn sys_fcntl(fd: usize, op: isize, arg: usize) -> SyscallResult {
+    use FcntlOp::*;
+    let task = current_task();
+    let op = FcntlOp::from_repr(op).unwrap_or_default();
+    log::debug!("[sys_fcntl] fd: {fd}, op: {op:?}, arg: {arg:#x}");
+    match op {
+        F_DUPFD_CLOEXEC => {
+            task.with_mut_fdtable(|table| table.dup_with_bound(fd, arg, OpenFlags::O_CLOEXEC))
+        }
+        _ => {
+            log::error!("[sys_fcntl] not implemented {op:?}");
+            Ok(0)
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct IoVec {
+    pub base: usize,
+    pub len: usize,
+}
+
+/// `sys_writev()` write data into file from multiple buffers
+pub async fn sys_writev(fd: usize, iov: usize, iovcnt: usize) -> SyscallResult {
+    log::info!("[sys_writev] fd: {fd}, iov: {iov:#x}, iovcnt: {iovcnt}");
+
+    let task = current_task();
+    let addrspace = task.addr_space();
+
+    let iovs = {
+        let mut iovs_ptr = UserReadPtr::<IoVec>::new(iov, &addrspace);
+        let pointers = unsafe { iovs_ptr.read_array(iovcnt)? };
+        // log::info!("[sys_writev] pointers: {:?}", pointers);
+        // log::info!("[sys_writev] iovcnt: {}", iovcnt);
+        pointers
+    };
+
+    log::info!("[sys_writev] iov: {:?}", iovs);
+
+    let mut write_bytes = 0;
+    let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
+    for iov in iovs {
+        if iov.len == 0 {
+            continue;
+        }
+        let mut ptr = UserReadPtr::<u8>::new(iov.base, &addrspace);
+        let slice = unsafe { ptr.try_into_slice(iov.len)? };
+        write_bytes += file.write(slice).await?;
+    }
+
+    log::info!("[sys_writev] write bytes: {:?}", write_bytes);
     Ok(write_bytes)
 }

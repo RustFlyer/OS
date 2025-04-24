@@ -93,13 +93,13 @@ impl Termios {
     pub(crate) fn new() -> Self {
         Self {
             // IMAXBEL | IUTF8 | IXON | IXANY | ICRNL | BRKINT
-            iflag: 0, // 0o66402,
+            iflag: 0o66402,
             // OPOST | ONLCR
             oflag: 0o5,
             // HUPCL | CREAD | CSIZE | EXTB
             cflag: 0o2277,
             // IEXTEN | ECHOTCL | ECHOKE ECHO | ECHOE | ECHOK | ISIG | ICANON
-            lflag: 0, // 0o105073,
+            lflag: 0o105073,
             line: 0,
             cc: [
                 3,   // VINTR Ctrl-C
