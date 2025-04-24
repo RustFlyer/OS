@@ -4,8 +4,13 @@
 //! This module provides functions to open, create, and remove directories, and read
 //! directory entries, along with other directory-related operations.
 
-use core::{ffi::CStr, mem::MaybeUninit, panic};
 use alloc::string::String;
+use core::{
+    cell::SyncUnsafeCell,
+    ffi::CStr,
+    mem::{ManuallyDrop, MaybeUninit},
+    panic,
+};
 
 use lwext4_rust::{
     InodeTypes,
@@ -17,6 +22,8 @@ use lwext4_rust::{
 
 use config::inode::InodeType;
 use systype::{SysError, SysResult};
+
+use super::file::ExtFile;
 
 /// Wrapper for `lwext4_rust` crate's `ext4_dir` struct which represents a directory
 /// file which can reads and writes directory entries.
@@ -40,6 +47,17 @@ impl Drop for ExtDir {
 }
 
 impl ExtDir {
+    /// Returns an [`ExtFile`] which is a handle to the directory file to allow
+    /// file operations on it.
+    ///
+    /// The returned [`ExtFile`] is wrapped in a [`ManuallyDrop`]; do not drop it, e.g.,
+    /// by calling [`ManuallyDrop::drop`]! Also be careful when calling functions like
+    /// [`ExtFile::write`] or [`ExtFile::truncate`] on the returned [`ExtFile`]; this is
+    /// usually not what you want to do.
+    pub fn as_file(&self) -> ManuallyDrop<ExtFile> {
+        ManuallyDrop::new(ExtFile(SyncUnsafeCell::new(self.0.f)))
+    }
+
     /// Opens a directory file at the given path and returns a handle to it.
     ///
     /// `path` is the absolute path to the file to be opened.

@@ -21,7 +21,7 @@ unsafe impl Sync for ExtDirInode {}
 impl ExtDirInode {
     pub fn new(superblock: Arc<dyn SuperBlock>, dir: ExtDir) -> Arc<Self> {
         Arc::new(Self {
-            meta: InodeMeta::new(0, superblock),
+            meta: InodeMeta::new(dir.as_file().ino() as usize, superblock),
             dir: new_share_mutex(dir),
         })
     }
