@@ -13,7 +13,7 @@ use crate::task::{TaskState, signal::sig_info::*};
 
 use super::Task;
 
-#[derive(Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 #[repr(C)]
 pub struct SigAction {
     /// sa_handler specifies the action to be associated with signum and can be

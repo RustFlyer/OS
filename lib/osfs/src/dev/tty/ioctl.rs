@@ -1,6 +1,6 @@
 use strum::FromRepr;
 
-pub(crate) type Pid = usize;
+pub type Pid = u8;
 pub(crate) struct TtyInner {
     pub(crate) fg_pgid: Pid,
     pub(crate) win_size: WinSize,
@@ -10,7 +10,7 @@ pub(crate) struct TtyInner {
 /// Defined in <asm-generic/ioctls.h>
 #[derive(FromRepr, Debug)]
 #[repr(usize)]
-pub(crate) enum TtyIoctlCmd {
+pub enum TtyIoctlCmd {
     // For struct termios
     /// Gets the current serial port settings.
     TCGETS = 0x5401,
@@ -74,7 +74,7 @@ impl WinSize {
 /// Defined in <asm-generic/termbits.h>
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
-pub(crate) struct Termios {
+pub struct Termios {
     /// Input mode flags.
     pub iflag: u32,
     /// Output mode flags.
@@ -93,13 +93,13 @@ impl Termios {
     pub(crate) fn new() -> Self {
         Self {
             // IMAXBEL | IUTF8 | IXON | IXANY | ICRNL | BRKINT
-            iflag: 0o66402,
+            iflag: 0, // 0o66402,
             // OPOST | ONLCR
             oflag: 0o5,
             // HUPCL | CREAD | CSIZE | EXTB
             cflag: 0o2277,
             // IEXTEN | ECHOTCL | ECHOKE ECHO | ECHOE | ECHOK | ISIG | ICANON
-            lflag: 0o105073,
+            lflag: 0, // 0o105073,
             line: 0,
             cc: [
                 3,   // VINTR Ctrl-C

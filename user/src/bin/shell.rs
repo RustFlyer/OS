@@ -37,7 +37,7 @@ fn main() {
         let mut exitcode = 0;
         let pid = fork();
         if pid == 0 {
-            execve(args[0], &args[1..], &[]);
+            execve(args[0], &args[0..], &[]);
             exit(0);
         }
         waitpid(pid, &mut exitcode);

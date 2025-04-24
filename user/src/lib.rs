@@ -12,8 +12,6 @@ mod syscall;
 
 extern crate alloc;
 
-use core::ffi::CStr;
-
 use alloc::{ffi::CString, vec::Vec};
 
 use buddy_system_allocator::LockedHeap;

@@ -60,9 +60,19 @@ pub fn sys_exit(status: i32) -> SyscallResult {
 /// `exit_group` system call terminates all threads in the calling thread group.
 ///
 /// # Note
-/// The current implementation does not support multi-threading.
+/// The current implementation now supports multi-threading.
 pub fn sys_exit_group(status: i32) -> SyscallResult {
-    sys_exit(status)
+    let thread_group = current_task().thread_group_mut();
+    let thread_group_lock = thread_group.lock();
+
+    thread_group_lock.iter().for_each(|thread| {
+        thread.set_state(TaskState::Zombie);
+        if thread.is_process() {
+            thread.set_exit_code((status & 0xFF) << 8);
+        }
+    });
+
+    Ok(0)
 }
 
 /// `sched_yield`  causes the calling thread to relinquish the CPU.  The thread is moved to the end
@@ -422,7 +432,8 @@ pub fn sys_set_tid_address(tidptr: usize) -> SyscallResult {
 ///
 /// Typical application: After the daemon process starts, it first starts as root,
 /// and then sets gid/gid to a regular user to reduce permissions and enhance system security.
-pub fn sys_setgid(_gid: usize) -> SyscallResult {
+pub fn sys_setgid(gid: usize) -> SyscallResult {
+    log::error!("[sys_setgid] unimplemented call gid: {gid}");
     Ok(0)
 }
 
@@ -434,6 +445,57 @@ pub fn sys_setgid(_gid: usize) -> SyscallResult {
 /// Typical application: A daemon process first performs sensitive tasks as root,
 /// and then setuid(1000) returns to a regular user to continue working stably
 /// and enhance security.
-pub fn sys_setuid(_uid: usize) -> SyscallResult {
+pub fn sys_setuid(uid: usize) -> SyscallResult {
+    log::error!("[sys_setuid] unimplemented call uid: {uid}");
+    Ok(0)
+}
+
+/// `getpgid` gets pgid from thread with specified id `pid`.
+/// If `pid` is zero, the function will return current task pgid.
+pub fn sys_getpgid(pid: usize) -> SyscallResult {
+    let task = if pid != 0 {
+        TASK_MANAGER.get_task(pid).ok_or(SysError::ENOMEM)?
+    } else {
+        current_task()
+    };
+    let pgid = task.get_pgid();
+
+    Ok(pgid)
+}
+
+/// setpgid() sets the PGID of the process specified by pid to pgid.
+///
+/// # Exception
+/// - If `pid` is zero, then the process ID of the calling process is used.
+/// - If `pgid` is zero, then the PGID of the process specified by pid is made the
+///   same as its process ID.
+///
+/// If setpgid() is used to move a process from one process group to another (as is
+/// done by some shells when creating pipelines), both process groups must be part of
+/// the same session (see setsid(2) and credentials(7)).
+///
+/// In this case, the pgid specifies an existing process group to be joined
+/// and the session ID of that group must match the session ID of the joining process.
+pub fn sys_setpgid(pid: usize, pgid: usize) -> SyscallResult {
+    let task = if pid != 0 {
+        TASK_MANAGER.get_task(pid).ok_or(SysError::ENOMEM)?
+    } else {
+        current_task()
+    };
+
+    let pgid = if pgid == 0 {
+        task.process().get_pgid()
+    } else {
+        pgid
+    };
+
+    *task.pgid_mut().lock() = pgid;
+
+    Ok(0)
+}
+
+/// geteuid() returns the effective user ID of the calling process.
+pub fn sys_geteuid() -> SyscallResult {
+    log::error!("[geteuid] unimplemented call");
     Ok(0)
 }

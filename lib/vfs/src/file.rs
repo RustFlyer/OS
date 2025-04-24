@@ -113,20 +113,6 @@ pub trait File: Send + Sync + DowncastSync {
         todo!()
     }
 
-    /// Given interested events, keep track of these events and return events
-    /// that is ready.
-    #[deprecated = "Legacy function from Phoenix OS."]
-    async fn base_poll(&self, events: PollEvents) -> PollEvents {
-        let mut res = PollEvents::empty();
-        if events.contains(PollEvents::IN) {
-            res |= PollEvents::IN;
-        }
-        if events.contains(PollEvents::OUT) {
-            res |= PollEvents::OUT;
-        }
-        res
-    }
-
     fn inode(&self) -> Arc<dyn Inode> {
         self.meta().dentry.inode().unwrap()
     }
@@ -200,6 +186,19 @@ pub trait File: Send + Sync + DowncastSync {
 
     fn ioctl(&self, _cmd: usize, _arg: usize) -> SyscallResult {
         Err(SysError::ENOTTY)
+    }
+
+    /// Given interested events, keep track of these events and return events
+    /// that is ready.
+    async fn base_poll(&self, events: PollEvents) -> PollEvents {
+        let mut res = PollEvents::empty();
+        if events.contains(PollEvents::IN) {
+            res |= PollEvents::IN;
+        }
+        if events.contains(PollEvents::OUT) {
+            res |= PollEvents::OUT;
+        }
+        res
     }
 }
 
@@ -384,8 +383,8 @@ impl dyn File {
     /// Given interested events, keep track of these events and return events
     /// that is ready.
     pub async fn poll(&self, events: PollEvents) -> PollEvents {
-        unimplemented!();
-        log::info!("[File::poll] path:{}", self.dentry().path());
+        // unimplemented!();
+        // log::info!("[File::poll] path:{}", self.dentry().path());
         self.base_poll(events).await
     }
 

@@ -108,7 +108,7 @@ pub fn sys_sigmask(mode: usize, input_mask: usize, prev_mask: usize) -> SyscallR
 
     if !prev_mask.is_null() {
         unsafe {
-            let _ = prev_mask.write(*mask)?;
+            prev_mask.write(*mask)?;
         }
     }
 
@@ -183,7 +183,7 @@ pub fn sys_rt_sigaction(
     let addrspace = task.addr_space();
     let signum = Sig::from_i32(signum);
 
-    if !signum.is_valid() || signum == Sig::SIGKILL || signum == Sig::SIGSTOP {
+    if !signum.is_valid() || matches!(signum, Sig::SIGKILL | Sig::SIGSTOP) {
         return Err(SysError::EINVAL);
     }
 
@@ -199,6 +199,9 @@ pub fn sys_rt_sigaction(
 
     if !new_sa.is_null() {
         let mut action = unsafe { new_sa.read()? };
+
+        log::info!("[sys_rt_sigaction] new action: {:?}", action);
+
         action.sa_mask.remove(SigSet::SIGKILL | SigSet::SIGSTOP);
 
         let atype = match action.sa_handler {
@@ -213,7 +216,7 @@ pub fn sys_rt_sigaction(
             mask: action.sa_mask,
         };
 
-        log::info!("[sys_rt_sigaction] new:{:?}", new);
+        // log::info!("[sys_rt_sigaction] new:{:?}", new);
         task.sig_handlers_mut().lock().update(signum, new);
     }
     Ok(0)
@@ -259,7 +262,7 @@ pub fn sys_rt_sigmask(
     if !input_mask.is_null() {
         unsafe {
             let input = input_mask.read()?;
-            log::info!("[sys_sigmask] input:{input:#x}");
+            log::info!("[sys_rt_sigmask] input:{input:#x}");
 
             match how {
                 SIGBLOCK => {

@@ -1,23 +1,31 @@
-use alloc::{
-    ffi::CString,
-    string::ToString,
-    vec::{self, Vec},
+use alloc::{boxed::Box, ffi::CString, string::ToString, vec::Vec};
+use core::{
+    cmp,
+    pin::Pin,
+    task::{Context, Poll},
+    time::Duration,
+    usize,
 };
-use core::{cmp, error};
+use time::TimeSpec;
+use timer::{TimedTaskResult, TimeoutFuture};
 
 use simdebug::stop;
 use strum::FromRepr;
 
 use config::{
     inode::InodeMode,
-    vfs::{AccessFlags, AtFd, AtFlags, MountFlags, OpenFlags, SeekFrom},
+    vfs::{AccessFlags, AtFd, AtFlags, MountFlags, OpenFlags, PollEvents, SeekFrom},
 };
 use driver::BLOCK_DEVICE;
 use osfs::{
     FS_MANAGER,
+    dev::tty::{
+        TtyIoctlCmd,
+        ioctl::{Pid, Termios},
+    },
     pipe::{inode::PIPE_BUF_LEN, new_pipe},
 };
-use systype::{SysError, SyscallResult};
+use systype::{SysError, SysResult, SyscallResult};
 use vfs::{
     file::File,
     kstat::Kstat,
@@ -76,6 +84,8 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
         let cstring = data_ptr.read_c_string(256)?;
         cstring.into_string().map_err(|_| SysError::EINVAL)?
     };
+
+    let name = path.clone();
     log::info!("[sys_openat] dirfd: {dirfd:#x}, path: {path}, flags: {flags:?}, mode: {_mode:?}");
 
     let mut dentry = task.walk_at(AtFd::from(dirfd), path)?;
@@ -107,6 +117,8 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
 
     let file = <dyn File>::open(dentry)?;
     file.set_flags(flags);
+
+    log::debug!("[sys_openat] file open success with its name {:?}", name);
 
     task.with_mut_fdtable(|ft| ft.alloc(file, flags))
 }
@@ -704,12 +716,27 @@ pub async fn sys_pipe2(pipefd: usize, flags: i32) -> SyscallResult {
 /// In particular, many operating characteristics of character special files (e.g., terminals)
 /// may be controlled with `ioctl()` operations. The argument fd must be an open file descriptor.
 pub fn sys_ioctl(fd: usize, request: usize, argp: usize) -> SyscallResult {
-    log::info!("[sys_ioctl] fd: {fd}, request: {request:#x}, arg: {argp:#x}");
+    // return Err(SysError::EBUSY);
+    // log::info!("[sys_ioctl] fd: {fd}, request: {request:#x}, arg: {argp:#x}");
     let task = current_task();
     let addrspace = task.addr_space();
     let mut arg = UserWritePtr::<u8>::new(argp, &addrspace);
     unsafe {
-        let slice = arg.try_into_mut_slice(30)?;
+        let len = if let Some(cmd) = TtyIoctlCmd::from_repr(request) {
+            match cmd {
+                TtyIoctlCmd::TCGETS => core::mem::size_of::<Termios>(),
+                TtyIoctlCmd::TIOCGPGRP => core::mem::size_of::<Pid>(),
+                TtyIoctlCmd::TCSETS => core::mem::size_of::<Termios>(),
+                _ => 0,
+            }
+        } else {
+            0
+        };
+
+        // log::debug!("[sys_ioctl] should write with len: {len}");
+
+        let slice = arg.try_into_mut_slice(len)?;
+
         let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
         file.ioctl(request, slice.as_ptr() as usize)
     }
@@ -817,6 +844,7 @@ pub struct IoVec {
 
 /// `sys_writev()` write data into file from multiple buffers
 pub async fn sys_writev(fd: usize, iov: usize, iovcnt: usize) -> SyscallResult {
+    // return Err(SysError::EBUSY);
     log::info!("[sys_writev] fd: {fd}, iov: {iov:#x}, iovcnt: {iovcnt}");
 
     let task = current_task();
@@ -845,4 +873,141 @@ pub async fn sys_writev(fd: usize, iov: usize, iovcnt: usize) -> SyscallResult {
 
     log::info!("[sys_writev] write bytes: {:?}", write_bytes);
     Ok(write_bytes)
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct PollFd {
+    fd: i32,
+    events: i16,
+    revents: i16,
+}
+
+pub type Async<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
+pub struct PollFuture<'a> {
+    futures: Vec<Async<'a, PollEvents>>,
+    ready_cnt: usize,
+}
+
+impl Future for PollFuture<'_> {
+    type Output = Vec<(usize, PollEvents)>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = unsafe { self.get_unchecked_mut() };
+        let mut ret_vec = Vec::new();
+        for (i, future) in this.futures.iter_mut().enumerate() {
+            let result = unsafe { Pin::new_unchecked(future).poll(cx) };
+            if let Poll::Ready(result) = result {
+                this.ready_cnt += 1;
+                ret_vec.push((i, result))
+            }
+        }
+        if this.ready_cnt > 0 {
+            Poll::Ready(ret_vec)
+        } else {
+            Poll::Pending
+        }
+    }
+}
+
+pub fn dyn_future<'a, T: Future + Send + 'a>(async_blk: T) -> Async<'a, T::Output> {
+    Box::pin(async_blk)
+}
+
+/// `sys_ppoll` waits for one of a set of file descriptors to become ready to perform I/O.
+/// The set of file descriptors to be monitored is specified in the `fds` argument, which
+/// is an array of structures of the following form:
+/// ```c
+/// struct pollfd {
+///     int   fd;         /* file descriptor */
+///     short events;     /* requested events */
+///     short revents;    /* returned events */
+/// };
+/// ```
+/// The caller should specify the number of items in the `fds` array in `nfds`.
+///
+/// The field `fd` contains a file descriptor for an open file. If this field is negative,
+/// then the corresponding `events` field is ignored and the `revents` field returns zero.
+///
+/// The field `events` is an input parameter, a bit mask specifying the `events` the application is
+/// interested in for the file descriptor fd. This field may be specified as zero, in which case
+/// the only `events` that can be returned in `revents` are POLLHUP, POLLERR, and POLLNVAL
+///
+/// The field `revents` is an output parameter, filled by the kernel with the `events` that actually
+/// occurred. The bits returned in `revents` can include any of those specified in `events`, or one
+/// of the values POLLERR, POLLHUP, or POLLNVAL.
+///
+/// If none of the events requested (and no error) has occurred for any of the file descriptors,
+/// then `poll()` blocks until one of the events occurs.
+///
+/// The timeout argument specifies the number of milliseconds that poll() should block waiting
+/// for a file descriptor to become ready. The call will block until either:
+/// - a file descriptor becomes ready
+/// - the call is interrupted by a signal handler
+/// - the timeout expires.
+///
+/// Being "ready" means that the requested operation will not block;
+/// thus, poll()ing regular files, block devices, and other files with no reasonable polling
+/// semantic always returns instantly as ready to read and write.
+///
+/// ppoll() allows an application to safely wait until either a file descriptor
+/// becomes ready or until a signal is caught.
+///
+/// If the sigmask argument is specified as NULL, then no signal mask manipulation is
+/// performed (and thus ppoll() differs from poll() only in the precision of the timeout argument).
+///
+/// The tmo_p argument specifies an upper limit on the amount of time that ppoll() will block.
+///
+/// If tmo_p is specified as NULL, then ppoll() can block indefinitely.
+pub async fn sys_ppoll(fds: usize, nfds: usize, tmo_p: usize, sigmask: usize) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+
+    let mut poll_fds = unsafe { UserReadPtr::<PollFd>::new(fds, &addrspace).read_array(nfds)? };
+    // log::debug!("[sys_ppoll] fds: {:?}", fds);
+
+    let time_out = if tmo_p == 0 {
+        None
+    } else {
+        let timespec = unsafe { UserReadPtr::<TimeSpec>::new(tmo_p, &addrspace).read()? };
+        Some(Duration::from_micros(timespec.into_ms() as u64))
+    };
+
+    let mut futures = Vec::<Async<PollEvents>>::with_capacity(nfds);
+    for poll_fd in poll_fds.iter() {
+        let fd = poll_fd.fd as usize;
+        let events = PollEvents::from_bits(poll_fd.events).unwrap();
+        let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
+        let future = dyn_future(async move { file.poll(events).await });
+        futures.push(future);
+    }
+
+    let poll_future = PollFuture {
+        futures,
+        ready_cnt: 0,
+    };
+
+    let ret_vec = if let Some(timeout) = time_out {
+        match TimeoutFuture::new(timeout, poll_future).await {
+            TimedTaskResult::Completed(ret_vec) => ret_vec,
+            TimedTaskResult::Timeout => {
+                log::debug!("[sys_ppoll]: timeout");
+                return Ok(0);
+            }
+        }
+    } else {
+        poll_future.await
+    };
+
+    let ret = ret_vec.len();
+    for (i, result) in ret_vec {
+        poll_fds[i].revents |= result.bits() as i16;
+        // else {
+        //     poll_fds[i].revents |= PollEvents::ERR.bits() as i16;
+        // }
+    }
+
+    unsafe { UserWritePtr::<PollFd>::new(fds, &addrspace).write_array(&poll_fds)? };
+
+    Ok(ret)
 }

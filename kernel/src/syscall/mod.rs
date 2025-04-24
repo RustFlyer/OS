@@ -85,6 +85,10 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         WRITEV => sys_writev(args[0], args[1], args[2]).await,
         RT_SIGPROCMASK => sys_rt_sigmask(args[0], args[1], args[2], args[3]),
         TGKILL => sys_tgkill(args[0] as isize, args[1] as isize, args[2] as i32),
+        GETPGID => sys_getpgid(args[0]),
+        SETPGID => sys_setpgid(args[0], args[1]),
+        GETEUID => sys_geteuid(),
+        PPOLL => sys_ppoll(args[0], args[1], args[2], args[3]).await,
         _ => {
             log::error!("Syscall not implemented: {}", syscall_no.as_str());
             unimplemented!()

@@ -15,10 +15,10 @@ use crate::dev::tty::{
     ioctl::{Pid, Termios, TtyIoctlCmd, WinSize},
 };
 
-use super::{ioctl::TtyInner, queuebuffer::QueueBuffer};
+use super::ioctl::TtyInner;
 use alloc::boxed::Box;
 pub struct TtyFile {
-    buf: SpinNoIrqLock<QueueBuffer>,
+    // buf: SpinNoIrqLock<QueueBuffer>,
     meta: FileMeta,
     pub(crate) inner: SpinNoIrqLock<TtyInner>,
 }
@@ -26,7 +26,7 @@ pub struct TtyFile {
 impl TtyFile {
     pub fn new(dentry: Arc<dyn Dentry>) -> Arc<Self> {
         Arc::new(Self {
-            buf: SpinNoIrqLock::new(QueueBuffer::new()),
+            // buf: SpinNoIrqLock::new(QueueBuffer::new()),
             meta: FileMeta::new(dentry),
             inner: SpinNoIrqLock::new(TtyInner {
                 fg_pgid: 1,
@@ -53,37 +53,12 @@ impl File for TtyFile {
             .unwrap_or_else(|_| unreachable!())
             .char_dev;
         let rlen = dev.read(buf);
-        // let mut cnt = 0;
-        // loop {
-        //     let ch: u8;
-        //     let self_buf = self.buf.lock().pop();
-        //     if self_buf != 0xff {
-        //         ch = self_buf;
-        //     } else {
-        //         ch = getchar();
-        //         if ch == 0xff {
-        //             todo!();
-        //         }
-        //     }
-        //     buf[cnt] = ch;
-
-        //     cnt += 1;
-
-        //     if cnt < buf.len() {
-        //         // return Ok(buf.len());
-        //         log::warn!("can not async yield");
-        //         yield_now().await;
-        //         continue;
-        //     } else {
-        //         return Ok(buf.len());
-        //     }
-        // }
 
         let termios = self.inner.lock().termios;
         if termios.is_icrnl() {
             for i in 0..rlen {
                 if buf[i] == '\r' as u8 {
-                    buf[i] = '\n' as u8;
+                    // buf[i] = '\n' as u8;
                 }
             }
         }
@@ -94,8 +69,6 @@ impl File for TtyFile {
     }
 
     async fn base_write(&self, buf: &[u8], _offset: usize) -> SysResult<usize> {
-        // let utf8_buf: Vec<u8> = buf.iter().filter(|c| c.is_ascii()).map(|c| *c).collect();
-        // print!("{}", unsafe { core::str::from_utf8_unchecked(&utf8_buf) });
         let dev = &self
             .meta
             .dentry
@@ -126,7 +99,7 @@ impl File for TtyFile {
             TCSETS | TCSETSW | TCSETSF => {
                 unsafe {
                     self.inner.lock().termios = *(arg as *const Termios);
-                    log::info!("termios {:#x?}", self.inner.lock().termios);
+                    // log::info!("termios {:#x?}", self.inner.lock().termios);
                 }
                 Ok(0)
             }

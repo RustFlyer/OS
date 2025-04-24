@@ -186,7 +186,8 @@ impl FdTable {
             .get_available_slot(lower_bound)
             .ok_or_else(|| SysError::EMFILE)?;
         log::debug!(
-            "[dup_with_bound] lowerbound {}, new fd {}",
+            "[dup_with_bound] old fd {}, lowerbound {}, new fd {}",
+            old_fd,
             lower_bound,
             new_fd
         );

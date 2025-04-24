@@ -60,6 +60,9 @@ pub fn user_exception_handler(task: &Task, e: Exception, stval: usize) {
             let addr_space = task.addr_space();
             // log::debug!("pass sleep lock {:?}", addrspace.change_heap_size(0, 0));
             if let Err(e) = addr_space.handle_page_fault(fault_addr, access) {
+                if fault_addr.to_usize() == 0x68094 {
+                    simdebug::stop();
+                }
                 // Should send a `SIGSEGV` signal to the task
                 log::error!(
                     "[user_exception_handler] unsolved page fault at {:#x}, access: {:?}, error: {:?}",
@@ -97,7 +100,7 @@ pub fn user_interrupt_handler(task: &Task, i: Interrupt) {
     // log::error!("[trap_handler] user_interrupt_handler");
     match i {
         Interrupt::SupervisorTimer => {
-            log::trace!("[trap_handler] timer interrupt");
+            // log::trace!("[trap_handler] timer interrupt");
             set_nx_timer_irq();
 
             // if executor does not have other tasks, it is no need to yield.

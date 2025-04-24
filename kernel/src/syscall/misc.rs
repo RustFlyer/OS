@@ -1,4 +1,3 @@
-use log::info;
 use systype::SyscallResult;
 
 use crate::{processor::current_task, vm::user_ptr::UserWritePtr};
@@ -37,13 +36,13 @@ impl UtsName {
 }
 
 pub async fn sys_uname(buf: usize) -> SyscallResult {
-    info!("uname buf: {buf:#x}");
+    log::info!("uname buf: {buf:#x}");
     let task = current_task();
-    let addr_space= task.addr_space();
+    let addr_space = task.addr_space();
     let mut ubuf = UserWritePtr::<UtsName>::new(buf, &addr_space);
     if !ubuf.is_null() {
         unsafe {
-            info!("uname write");
+            log::info!("uname write");
             ubuf.write(UtsName::default())?;
         }
     }
