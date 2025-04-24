@@ -200,14 +200,21 @@ pub fn sys_rt_sigaction(
     if !new_sa.is_null() {
         let mut action = unsafe { new_sa.read()? };
 
-        log::info!("[sys_rt_sigaction] new action: {:?}", action);
+        // log::info!("[sys_rt_sigaction] new action: {:?}", action);
 
         action.sa_mask.remove(SigSet::SIGKILL | SigSet::SIGSTOP);
 
         let atype = match action.sa_handler {
             SIG_DFL => ActionType::default(signum),
             SIG_IGN => ActionType::Ignore,
-            entry => ActionType::User { entry },
+            entry => {
+                log::info!(
+                    "[sys_rt_sigaction] task [{}] set code entry: {:#x}",
+                    task.get_name(),
+                    entry
+                );
+                ActionType::User { entry }
+            }
         };
 
         let new = Action {

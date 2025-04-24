@@ -34,12 +34,19 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo) -> SysResult<bool> {
     let cx = task.trap_context_mut();
     let old_mask = task.get_sig_mask();
 
-    log::info!("[do signal] Handling signal: {:?} {:?}", si, action);
+    log::debug!(
+        "[sig_exec] task [{}] Handling signal: {:?} {:?}",
+        task.get_name(),
+        si,
+        action
+    );
+
     if action.flags.contains(SigActionFlag::SA_RESTART) {
         cx.sepc -= 4;
         cx.restore_last_user_a0();
-        log::info!("[do_signal] restart syscall");
+        log::info!("[sig_exec] restart syscall");
     }
+
     match action.atype {
         ActionType::Ignore => Ok(false),
         ActionType::Kill => {

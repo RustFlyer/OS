@@ -27,6 +27,7 @@ use vfs::path::Path;
 use super::future::{self};
 use super::manager::TASK_MANAGER;
 use super::process_manager::PROCESS_GROUP_MANAGER;
+use super::sig_members::SigHandlers;
 use super::sig_members::SigManager;
 use super::task::*;
 use super::threadgroup::ThreadGroup;
@@ -209,7 +210,7 @@ impl Task {
         }
 
         let sig_mask = SyncUnsafeCell::new(self.get_sig_mask());
-        let sig_handlers = (*self.sig_handlers_mut()).clone();
+        let sig_handlers = new_share_mutex(SigHandlers::new());
         let sig_manager = SyncUnsafeCell::new(SigManager::new());
         let sig_stack = SyncUnsafeCell::new(*self.sig_stack_mut());
         let sig_cx_ptr = AtomicUsize::new(0);

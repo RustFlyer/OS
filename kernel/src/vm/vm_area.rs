@@ -64,14 +64,14 @@ pub struct VmArea {
     /// Allocated physical pages.
     pages: BTreeMap<VirtPageNum, Arc<Page>>,
     /// Unique data of a specific type of VMA.
-    map_type: TypedArea,
+    pub map_type: TypedArea,
     /// Page fault handler.
     handler: Option<PageFaultHandler>,
 }
 
 /// Unique data of a specific type of VMA. This enum is used in [`VmArea`].
 #[derive(Debug, Clone)]
-enum TypedArea {
+pub enum TypedArea {
     /// A fixed-offset VMA.
     ///
     /// A fixed-offset VMA is used to map physical addresses to virtual addresses

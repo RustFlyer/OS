@@ -363,6 +363,19 @@ impl AddrSpace {
     /// when handling the page fault.
     pub fn handle_page_fault(&self, fault_addr: VirtAddr, access: MemPerm) -> SysResult<()> {
         let mut vm_areas_lock = self.vm_areas.lock();
+
+        if fault_addr.to_usize() == 0x68094 {
+            vm_areas_lock.iter().for_each(|(_, vma)| {
+                log::debug!(
+                    "[{:?}][{:?}]: {:#x} ~ {:#x}",
+                    vma.map_type,
+                    vma.flags(),
+                    vma.start_va().to_usize(),
+                    vma.end_va().to_usize()
+                )
+            });
+        }
+
         let vma = vm_areas_lock
             .range_mut(..=fault_addr)
             .next_back()

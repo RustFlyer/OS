@@ -1002,9 +1002,6 @@ pub async fn sys_ppoll(fds: usize, nfds: usize, tmo_p: usize, sigmask: usize) ->
     let ret = ret_vec.len();
     for (i, result) in ret_vec {
         poll_fds[i].revents |= result.bits() as i16;
-        // else {
-        //     poll_fds[i].revents |= PollEvents::ERR.bits() as i16;
-        // }
     }
 
     unsafe { UserWritePtr::<PollFd>::new(fds, &addrspace).write_array(&poll_fds)? };

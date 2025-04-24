@@ -29,6 +29,7 @@ pub struct SigAction {
     /// execution of the signal handler.
     pub sa_mask: SigSet,
 }
+
 pub const SIG_DFL: usize = 0;
 pub const SIG_IGN: usize = 1;
 
@@ -59,11 +60,11 @@ impl Task {
     /// Interrupt state, task will be waken and handle the
     /// signal.
     fn recv(&self, si: SigInfo) {
-        log::info!(
-            "[Task::recv] tid {} recv {si:?} {:?}",
-            self.tid(),
-            self.sig_handlers_mut().lock().get(si.sig)
-        );
+        // log::info!(
+        //     "[Task::recv] tid {} recv {si:?} {:?}",
+        //     self.tid(),
+        //     self.sig_handlers_mut().lock().get(si.sig)
+        // );
 
         let manager = self.sig_manager_mut();
         manager.add(si);
