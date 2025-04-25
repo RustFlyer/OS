@@ -194,8 +194,12 @@ pub fn sys_readlinkat(dirfd: usize, pathname: usize, buf: usize, bufsiz: usize) 
     if !inode.inotype().is_symlink() {
         return Err(SysError::EINVAL);
     }
+
     let file = <dyn File>::open(dentry).unwrap();
     let link_path = file.readlink()?;
+
+    log::info!("[sys_readlinkat] link_path : [{link_path}]");
+
     let mut buf_ptr = UserWritePtr::<u8>::new(buf, &addr_space);
     let len = cmp::min(link_path.len(), bufsiz);
     unsafe {
