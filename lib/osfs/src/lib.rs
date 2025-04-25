@@ -7,6 +7,7 @@ use config::vfs::MountFlags;
 use dev::DevFsType;
 use driver::{BLOCK_DEVICE, BlockDevice};
 use mutex::SpinNoIrqLock;
+use proc::{fs::ProcFsType, init_procfs};
 use systype::{SysError, SysResult};
 use vfs::{SYS_ROOT_DENTRY, file::File, fstype::FileSystemType};
 
@@ -15,6 +16,7 @@ extern crate alloc;
 pub mod dev;
 pub mod fd_table;
 pub mod pipe;
+pub mod proc;
 pub mod simple;
 pub mod simplefile;
 
@@ -39,6 +41,9 @@ pub fn register_dev() {
 
     let devfs2 = DiskFsTypeFat::new();
     FS_MANAGER.lock().insert(devfs2.name(), devfs2);
+
+    let procfs = ProcFsType::new();
+    FS_MANAGER.lock().insert(procfs.name(), procfs);
 }
 
 pub fn init() {
@@ -63,6 +68,13 @@ pub fn init() {
         .mount("dev", Some(diskfs_root.clone()), MountFlags::empty(), None)
         .unwrap();
     log::debug!("success mount devfs");
+
+    let procfs = FS_MANAGER.lock().get("procfs").unwrap().clone();
+    let procfs_dentry = procfs
+        .mount("proc", Some(diskfs_root.clone()), MountFlags::empty(), None)
+        .unwrap();
+    init_procfs(procfs_dentry).unwrap();
+    log::debug!("success mount procfs");
 
     SYS_ROOT_DENTRY.call_once(|| diskfs_root);
 

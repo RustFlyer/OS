@@ -360,10 +360,11 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
         path.walk()?
     };
 
-    // log::info!("[sys_execve]: open file");
     let file = <dyn File>::open(dentry)?;
+    log::info!("[sys_execve]: open file");
+
     task.execve(file, args, envs, path)?;
-    // log::info!("[sys_execve]: finish execve and convert to a new task");
+    log::info!("[sys_execve]: finish execve and convert to a new task");
     Ok(0)
 }
 

@@ -13,7 +13,7 @@ use crate::{dentry::Dentry, superblock::SuperBlock};
 
 pub struct FileSystemTypeMeta {
     name: String,
-    sblks: SpinNoIrqLock<BTreeMap<String, Arc<dyn SuperBlock>>>,
+    pub sblks: SpinNoIrqLock<BTreeMap<String, Arc<dyn SuperBlock>>>,
 }
 
 impl FileSystemTypeMeta {

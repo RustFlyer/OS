@@ -492,6 +492,7 @@ dependencies = [
  "async-trait",
  "bitflags 2.9.0",
  "config",
+ "crate_interface",
  "driver",
  "ext4",
  "fat32",

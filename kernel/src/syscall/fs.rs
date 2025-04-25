@@ -181,7 +181,16 @@ pub fn sys_readlinkat(dirfd: usize, pathname: usize, buf: usize, bufsiz: usize) 
     log::info!("[sys_readlinkat] dirfd: {dirfd}, path: {path}, bufsiz: {bufsiz:#x}");
 
     let dentry = task.walk_at(AtFd::from(dirfd), path)?;
+
+    log::info!("[sys_readlinkat] dentry get");
     let inode = dentry.inode().ok_or(SysError::ENOENT)?;
+
+    log::info!(
+        "[sys_readlinkat] dentry {} get flag {}",
+        dentry.get_meta().name,
+        inode.inotype().as_char()
+    );
+
     if !inode.inotype().is_symlink() {
         return Err(SysError::EINVAL);
     }

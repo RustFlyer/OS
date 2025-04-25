@@ -470,7 +470,7 @@ impl dyn File {
     pub fn readlink(&self) -> SysResult<String> {
         let mut path_buf: Vec<u8> = vec![0; 512];
         let len = self.base_readlink(&mut path_buf)?;
-        path_buf.truncate(len + 1);
+        path_buf.truncate(len);
         let path = CString::from_vec_with_nul(path_buf)
             .unwrap()
             .into_string()

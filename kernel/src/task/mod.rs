@@ -1,4 +1,5 @@
 pub mod future;
+pub mod kernelproc;
 pub mod manager;
 pub mod process_manager;
 pub mod sig_members;
