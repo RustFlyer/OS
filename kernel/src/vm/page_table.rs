@@ -100,7 +100,8 @@ impl PageTable {
         let trampoline_start_va = VirtAddr::new(trampoline_start());
         let trampoline_end_va = VirtAddr::new(trampoline_end());
         let trampoline_prot = MemPerm::R | MemPerm::X | MemPerm::U;
-        let trampoline_vma = VmArea::new_kernel(trampoline_start_va, trampoline_end_va, trampoline_prot);
+        let trampoline_vma =
+            VmArea::new_kernel(trampoline_start_va, trampoline_end_va, trampoline_prot);
         OffsetArea::map(&trampoline_vma, &mut page_table);
 
         let rodata_start_va = VirtAddr::new(rodata_start());

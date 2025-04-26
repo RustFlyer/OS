@@ -41,6 +41,14 @@ pub fn text_start() -> usize {
 pub fn text_end() -> usize {
     _etext as usize
 }
+/// Start of signal handling trampoline in virtual memory
+pub fn trampoline_start() -> usize {
+    _strampoline as usize
+}
+/// End of signal handling trampoline in virtual memory
+pub fn trampoline_end() -> usize {
+    _etrampoline as usize
+}
 /// Start of kernel rodata section in virtual memory
 pub fn rodata_start() -> usize {
     _srodata as usize
@@ -146,6 +154,8 @@ unsafe extern "C" {
     fn _ekernel();
     fn _stext();
     fn _etext();
+    fn _strampoline();
+    fn _etrampoline();
     fn _srodata();
     fn _erodata();
     fn _sdata();

@@ -137,7 +137,8 @@ impl VmArea {
     ///
     /// `start_va` must be page-aligned.
     ///
-    /// `pte_flags` needs to have `RWX` bits set properly; other bits must be zero.
+    /// `pte_flags` needs to have `RWX` bits set properly; other bits except `U` must be
+    /// zero.
     pub fn new_kernel(start_va: VirtAddr, end_va: VirtAddr, prot: MemPerm) -> Self {
         debug_assert!(start_va.to_usize() % PAGE_SIZE == 0);
         Self::new_fixed_offset(
@@ -154,9 +155,6 @@ impl VmArea {
     /// an area in the kernel space. This function is used to map a MMIO region.
     ///
     /// `start_va` must be page-aligned.
-    ///
-    /// `prot` should have `U` bit cleared, because fixed-offset VMAs are supposed to be
-    /// used in kernel space.
     pub fn new_fixed_offset(
         start_va: VirtAddr,
         end_va: VirtAddr,
@@ -165,7 +163,6 @@ impl VmArea {
         offset: usize,
     ) -> Self {
         debug_assert!(start_va.to_usize() % PAGE_SIZE == 0);
-        debug_assert!(!prot.contains(MemPerm::U));
         Self {
             start: start_va,
             end: end_va.round_up(),
