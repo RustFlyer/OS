@@ -1,16 +1,17 @@
 use alloc::{string::String, sync::Arc};
 use downcast_rs::DowncastSync;
+use virtio_drivers::transport::DeviceType;
 
 use crate::{BlockDevice, CharDevice, net::NetDevice};
 
-/// General Device Operations
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum DeviceType {
-    Block,
-    Char,
-    Net,
-    Display,
-}
+// /// General Device Operations
+// #[derive(Debug, Clone, Copy, Eq, PartialEq)]
+// pub enum DeviceType {
+//     Block,
+//     Char,
+//     Net,
+//     Display,
+// }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(usize)]

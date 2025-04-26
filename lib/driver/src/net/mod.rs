@@ -1,7 +1,57 @@
 use core::any::Any;
 
-use alloc::boxed::Box;
+use alloc::{boxed::Box, string::ToString};
+use fdt::Fdt;
+use mm::address::PhysAddr;
 use smoltcp::phy::DeviceCapabilities;
+use virtio_drivers::transport::DeviceType;
+
+use crate::{
+    device::{DevId, DeviceMajor, DeviceMeta},
+    manager::probe_mmio_device,
+};
+
+pub fn probe_virtio_net(root: &Fdt) -> Option<DeviceMeta> {
+    let device_tree = root;
+    let mut net_meta = None;
+    for node in device_tree.find_all_nodes("/soc/virtio_mmio") {
+        log::debug!("[probe_virtio_net] probe node {}", node.name);
+        for reg in node.reg()? {
+            let mmio_base_paddr = PhysAddr::new(reg.starting_address as usize);
+            let mmio_size = reg.size?;
+            log::debug!("[probe_virtio_net] probe reg {:?}", reg);
+            if probe_mmio_device(
+                mmio_base_paddr.to_va_kernel().to_usize() as *mut u8,
+                mmio_size,
+                Some(DeviceType::Network),
+            )
+            .is_some()
+            {
+                log::debug!("[probe_virtio_net] find a net device");
+                net_meta = {
+                    Some(DeviceMeta {
+                        mmio_base: mmio_base_paddr.to_usize(),
+                        mmio_size,
+                        name: "virtio-blk".to_string(),
+                        dtype: DeviceType::Network,
+                        dev_id: DevId {
+                            major: DeviceMajor::Net,
+                            minor: 0,
+                        },
+                        irq_no: None,
+                    })
+                }
+            }
+            if net_meta.is_some() {
+                break;
+            }
+        }
+    }
+    if net_meta.is_none() {
+        log::warn!("No virtio net device found");
+    }
+    net_meta
+}
 
 /// The error type for device operation failures.
 #[derive(Debug)]

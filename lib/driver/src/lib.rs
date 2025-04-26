@@ -8,6 +8,7 @@ extern crate alloc;
 use alloc::sync::Arc;
 use config::mm::{DTB_ADDR, KERNEL_MAP_OFFSET};
 use core::fmt::{self};
+use net::probe_virtio_net;
 use qemu::{UartDevice, VirtBlkDevice};
 use spin::Once;
 
@@ -21,10 +22,18 @@ pub mod sbi;
 
 pub use sbi::sbi_print;
 
-pub fn init2() {
+pub fn probe_test() {
     let device_tree = unsafe {
         fdt::Fdt::from_ptr((DTB_ADDR + KERNEL_MAP_OFFSET) as *const u8).expect("Parse DTB failed")
     };
+
+    if let Some(bootargs) = device_tree.chosen().bootargs() {
+        log::debug!("Bootargs: {:?}", bootargs);
+    }
+    log::debug!("Device: {}", device_tree.root().model());
+
+    probe_virtio_net(&device_tree);
+
     // config::board::set_clock_freq(device_tree.cpus().next().unwrap().timebase_frequency());
     // log::info!("clock freq set to {} Hz", clock_freq());
 

@@ -24,6 +24,7 @@ mod vm;
 use core::ptr;
 
 use config::mm::{DTB_END, DTB_START};
+use driver::probe_test;
 use mm::{self, frame, heap};
 use processor::hart;
 
@@ -89,6 +90,8 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         log::info!("device tree blob {:#x} - {:#x}", DTB_START, DTB_END,);
         log::info!("device tree blob PA start: {:#x}", dtb_addr);
         log::info!("====== kernel memory layout end ======");
+
+        probe_test();
 
         driver::init();
         log::info!("hart {}: initialized driver", hart_id);
