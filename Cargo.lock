@@ -395,7 +395,7 @@ dependencies = [
  "mutex",
  "osfs",
  "osfuture",
- "polyhal",
+ "polyhal-macro",
  "pps",
  "riscv 0.13.0",
  "riscv-rt",
