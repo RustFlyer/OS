@@ -16,6 +16,7 @@ pub mod inode;
 pub mod inoid;
 pub mod kstat;
 pub mod path;
+pub mod stat;
 pub mod superblock;
 
 #[macro_use]

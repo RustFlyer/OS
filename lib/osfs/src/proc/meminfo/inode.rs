@@ -1,9 +1,10 @@
 use alloc::sync::Arc;
-use config::{inode::InodeType, vfs::Stat};
+use config::inode::InodeType;
 use systype::SysResult;
 use vfs::{
     inode::{Inode, InodeMeta},
     inoid::alloc_ino,
+    stat::Stat,
     superblock::SuperBlock,
 };
 

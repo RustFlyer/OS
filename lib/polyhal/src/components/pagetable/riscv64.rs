@@ -193,7 +193,7 @@ impl PageTable {
     #[inline]
     pub fn change(&self) {
         // Write page table entry for
-        satp::write((8 << 60) | (self.0.0 >> 12));
+        satp::write((8 << 60) | (self.0 .0 >> 12));
         TLB::flush_all();
     }
 }

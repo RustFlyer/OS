@@ -31,6 +31,10 @@ impl File for SimpleDirFile {
     async fn base_write(&self, _buf: &[u8], _offset: usize) -> SysResult<usize> {
         Err(SysError::EISDIR)
     }
+
+    fn base_load_dir(&self) -> SysResult<()> {
+        Ok(())
+    }
 }
 
 pub struct SimpleFileFile {

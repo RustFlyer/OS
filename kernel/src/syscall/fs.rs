@@ -1,4 +1,5 @@
 use alloc::{boxed::Box, ffi::CString, string::ToString, vec::Vec};
+use arch::riscv64::time::get_time_duration;
 use core::{
     cmp,
     pin::Pin,
@@ -13,8 +14,9 @@ use simdebug::stop;
 use strum::FromRepr;
 
 use config::{
+    device::BLOCK_SIZE,
     inode::InodeMode,
-    vfs::{AccessFlags, AtFd, AtFlags, MountFlags, OpenFlags, PollEvents, SeekFrom},
+    vfs::{AccessFlags, AtFd, AtFlags, MountFlags, OpenFlags, PollEvents, RenameFlags, SeekFrom},
 };
 use driver::BLOCK_DEVICE;
 use osfs::{
@@ -1020,4 +1022,171 @@ pub async fn sys_ppoll(fds: usize, nfds: usize, tmo_p: usize, sigmask: usize) ->
     unsafe { UserWritePtr::<PollFd>::new(fds, &addrspace).write_array(&poll_fds)? };
 
     Ok(ret)
+}
+
+#[derive(Default, Debug, Clone, Copy)]
+#[repr(C)]
+pub struct StatFs {
+    /// 是个 magic number，每个知名的 fs 都各有定义，但显然我们没有
+    pub f_type: i64,
+    /// 最优传输块大小
+    pub f_bsize: i64,
+    /// 总的块数
+    pub f_blocks: u64,
+    /// 还剩多少块未分配
+    pub f_bfree: u64,
+    /// 对用户来说，还有多少块可用
+    pub f_bavail: u64,
+    /// 总的 inode 数
+    pub f_files: u64,
+    /// 空闲的 inode 数
+    pub f_ffree: u64,
+    /// 文件系统编号，但实际上对于不同的OS差异很大，所以不会特地去用
+    pub f_fsid: [i32; 2],
+    /// 文件名长度限制，这个OS默认FAT已经使用了加长命名
+    pub f_namelen: isize,
+    /// 片大小
+    pub f_frsize: isize,
+    /// 一些选项，但其实也没用到
+    pub f_flags: isize,
+    /// 空余 padding
+    pub f_spare: [isize; 4],
+}
+
+pub fn sys_statfs(path: usize, buf: usize) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+
+    let cpath = UserReadPtr::<u8>::new(path, &addrspace).read_c_string(256)?;
+    let path = cpath.into_string().expect("cstring fail to convert");
+
+    log::info!("[sys_statfs] path: {path}");
+
+    let stfs = StatFs {
+        f_type: 0x20259527 as i64,
+        f_bsize: BLOCK_SIZE as i64,
+        f_blocks: 1 << 27,
+        f_bfree: 1 << 26,
+        f_bavail: 1 << 20,
+        f_files: 1 << 10,
+        f_ffree: 1 << 9,
+        f_fsid: [0; 2],
+        f_namelen: 1 << 8,
+        f_frsize: 1 << 9,
+        f_flags: 1 << 1 as i64,
+        f_spare: [0; 4],
+    };
+
+    unsafe {
+        UserWritePtr::<StatFs>::new(buf, &addrspace).write(stfs)?;
+    }
+
+    Ok(0)
+}
+
+/// The utime() system call changes the access and modification times of the
+/// inode specified by filename to the actime and modtime fields of times
+/// respectively. The status change time (ctime) will be set to the current
+/// time, even if the other time stamps don't actually change.
+///
+/// If the tv_nsec field of one of the timespec structures has the special
+/// value UTIME_NOW, then the corresponding file timestamp is set to the
+/// current time. If the tv_nsec field of one of the timespec structures has
+/// the special value UTIME_OMIT, then the corresponding file timestamp
+/// is left unchanged. In both of these cases, the value of the
+/// corresponding tv_sec field is ignored.
+///
+/// If times is NULL, then the access and modification times of the file are
+/// set to the current time.
+pub fn sys_utimensat(dirfd: usize, pathname: usize, times: usize, flags: i32) -> SyscallResult {
+    const UTIME_NOW: usize = 0x3fffffff;
+    const UTIME_OMIT: usize = 0x3ffffffe;
+
+    let task = current_task();
+    let addrspace = task.addr_space();
+    let mut pathname = UserReadPtr::<u8>::new(pathname, &addrspace);
+    let mut times = UserReadPtr::<TimeSpec>::new(times, &addrspace);
+    let dirfd = AtFd::from(dirfd);
+
+    let inode = if !pathname.is_null() {
+        let path = pathname
+            .read_c_string(256)?
+            .into_string()
+            .expect("cstring convert failed");
+        log::info!("[sys_utimensat] dirfd: {dirfd}, path: {path}");
+        let flags = OpenFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
+        let dentry = task.walk_at(dirfd, path)?;
+        dentry.inode().ok_or(SysError::ENOENT)?
+    } else {
+        // NOTE: if `pathname` is NULL, acts as futimens
+        log::info!("[sys_utimensat] fd: {dirfd}");
+        match dirfd {
+            AtFd::FdCwd => return Err(SysError::EINVAL),
+            AtFd::Normal(fd) => {
+                let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
+                file.inode()
+            }
+        }
+    };
+
+    let mut inner = inode.get_meta().inner.lock();
+    let current_time = TimeSpec::from(get_time_duration());
+    if times.is_null() {
+        log::info!("[sys_utimensat] times is null, update with current time");
+        inner.atime = current_time;
+        inner.mtime = current_time;
+        inner.ctime = current_time;
+    } else {
+        let times = unsafe { times.read_array(2)? };
+        log::info!("[sys_utimensat] times {:?}", times);
+        match times[0].tv_nsec {
+            UTIME_NOW => inner.atime = current_time,
+            UTIME_OMIT => {}
+            _ => inner.atime = times[0],
+        };
+        match times[1].tv_nsec {
+            UTIME_NOW => inner.mtime = current_time,
+            UTIME_OMIT => {}
+            _ => inner.mtime = times[1],
+        };
+        inner.ctime = current_time;
+    }
+
+    Ok(0)
+}
+
+pub fn sys_renameat2(
+    olddirfd: usize,
+    oldpath: usize,
+    newdirfd: usize,
+    newpath: usize,
+    flags: i32,
+) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+    let olddirfd = AtFd::from(olddirfd);
+    let newdirfd = AtFd::from(newdirfd);
+
+    let mut oldpath = UserReadPtr::<u8>::new(oldpath, &addrspace);
+    let mut newpath = UserReadPtr::<u8>::new(newpath, &addrspace);
+
+    let flags = RenameFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
+
+    let coldpath = oldpath.read_c_string(256)?;
+    let cnewpath = newpath.read_c_string(256)?;
+
+    let oldpath = coldpath.into_string().expect("convert to string failed");
+    let newpath = cnewpath.into_string().expect("convert to string failed");
+
+    log::info!(
+        "[sys_renameat2] olddirfd:{olddirfd:?}, oldpath:{oldpath}, newdirfd:{newdirfd:?}, newpath:{newpath}, flags:{flags:?}"
+    );
+
+    //OpenFlag::NO_FOLLOW
+    let old_dentry = task.walk_at(olddirfd, oldpath)?;
+    let new_dentry = task.walk_at(newdirfd, newpath)?;
+
+    // old_dentry.rename_to(&new_dentry, flags).map(|_| 0)
+    log::error!("[sys_renameat2] not implement rename");
+    Ok(0)
 }

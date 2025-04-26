@@ -10,6 +10,7 @@ config = { path = "../config/" }
 systype = { path = "../systype/" }
 mutex = { path = "../mutex/" }
 simdebug = { path = "../simdebug/" }
+time = { path = "../time/" }
 
 fatfs = { workspace = true }
 log = { workspace = true }

@@ -1,9 +1,10 @@
 use alloc::boxed::Box;
 use alloc::sync::{Arc, Weak};
 use async_trait::async_trait;
-use config::{inode::InodeType, vfs::Stat};
+use config::inode::InodeType;
 use driver::print;
 use systype::SysResult;
+use vfs::stat::Stat;
 use vfs::{
     dentry::{Dentry, DentryMeta},
     file::{File, FileMeta},

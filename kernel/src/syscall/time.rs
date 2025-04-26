@@ -193,3 +193,50 @@ pub fn sys_clock_gettime(clockid: usize, tp: usize) -> SyscallResult {
     }
     Ok(0)
 }
+
+pub async fn sys_clock_nanosleep(
+    clockid: usize,
+    flags: usize,
+    t: usize,
+    rem: usize,
+) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+    let mut t = UserReadPtr::<TimeSpec>::new(t, &addrspace);
+    let mut rem = UserWritePtr::<TimeSpec>::new(rem, &addrspace);
+
+    /// for clock_nanosleep
+    pub const TIMER_ABSTIME: usize = 1;
+    match clockid {
+        // FIXME: what is CLOCK_MONOTONIC
+        CLOCK_REALTIME | CLOCK_MONOTONIC => {
+            let ts = unsafe { t.read()? };
+            let req: Duration = ts.into();
+            let remain = if flags == TIMER_ABSTIME {
+                let current = get_time_duration();
+                // request time is absolutely
+                if req.le(&current) {
+                    return Ok(0);
+                }
+                let sleep = req - current;
+                task.suspend_timeout(sleep).await
+            } else {
+                task.suspend_timeout(req).await
+            };
+            if remain.is_zero() {
+                Ok(0)
+            } else {
+                if !rem.is_null() {
+                    unsafe {
+                        rem.write(remain.into())?;
+                    }
+                }
+                Err(SysError::EINTR)
+            }
+        }
+        _ => {
+            log::error!("[sys_clock_nanosleep] unsupported clockid {}", clockid);
+            return Err(SysError::EINVAL);
+        }
+    }
+}

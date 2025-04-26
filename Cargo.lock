@@ -312,6 +312,7 @@ dependencies = [
  "mutex",
  "simdebug",
  "systype",
+ "time",
  "vfs",
 ]
 
@@ -973,6 +974,7 @@ dependencies = [
  "osfuture",
  "spin",
  "systype",
+ "time",
 ]
 
 [[package]]

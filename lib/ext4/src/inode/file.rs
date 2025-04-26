@@ -1,10 +1,11 @@
 use alloc::sync::Arc;
 
-use config::{device::BLOCK_SIZE, vfs::Stat};
-use mutex::{new_share_mutex, ShareMutex};
+use config::device::BLOCK_SIZE;
+use mutex::{ShareMutex, new_share_mutex};
 use systype::SysResult;
 use vfs::{
     inode::{Inode, InodeMeta},
+    stat::Stat,
     superblock::SuperBlock,
 };
 
