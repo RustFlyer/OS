@@ -6,14 +6,54 @@
 use core::task::Waker;
 extern crate alloc;
 use alloc::sync::Arc;
+use config::mm::{DTB_ADDR, KERNEL_MAP_OFFSET};
 use core::fmt::{self};
 use qemu::{UartDevice, VirtBlkDevice};
 use spin::Once;
+
+pub mod cpu;
+pub mod device;
+pub mod manager;
 pub mod net;
+pub mod plic;
 pub mod qemu;
 pub mod sbi;
 
 pub use sbi::sbi_print;
+
+pub fn init2() {
+    let device_tree = unsafe {
+        fdt::Fdt::from_ptr((DTB_ADDR + KERNEL_MAP_OFFSET) as *const u8).expect("Parse DTB failed")
+    };
+    // config::board::set_clock_freq(device_tree.cpus().next().unwrap().timebase_frequency());
+    // log::info!("clock freq set to {} Hz", clock_freq());
+
+    // init_device_manager();
+    // let manager = get_device_manager_mut();
+    // manager.probe();
+    // manager.map_devices();
+    // manager.init_devices();
+
+    // log::info!("Device initialization complete");
+    // manager.enable_device_interrupts();
+    // log::info!("External interrupts enabled");
+    // let serial = manager
+    //     .find_devices_by_major(DeviceMajor::Serial)
+    //     .into_iter()
+    //     .map(|device| device.as_char().unwrap())
+    //     .next()
+    //     .unwrap();
+    // UART0.call_once(|| serial.clone());
+
+    // let blk = manager
+    //     .find_devices_by_major(DeviceMajor::Block)
+    //     .into_iter()
+    //     .map(|device| device.as_blk().unwrap())
+    //     .next()
+    //     .unwrap();
+    // BLOCK_DEVICE.call_once(|| blk.clone());
+    // manager.init_net();
+}
 
 pub static BLOCK_DEVICE: Once<Arc<dyn BlockDevice>> = Once::new();
 pub static CHAR_DEVICE: Once<Arc<dyn CharDevice>> = Once::new();

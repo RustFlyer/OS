@@ -8,13 +8,14 @@ config = { path = "../config" }
 mutex = { path = "../mutex" }
 mm = { path = "../mm" }
 
-
 spin = { workspace = true }
 virtio-drivers ={ workspace = true }
 uart_16550 = { workspace = true }
 log = { workspace = true }
 smoltcp = { workspace = true }
-
+fdt = { workspace = true }
+async-trait = { workspace = true }
+downcast-rs = { workspace = true }
 
 [features]
 smoltcp = []

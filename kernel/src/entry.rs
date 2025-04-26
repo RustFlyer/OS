@@ -45,7 +45,7 @@ static mut BOOT_PAGE_TABLE: BootPageTable = {
 #[naked]
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".text.entry")]
-unsafe extern "C" fn _start(hart_id: usize) -> ! {
+unsafe extern "C" fn _start(hart_id: usize, dtb_addr: usize) -> ! {
     // Note: The `hart_id` parameter is passed in `a0` register on boot.
     unsafe {
         core::arch::naked_asm!(
@@ -73,9 +73,9 @@ unsafe extern "C" fn _start(hart_id: usize) -> ! {
         ",
             // Jump to the virtual address of `rust_main`
             "
-            la      a1, rust_main
-            or      a1, a1, t0
-            jr      a1
+            la      a2, rust_main
+            or      a2, a2, t0
+            jr      a2
         ",
             page_table_pa = sym BOOT_PAGE_TABLE,
             boot_stack_pa = sym BOOT_STACK,

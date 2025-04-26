@@ -131,13 +131,13 @@ pub const MMIO_PHYS_RANGES: &[(usize, usize)] = &[
     (0x1000_1000, 0x1000),   // VIRTIO
 ];
 
-// /// Address of the device tree blob
+/// Address of the device tree blob
 pub static mut DTB_ADDR: usize = 0;
-// /// Maximum size of the device tree blob
+/// Maximum size of the device tree blob
 pub const MAX_DTB_SIZE: usize = 0x100_0000;
-// /// Starting virtual address of the device tree blob
+/// Starting virtual address of the device tree blob
 pub const DTB_START: usize = DTB_END - MAX_DTB_SIZE;
-// /// Ending virtual address of the device tree blob
+/// Ending virtual address of the device tree blob
 pub const DTB_END: usize = 0xffff_ffff_f000_0000;
 
 /* Symbols defined in the linker script */

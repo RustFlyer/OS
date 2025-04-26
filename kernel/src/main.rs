@@ -13,6 +13,7 @@ mod lang_item;
 mod link_app;
 mod loader;
 mod logging;
+mod net;
 mod processor;
 mod sbi;
 mod syscall;
@@ -44,6 +45,7 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         /* Initialize heap allocator and page table */
         unsafe {
             config::mm::DTB_ADDR = dtb_addr;
+            log::info!("hart {}: initializing DTB_ADDR {:#x}", hart_id, dtb_addr);
             heap::init_heap_allocator();
             log::info!("hart {}: initialized heap allocator", hart_id);
             frame::init_frame_allocator();

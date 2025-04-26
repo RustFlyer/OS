@@ -241,7 +241,10 @@ checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 name = "driver"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "config",
+ "downcast-rs",
+ "fdt",
  "log",
  "mm",
  "mutex",
@@ -335,6 +338,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "fdt"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "784a4df722dc6267a04af36895398f59d21d07dce47232adf31ec0ff2fa45e67"
+
+[[package]]
 name = "glob"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -402,6 +411,7 @@ name = "kernel"
 version = "0.1.0"
 dependencies = [
  "arch",
+ "async-trait",
  "bitflags 2.9.0",
  "cfg-if",
  "config",
@@ -415,6 +425,7 @@ dependencies = [
  "logger",
  "mm",
  "mutex",
+ "net",
  "osfs",
  "osfuture",
  "pps",
@@ -422,6 +433,7 @@ dependencies = [
  "riscv-rt",
  "sbi-rt",
  "simdebug",
+ "smoltcp",
  "strum",
  "systype",
  "time",

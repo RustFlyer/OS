@@ -67,3 +67,11 @@ pub struct NetPollState {
     /// Object is hang up now.
     pub hangup: bool,
 }
+
+/// Poll the network stack.
+///
+/// It may receive packets from the NIC and process them, and transmit queued
+/// packets to the NIC.
+pub fn poll_interfaces() -> smoltcp::time::Instant {
+    SOCKET_SET.poll_interfaces()
+}

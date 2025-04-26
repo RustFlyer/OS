@@ -10,9 +10,9 @@ use riscv::register::satp::{self, Satp};
 
 use arch::riscv64::mm::{fence, sfence_vma_addr, sfence_vma_all_except_global, tlb_shootdown};
 use config::mm::{
-    KERNEL_MAP_OFFSET, MMIO_END, MMIO_PHYS_RANGES, MMIO_START, PTE_PER_TABLE, VIRT_END, bss_end,
-    bss_start, data_end, data_start, kernel_end, kernel_start, rodata_end, rodata_start, text_end,
-    text_start,
+    DTB_ADDR, KERNEL_MAP_OFFSET, MAX_DTB_SIZE, MMIO_END, MMIO_PHYS_RANGES, MMIO_START,
+    PTE_PER_TABLE, VIRT_END, bss_end, bss_start, data_end, data_start, kernel_end, kernel_start,
+    rodata_end, rodata_start, text_end, text_start,
 };
 use mm::{
     address::{PhysPageNum, VirtAddr, VirtPageNum},
@@ -128,6 +128,19 @@ impl PageTable {
             let mmio_end_va = VirtAddr::new(start_pa + len + KERNEL_MAP_OFFSET);
             let mmio_vma = VmArea::new_kernel(mmio_start_va, mmio_end_va, mmio_prot);
             OffsetArea::map(&mmio_vma, &mut page_table);
+        }
+
+        {
+            log::error!(
+                "todo! when kernel pagetable init, DTB_ADDR is {:#x}",
+                unsafe { DTB_ADDR }
+            );
+            let dtb_prot = MemPerm::R | MemPerm::W;
+            let dtb_start = VirtAddr::new(DTB_ADDR + KERNEL_MAP_OFFSET);
+            let dtb_end =
+                VirtAddr::new((DTB_ADDR + MAX_DTB_SIZE + KERNEL_MAP_OFFSET).min(VIRT_END));
+            let dtb_vma = VmArea::new_kernel(dtb_start, dtb_end, dtb_prot);
+            OffsetArea::map(&dtb_vma, &mut page_table);
         }
 
         page_table
