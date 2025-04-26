@@ -7,8 +7,16 @@ SECTIONS
         _skernel = .;
         _stext = .;
         *(.text.entry)
-        *(.text .text.*)
+        *(.text)
+        *(.text.*)
+        EXCLUDE_FILE(*(.text.trampoline))
         _etext = .;
+    } > VIRT AT> RAM
+
+    .text.trampoline : ALIGN(4K) {
+        _strampoline = .;
+        *(.text.trampoline)
+        _etrampoline = .;
     } > VIRT AT> RAM
 
     .rodata : ALIGN(4K) {

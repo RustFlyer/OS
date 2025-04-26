@@ -128,9 +128,11 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo) -> SysResult<bool> {
                     pub _pad: [i32; 29],
                     _align: [u64; 0],
                 }
-                let mut siginfo_v = LinuxSigInfo::default();
-                siginfo_v.si_signo = si.sig.raw() as _;
-                siginfo_v.si_code = si.code;
+                let siginfo_v = LinuxSigInfo {
+                    si_signo: si.sig.raw() as _,
+                    si_code: si.code,
+                    ..Default::default()
+                };
                 new_sp -= size_of::<LinuxSigInfo>();
                 let mut siginfo_ptr = UserWritePtr::<LinuxSigInfo>::new(new_sp, &addr_space);
                 unsafe {

@@ -12,7 +12,7 @@ use arch::riscv64::mm::{fence, sfence_vma_addr, sfence_vma_all_except_global, tl
 use config::mm::{
     KERNEL_MAP_OFFSET, MMIO_END, MMIO_PHYS_RANGES, MMIO_START, PTE_PER_TABLE, VIRT_END, bss_end,
     bss_start, data_end, data_start, kernel_end, kernel_start, rodata_end, rodata_start, text_end,
-    text_start,
+    text_start, trampoline_end, trampoline_start,
 };
 use mm::{
     address::{PhysPageNum, VirtAddr, VirtPageNum},
@@ -95,6 +95,13 @@ impl PageTable {
         let text_prot = MemPerm::R | MemPerm::X;
         let text_vma = VmArea::new_kernel(text_start_va, text_end_va, text_prot);
         OffsetArea::map(&text_vma, &mut page_table);
+
+        // Map the kernel's signal handling trampoline.
+        let trampoline_start_va = VirtAddr::new(trampoline_start());
+        let trampoline_end_va = VirtAddr::new(trampoline_end());
+        let trampoline_prot = MemPerm::R | MemPerm::X | MemPerm::U;
+        let trampoline_vma = VmArea::new_kernel(trampoline_start_va, trampoline_end_va, trampoline_prot);
+        OffsetArea::map(&trampoline_vma, &mut page_table);
 
         let rodata_start_va = VirtAddr::new(rodata_start());
         let rodata_end_va = VirtAddr::new(rodata_end());
