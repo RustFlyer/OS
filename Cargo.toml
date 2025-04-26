@@ -18,7 +18,7 @@ log = "0.4"
 riscv = { version = "0.13", features = ["s-mode"] }
 riscv-rt = "0.14"
 sbi-rt = { version = "0.0.3", features = ["legacy"] }
-spin = { version = "0.9", features = ["lazy"] }
+spin = { version = "0.9.8", features = ["lazy", "mutex"] }
 strum = { version = "0.27", default-features = false, features = ["derive"] }
 virtio-drivers = { version = "0.7" }
 uart_16550 = "0.3"
@@ -32,5 +32,6 @@ fatfs = { default-features = false,  git = "https://github.com/EchudeT/rust-fatf
 elf = { git = "https://github.com/adong660/rust-elf.git", branch = "no-std-elfstream", default-features = false, features = [
     "alloc",
 ] }
-lwext4_rust = { git = "https://github.com/EchudeT/lwext4_rust.git", rev = "719c" }
+lwext4_rust = { git = "https://github.com/EchudeT/lwext4_rust.git", rev = "405b"}
 
+fdt = "0.1.5"
