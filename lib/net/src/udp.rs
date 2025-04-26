@@ -26,6 +26,9 @@ const PORT_START: u16 = 0xc000;
 const PORT_END: u16 = 0xffff;
 static CURR: SpinNoIrqLock<u16> = SpinNoIrqLock::new(PORT_START);
 
+/// `UdpSocket` is a socket with udp protocal, used to
+/// bind a local address, connect to a peer address, recv from and send to
+/// a remote address.
 pub struct UdpSocket {
     handle: SocketHandle,
     local_addr: RwLock<Option<IpListenEndpoint>>,
@@ -45,6 +48,8 @@ impl UdpSocket {
         }
     }
 
+    /// `local_addr` can return the udpsocket local address if binded.
+    /// If not binded, it will return a ENOTCONN Error.
     pub fn local_addr(&self) -> SysResult<IpEndpoint> {
         match self.local_addr.try_read() {
             Some(addr) => addr.ok_or(SysError::ENOTCONN).map(to_endpoint),
@@ -52,6 +57,8 @@ impl UdpSocket {
         }
     }
 
+    /// `peer_addr` can return the udpsocket peer address if connected.
+    /// If not connected, it will return a ENOTCONN Error.
     pub fn peer_addr(&self) -> SysResult<IpEndpoint> {
         match self.peer_addr.try_read() {
             Some(addr) => addr.ok_or(SysError::ENOTCONN),
@@ -69,6 +76,8 @@ impl UdpSocket {
 }
 
 impl UdpSocket {
+    /// this function checks whether a specified `bound_addr` is binded in `PORT_MAP`.
+    /// If not, this function will insert it into `PORT_MAP`.
     pub fn check_bind(&self, fd: usize, mut bound_addr: IpListenEndpoint) -> Option<usize> {
         if let Some((fd, prev_bound_addr)) = PORT_MAP.get(bound_addr.port) {
             if bound_addr == prev_bound_addr {
@@ -83,6 +92,13 @@ impl UdpSocket {
         None
     }
 
+    /// this function binds udpsocket local address with `bound_addr` and fetches a
+    /// socket in `SOCKET_SET` by self.handle to bind its endpoint with `bound_addr`.
+    ///
+    /// when the port of `bound_addr` is not specified, the port will be converted to
+    /// a unused port automatically.
+    ///
+    /// If udpsocket's local_addr is binded, this function will return a EINVAL Error.
     pub fn bind(&self, mut bound_addr: IpListenEndpoint) -> SysResult<()> {
         let mut local_addr = self.local_addr.write();
 
@@ -106,6 +122,17 @@ impl UdpSocket {
         Ok(())
     }
 
+    /// `send_to` can send a buf to a specified remote_addr.
+    /// This function calls `send_slice` in `smoltcp` and try to send buffer to remote address.
+    /// When `tx_buffer` is full, it will register a send waker and return a `EAGAIN` Error.
+    /// Calling thread can receive this error and suspend itself. As the buffer can be used,
+    /// the registered waker wakes the thread and the thread can call this function again.
+    ///
+    /// Attention: The Action that the thread suspend itself and call the funtion again should be
+    /// implemented by calling thread.
+    ///
+    /// - when `remote_addr`(not self.remote_addr) is 0 or unspecified, this function will return EINVAL Error.
+    /// - when self.local_addr is none, it will be set as [`UNSPECIFIED_LISTEN_ENDPOINT`].
     pub async fn send_to(&self, buf: &[u8], remote_addr: IpEndpoint) -> SysResult<usize> {
         if remote_addr.port == 0 || remote_addr.addr.is_unspecified() {
             return Err(SysError::EINVAL);
@@ -149,17 +176,39 @@ impl UdpSocket {
         Ok(bytes)
     }
 
+    /// `send` can send a buf to a specified remote_addr.
+    /// This function calls `send_slice` in `smoltcp` and try to send buffer to remote address.
+    /// When `tx_buffer` is full, it will register a send waker and return a `EAGAIN` Error.
+    /// Calling thread can receive this error and suspend itself. As the buffer can be used,
+    /// the registered waker wakes the thread and the thread can call this function again.
+    ///
+    /// Attention: The Action that the thread suspend itself and call the funtion again should be
+    /// implemented by calling thread.
+    ///
+    /// - when self.remote_addr is 0 or unspecified, this function will return EINVAL Error.
+    /// - when self.local_addr is none, it will be set as [`UNSPECIFIED_LISTEN_ENDPOINT`].
     pub async fn send(&self, buf: &[u8]) -> SysResult<usize> {
         let remote_addr = self.peer_addr()?;
         self.send_to(buf, remote_addr).await
     }
 
-    pub async fn recv_impl<F, T>(&self, mut op: F) -> SysResult<T>
+    /// `recv_impl` is a private function implemented just for `recv_from`, `recv` and `peek_from`.
+    /// This function recvs buffer from remote address. If there is no data in buffer, it will
+    /// register a waker and return a `EAGAIN` Error to inform the calling thread to suspend itself.
+    /// When the buffer can be used, the register waker will wake the thread and the thread can call
+    /// this function again.
+    ///
+    /// Attention: the action that the thread suspend itself and call the funtion again should be
+    /// implemented by calling thread.
+    ///
+    /// - If self.local_addr is none, this function returns `ENOTCONN` Error.
+    /// - If socket endpoint is zero, this function returns `ENOTCONN` Error.
+    async fn recv_impl<F, T>(&self, mut op: F) -> SysResult<T>
     where
         F: FnMut(&mut udp::Socket) -> SysResult<T>,
     {
         if self.local_addr.read().is_none() {
-            log::warn!("socket send() failed");
+            log::warn!("socket recv() failed");
             return Err(SysError::ENOTCONN);
         }
         let waker = take_waker().await;
@@ -181,6 +230,16 @@ impl UdpSocket {
         ret
     }
 
+    /// `recv_from` recvs buffer from remote address. If there is no data in buffer, it will
+    /// register a waker and return a `EAGAIN` Error to inform the calling thread to suspend itself.
+    /// When the buffer can be used, the register waker will wake the thread and the thread can call
+    /// this function again.
+    ///
+    /// Attention: the action that the thread suspend itself and call the funtion again should be
+    /// implemented by calling thread.
+    ///
+    /// - If self.local_addr is none, this function returns `ENOTCONN` Error.
+    /// - If socket endpoint is zero, this function returns `ENOTCONN` Error.
     pub async fn recv_from(&self, buf: &mut [u8]) -> SysResult<(usize, IpEndpoint)> {
         self.recv_impl(|socket| match socket.recv_slice(buf) {
             Ok((len, meta)) => Ok((len, meta.endpoint)),
@@ -192,6 +251,19 @@ impl UdpSocket {
         .await
     }
 
+    /// `recv` recvs buffer from remote address. If there is no data in buffer, it will
+    /// register a waker and return a `EAGAIN` Error to inform the calling thread to suspend itself.
+    /// When the buffer can be used, the register waker will wake the thread and the thread can call
+    /// this function again.
+    ///
+    /// Attention: the action that the thread suspend itself and call the funtion again should be
+    /// implemented by calling thread.
+    ///
+    /// - If self.local_addr is none, this function returns `ENOTCONN` Error.
+    /// - If self.peer_addr  is zero, this function returns `EAGAIN` Error.
+    /// - If socket endpoint is zero, this function returns `ENOTCONN` Error.
+    /// - If current remote endpoint prot is not equal to current recieved endpoint port,
+    ///   this function returns `EAGAIN` Error.
     pub async fn recv(&self, buf: &mut [u8]) -> SysResult<usize> {
         let remote_endpoint = self.peer_addr()?;
         self.recv_impl(|socket| {
@@ -210,6 +282,16 @@ impl UdpSocket {
         .await
     }
 
+    /// `peek_from` peeks buffer from rx_buffer without removing it. If there is no data in buffer,
+    /// it will register a waker and return a `EAGAIN` Error to inform the calling thread to suspend itself.
+    /// When the buffer can be used, the register waker will wake the thread and the thread can call
+    /// this function again.
+    ///
+    /// Attention: the action that the thread suspend itself and call the funtion again should be
+    /// implemented by calling thread.
+    ///
+    /// - If self.local_addr is none, this function returns `ENOTCONN` Error.
+    /// - If socket endpoint is zero, this function returns `ENOTCONN` Error.
     pub async fn peek_from(&self, buf: &mut [u8]) -> SysResult<(usize, IpEndpoint)> {
         self.recv_impl(|socket| match socket.peek_slice(buf) {
             Ok((len, meta)) => Ok((len, meta.endpoint)),
@@ -221,6 +303,8 @@ impl UdpSocket {
         .await
     }
 
+    /// `connect` can bind self.peer_addr with `addr`. If local address is not specified,
+    /// it will be set as [`UNSPECIFIED_LISTEN_ENDPOINT`].
     pub fn connect(&self, addr: IpEndpoint) -> SysResult<()> {
         if self.local_addr.read().is_none() {
             log::info!(
@@ -254,7 +338,14 @@ impl UdpSocket {
         Ok(())
     }
 
-    /// Whether the socket is readable or writable.
+    /// `poll` checks whether the socket can be writable and readable.
+    ///
+    /// - If it can not recv, this function registers a recv waker and returns
+    ///   `NetPollState` with readable false.
+    /// - If it can not send, this function registers a send waker and returns
+    ///   `NetPollState` with writable false.
+    /// - If its `local_addr` is none, this function returns `NetPollState` with all
+    ///   false.
     pub async fn poll(&self) -> NetPollState {
         if self.local_addr.read().is_none() {
             return NetPollState {
