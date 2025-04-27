@@ -96,9 +96,9 @@ where
         // }
         push_in_available_line(runnable, info);
     };
-    log::debug!("[executor::spawn] call asynctask spawn");
+    // log::debug!("[executor::spawn] call asynctask spawn");
     let (runnable, handle) = async_task::spawn(future, WithInfo(schedule));
-    log::debug!("[executor::spawn] call asynctask spawn success");
+    // log::debug!("[executor::spawn] call asynctask spawn success");
     (runnable, handle)
 }
 

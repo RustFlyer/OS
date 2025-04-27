@@ -259,24 +259,35 @@ pub async fn sys_clone(
     log::info!(
         "[sys_clone] flags:{flags:?}, stack:{stack:#x}, tls:{tls_ptr:?}, parent_tid:{parent_tid_ptr:?}, child_tid:{chilren_tid_ptr:?}"
     );
+    let task = current_task();
+    let addrspace = task.addr_space();
     let _exit_signal = flags & 0xff;
     let flags = CloneFlags::from_bits(flags as u64 & !0xff).ok_or(SysError::EINVAL)?;
     log::info!("[sys_clone] flags {flags:?}");
 
-    let new_task = current_task().fork(flags).await;
+    let new_task = task.fork(flags).await;
     new_task.trap_context_mut().set_user_a0(0);
     let new_tid = new_task.tid();
     log::info!("[sys_clone] clone a new thread, tid {new_tid}, clone flags {flags:?}",);
 
-    current_task().add_child(new_task.clone());
+    task.add_child(new_task.clone());
 
     if stack != 0 {
         new_task.trap_context_mut().set_user_sp(stack);
     }
 
-    if flags.contains(CloneFlags::PARENT_SETTID) {}
-    if flags.contains(CloneFlags::CHILD_SETTID) {}
-    if flags.contains(CloneFlags::CHILD_CLEARTID) {}
+    if flags.contains(CloneFlags::PARENT_SETTID) {
+        let mut parent_tid = UserWritePtr::<usize>::new(parent_tid_ptr, &addrspace);
+        unsafe { parent_tid.write(new_tid)? };
+    }
+    if flags.contains(CloneFlags::CHILD_SETTID) {
+        let mut chilren_tid = UserWritePtr::<usize>::new(chilren_tid_ptr, &addrspace);
+        unsafe { chilren_tid.write(new_tid)? };
+        new_task.tid_address_mut().set_child_tid = Some(chilren_tid_ptr);
+    }
+    if flags.contains(CloneFlags::CHILD_CLEARTID) {
+        new_task.tid_address_mut().clear_child_tid = Some(chilren_tid_ptr);
+    }
     if flags.contains(CloneFlags::SETTLS) {
         new_task.trap_context_mut().set_user_tp(tls_ptr);
     }
@@ -355,16 +366,20 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
     log::info!("[sys_execve] envs: {envs:?}");
     log::info!("[sys_execve] path: {path:?}");
 
+    envs.push(String::from(
+        r#"PATH=/:/bin:/sbin:/usr/bin:/usr/local/bin:/usr/local/sbin:"#,
+    ));
+
     let dentry = {
         let path = Path::new(sys_root_dentry(), path.clone());
         path.walk()?
     };
 
     let file = <dyn File>::open(dentry)?;
-    log::info!("[sys_execve]: open file");
+    // log::info!("[sys_execve]: open file");
 
     task.execve(file, args, envs, path)?;
-    log::info!("[sys_execve]: finish execve and convert to a new task");
+    // log::info!("[sys_execve]: finish execve and convert to a new task");
     Ok(0)
 }
 

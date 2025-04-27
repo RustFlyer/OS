@@ -162,7 +162,8 @@ impl Dentry for ExtDentry {
         let new_path = CString::new(new_dentry.path()).unwrap();
 
         let old_type = dentry.inode().unwrap().inotype();
-        if let Some(new_type) = new_dentry.inode() {
+        if let Some(inode) = new_dentry.inode() {
+            let new_type = inode.inotype();
             if old_type != InodeType::Dir && new_type == InodeType::Dir {
                 return Err(SysError::EISDIR);
             } else if old_type == InodeType::Dir && new_type != InodeType::Dir {

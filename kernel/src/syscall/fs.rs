@@ -184,14 +184,14 @@ pub fn sys_readlinkat(dirfd: usize, pathname: usize, buf: usize, bufsiz: usize) 
 
     let dentry = task.walk_at(AtFd::from(dirfd), path)?;
 
-    log::info!("[sys_readlinkat] dentry get");
+    // log::info!("[sys_readlinkat] dentry get");
     let inode = dentry.inode().ok_or(SysError::ENOENT)?;
 
-    log::info!(
-        "[sys_readlinkat] dentry {} get flag {}",
-        dentry.get_meta().name,
-        inode.inotype().as_char()
-    );
+    // log::info!(
+    //     "[sys_readlinkat] dentry {} get flag {}",
+    //     dentry.get_meta().name,
+    //     inode.inotype().as_char()
+    // );
 
     if !inode.inotype().is_symlink() {
         return Err(SysError::EINVAL);
@@ -200,7 +200,7 @@ pub fn sys_readlinkat(dirfd: usize, pathname: usize, buf: usize, bufsiz: usize) 
     let file = <dyn File>::open(dentry).unwrap();
     let link_path = file.readlink()?;
 
-    log::info!("[sys_readlinkat] link_path : [{link_path}]");
+    // log::info!("[sys_readlinkat] link_path : [{link_path}]");
 
     let mut buf_ptr = UserWritePtr::<u8>::new(buf, &addr_space);
     let len = cmp::min(link_path.len(), bufsiz);
@@ -475,12 +475,16 @@ pub async fn sys_unlinkat(dirfd: usize, pathname: usize, flags: i32) -> SyscallR
         if !is_dir {
             return Err(SysError::ENOTDIR);
         }
-        todo!("remove directory");
+        parent.rmdir(dentry.as_ref())?;
+        log::error!("remove directory recursively");
     } else if is_dir {
         return Err(SysError::EISDIR);
     }
 
-    parent.unlink(dentry.as_ref()).map(|_| 0)
+    if !is_dir {
+        parent.unlink(dentry.as_ref())?;
+    }
+    Ok(0)
 }
 
 /// `getdents64()` get directory entries.
@@ -634,38 +638,64 @@ pub async fn sys_umount2(target: usize, flags: u32) -> SyscallResult {
     Ok(0)
 }
 
-/// Checks file permissions relative to a directory
+/// `faccessat()` checks user's permissions for a file
+///
+/// `faccessat()` checks whether the calling process can access the file pathname.
+/// If pathname is a symbolic link, it is dereferenced.
+///
+/// If the `pathname` given in `pathname` is relative, then it is interpreted relative
+/// to the directory referred to by the file descriptor `dirfd`
 ///
 /// Verifies whether the calling process can access the file at `pathname` with the
 /// specified `mode`.
+///
+/// The mode specifies the accessibility check(s) to be performed, and is either the
+/// value F_OK, or a mask consisting of the bitwise OR of one or more of R_OK, W_OK,
+/// and X_OK. F_OK tests for the existence of the file. R_OK, W_OK, and X_OK test
+/// whether the file exists and grants read, write, and execute permissions, respectively.
+///
+/// Because the Linux kernel's faccessat() system call does not support a flags argument,
+/// the glibc faccessat() wrapper function provided in glibc 2.32 and earlier emulates the
+/// required functionality using a combination of the faccessat() system call and fstatat(2).
 ///
 /// # Parameters
 /// - `dirfd`: Directory file descriptor (use `AT_FDCWD` for current working directory)
 /// - `pathname`: Path string (relative to `dirfd` if not absolute)
 /// - `mode`: Permission mask
 /// - `flags`: Behavior flags
-pub async fn sys_faccessat(dirfd: usize, pathname: usize, mode: i32, flags: i32) -> SyscallResult {
+pub async fn sys_faccessat(
+    dirfd: usize,
+    pathname: usize,
+    mode: i32,
+    flags: usize,
+) -> SyscallResult {
+    log::info!(
+        "[sys_faccessat] dirfd: {dirfd}, pathname: {pathname:#x}, mode: {mode:#x}, flags: {flags:#x}"
+    );
     let task = current_task();
+    let addr_space = task.addr_space();
     let _mode = AccessFlags::from_bits(mode).ok_or(SysError::EINVAL)?;
-    let flags = AtFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
+
+    // let flags = AtFlags::from_bits(flags as i32).unwrap();
 
     let path = {
-        let addr_space = task.addr_space();
         let mut user_ptr = UserReadPtr::<u8>::new(pathname, &addr_space);
         let cstring = user_ptr.read_c_string(256)?;
         cstring.into_string().map_err(|_| SysError::EINVAL)?
     };
+    log::info!("[sys_faccessat] dirfd: {dirfd}, path: {path}, mode: {_mode:?}, flags: {flags:?}");
 
-    log::info!(
-        "[sys_faccessat] dirfd: {dirfd}, pathname: {pathname}, mode: {_mode:?}, flags: {flags:?}"
-    );
-
-    let mut dentry = task.walk_at(AtFd::from(dirfd), path)?;
+    let mut dentry = task.walk_at(AtFd::from(dirfd), path.clone())?;
     if dentry.is_negative() {
+        // let parent = dentry.parent().unwrap();
+        // parent.create(dentry.as_ref(), InodeMode::REG)?;
+        // log::debug!("is negative? :{}", dentry.is_negative());
+        // return Ok(0);
         return Err(SysError::ENOENT);
     }
+
     if dentry.inode().unwrap().inotype().is_symlink()
-        && !flags.contains(AtFlags::AT_SYMLINK_NOFOLLOW)
+    // && !flags.contains(AtFlags::AT_SYMLINK_NOFOLLOW)
     {
         dentry = Path::resolve_symlink_through(dentry)?;
         if dentry.is_negative() {
@@ -1155,6 +1185,8 @@ pub fn sys_utimensat(dirfd: usize, pathname: usize, times: usize, flags: i32) ->
     Ok(0)
 }
 
+/// `renameat2` renames old path name as new path name.
+///
 pub fn sys_renameat2(
     olddirfd: usize,
     oldpath: usize,

@@ -28,12 +28,12 @@ impl TaskManager {
     }
 
     pub fn add_task(&self, task: &Arc<Task>) {
-        // println!("[add_task] {}", task.tid());
+        log::error!("[add_task] {}", task.tid());
         self.0.lock().insert(task.tid(), Arc::downgrade(task));
     }
 
     pub fn remove_task(&self, tid: Tid) {
-        // println!("[remove_task] {tid}");
+        log::error!("[remove_task] {tid}");
         self.0.lock().remove(&tid);
     }
 
