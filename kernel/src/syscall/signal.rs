@@ -7,12 +7,19 @@ use crate::{
     },
     vm::user_ptr::{UserReadPtr, UserWritePtr},
 };
+use config::process::INIT_PROC_ID;
 use systype::{SysError, SyscallResult};
 
-/// if pid > 0, send a SigInfo built on sig_code to the process with pid
+/// - if pid > 0, send a SigInfo built on sig_code to the process with pid
+/// - If pid = -1, then sig is sent to every process for which the calling
+///   process has permission to send signals, except for process 1 (init)
 /// to do: broadcast(to process group) when pid <= 0; permission check when sig_code == 0; i32 or u32
-pub fn sys_kill(sig_code: i32, pid: isize) -> SyscallResult {
-    log::error!("[sys_kill] in");
+pub fn sys_kill(pid: isize, sig_code: i32) -> SyscallResult {
+    // log::error!("[sys_kill] try to send sig_code {} to pid {}", sig_code, pid);
+    // TASK_MANAGER.for_each(|task| {
+    //     log::error!("[sys_kill] existing task's pid: {}", task.tid());
+    //     Ok(())
+    // })?;
     let sig = Sig::from_i32(sig_code);
     if !sig.is_valid() {
         log::error!("invalid sig_code: {:}", sig_code);
@@ -21,7 +28,7 @@ pub fn sys_kill(sig_code: i32, pid: isize) -> SyscallResult {
 
     match pid {
         _ if pid > 0 => {
-            log::info!("[sys_kill] Send {sig_code} to {pid}");
+            log::error!("[sys_kill] Send {sig_code} to {pid}");
             if let Some(task) = TASK_MANAGER.get_task(pid as usize) {
                 if !task.is_process() {
                     return Err(SysError::ESRCH);
@@ -35,6 +42,20 @@ pub fn sys_kill(sig_code: i32, pid: isize) -> SyscallResult {
             } else {
                 return Err(SysError::ESRCH);
             }
+        }
+
+        -1 => {
+            TASK_MANAGER.for_each(|task| {
+                Ok(if task.pid() != INIT_PROC_ID && task.is_process() && sig.raw() != 0 {
+                    task.receive_siginfo(
+                        SigInfo {
+                            sig,
+                            code: SigInfo::USER,
+                            details: SigDetails::Kill { pid: task.pid() },
+                        }
+                    );
+                })
+            })?;
         }
 
         _ => {
