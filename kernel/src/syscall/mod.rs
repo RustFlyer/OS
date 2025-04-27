@@ -2,6 +2,7 @@ mod consts;
 mod fs;
 mod misc;
 mod mm;
+mod net;
 mod process;
 mod signal;
 mod time;

@@ -10,12 +10,12 @@ use riscv::register::satp::{self, Satp};
 
 use arch::riscv64::mm::{fence, sfence_vma_addr, sfence_vma_all_except_global, tlb_shootdown};
 use config::mm::{
-    DTB_ADDR, KERNEL_MAP_OFFSET, MAX_DTB_SIZE, MMIO_END, MMIO_PHYS_RANGES, MMIO_START,
-    PTE_PER_TABLE, VIRT_END, bss_end, bss_start, data_end, data_start, kernel_end, kernel_start,
-    rodata_end, rodata_start, text_end, text_start,
+    DTB_ADDR, DTB_END, DTB_START, KERNEL_MAP_OFFSET, MAX_DTB_SIZE, MMIO_END, MMIO_PHYS_RANGES,
+    MMIO_START, PAGE_SIZE, PTE_PER_TABLE, VIRT_END, bss_end, bss_start, data_end, data_start,
+    kernel_end, kernel_start, rodata_end, rodata_start, text_end, text_start,
 };
 use mm::{
-    address::{PhysPageNum, VirtAddr, VirtPageNum},
+    address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum},
     page_cache::page::Page,
 };
 use mutex::SpinLock;
@@ -28,7 +28,7 @@ use super::{
 };
 use crate::{
     frame::FrameTracker,
-    vm::vm_area::{OffsetArea, VmArea},
+    vm::vm_area::{OffsetArea, VmArea, VmaFlags},
 };
 
 /// A data structure for manipulating page tables and manage memory mappings.
@@ -135,11 +135,15 @@ impl PageTable {
                 "todo! when kernel pagetable init, DTB_ADDR is {:#x}",
                 unsafe { DTB_ADDR }
             );
+            /* Map dtb memory*/
+            let offset = DTB_START - DTB_ADDR;
+            let dtb_start = VirtAddr::new(DTB_START);
+            let dtb_end = VirtAddr::new(DTB_END);
+
             let dtb_prot = MemPerm::R | MemPerm::W;
-            let dtb_start = VirtAddr::new(DTB_ADDR + KERNEL_MAP_OFFSET);
-            let dtb_end =
-                VirtAddr::new((DTB_ADDR + MAX_DTB_SIZE + KERNEL_MAP_OFFSET).min(VIRT_END));
-            let dtb_vma = VmArea::new_kernel(dtb_start, dtb_end, dtb_prot);
+            let dtb_vma =
+                VmArea::new_fixed_offset(dtb_start, dtb_end, VmaFlags::PRIVATE, dtb_prot, offset);
+
             OffsetArea::map(&dtb_vma, &mut page_table);
         }
 
@@ -401,6 +405,16 @@ impl PageTable {
         let src = &kernel_page_table.as_slice()[index_start..=index_end];
         let dst = &mut page_table.as_slice_mut()[index_start..=index_end];
         dst.copy_from_slice(src);
+
+        // Map the memory-mapped I/O space.
+        let dtb_vpn_start = VirtAddr::new(DTB_START).page_number();
+        let dtb_vpn_end = VirtAddr::new(DTB_END).page_number();
+        let index_start = dtb_vpn_start.indices()[2];
+        let index_end = dtb_vpn_end.indices()[2];
+
+        let src = &kernel_page_table.as_slice()[index_start..=index_end];
+        let dst = &mut page_table.as_slice_mut()[index_start..=index_end];
+        dst.copy_from_slice(src);
     }
 
     /// Adds a `FrameTracker` to the page table so that the frame can be deallocated
@@ -408,6 +422,36 @@ impl PageTable {
     /// table must be tracked by calling this method.
     fn track_frame(&self, frame: FrameTracker) {
         self.frames.lock().push(frame);
+    }
+
+    /// Map the physical addresses of I/O memory resources to core virtual
+    /// addresses
+    ///
+    /// Linux also has this function
+    pub fn ioremap(&self, paddr: usize, size: usize) -> SysResult<()> {
+        let flags = PteFlags::V | PteFlags::W | PteFlags::R | PteFlags::A | PteFlags::D;
+        let mut vpn = VirtAddr::new(paddr + KERNEL_MAP_OFFSET)
+            .round_down()
+            .page_number();
+        let mut ppn = vpn.to_ppn_kernel();
+        let mut size = size as isize;
+        while size > 0 {
+            self.map_page_to(vpn, ppn, flags)?;
+            vpn = VirtPageNum::new(vpn.to_usize() + 1);
+            ppn = PhysPageNum::new(ppn.to_usize() + 1);
+            size -= PAGE_SIZE as isize;
+        }
+        Ok(())
+    }
+
+    pub fn iounmap(&self, vaddr: usize, size: usize) {
+        let mut vpn = VirtAddr::new(vaddr).page_number();
+        let mut size = size as isize;
+        while size > 0 {
+            self.unmap_page(vpn);
+            vpn = VirtPageNum::new(vpn.to_usize() + 1);
+            size -= PAGE_SIZE as isize;
+        }
     }
 }
 

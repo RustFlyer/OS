@@ -1,8 +1,10 @@
+use strum::FromRepr;
+
 pub mod addr;
 pub mod sock;
 pub mod socket;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(FromRepr, Debug, PartialEq, Eq, Clone, Copy)]
 pub enum SocketType {
     /// TCP
     STREAM = 1,

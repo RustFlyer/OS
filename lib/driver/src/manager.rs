@@ -34,29 +34,3 @@ pub struct DeviceManager {
     /// responsible for handling a specific interrupt.
     pub irq_map: BTreeMap<usize, Arc<dyn Device>>,
 }
-
-pub(crate) fn probe_mmio_device(
-    reg_base: *mut u8,
-    _reg_size: usize,
-    type_match: Option<DeviceType>,
-) -> Option<MmioTransport> {
-    use transport::mmio::VirtIOHeader;
-
-    let header = NonNull::new(reg_base as *mut VirtIOHeader).unwrap();
-    if let Ok(transport) = unsafe { MmioTransport::new(header) } {
-        if type_match.is_none() || transport.device_type() == type_match.unwrap() {
-            log::info!(
-                "Detected virtio MMIO device with vendor id: {:#X}, device type: {:?}, version: {:?}",
-                transport.vendor_id(),
-                transport.device_type(),
-                transport.version(),
-            );
-            Some(transport)
-        } else {
-            mem::forget(transport);
-            None
-        }
-    } else {
-        None
-    }
-}
