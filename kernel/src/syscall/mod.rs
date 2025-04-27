@@ -93,7 +93,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         STATFS => sys_statfs(args[0], args[1]),
         SYSLOG => sys_syslog(args[0], args[1], args[2]),
         SYSINFO => sys_sysinfo(args[0]),
-        KILL => sys_kill(args[0] as i32, args[1] as isize),
+        KILL => sys_kill(args[0] as isize, args[1] as i32),
         CLOCK_NANOSLEEP => sys_clock_nanosleep(args[0], args[1], args[2], args[3]).await,
         UTIMENSAT => sys_utimensat(args[0], args[1], args[2], args[3] as i32),
         RENAMEAT2 => sys_renameat2(args[0], args[1], args[2], args[3], args[4] as i32),

@@ -5,6 +5,7 @@ use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::sync::Weak;
 use mutex::SpinNoIrqLock;
+use systype::SysResult;
 
 use crate::task::tid::Tid;
 
@@ -43,6 +44,13 @@ impl TaskManager {
         } else {
             None
         }
+    }
+
+    pub fn for_each(&self, f: impl Fn(&Arc<Task>) -> SysResult<()>) -> SysResult<()> {
+        for task in self.0.lock().values() {
+            f(&task.upgrade().unwrap())?
+        }
+        Ok(())
     }
 }
 
