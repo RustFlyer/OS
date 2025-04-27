@@ -161,21 +161,21 @@ impl Dentry for ExtDentry {
         let new_path = CString::new(new_dentry.path()).unwrap();
 
         let old_type = dentry.inode().unwrap().inotype();
-        let new_type = new_dentry.inode().unwrap().inotype();
-        if old_type == new_type {
-            if old_type == InodeType::Dir {
-                ExtDir::rename(&old_path, &new_path)?;
-            } else {
-                ExtFile::rename(&old_path, &new_path)?;
+        if let Some(new_type) = new_dentry.inode() {
+            if old_type != InodeType::Dir && new_type == InodeType::Dir {
+                return Err(SysError::EISDIR);
+            } else if old_type == InodeType::Dir && new_type != InodeType::Dir {
+                return Err(SysError::ENOTDIR);
             }
-            new_dentry.set_inode(dentry.inode().unwrap());
-            dentry.unset_inode();
-            dentry.get_meta().children.lock().clear();
-            Ok(())
-        } else if new_type == InodeType::Dir {
-            Err(SysError::EISDIR)
-        } else {
-            Err(SysError::ENOTDIR)
         }
+        if old_type == InodeType::Dir {
+            ExtDir::rename(&old_path, &new_path)?;
+        } else {
+            ExtFile::rename(&old_path, &new_path)?;
+        }
+        new_dentry.set_inode(dentry.inode().unwrap());
+        dentry.unset_inode();
+        dentry.get_meta().children.lock().clear();
+        Ok(())
     }
 }
