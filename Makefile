@@ -11,7 +11,8 @@
 DOCKER_NAME = os
 PACKAGE_NAME = kernel
 BOOTLOADER = default
-TARGET = loongarch64-unknown-none
+TARGET = riscv64gc-unknown-none-elf
+# TARGET = loongarch64-unknown-none
 
 # Number of CPU cores
 # Target board (QEMU emulator)

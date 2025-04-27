@@ -5,7 +5,7 @@ use systype::{SysError, SyscallResult};
 use crate::{
     processor::current_task,
     vm::{
-        mem_perm::MemPerm,
+        mapping_flags::MappingFlags,
         mmap::{MmapFlags, MmapProt},
     },
 };
@@ -57,10 +57,9 @@ pub async fn sys_mmap(
     };
     let flags = MmapFlags::from_bits_truncate(flags);
     let prot = MmapProt::from_bits_truncate(prot);
-    let perm = MemPerm::from_mmapprot(prot);
     let va = VirtAddr::new(addr);
 
-    log::info!("[sys_mmap] addr: {addr:#x} prot: {prot:?}, flags: {flags:?}, perm: {perm:?}");
+    log::info!("[sys_mmap] addr: {addr:#x}, prot: {prot:?}, flags: {flags:?}");
 
     if addr == 0 && flags.contains(MmapFlags::MAP_FIXED) {
         return Err(SysError::EINVAL);
@@ -112,6 +111,6 @@ pub fn sys_mprotect(addr: usize, len: usize, prot: i32) -> SyscallResult {
 
     log::info!("[sys_mprotect] addr: {addr:#x}, len: {len:#x}, prot: {prot:?}");
 
-    addr_space.change_prot(VirtAddr::new(addr), len, MemPerm::from_mmapprot(prot));
+    addr_space.change_prot(VirtAddr::new(addr), len, MappingFlags::from_mmapprot(prot));
     Ok(0)
 }

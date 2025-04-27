@@ -23,7 +23,7 @@ use simdebug::when_debug;
 use systype::SysResult;
 
 use super::{
-    mem_perm::MemPerm,
+    mapping_flags::MappingFlags,
     pte::{PageTableEntry, PteFlags},
 };
 use crate::{
@@ -92,45 +92,45 @@ impl PageTable {
 
         let text_start_va = VirtAddr::new(text_start());
         let text_end_va = VirtAddr::new(text_end());
-        let text_prot = MemPerm::R | MemPerm::X;
+        let text_prot = MappingFlags::R | MappingFlags::X;
         let text_vma = VmArea::new_kernel(text_start_va, text_end_va, text_prot);
         OffsetArea::map(&text_vma, &mut page_table);
 
         // Map the kernel's signal handling trampoline.
         let trampoline_start_va = VirtAddr::new(trampoline_start());
         let trampoline_end_va = VirtAddr::new(trampoline_end());
-        let trampoline_prot = MemPerm::R | MemPerm::X | MemPerm::U;
+        let trampoline_prot = MappingFlags::R | MappingFlags::X | MappingFlags::U;
         let trampoline_vma =
             VmArea::new_kernel(trampoline_start_va, trampoline_end_va, trampoline_prot);
         OffsetArea::map(&trampoline_vma, &mut page_table);
 
         let rodata_start_va = VirtAddr::new(rodata_start());
         let rodata_end_va = VirtAddr::new(rodata_end());
-        let rodata_prot = MemPerm::R;
+        let rodata_prot = MappingFlags::R;
         let rodata_vma = VmArea::new_kernel(rodata_start_va, rodata_end_va, rodata_prot);
         OffsetArea::map(&rodata_vma, &mut page_table);
 
         let data_start_va = VirtAddr::new(data_start());
         let data_end_va = VirtAddr::new(data_end());
-        let data_prot = MemPerm::R | MemPerm::W;
+        let data_prot = MappingFlags::R | MappingFlags::W;
         let data_vma = VmArea::new_kernel(data_start_va, data_end_va, data_prot);
         OffsetArea::map(&data_vma, &mut page_table);
 
         let bss_start_va = VirtAddr::new(bss_start());
         let bss_end_va = VirtAddr::new(bss_end());
-        let bss_prot = MemPerm::R | MemPerm::W;
+        let bss_prot = MappingFlags::R | MappingFlags::W;
         let bss_vma = VmArea::new_kernel(bss_start_va, bss_end_va, bss_prot);
         OffsetArea::map(&bss_vma, &mut page_table);
 
         /* Map the allocatable frames */
         let alloc_start_va = VirtAddr::new(kernel_end());
         let alloc_end_va = VirtAddr::new(VIRT_END);
-        let alloc_prot = MemPerm::R | MemPerm::W;
+        let alloc_prot = MappingFlags::R | MappingFlags::W;
         let alloc_vma = VmArea::new_kernel(alloc_start_va, alloc_end_va, alloc_prot);
         OffsetArea::map(&alloc_vma, &mut page_table);
 
         /* Map memory-mapped I/O */
-        let mmio_prot = MemPerm::R | MemPerm::W;
+        let mmio_prot = MappingFlags::R | MappingFlags::W;
         for &(start_pa, len) in MMIO_PHYS_RANGES {
             let mmio_start_va = VirtAddr::new(start_pa + KERNEL_MAP_OFFSET);
             let mmio_end_va = VirtAddr::new(start_pa + len + KERNEL_MAP_OFFSET);
@@ -150,9 +150,8 @@ impl PageTable {
     /// This method creates absent non-leaf entries using `inner_flags`. Note that
     /// the returned entry may be invalid.
     ///
-    /// `inner_flags` are the flags for newly created non-leaf entries, if any.
-    /// Several bits in the parameter can be set, but only bit `G` of it is used,
-    /// as the non-leaf entries can only have bits `VG` set, and `V` is mandatory.
+    /// `inner_flags` decides the flags for non-leaf entries. Some bits may not be
+    /// used.
     ///
     /// This function only support 4 KiB pages, 3-level page tables.
     ///
@@ -170,7 +169,17 @@ impl PageTable {
         inner_flags: PteFlags,
     ) -> SysResult<(&mut PageTableEntry, bool)> {
         let mut ppn = self.root;
-        let inner_flags = PteFlags::V | (inner_flags & PteFlags::G);
+        let inner_flags = {
+            #[cfg(target_arch = "riscv64")]
+            {
+                (inner_flags & PteFlags::G) | PteFlags::V
+            }
+            #[cfg(target_arch = "loongarch64")]
+            {
+                // Flags in non-leaf entries are not specified in LoongArch architecture.
+                PteFlags::empty()
+            }
+        };
         let mut inner_created = false;
         for (i, index) in vpn.indices().into_iter().enumerate().rev() {
             let mut page_table = unsafe { PageTableMem::new(ppn) };
@@ -179,13 +188,6 @@ impl PageTable {
                 return Ok((entry, inner_created));
             }
             if !entry.is_valid() {
-                // Returning an error immediately is safe even when a non-leaf entry
-                // is created and a sub-table is allocated. An error happening here
-                // means that at least one page table on the path is not allocated.
-                // Therefore, the next time the kernel tries to find a leaf entry under
-                // the former allocated sub-table, it must allocate a frame for missing
-                // page tables, which will cause a `sfence_vma` later, which ensures
-                // the visibility of the former allocated sub-table.
                 let frame = FrameTracker::build()?;
                 unsafe {
                     PageTableMem::new(frame.ppn()).clear();
@@ -235,7 +237,7 @@ impl PageTable {
     /// `SysResult::Ok(Err(entry))`. Otherwise, the function allocates a new frame
     /// for it and returns the new page wrapped as `SysResult::Ok(Ok(page))`.
     ///
-    /// # Note
+    /// # Note for RISC-V
     /// This function takes `flags` as the flags for the leaf page table entry, and
     /// it takes bits `G` to set the flags for intermediate entries. This design
     /// provides a lower granularity of control over intermediate entries, but it is
@@ -301,8 +303,8 @@ impl PageTable {
         if let Some(entry) = self.find_entry(vpn) {
             *entry = PageTableEntry::default();
             // Flush TLB entries for the page for all harts.
-            // Later, we can optimize this by only flushing the TLB for harts that
-            // execute the current process.
+            // We can optimize this by only flushing the TLB for harts that execute
+            // the current process.
             fence();
             tlb_shootdown(vpn.address().to_usize(), 1);
         }
@@ -344,7 +346,7 @@ impl PageTable {
             };
             *entry = PageTableEntry::new(ppn, flags);
         }
-        // Simply flush all TLB entries, as the range may be large.
+        // Simply flush all TLB entries, as the range is likely to be large.
         sfence_vma_all_except_global();
         Ok(())
     }
