@@ -1,4 +1,5 @@
 use alloc::sync::{Arc, Weak};
+
 use config::inode::{InodeMode, InodeType};
 use systype::{SysError, SysResult};
 use vfs::{
@@ -23,10 +24,9 @@ impl FatDentry {
         inode: Option<Arc<dyn Inode>>,
         parent: Option<Weak<dyn Dentry>>,
     ) -> Arc<Self> {
-        let dentry = Arc::new(Self {
+        Arc::new(Self {
             meta: DentryMeta::new(name, inode, parent),
-        });
-        dentry
+        })
     }
 
     pub fn into_dyn(self: Arc<Self>) -> Arc<dyn Dentry> {
@@ -132,6 +132,41 @@ impl Dentry for FatDentry {
 
     fn base_rmdir(&self, _dentry: &dyn Dentry) -> SysResult<()> {
         todo!()
+    }
+
+    fn base_rename(
+        &self,
+        dentry: &dyn Dentry,
+        new_dir: &dyn Dentry,
+        new_dentry: &dyn Dentry,
+    ) -> SysResult<()> {
+        log::debug!(
+            "[FatDentry::base_rename] rename {} to {}",
+            dentry.path(),
+            new_dentry.path()
+        );
+
+        let dir_inode = self
+            .inode()
+            .ok_or(SysError::ENOENT)?
+            .downcast_arc::<FatDirInode>()
+            .map_err(|_| SysError::ENOTDIR)?;
+        let dir = dir_inode.dir.lock();
+
+        let new_dir_inode = new_dir
+            .inode()
+            .ok_or(SysError::ENOENT)?
+            .downcast_arc::<FatDirInode>()
+            .map_err(|_| SysError::ENOTDIR)?;
+        let new_dir = new_dir_inode.dir.lock();
+
+        dir.rename(dentry.name(), &new_dir, new_dentry.name())
+            .map_err(as_sys_err)?;
+
+        new_dentry.set_inode(dentry.inode().ok_or(SysError::ENOENT)?);
+        dentry.unset_inode();
+        dentry.get_meta().children.lock().clear();
+        Ok(())
     }
 
     fn base_unlink(&self, dentry: &dyn Dentry) -> SysResult<()> {
