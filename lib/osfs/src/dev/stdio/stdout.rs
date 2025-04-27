@@ -81,6 +81,15 @@ impl Dentry for StdOutDentry {
     fn base_unlink(&self, _dentry: &dyn Dentry) -> SysResult<()> {
         todo!()
     }
+
+    fn base_rename(
+        &self,
+        _dentry: &dyn Dentry,
+        _new_dir: &dyn Dentry,
+        _new_dentry: &dyn Dentry,
+    ) -> SysResult<()> {
+        todo!()
+    }
 }
 
 impl Inode for StdOutInode {

@@ -1186,7 +1186,14 @@ pub fn sys_renameat2(
     let old_dentry = task.walk_at(olddirfd, oldpath)?;
     let new_dentry = task.walk_at(newdirfd, newpath)?;
 
+    let parent_dentry = old_dentry.parent().expect("can not rename root dentry");
     // old_dentry.rename_to(&new_dentry, flags).map(|_| 0)
-    log::error!("[sys_renameat2] not implement rename");
+    parent_dentry.rename(
+        old_dentry.as_ref(),
+        parent_dentry.as_ref(),
+        new_dentry.as_ref(),
+    )?;
+
+    log::error!("[sys_renameat2] implement rename");
     Ok(0)
 }

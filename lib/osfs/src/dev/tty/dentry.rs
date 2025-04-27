@@ -61,4 +61,13 @@ impl Dentry for TtyDentry {
     fn set_inode(&self, inode: Arc<dyn Inode>) {
         *self.meta.inode.lock() = Some(inode);
     }
+
+    fn base_rename(
+        &self,
+        _dentry: &dyn Dentry,
+        _new_dir: &dyn Dentry,
+        _new_dentry: &dyn Dentry,
+    ) -> SysResult<()> {
+        todo!()
+    }
 }

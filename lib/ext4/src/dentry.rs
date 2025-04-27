@@ -66,6 +66,7 @@ impl Dentry for ExtDentry {
             _ => unimplemented!("Unsupported file type"),
         };
         dentry.set_inode(new_inode);
+        // log::error!("[base_create] {} set inode", dentry.path());
         Ok(())
     }
 
