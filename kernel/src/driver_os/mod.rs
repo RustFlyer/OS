@@ -5,7 +5,8 @@ use config::mm::{DTB_ADDR, KERNEL_MAP_OFFSET};
 use driver::{
     BLOCK_DEVICE, BlockDevice, CHAR_DEVICE, DeviceType, MmioSerialPort,
     device::{DevId, DeviceMajor, DeviceMeta},
-    net::virtnet::create_virt_net_dev,
+    net::{loopback::LoopbackDev, virtnet::create_virt_net_dev},
+    println,
     qemu::{UartDevice, VirtBlkDevice},
 };
 use fdt::Fdt;
@@ -28,10 +29,15 @@ pub fn probe_test() {
     let blk = probe_virtio_blk(&device_tree);
     BLOCK_DEVICE.call_once(|| blk.unwrap());
 
+    let mut buf: [u8; 512] = [0; 512];
+    BLOCK_DEVICE.get().unwrap().read(0, &mut buf);
+    log::debug!("BLOCK_DEVICE INIT SUCCESS");
+
     let chardev = probe_char_device(&device_tree);
     CHAR_DEVICE.call_once(|| Arc::new(UartDevice::from_another(chardev.unwrap())));
 
     init_net(&device_tree);
+    println!("CHAR_DEVICE INIT SUCCESS");
 
     log::debug!("probe_test finish");
 }
@@ -98,7 +104,6 @@ pub fn probe_virtio_blk(root: &Fdt) -> Option<Arc<VirtBlkDevice>> {
 
             log::debug!("[probe_virtio_blk] irq_no :{:?}", irq_no);
 
-            // First map memory, probe virtio device need to map it
             KERNEL_PAGE_TABLE
                 .ioremap(mmio_base_paddr.to_usize(), mmio_size)
                 .expect("can not ioremap");
@@ -115,11 +120,10 @@ pub fn probe_virtio_blk(root: &Fdt) -> Option<Arc<VirtBlkDevice>> {
                 );
             }
 
-            KERNEL_PAGE_TABLE.iounmap(mmio_base_paddr.to_va_kernel().to_usize(), mmio_size);
-
             if dev.is_some() {
                 break;
             }
+            KERNEL_PAGE_TABLE.iounmap(mmio_base_paddr.to_va_kernel().to_usize(), mmio_size);
         }
     }
     if dev.is_none() {
@@ -236,6 +240,7 @@ fn probe_serial_console(stdout: &fdt::node::FdtNode) -> MmioSerialPort {
                 "uart: base_paddr:{base_paddr:#x}, size:{size:#x}, reg_io_width:{reg_io_width}, reg_shift:{reg_shift}"
             );
 
+            log::debug!("MmioSerialPort::new {:#x}", base_vaddr);
             unsafe { MmioSerialPort::new(base_vaddr) }
         }
         _ => panic!("Unsupported serial console"),
@@ -256,6 +261,6 @@ pub fn init_net(root: &Fdt) {
         init_network(dev, false);
     } else {
         log::info!("[init_net] can't find qemu virtio-net.");
-        // init_network(LoopbackDev::new(), true);
+        init_network(LoopbackDev::new(), true);
     }
 }

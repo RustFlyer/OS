@@ -50,6 +50,7 @@ pub fn init_network(net_dev: Box<dyn NetDevice>, is_loopback: bool) {
             IpCidr::new(ip, IP_PREFIX),
         ]
     };
+
     eth0.setup_ip_addr(ip_addrs);
     eth0.setup_gateway(gateway);
 
@@ -73,4 +74,8 @@ pub struct NetPollState {
 /// packets to the NIC.
 pub fn poll_interfaces() -> smoltcp::time::Instant {
     SOCKET_SET.poll_interfaces()
+}
+
+pub fn net_bench() {
+    ETH0.get().unwrap().bench_test();
 }

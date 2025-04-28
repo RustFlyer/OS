@@ -27,12 +27,12 @@ fatfs = { default-features = false,  git = "https://github.com/EchudeT/rust-fatf
     "lfn",
     "log_level_info",
 ] }
-fdt = "0.1"
+fdt = "0.1.5"
 
 elf = { git = "https://github.com/adong660/rust-elf.git", branch = "no-std-elfstream", default-features = false, features = [
     "alloc",
 ] }
-lwext4_rust = { git = "https://github.com/EchudeT/lwext4_rust.git", rev = "91ee"}
+lwext4_rust = { git = "https://github.com/EchudeT/lwext4_rust.git", rev = "719c"}
 
 
 
@@ -57,4 +57,3 @@ features = [
     # "reassembly-buffer-size-65536", "reassembly-buffer-count-32",
     # "assembler-max-segment-count-32",
 ]
-fdt = "0.1.5"

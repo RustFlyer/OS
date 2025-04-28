@@ -55,11 +55,6 @@ impl InterfaceWrapper {
 
         let mut dev = DeviceWrapper::new(dev);
 
-        {
-            dev.bench_receive_bandwidth();
-            dev.bench_transmit_bandwidth();
-        }
-
         let iface = SpinNoIrqLock::new(Interface::new(config, &mut dev, Self::current_time()));
         Self {
             name,
@@ -170,5 +165,11 @@ impl InterfaceWrapper {
                 // TIMER_MANAGER.add_timer(timer);
             }
         }
+    }
+
+    pub(crate) fn bench_test(&self) {
+        let mut dev = self.dev.lock();
+        dev.bench_transmit_bandwidth();
+        dev.bench_receive_bandwidth();
     }
 }

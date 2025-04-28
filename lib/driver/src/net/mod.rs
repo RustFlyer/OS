@@ -2,6 +2,7 @@ use alloc::boxed::Box;
 use netbuf::NetBufPtrOps;
 use smoltcp::phy::DeviceCapabilities;
 
+pub mod loopback;
 pub mod netbuf;
 pub mod netpool;
 pub mod virtnet;
@@ -25,6 +26,23 @@ pub enum DevError {
     ResourceBusy,
     /// This operation is unsupported or unimplemented.
     Unsupported,
+}
+
+pub(crate) const fn as_dev_err(e: virtio_drivers::Error) -> DevError {
+    use virtio_drivers::Error::*;
+    match e {
+        QueueFull => DevError::BadState,
+        NotReady => DevError::Again,
+        WrongToken => DevError::BadState,
+        AlreadyUsed => DevError::AlreadyExists,
+        InvalidParam => DevError::InvalidParam,
+        DmaError => DevError::NoMemory,
+        IoError => DevError::Io,
+        Unsupported => DevError::Unsupported,
+        ConfigSpaceTooSmall => DevError::BadState,
+        ConfigSpaceMissing => DevError::BadState,
+        _ => DevError::BadState,
+    }
 }
 
 /// A specialized `Result` type for device operations.

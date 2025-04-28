@@ -39,6 +39,7 @@ impl DeviceWrapper {
         // Send bytes
         while send_bytes < MAX_SEND_BYTES {
             if let Some(tx_token) = self.transmit(InterfaceWrapper::current_time()) {
+                // log::debug!("try to send bytes");
                 NetTxToken::consume(tx_token, STANDARD_MTU, |tx_buf| {
                     tx_buf[0..12].fill(1);
                     // ether type: IPv4
@@ -61,6 +62,7 @@ impl DeviceWrapper {
                     gb,
                     mb
                 );
+                log::info!("Transmit: total send bytes: {}", send_bytes);
                 past_time = current_time;
                 past_send_bytes = send_bytes;
             }

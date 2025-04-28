@@ -10,15 +10,10 @@ use riscv::register::satp::{self, Satp};
 
 use arch::riscv64::mm::{fence, sfence_vma_addr, sfence_vma_all_except_global, tlb_shootdown};
 use config::mm::{
-<<<<<<< HEAD
     DTB_ADDR, DTB_END, DTB_START, KERNEL_MAP_OFFSET, MAX_DTB_SIZE, MMIO_END, MMIO_PHYS_RANGES,
     MMIO_START, PAGE_SIZE, PTE_PER_TABLE, VIRT_END, bss_end, bss_start, data_end, data_start,
-    kernel_end, kernel_start, rodata_end, rodata_start, text_end, text_start,
-=======
-    KERNEL_MAP_OFFSET, MMIO_END, MMIO_PHYS_RANGES, MMIO_START, PTE_PER_TABLE, VIRT_END, bss_end,
-    bss_start, data_end, data_start, kernel_end, kernel_start, rodata_end, rodata_start, text_end,
-    text_start, trampoline_end, trampoline_start,
->>>>>>> main
+    kernel_end, kernel_start, rodata_end, rodata_start, text_end, text_start, trampoline_end,
+    trampoline_start,
 };
 use mm::{
     address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum},

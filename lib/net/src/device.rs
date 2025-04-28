@@ -69,12 +69,14 @@ impl Device for DeviceWrapper {
     /// since an arbitrary moment in time, such as system startup.
     fn transmit(&mut self, _timestamp: smoltcp::time::Instant) -> Option<Self::TxToken<'_>> {
         let mut dev = self.inner.borrow_mut();
-        if let Err(_e) = dev.recycle_tx_buffers() {
+        if let Err(e) = dev.recycle_tx_buffers() {
+            log::error!("DevError: {:?}", e);
             return None;
         }
         if dev.can_transmit() {
             Some(NetTxToken(&self.inner))
         } else {
+            // log::error!("can not transmit");
             None
         }
     }
