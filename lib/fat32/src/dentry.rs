@@ -130,10 +130,6 @@ impl Dentry for FatDentry {
         }
     }
 
-    fn base_rmdir(&self, _dentry: &dyn Dentry) -> SysResult<()> {
-        todo!()
-    }
-
     fn base_rename(
         &self,
         dentry: &dyn Dentry,
