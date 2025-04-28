@@ -79,6 +79,7 @@ pub fn init() {
     SYS_ROOT_DENTRY.call_once(|| diskfs_root);
 
     dev::tty::init().expect("dev-tty init fails");
+    dev::rtc::init().expect("dev-rtc init fails");
 
     <dyn File>::open(sys_root_dentry())
         .unwrap()

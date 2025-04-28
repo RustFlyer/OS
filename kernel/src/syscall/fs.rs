@@ -21,9 +21,12 @@ use config::{
 use driver::BLOCK_DEVICE;
 use osfs::{
     FS_MANAGER,
-    dev::tty::{
-        TtyIoctlCmd,
-        ioctl::{Pid, Termios},
+    dev::{
+        rtc::{RtcTime, ioctl::RtcIoctlCmd},
+        tty::{
+            TtyIoctlCmd,
+            ioctl::{Pid, Termios},
+        },
     },
     pipe::{inode::PIPE_BUF_LEN, new_pipe},
 };
@@ -762,7 +765,7 @@ pub async fn sys_pipe2(pipefd: usize, flags: i32) -> SyscallResult {
 /// may be controlled with `ioctl()` operations. The argument fd must be an open file descriptor.
 pub fn sys_ioctl(fd: usize, request: usize, argp: usize) -> SyscallResult {
     // return Err(SysError::EBUSY);
-    // log::info!("[sys_ioctl] fd: {fd}, request: {request:#x}, arg: {argp:#x}");
+    log::info!("[sys_ioctl] fd: {fd}, request: {request:#x}, arg: {argp:#x}");
     let task = current_task();
     let addrspace = task.addr_space();
     let mut arg = UserWritePtr::<u8>::new(argp, &addrspace);
@@ -772,6 +775,11 @@ pub fn sys_ioctl(fd: usize, request: usize, argp: usize) -> SyscallResult {
                 TtyIoctlCmd::TCGETS => core::mem::size_of::<Termios>(),
                 TtyIoctlCmd::TIOCGPGRP => core::mem::size_of::<Pid>(),
                 TtyIoctlCmd::TCSETS => core::mem::size_of::<Termios>(),
+                _ => 0,
+            }
+        } else if let Some(cmd) = RtcIoctlCmd::from_repr(request as u64) {
+            match cmd {
+                RtcIoctlCmd::RTC_RD_TIME => core::mem::size_of::<RtcTime>(),
                 _ => 0,
             }
         } else {

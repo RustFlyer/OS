@@ -194,6 +194,7 @@ impl Task {
         let mut name = self.get_name() + "(fork)";
 
         if cloneflags.contains(CloneFlags::THREAD) {
+            name += "(thread)";
             is_process = false;
             process = Some(Arc::downgrade(self));
             threadgroup = self.thread_group_mut().clone();
@@ -216,7 +217,6 @@ impl Task {
         let sig_cx_ptr = AtomicUsize::new(0);
 
         let addr_space = if cloneflags.contains(CloneFlags::VM) {
-            name += "(thread)";
             self.addr_space()
         } else {
             let cow_address_space = self.addr_space().clone_cow().unwrap();

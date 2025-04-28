@@ -101,7 +101,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
     let res_task = {
         let children = task.children_mut().lock();
         if children.is_empty() {
-            log::info!("[sys_wait4] fail: no child");
+            log::info!("[sys_wait4] task [{}] fail: no child", task.get_name());
             return Err(SysError::ECHILD);
         }
         // TODO: check if PG has
@@ -150,8 +150,14 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
             }
         }
         let tid = zombie_task.tid();
+        log::error!(
+            "[sys_wait4] remove tid [{}] task [{}]",
+            tid,
+            zombie_task.get_name()
+        );
+
         task.remove_child(zombie_task.clone());
-        // log::error!("[sys_wait4] remove tid {}", tid);
+
         TASK_MANAGER.remove_task(tid);
         PROCESS_GROUP_MANAGER.remove(&zombie_task);
         Ok(tid)
@@ -224,8 +230,13 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
             }
         }
         let child = TASK_MANAGER.get_task(child_pid).unwrap();
+        log::error!(
+            "[sys_wait4] remove tid [{}] task [{}]",
+            child_pid,
+            child.get_name()
+        );
         task.remove_child(child);
-        log::info!("[sys_wait4] remove child_pid {}", child_pid);
+
         TASK_MANAGER.remove_task(child_pid);
         PROCESS_GROUP_MANAGER.remove(&task);
         // log::error!("[sys_wait4] out");
@@ -380,7 +391,13 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
     let file = <dyn File>::open(dentry)?;
     // log::info!("[sys_execve]: open file");
 
-    task.execve(file, args, envs, path)?;
+    let mut name = String::new();
+    args.iter().for_each(|arg| {
+        name.push_str(&arg);
+        name.push(' ');
+    });
+
+    task.execve(file, args, envs, name)?;
     // log::info!("[sys_execve]: finish execve and convert to a new task");
     Ok(0)
 }

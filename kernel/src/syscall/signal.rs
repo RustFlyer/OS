@@ -30,6 +30,11 @@ pub fn sys_kill(pid: isize, sig_code: i32) -> SyscallResult {
         _ if pid > 0 => {
             log::error!("[sys_kill] Send {sig_code} to {pid}");
             if let Some(task) = TASK_MANAGER.get_task(pid as usize) {
+                log::debug!(
+                    "[sys_kill] thread {} name {} gets killed",
+                    task.tid(),
+                    task.get_name()
+                );
                 if !task.is_process() {
                     return Err(SysError::ESRCH);
                 } else {
@@ -46,15 +51,15 @@ pub fn sys_kill(pid: isize, sig_code: i32) -> SyscallResult {
 
         -1 => {
             TASK_MANAGER.for_each(|task| {
-                Ok(if task.pid() != INIT_PROC_ID && task.is_process() && sig.raw() != 0 {
-                    task.receive_siginfo(
-                        SigInfo {
+                Ok(
+                    if task.pid() != INIT_PROC_ID && task.is_process() && sig.raw() != 0 {
+                        task.receive_siginfo(SigInfo {
                             sig,
                             code: SigInfo::USER,
                             details: SigDetails::Kill { pid: task.pid() },
-                        }
-                    );
-                })
+                        });
+                    },
+                )
             })?;
         }
 
