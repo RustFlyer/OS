@@ -53,6 +53,7 @@ pub trait Dentry: Send + Sync {
     /// Returns the metadata of this dentry.
     fn get_meta(&self) -> &DentryMeta;
 
+    /// Returns a `File` handle to this dentry.
     fn base_open(self: Arc<Self>) -> SysResult<Arc<dyn File>>;
 
     /// Creates a file in directory `self` with the name given in `dentry` and the mode
@@ -89,14 +90,23 @@ pub trait Dentry: Send + Sync {
     /// `self`. After this call, `dentry` will become invalid. `dentry` must not be a directory.
     fn base_unlink(&self, dentry: &dyn Dentry) -> SysResult<()>;
 
+    /// Creates a symbolic link in directory `self` with the name given in `dentry` which contains
+    /// the string `target`.
+    ///
+    /// `self` must be a valid directory. `dentry` must be a negative dentry and a child of
+    /// `self`. After this call, `dentry` will become valid.
+    fn base_symlink(&self, _dentry: &dyn Dentry, _target: &str) -> SysResult<()> {
+        unimplemented!("`base_symlink` is not implemented for this file system")
+    }
+
     /// Removes the child directory `dentry` from directory `self` if it is empty.
     ///
     /// `self` must be a valid directory. `dentry` must be a valid dentry and a child of
     /// `self`. After this call, `dentry` will become invalid.
     ///
     /// Returns `ENOTEMPTY` if `dentry` is not empty. Other errors may be returned.
-    fn base_rmdir(&self, dentry: &dyn Dentry) -> SysResult<()> {
-        todo!()
+    fn base_rmdir(&self, _dentry: &dyn Dentry) -> SysResult<()> {
+        unimplemented!("`base_rmdir` is not implemented for this file system")
     }
 
     /// Removes the child directory `dentry` recursively from directory `self`.
@@ -245,8 +255,16 @@ impl dyn Dentry {
         self.base_create(dentry, mode)
     }
 
-    pub fn symlink(&self, _dentry: &dyn Dentry, _target: &str) -> SysResult<()> {
-        unimplemented!("`symlink` is not implemented yet")
+    /// Creates a symbolic link in directory `self` with the name given in `dentry` which contains
+    /// the string `target`.
+    ///
+    /// `self` must be a valid directory. `dentry` must be a negative dentry and a child of
+    /// `self`. After this call, `dentry` will become valid.
+    pub fn symlink(&self, dentry: &dyn Dentry, target: &str) -> SysResult<()> {
+        debug_assert!(!self.is_negative());
+        debug_assert!(self.inode().unwrap().inotype().is_dir());
+        debug_assert!(dentry.is_negative());
+        self.base_symlink(dentry, target)
     }
 
     pub fn mknod(&self, _dentry: &dyn Dentry, _mode: InodeMode, _device: usize) -> SysResult<()> {

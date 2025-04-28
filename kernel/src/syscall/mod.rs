@@ -66,7 +66,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         UNLINKAT => sys_unlinkat(args[0], args[1], args[2] as i32).await,
         GETDENTS64 => sys_getdents64(args[0], args[1], args[2]).await,
         MOUNT => sys_mount(args[0], args[1], args[2], args[3] as u32, args[4]).await,
-        FACCESSAT => sys_faccessat(args[0], args[1], args[2] as i32, args[3]).await,
+        FACCESSAT => sys_faccessat(args[0], args[1], args[2] as i32).await,
         SET_TID_ADDRESS => sys_set_tid_address(args[0]),
         SET_ROBUST_LIST => sys_set_robust_list(args[0], args[1]),
         UMOUNT2 => sys_umount2(args[0], args[1] as u32).await,

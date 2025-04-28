@@ -145,6 +145,17 @@ impl Dentry for ExtDentry {
         Ok(())
     }
 
+    fn base_symlink(&self, dentry: &dyn Dentry, target: &str) -> SysResult<()> {
+        let path = CString::new(dentry.path()).unwrap();
+        let target = CString::new(target).unwrap();
+        ExtFile::symlink(&target, &path)?;
+        let superblock = self.superblock().unwrap();
+        let inode = ExtLinkInode::new(superblock, ExtFile::open2(&path, OpenFlags::empty())?);
+        inode.set_inotype(InodeType::SymLink);
+        dentry.set_inode(inode);
+        Ok(())
+    }
+
     fn base_rmdir(&self, dentry: &dyn Dentry) -> SysResult<()> {
         let path = CString::new(dentry.path()).unwrap();
         let mut dir = ExtDir::open(&path)?;

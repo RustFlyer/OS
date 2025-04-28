@@ -102,7 +102,7 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
         dentry = Path::resolve_symlink_through(dentry)?;
     }
 
-    // If pathname does not exist, create it as a regular file.
+    // Create a regular file when `O_CREAT` is specified if the file does not exist.
     if dentry.is_negative() {
         if flags.contains(OpenFlags::O_CREAT) {
             let parent = dentry.parent().unwrap();
@@ -123,7 +123,7 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
     let file = <dyn File>::open(dentry)?;
     file.set_flags(flags);
 
-    log::debug!("[sys_openat] file open success with its name {:?}", name);
+    log::debug!("[sys_openat] opened {:?}", name);
 
     task.with_mut_fdtable(|ft| ft.alloc(file, flags))
 }
@@ -186,15 +186,7 @@ pub fn sys_readlinkat(dirfd: usize, pathname: usize, buf: usize, bufsiz: usize) 
     log::info!("[sys_readlinkat] dirfd: {dirfd}, path: {path}, bufsiz: {bufsiz:#x}");
 
     let dentry = task.walk_at(AtFd::from(dirfd), path)?;
-
-    // log::info!("[sys_readlinkat] dentry get");
     let inode = dentry.inode().ok_or(SysError::ENOENT)?;
-
-    // log::info!(
-    //     "[sys_readlinkat] dentry {} get flag {}",
-    //     dentry.get_meta().name,
-    //     inode.inotype().as_char()
-    // );
 
     if !inode.inotype().is_symlink() {
         return Err(SysError::EINVAL);
@@ -309,20 +301,31 @@ pub fn sys_fstat(fd: usize, stat_buf: usize) -> SyscallResult {
     Ok(0)
 }
 
-pub fn sys_fstatat(dirfd: usize, pathname: usize, stat_buf: usize, _flags: i32) -> SyscallResult {
+pub fn sys_fstatat(dirfd: usize, pathname: usize, stat_buf: usize, flags: i32) -> SyscallResult {
     let task = current_task();
     let addr_space = task.addr_space();
     let path = UserReadPtr::<u8>::new(pathname, &addr_space).read_c_string(256)?;
     let path = path.into_string().map_err(|_| SysError::EINVAL)?;
 
-    log::info!("[sys_fstat_at] dirfd: {dirfd:#x}, path: {path}, flags: {_flags}");
-    assert!(
-        _flags == 0 || _flags == AtFlags::AT_SYMLINK_NOFOLLOW.bits(),
-        "Flags {_flags} is not supported",
-    );
+    log::info!("[sys_fstat_at] dirfd: {dirfd:#x}, path: {path}, flags: {flags}");
 
-    let dentry = task.walk_at(AtFd::from(dirfd), path)?;
-    log::debug!("[sys_fstatat] find file here");
+    if !(flags == 0 || flags == AtFlags::AT_SYMLINK_NOFOLLOW.bits()) {
+        log::warn!("[sys_fstatat] flags: {flags} is not supported");
+        return Err(SysError::EINVAL);
+    }
+    let flags = AtFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
+
+    let dentry = {
+        let dentry = task.walk_at(AtFd::from(dirfd), path)?;
+        if !flags.contains(AtFlags::AT_SYMLINK_NOFOLLOW)
+            && !dentry.is_negative()
+            && dentry.inode().unwrap().inotype().is_symlink()
+        {
+            Path::resolve_symlink_through(dentry)?
+        } else {
+            dentry
+        }
+    };
     let inode = dentry.inode().ok_or(SysError::ENOENT)?;
     let kstat = Kstat::from_vfs_file(inode)?;
     unsafe {
@@ -665,36 +668,24 @@ pub async fn sys_umount2(target: usize, flags: u32) -> SyscallResult {
 /// - `pathname`: Path string (relative to `dirfd` if not absolute)
 /// - `mode`: Permission mask
 /// - `flags`: Behavior flags
-pub async fn sys_faccessat(dirfd: usize, pathname: usize, mode: i32, flag: usize) -> SyscallResult {
-    log::info!(
-        "[sys_faccessat] dirfd: {dirfd}, pathname: {pathname:#x}, mode: {mode:#x}, flags: {flag:#x}"
-    );
+pub async fn sys_faccessat(dirfd: usize, pathname: usize, mode: i32) -> SyscallResult {
     let task = current_task();
     let addr_space = task.addr_space();
     let _mode = AccessFlags::from_bits(mode).ok_or(SysError::EINVAL)?;
-
-    let flags;
-    if let Some(f) = AtFlags::from_bits(flag as i32) {
-        flags = f;
-    } else {
-        flags = unsafe { UserReadPtr::<AtFlags>::new(flag, &addr_space).read()? };
-    }
 
     let path = {
         let mut user_ptr = UserReadPtr::<u8>::new(pathname, &addr_space);
         let cstring = user_ptr.read_c_string(256)?;
         cstring.into_string().map_err(|_| SysError::EINVAL)?
     };
-    log::info!("[sys_faccessat] dirfd: {dirfd}, path: {path}, mode: {_mode:?}, flags: {flags:?}");
+    log::info!("[sys_faccessat] dirfd: {dirfd}, path: {path}, mode: {_mode:?}");
 
     let mut dentry = task.walk_at(AtFd::from(dirfd), path.clone())?;
     if dentry.is_negative() {
         return Err(SysError::ENOENT);
     }
 
-    if dentry.inode().unwrap().inotype().is_symlink()
-        && !flags.contains(AtFlags::AT_SYMLINK_NOFOLLOW)
-    {
+    if dentry.inode().unwrap().inotype().is_symlink() {
         dentry = Path::resolve_symlink_through(dentry)?;
         if dentry.is_negative() {
             return Err(SysError::ENOENT);
@@ -1300,6 +1291,9 @@ pub fn sys_symlinkat(target: usize, newdirfd: usize, linkpath: usize) -> Syscall
     let newdirfd = AtFd::from(newdirfd);
 
     let dentry = task.walk_at(newdirfd, linkpath)?;
+    if !dentry.is_negative() {
+        return Err(SysError::EEXIST);
+    }
     dentry.parent().unwrap().symlink(dentry.as_ref(), &target)?;
     Ok(0)
 }
