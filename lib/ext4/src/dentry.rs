@@ -147,7 +147,18 @@ impl Dentry for ExtDentry {
 
     fn base_rmdir(&self, dentry: &dyn Dentry) -> SysResult<()> {
         let path = CString::new(dentry.path()).unwrap();
-        ExtDir::remove_recursively(&path)?;
+        let mut dir = ExtDir::open(&path)?;
+        if dir.next().is_some() {
+            return Err(SysError::ENOTEMPTY);
+        }
+        ExtDir::remove_recur(&path)?;
+        dentry.unset_inode();
+        Ok(())
+    }
+
+    fn base_rmdir_recur(&self, dentry: &dyn Dentry) -> SysResult<()> {
+        let path = CString::new(dentry.path()).unwrap();
+        ExtDir::remove_recur(&path)?;
         dentry.unset_inode();
         Ok(())
     }

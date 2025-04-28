@@ -13,11 +13,9 @@ use core::{
 };
 
 use lwext4_rust::{
-    InodeTypes,
     bindings::{
-        ext4_dir, ext4_dir_close, ext4_dir_entry_next, ext4_dir_entry_rewind, ext4_dir_mk,
-        ext4_dir_mv, ext4_dir_open, ext4_direntry,
-    },
+        ext4_dir, ext4_dir_close, ext4_dir_entry_next, ext4_dir_entry_rewind, ext4_dir_mk, ext4_dir_mv, ext4_dir_open, ext4_dir_rm, ext4_direntry
+    }, InodeTypes
 };
 
 use config::inode::InodeType;
@@ -111,8 +109,8 @@ impl ExtDir {
     }
 
     /// Recursively removes a directory and all its contents.
-    pub fn remove_recursively(path: &CStr) -> SysResult<()> {
-        let err = unsafe { ext4_dir_mk(path.as_ptr()) };
+    pub fn remove_recur(path: &CStr) -> SysResult<()> {
+        let err = unsafe { ext4_dir_rm(path.as_ptr()) };
         match err {
             0 => Ok(()),
             _ => {

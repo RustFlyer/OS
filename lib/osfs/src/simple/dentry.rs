@@ -72,10 +72,6 @@ impl Dentry for SimpleDentry {
         }
     }
 
-    fn base_rmdir(&self, _dentry: &dyn Dentry) -> SysResult<()> {
-        todo!()
-    }
-
     fn base_unlink(&self, _dentry: &dyn Dentry) -> SysResult<()> {
         todo!()
     }

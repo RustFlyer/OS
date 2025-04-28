@@ -55,10 +55,6 @@ impl Dentry for MemInfoDentry {
         todo!()
     }
 
-    fn base_rmdir(&self, _dentry: &dyn Dentry) -> SysResult<()> {
-        todo!()
-    }
-
     fn base_rename(
         &self,
         _dentry: &dyn Dentry,

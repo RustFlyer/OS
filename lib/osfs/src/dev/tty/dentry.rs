@@ -54,7 +54,7 @@ impl Dentry for TtyDentry {
         todo!()
     }
 
-    fn base_rmdir(&self, _dentry: &dyn Dentry) -> SysResult<()> {
+    fn base_rmdir_recur(&self, _dentry: &dyn Dentry) -> SysResult<()> {
         Err(SysError::ENOTDIR)
     }
 
