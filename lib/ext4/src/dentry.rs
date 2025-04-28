@@ -148,6 +148,9 @@ impl Dentry for ExtDentry {
     fn base_rmdir(&self, dentry: &dyn Dentry) -> SysResult<()> {
         let path = CString::new(dentry.path()).unwrap();
         let mut dir = ExtDir::open(&path)?;
+        // Skip "." and ".."
+        dir.next().unwrap();
+        dir.next().unwrap();
         if dir.next().is_some() {
             return Err(SysError::ENOTEMPTY);
         }
