@@ -3,7 +3,10 @@ use core::arch::global_asm;
 use arch::riscv64::interrupt::set_trap_handler;
 use riscv::register::stvec::TrapMode;
 
+#[cfg(target_arch = "riscv64")]
 global_asm!(include_str!("rv_trap.asm"));
+#[cfg(target_arch = "loongarch64")]
+global_asm!(include_str!("loong_trap.asm"));
 
 unsafe extern "C" {
     fn __trap_from_kernel();

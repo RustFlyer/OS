@@ -18,23 +18,18 @@ pub fn trap_return(task: &Arc<Task>) {
     // restore registers situations:
     // 1. current task yields after last trap.
     // 2. current task gets into sig-handler.
-    let mut trap_context_mut = task.trap_context_mut();
-    trap_context_mut.restore_fx();
-    trap_context_mut.sstatus.set_fs(FS::Clean);
+    let trap_cx = task.trap_context_mut();
+    trap_cx.sstatus.set_fs(FS::Clean);
 
-    assert!(!(trap_context_mut.sstatus.sie()));
+    assert!(!(trap_cx.sstatus.sie()));
     assert!(!(task.is_in_state(TaskState::Zombie) || task.is_in_state(TaskState::Sleeping)));
 
     task.timer_mut().switch_to_user();
     // log::info!("[trap_return] go to user space");
     unsafe {
-        let ptr = trap_context_mut as *mut TrapContext;
+        let ptr = trap_cx as *mut TrapContext;
         __return_to_user(ptr);
     }
     // log::info!("[trap_return] return from user space");
     task.timer_mut().switch_to_kernel();
-
-    trap_context_mut = task.trap_context_mut();
-    let new_sstatus = trap_context_mut.sstatus;
-    trap_context_mut.mark_dirty(new_sstatus);
 }

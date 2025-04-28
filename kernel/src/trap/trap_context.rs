@@ -36,25 +36,6 @@ pub struct TrapContext {
 
     pub k_tp: usize, // 49, thread pointer, the kernel hart(which records CPU status) address, useless for now
 
-    // float register to be saved, useless for now
-    pub user_fx: [f64; 32], // 50 - 81
-
-    // This is RISC-V Floating-point Control and Status Register
-    // It can control the behaviour about floating-point number operation
-    pub fcsr: u32,
-
-    // This bit mark whether floating point number is dirty.
-    // When it is marked as 1, it means that float reg has been modified.
-    pub is_dirty: u8,
-
-    // When task switch or application returns from sig-handle,
-    // this bit will be marked as 1, meaning that float reg needs to be restored.
-    pub is_need_restore: u8,
-
-    // when handle signals with a dirty float mode,
-    // this bit is marked as 1 to ensure that floating state is set correctly.
-    pub is_signal_dirty: u8,
-
     pub last_a0: usize,
 }
 
@@ -91,11 +72,6 @@ impl TrapContext {
             k_s: [0; 12],
             k_fp: 0,
             k_tp: 0,
-            user_fx: [0.0; 32],
-            fcsr: 0,
-            is_dirty: 0,
-            is_need_restore: 0,
-            is_signal_dirty: 0,
             last_a0: 0,
         };
 
@@ -125,20 +101,7 @@ impl TrapContext {
         self.user_reg[11] = argv;
         self.user_reg[12] = envp;
         self.sepc = sepc;
-
-        // self.sstatus = sstatus::read();
-        self.clear_fx();
     }
-
-    /// clear float regs and set relevant privilege regs.
-    pub fn clear_fx(&mut self) {
-        self.user_fx.fill(0.0);
-        self.fcsr = 0;
-        self.is_dirty = 0;
-        self.is_need_restore = 0;
-        self.is_signal_dirty = 0;
-    }
-
     /// this function can be called to get syscall number
     /// when trapped
     pub fn syscall_no(&self) -> usize {
@@ -184,83 +147,6 @@ impl TrapContext {
     /// pc points to the next instruction.
     pub fn sepc_forward(&mut self) {
         self.sepc += 4;
-    }
-
-    pub fn mark_dirty(&mut self, sstatus: Sstatus) {
-        self.is_dirty |= (sstatus.fs() == FS::Dirty) as u8;
-    }
-
-    //XXX: save register when yield, but not checked yet.
-    pub fn yield_task(&mut self) {
-        self.save_fx();
-        self.is_need_restore = 1;
-    }
-
-    pub fn restore_fx(&mut self) {
-        if self.is_need_restore == 0 {
-            return;
-        }
-        self.is_need_restore = 0;
-        let ptr = self.user_fx.as_mut_ptr();
-        unsafe {
-            macro_rules! load_regs {
-                ($($i:literal),*) => {
-                    $(
-                        asm!(
-                            "fld f{}, {offset}*8({ptr})",
-                            const $i,
-                            offset = const $i,
-                            ptr = in(reg) ptr
-                        );
-                    )*
-                };
-            }
-            load_regs!(
-                0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
-                23, 24, 25, 26, 27, 28, 29, 30, 31
-            );
-
-            asm!(
-                "lw  {0}, 32*8({0})
-                csrw fcsr, {0}",
-                in(reg) ptr,
-            );
-        }
-    }
-
-    pub fn save_fx(&mut self) {
-        if self.is_dirty == 0 {
-            return;
-        }
-        self.is_dirty = 0;
-        let ptr = self.user_fx.as_mut_ptr();
-        unsafe {
-            let mut _t: usize = 1;
-            macro_rules! save_regs {
-                ($($i:literal),*) => {
-                    $(
-                        asm!(
-                            "fsd f{}, {offset}*8({ptr})",
-                            const $i,
-                            offset = const $i,
-                            ptr = in(reg) ptr
-                        );
-                    )*
-                };
-            }
-            save_regs!(
-                0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
-                23, 24, 25, 26, 27, 28, 29, 30, 31
-            );
-
-            asm!(
-                "csrr {1}, fcsr
-                sw  {1}, 32*8({0})
-                ",
-                in(reg) ptr,
-                inout(reg) _t
-            );
-        };
     }
 
     pub fn save_last_user_a0(&mut self) {
