@@ -1,5 +1,4 @@
-use super::hal::VirtHalImpl;
-use crate::BlockDevice;
+use crate::{BlockDevice, hal::VirtHalImpl};
 use config::device::{BLOCK_SIZE, DEV_SIZE, VIRTIO0};
 use mutex::SpinNoIrqLock;
 use virtio_drivers::{

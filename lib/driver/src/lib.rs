@@ -12,6 +12,7 @@ use spin::Once;
 
 pub mod cpu;
 pub mod device;
+pub mod hal;
 pub mod manager;
 pub mod net;
 pub mod plic;
@@ -19,6 +20,7 @@ pub mod qemu;
 pub mod sbi;
 
 pub use sbi::sbi_print;
+pub use uart_16550::MmioSerialPort;
 pub use virtio_drivers::transport::DeviceType;
 
 pub static BLOCK_DEVICE: Once<Arc<dyn BlockDevice>> = Once::new();
@@ -42,8 +44,8 @@ pub trait CharDevice: Send + Sync {
 }
 
 pub fn init() {
-    init_block_device();
-    init_char_device();
+    // init_block_device();
+    // init_char_device();
     log::info!("success init driver");
 }
 

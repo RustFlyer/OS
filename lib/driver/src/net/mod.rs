@@ -1,7 +1,10 @@
-use core::any::Any;
-
 use alloc::boxed::Box;
+use netbuf::NetBufPtrOps;
 use smoltcp::phy::DeviceCapabilities;
+
+pub mod netbuf;
+pub mod netpool;
+pub mod virtnet;
 
 /// The error type for device operation failures.
 #[derive(Debug)]
@@ -72,9 +75,4 @@ pub trait NetDevice: Sync + Send {
     /// Allocate a memory buffer of a specified size for network transmission,
     /// returns [`DevResult`]
     fn alloc_tx_buffer(&mut self, size: usize) -> DevResult<Box<dyn NetBufPtrOps>>;
-}
-pub trait NetBufPtrOps: Any {
-    fn packet(&self) -> &[u8];
-    fn packet_mut(&mut self) -> &mut [u8];
-    fn packet_len(&self) -> usize;
 }

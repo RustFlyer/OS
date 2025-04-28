@@ -1,7 +1,7 @@
 use core::cell::RefCell;
 
 use alloc::boxed::Box;
-use driver::net::{NetBufPtrOps, NetDevice};
+use driver::net::{NetDevice, netbuf::NetBufPtrOps};
 use smoltcp::phy::{RxToken, TxToken};
 
 /// `NetRxToken` implement `RxToken` trait, which means that

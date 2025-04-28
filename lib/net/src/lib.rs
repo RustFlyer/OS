@@ -21,8 +21,8 @@ pub mod udp;
 
 /// Some meaningless parameters. They will be parsed as bytes
 /// and mix with `RANDOM_SEED` to create ips and gateway address.
-const IP: &str = "IP";
-const GATEWAY: &str = "GATEWAY";
+const IP: &str = "192.168.0.100";
+const GATEWAY: &str = "192.168.0.1";
 const IP_PREFIX: u8 = 24;
 
 /// `SOCKET_SET` is a global socket manager, used to manage multi-type sockets,
@@ -40,12 +40,11 @@ pub fn init_network(net_dev: Box<dyn NetDevice>, is_loopback: bool) {
     let eth0 = InterfaceWrapper::new("eth0", net_dev, ether_addr);
 
     let gateway = GATEWAY.parse().unwrap();
-    let ip;
     let ip_addrs = if is_loopback {
-        ip = "127.0.0.1".parse().unwrap();
+        let ip = "127.0.0.1".parse().unwrap();
         vec![IpCidr::new(ip, 8)]
     } else {
-        ip = IP.parse().expect("invalid IP address");
+        let ip = IP.parse().expect("invalid IP address");
         vec![
             IpCidr::new(IP.parse().unwrap(), 8),
             IpCidr::new(ip, IP_PREFIX),

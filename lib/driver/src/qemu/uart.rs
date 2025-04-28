@@ -4,12 +4,18 @@ use mutex::SpinNoIrqLock;
 use uart_16550::MmioSerialPort;
 
 pub struct UartDevice {
-    device: SpinNoIrqLock<MmioSerialPort>,
+    pub device: SpinNoIrqLock<MmioSerialPort>,
 }
 
 impl UartDevice {
     pub fn new() -> Self {
         let serialport = unsafe { MmioSerialPort::new(MMIO_SERIAL_PORT_ADDR) };
+        Self {
+            device: SpinNoIrqLock::new(serialport),
+        }
+    }
+
+    pub fn from_another(serialport: MmioSerialPort) -> Self {
         Self {
             device: SpinNoIrqLock::new(serialport),
         }

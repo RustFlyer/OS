@@ -54,6 +54,12 @@ impl InterfaceWrapper {
         config.random_seed = RANDOM_SEED;
 
         let mut dev = DeviceWrapper::new(dev);
+
+        {
+            dev.bench_receive_bandwidth();
+            dev.bench_transmit_bandwidth();
+        }
+
         let iface = SpinNoIrqLock::new(Interface::new(config, &mut dev, Self::current_time()));
         Self {
             name,
