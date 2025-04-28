@@ -13,9 +13,9 @@
     .globl __user_rw_exception_entry
     .globl __try_read_user
     .globl __try_write_user
-    .align 2
 
 
+.align 2
 # __trap_from_user: This label marks the entry point for traps originating from user mode
 __trap_from_user:
     # Swap the user stack pointer (sscratch) with the kernel stack pointer (sp)
@@ -156,8 +156,8 @@ __trap_from_kernel:
 
 # arg: (user_ptr)
 # return: (usize, usize)
-# if a0 == 0, which means no exception happens
-# if a0 == 1, which means exception happens, then we will treat a1 as scause
+# a0 == 0 means no exception happens
+# a0 == 1 means exception happens, then we will treat a1 as scause
 #
 # Safety: need to set stvec to __user_rw_trap_vector and vector mode first
 __try_read_user:
