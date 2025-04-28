@@ -27,7 +27,12 @@ pub struct ExtFile(
     // that we should not get a mutable pointer from a shared reference by calling
     // `SyncUnsafeCell::get()` and pass the mutable pointer to a function that indedd
     // mutates the `ext4_file` struct, which violates Rust's borrowing rules.
-    SyncUnsafeCell<ext4_file>,
+    //
+    // Note: You should construct an `ExtFile` by calling `ExtFile::open()`; do not
+    // construct it directly as `ExtFile(SyncUnsafeCell::new(ext4_file))`, because
+    // this does not really open the file. Only do this if you know the `ext4_file` is
+    // already opened, and make sure you close it later correctly.
+    pub(crate) SyncUnsafeCell<ext4_file>,
 );
 
 // Note that `ext4_file` contains a raw mutable pointer, so it is not `Send` or `Sync`.

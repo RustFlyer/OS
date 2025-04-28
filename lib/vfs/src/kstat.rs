@@ -60,12 +60,12 @@ impl Kstat {
             st_blksize: stat.st_blksize as i32,
             _pad1: stat.__pad2 as i32,
             st_blocks: stat.st_blocks as i64,
-            st_atime_sec: stat.st_atime.sec as isize,
-            st_atime_nsec: stat.st_atime.nsec as isize,
-            st_mtime_sec: stat.st_mtime.sec as isize,
-            st_mtime_nsec: stat.st_mtime.nsec as isize,
-            st_ctime_sec: stat.st_ctime.sec as isize,
-            st_ctime_nsec: stat.st_ctime.nsec as isize,
+            st_atime_sec: stat.st_atime.tv_sec as isize,
+            st_atime_nsec: stat.st_atime.tv_nsec as isize,
+            st_mtime_sec: stat.st_mtime.tv_sec as isize,
+            st_mtime_nsec: stat.st_mtime.tv_nsec as isize,
+            st_ctime_sec: stat.st_ctime.tv_sec as isize,
+            st_ctime_nsec: stat.st_ctime.tv_nsec as isize,
         })
     }
 }

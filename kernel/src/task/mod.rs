@@ -1,4 +1,5 @@
 pub mod future;
+pub mod kernelproc;
 pub mod manager;
 pub mod process_manager;
 pub mod sig_members;
@@ -7,6 +8,7 @@ pub mod task;
 pub mod taskf;
 pub mod threadgroup;
 pub mod tid;
+pub mod time;
 
 use arch::riscv64::time::get_time_duration;
 use future::spawn_kernel_task;

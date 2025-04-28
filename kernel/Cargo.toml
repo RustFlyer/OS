@@ -21,6 +21,7 @@ vfs = { path = "../lib/vfs/" }
 osfs = { path = "../lib/osfs" }
 osfuture = { path = "../lib/osfuture" }
 net = { path = "../lib/net" }
+polyhal = { path = "../lib/polyhal" }
 
 fdt = { workspace = true }
 async-trait = { workspace = true }

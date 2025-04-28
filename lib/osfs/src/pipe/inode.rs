@@ -4,13 +4,13 @@ use alloc::{collections::vec_deque::VecDeque, sync::Arc};
 use config::{
     inode::{InodeMode, InodeType},
     mm::PAGE_SIZE,
-    vfs::Stat,
 };
 use mutex::SpinNoIrqLock;
 use systype::SysResult;
 use vfs::{
     inode::{Inode, InodeMeta},
     inoid::alloc_ino,
+    stat::Stat,
     sys_root_dentry,
 };
 

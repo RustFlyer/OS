@@ -2,18 +2,17 @@ use core::{cmp::Reverse, time::Duration};
 
 use alloc::collections::BinaryHeap;
 use mutex::SpinNoIrqLock;
-use spin::lazy::Lazy;
 
 use crate::{Timer, TimerState};
 
-pub static TIMER_MANAGER: Lazy<TimerManager> = Lazy::new(TimerManager::new);
+pub static TIMER_MANAGER: TimerManager = TimerManager::new();
 
 pub struct TimerManager {
     timers: SpinNoIrqLock<BinaryHeap<Reverse<Timer>>>,
 }
 
 impl TimerManager {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             timers: SpinNoIrqLock::new(BinaryHeap::new()),
         }

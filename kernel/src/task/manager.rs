@@ -5,6 +5,7 @@ use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::sync::Weak;
 use mutex::SpinNoIrqLock;
+use systype::SysResult;
 
 use crate::task::tid::Tid;
 
@@ -28,13 +29,15 @@ impl TaskManager {
     }
 
     pub fn add_task(&self, task: &Arc<Task>) {
-        // println!("[add_task] {}", task.tid());
+        log::error!("[add_task] {}", task.tid());
         self.0.lock().insert(task.tid(), Arc::downgrade(task));
+        let _ = self.for_each(|t| Ok(log::debug!("thread {}, name: {}", t.tid(), t.get_name())));
     }
 
     pub fn remove_task(&self, tid: Tid) {
-        // println!("[remove_task] {tid}");
+        log::error!("[remove_task] {tid}");
         self.0.lock().remove(&tid);
+        let _ = self.for_each(|t| Ok(log::debug!("thread {}, name: {}", t.tid(), t.get_name())));
     }
 
     pub fn get_task(&self, tid: Tid) -> Option<Arc<Task>> {
@@ -43,6 +46,13 @@ impl TaskManager {
         } else {
             None
         }
+    }
+
+    pub fn for_each(&self, f: impl Fn(&Arc<Task>) -> SysResult<()>) -> SysResult<()> {
+        for task in self.0.lock().values() {
+            f(&task.upgrade().unwrap())?
+        }
+        Ok(())
     }
 }
 

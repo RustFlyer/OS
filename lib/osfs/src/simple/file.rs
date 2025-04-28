@@ -31,4 +31,35 @@ impl File for SimpleDirFile {
     async fn base_write(&self, _buf: &[u8], _offset: usize) -> SysResult<usize> {
         Err(SysError::EISDIR)
     }
+
+    fn base_load_dir(&self) -> SysResult<()> {
+        Ok(())
+    }
+}
+
+pub struct SimpleFileFile {
+    meta: FileMeta,
+}
+
+impl SimpleFileFile {
+    pub fn new(dentry: Arc<dyn Dentry>) -> Arc<Self> {
+        Arc::new(Self {
+            meta: FileMeta::new(dentry),
+        })
+    }
+}
+
+#[async_trait]
+impl File for SimpleFileFile {
+    fn meta(&self) -> &FileMeta {
+        &self.meta
+    }
+
+    async fn base_read(&self, _buf: &mut [u8], _pos: usize) -> SysResult<usize> {
+        Err(SysError::EISDIR)
+    }
+
+    async fn base_write(&self, _buf: &[u8], _offset: usize) -> SysResult<usize> {
+        Err(SysError::EISDIR)
+    }
 }

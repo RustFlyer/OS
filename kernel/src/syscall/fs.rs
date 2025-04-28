@@ -1,19 +1,36 @@
-use alloc::{ffi::CString, string::ToString};
-use core::cmp;
+use alloc::{boxed::Box, ffi::CString, string::ToString, vec::Vec};
+use arch::riscv64::time::get_time_duration;
+use core::{
+    cmp,
+    pin::Pin,
+    task::{Context, Poll},
+    time::Duration,
+    usize,
+};
+use time::TimeSpec;
+use timer::{TimedTaskResult, TimeoutFuture};
 
 use simdebug::stop;
 use strum::FromRepr;
 
 use config::{
+    device::BLOCK_SIZE,
     inode::InodeMode,
-    vfs::{AccessFlags, AtFd, AtFlags, MountFlags, OpenFlags, SeekFrom},
+    vfs::{AccessFlags, AtFd, AtFlags, MountFlags, OpenFlags, PollEvents, RenameFlags, SeekFrom},
 };
 use driver::BLOCK_DEVICE;
 use osfs::{
     FS_MANAGER,
+    dev::{
+        rtc::{RtcTime, ioctl::RtcIoctlCmd},
+        tty::{
+            TtyIoctlCmd,
+            ioctl::{Pid, Termios},
+        },
+    },
     pipe::{inode::PIPE_BUF_LEN, new_pipe},
 };
-use systype::{SysError, SyscallResult};
+use systype::{SysError, SysResult, SyscallResult};
 use vfs::{
     file::File,
     kstat::Kstat,
@@ -72,9 +89,9 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
         let cstring = data_ptr.read_c_string(256)?;
         cstring.into_string().map_err(|_| SysError::EINVAL)?
     };
-    log::info!(
-        "[sys_openat] dirfd: {dirfd}, pathname: {pathname}, flags: {flags:?}, mode: {_mode:?}"
-    );
+
+    let name = path.clone();
+    log::info!("[sys_openat] dirfd: {dirfd:#x}, path: {path}, flags: {flags:?}, mode: {_mode:?}");
 
     let mut dentry = task.walk_at(AtFd::from(dirfd), path)?;
     // Handle symlinks early here to simplify the logic.
@@ -106,6 +123,8 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
     let file = <dyn File>::open(dentry)?;
     file.set_flags(flags);
 
+    log::debug!("[sys_openat] file open success with its name {:?}", name);
+
     task.with_mut_fdtable(|ft| ft.alloc(file, flags))
 }
 
@@ -123,7 +142,7 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
 /// - This is a `async` syscall, which means that it likely `yield` or `suspend` when called. Therefore, use
 ///   `lock` carefully and do not pass the `lock` across `await` as possible.
 pub async fn sys_write(fd: usize, addr: usize, len: usize) -> SyscallResult {
-    log::info!("[sys_write] fd: {fd}, addr: {addr:#x}, len: {len:#x}");
+    // log::trace!("[sys_write] fd: {fd}, addr: {addr:#x}, len: {len:#x}");
 
     let task = current_task();
     let addr_space = task.addr_space();
@@ -147,7 +166,7 @@ pub async fn sys_write(fd: usize, addr: usize, len: usize) -> SyscallResult {
 /// - This is a `async` syscall, which means that it likely `yield` or `suspend` when called. Therefore, use
 ///   `lock` carefully and do not pass the `lock` across `await` as possible.
 pub async fn sys_read(fd: usize, buf: usize, len: usize) -> SyscallResult {
-    log::info!("[sys_read] fd: {fd}, buf: {buf:#x}, len: {len:#x}");
+    // log::trace!("[sys_read] fd: {fd}, buf: {buf:#x}, len: {len:#x}");
 
     let task = current_task();
     let addr_space = task.addr_space();
@@ -164,15 +183,28 @@ pub fn sys_readlinkat(dirfd: usize, pathname: usize, buf: usize, bufsiz: usize) 
     let path = UserReadPtr::<u8>::new(pathname, &addr_space).read_c_string(256)?;
     let path = path.into_string().map_err(|_| SysError::EINVAL)?;
 
-    log::info!("[sys_readlinkat] dirfd: {dirfd}, pathname: {pathname}, bufsiz: {bufsiz:#x}");
+    log::info!("[sys_readlinkat] dirfd: {dirfd}, path: {path}, bufsiz: {bufsiz:#x}");
 
     let dentry = task.walk_at(AtFd::from(dirfd), path)?;
+
+    // log::info!("[sys_readlinkat] dentry get");
     let inode = dentry.inode().ok_or(SysError::ENOENT)?;
+
+    // log::info!(
+    //     "[sys_readlinkat] dentry {} get flag {}",
+    //     dentry.get_meta().name,
+    //     inode.inotype().as_char()
+    // );
+
     if !inode.inotype().is_symlink() {
         return Err(SysError::EINVAL);
     }
+
     let file = <dyn File>::open(dentry).unwrap();
     let link_path = file.readlink()?;
+
+    // log::info!("[sys_readlinkat] link_path : [{link_path}]");
+
     let mut buf_ptr = UserWritePtr::<u8>::new(buf, &addr_space);
     let len = cmp::min(link_path.len(), bufsiz);
     unsafe {
@@ -283,13 +315,14 @@ pub fn sys_fstatat(dirfd: usize, pathname: usize, stat_buf: usize, _flags: i32) 
     let path = UserReadPtr::<u8>::new(pathname, &addr_space).read_c_string(256)?;
     let path = path.into_string().map_err(|_| SysError::EINVAL)?;
 
-    log::info!("[sys_fstat_at] dirfd: {dirfd}, path: {path}, flags: {_flags}");
+    log::info!("[sys_fstat_at] dirfd: {dirfd:#x}, path: {path}, flags: {_flags}");
     assert!(
         _flags == 0 || _flags == AtFlags::AT_SYMLINK_NOFOLLOW.bits(),
         "Flags {_flags} is not supported",
     );
 
     let dentry = task.walk_at(AtFd::from(dirfd), path)?;
+    log::debug!("[sys_fstatat] find file here");
     let inode = dentry.inode().ok_or(SysError::ENOENT)?;
     let kstat = Kstat::from_vfs_file(inode)?;
     unsafe {
@@ -445,12 +478,15 @@ pub async fn sys_unlinkat(dirfd: usize, pathname: usize, flags: i32) -> SyscallR
         if !is_dir {
             return Err(SysError::ENOTDIR);
         }
-        todo!("remove directory");
+        parent.rmdir(dentry.as_ref())?;
     } else if is_dir {
         return Err(SysError::EISDIR);
     }
 
-    parent.unlink(dentry.as_ref()).map(|_| 0)
+    if !is_dir {
+        parent.unlink(dentry.as_ref())?;
+    }
+    Ok(0)
 }
 
 /// `getdents64()` get directory entries.
@@ -604,36 +640,58 @@ pub async fn sys_umount2(target: usize, flags: u32) -> SyscallResult {
     Ok(0)
 }
 
-/// Checks file permissions relative to a directory
+/// `faccessat()` checks user's permissions for a file
+///
+/// `faccessat()` checks whether the calling process can access the file pathname.
+/// If pathname is a symbolic link, it is dereferenced.
+///
+/// If the `pathname` given in `pathname` is relative, then it is interpreted relative
+/// to the directory referred to by the file descriptor `dirfd`
 ///
 /// Verifies whether the calling process can access the file at `pathname` with the
 /// specified `mode`.
+///
+/// The mode specifies the accessibility check(s) to be performed, and is either the
+/// value F_OK, or a mask consisting of the bitwise OR of one or more of R_OK, W_OK,
+/// and X_OK. F_OK tests for the existence of the file. R_OK, W_OK, and X_OK test
+/// whether the file exists and grants read, write, and execute permissions, respectively.
+///
+/// Because the Linux kernel's faccessat() system call does not support a flags argument,
+/// the glibc faccessat() wrapper function provided in glibc 2.32 and earlier emulates the
+/// required functionality using a combination of the faccessat() system call and fstatat(2).
 ///
 /// # Parameters
 /// - `dirfd`: Directory file descriptor (use `AT_FDCWD` for current working directory)
 /// - `pathname`: Path string (relative to `dirfd` if not absolute)
 /// - `mode`: Permission mask
 /// - `flags`: Behavior flags
-pub async fn sys_faccessat(dirfd: usize, pathname: usize, mode: i32, flags: i32) -> SyscallResult {
+pub async fn sys_faccessat(dirfd: usize, pathname: usize, mode: i32, flag: usize) -> SyscallResult {
+    log::info!(
+        "[sys_faccessat] dirfd: {dirfd}, pathname: {pathname:#x}, mode: {mode:#x}, flags: {flag:#x}"
+    );
     let task = current_task();
+    let addr_space = task.addr_space();
     let _mode = AccessFlags::from_bits(mode).ok_or(SysError::EINVAL)?;
-    let flags = AtFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
+
+    let flags;
+    if let Some(f) = AtFlags::from_bits(flag as i32) {
+        flags = f;
+    } else {
+        flags = unsafe { UserReadPtr::<AtFlags>::new(flag, &addr_space).read()? };
+    }
 
     let path = {
-        let addr_space = task.addr_space();
         let mut user_ptr = UserReadPtr::<u8>::new(pathname, &addr_space);
         let cstring = user_ptr.read_c_string(256)?;
         cstring.into_string().map_err(|_| SysError::EINVAL)?
     };
+    log::info!("[sys_faccessat] dirfd: {dirfd}, path: {path}, mode: {_mode:?}, flags: {flags:?}");
 
-    log::info!(
-        "[sys_faccessat] dirfd: {dirfd}, pathname: {pathname}, mode: {_mode:?}, flags: {flags:?}"
-    );
-
-    let mut dentry = task.walk_at(AtFd::from(dirfd), path)?;
+    let mut dentry = task.walk_at(AtFd::from(dirfd), path.clone())?;
     if dentry.is_negative() {
         return Err(SysError::ENOENT);
     }
+
     if dentry.inode().unwrap().inotype().is_symlink()
         && !flags.contains(AtFlags::AT_SYMLINK_NOFOLLOW)
     {
@@ -694,5 +752,554 @@ pub async fn sys_pipe2(pipefd: usize, flags: i32) -> SyscallResult {
         pipefd.write_array(&pipe)?;
     }
     stop();
+    Ok(0)
+}
+
+/// The `ioctl()` system call manipulates the underlying device parameters of special files.
+/// In particular, many operating characteristics of character special files (e.g., terminals)
+/// may be controlled with `ioctl()` operations. The argument fd must be an open file descriptor.
+pub fn sys_ioctl(fd: usize, request: usize, argp: usize) -> SyscallResult {
+    // return Err(SysError::EBUSY);
+    log::info!("[sys_ioctl] fd: {fd}, request: {request:#x}, arg: {argp:#x}");
+    let task = current_task();
+    let addrspace = task.addr_space();
+    let mut arg = UserWritePtr::<u8>::new(argp, &addrspace);
+    unsafe {
+        let len = if let Some(cmd) = TtyIoctlCmd::from_repr(request) {
+            match cmd {
+                TtyIoctlCmd::TCGETS => core::mem::size_of::<Termios>(),
+                TtyIoctlCmd::TIOCGPGRP => core::mem::size_of::<Pid>(),
+                TtyIoctlCmd::TCSETS => core::mem::size_of::<Termios>(),
+                _ => 0,
+            }
+        } else if let Some(cmd) = RtcIoctlCmd::from_repr(request as u64) {
+            match cmd {
+                RtcIoctlCmd::RTC_RD_TIME => core::mem::size_of::<RtcTime>(),
+                _ => 0,
+            }
+        } else {
+            0
+        };
+
+        // log::debug!("[sys_ioctl] should write with len: {len}");
+
+        let slice = arg.try_into_mut_slice(len)?;
+
+        let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
+        file.ioctl(request, slice.as_ptr() as usize)
+    }
+}
+
+/// `sendfile()` copies data between one file descriptor and another.
+/// Because this copying is done within the kernel, `sendfile()` is more efficient than the combination
+/// of read(2) and write(2), which would require transferring data to and from user space.
+///
+/// `in_fd` should be a file descriptor opened for reading and `out_fd` should be a descriptor
+/// opened for writing.
+///
+/// If `offset` is not NULL, then it points to a variable holding the file `offset` from which
+/// `sendfile()` will start reading data from in_fd. When `sendfile()` returns, this variable
+/// will be set to the `offset` of the byte following the last byte that was read.
+///
+/// If `offset` is not NULL, then `sendfile()` does not modify the file `offset` of in_fd;
+/// otherwise the file `offset` is adjusted to reflect the number of bytes read from in_fd.
+///
+/// If `offset` is NULL, then data will be read from in_fd starting at the file `offset`,
+/// and the file `offset` will be updated by the call.
+pub async fn sys_sendfile64(
+    out_fd: usize,
+    in_fd: usize,
+    offset: usize,
+    mut count: usize,
+) -> SyscallResult {
+    let task = current_task();
+    let in_file = task.with_mut_fdtable(|table| table.get_file(in_fd))?;
+    let out_file = task.with_mut_fdtable(|table| table.get_file(out_fd))?;
+
+    if offset != 0 {
+        in_file.seek(SeekFrom::Start(offset as u64))?;
+    }
+
+    let mut write_bytes = 0;
+    while count > 0 {
+        let mlen = count.min(4096);
+        let mut buf = vec![0; mlen];
+        let rlen = in_file.read(&mut buf).await?;
+        write_bytes += out_file.write(&buf[..rlen]).await?;
+        count -= rlen;
+
+        log::info!("read bytes {}", rlen);
+        if rlen == 0 {
+            break;
+        }
+    }
+
+    Ok(write_bytes)
+}
+
+// Defined in <bits/fcntl-linux.h>
+#[derive(FromRepr, Debug, Eq, PartialEq, Clone, Copy, Default)]
+#[allow(non_camel_case_types)]
+#[repr(isize)]
+pub enum FcntlOp {
+    F_DUPFD = 0,
+    F_DUPFD_CLOEXEC = 1030,
+    F_GETFD = 1,
+    F_SETFD = 2,
+    F_GETFL = 3,
+    F_SETFL = 4,
+    #[default]
+    F_UNIMPL,
+}
+
+/// `fcntl()` performs one of the operations described below on the open file descriptor `fd`.
+/// The operation is determined by `op`.
+///
+/// `fcntl()` can take an optional third argument. Whether or not this argument is required
+/// is determined by `op`. The required argument type is indicated in parentheses after
+/// each `op` name (in most cases, the required type is int, and we identify the argument
+/// using the name arg), or void is specified if the argument is not required.
+///
+/// # Op
+/// - `F_DUPFD`: Duplicate the file descriptor `fd` using the lowest-numbered available
+///   file descriptor greater than or equal to arg. This is different from dup2,
+///   which uses exactly the file descriptor specified.
+/// - `F_DUPFD_CLOEXEC`: As `F_DUPFD`, but additionally set the close-on-exec flag for
+///   the duplicate file descriptor. Specifying this flag permits a program to avoid
+///   an additional `fcntl()` `F_SETFD` operation to set the FD_CLOEXEC flag.
+pub fn sys_fcntl(fd: usize, op: isize, arg: usize) -> SyscallResult {
+    use FcntlOp::*;
+    let task = current_task();
+    let op = FcntlOp::from_repr(op).unwrap_or_default();
+    log::debug!("[sys_fcntl] fd: {fd}, op: {op:?}, arg: {arg:#x}");
+    match op {
+        F_DUPFD_CLOEXEC => {
+            task.with_mut_fdtable(|table| table.dup_with_bound(fd, arg, OpenFlags::O_CLOEXEC))
+        }
+        _ => {
+            log::error!("[sys_fcntl] not implemented {op:?}");
+            Ok(0)
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct IoVec {
+    pub base: usize,
+    pub len: usize,
+}
+
+/// `sys_writev()` write data into file from multiple buffers
+pub async fn sys_writev(fd: usize, iov: usize, iovcnt: usize) -> SyscallResult {
+    // return Err(SysError::EBUSY);
+    log::info!("[sys_writev] fd: {fd}, iov: {iov:#x}, iovcnt: {iovcnt}");
+
+    let task = current_task();
+    let addrspace = task.addr_space();
+
+    let iovs = {
+        let mut iovs_ptr = UserReadPtr::<IoVec>::new(iov, &addrspace);
+        let pointers = unsafe { iovs_ptr.read_array(iovcnt)? };
+        // log::info!("[sys_writev] pointers: {:?}", pointers);
+        // log::info!("[sys_writev] iovcnt: {}", iovcnt);
+        pointers
+    };
+
+    log::info!("[sys_writev] iov: {:?}", iovs);
+
+    let mut write_bytes = 0;
+    let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
+    for iov in iovs {
+        if iov.len == 0 {
+            continue;
+        }
+        let mut ptr = UserReadPtr::<u8>::new(iov.base, &addrspace);
+        let slice = unsafe { ptr.try_into_slice(iov.len)? };
+        write_bytes += file.write(slice).await?;
+    }
+
+    log::info!("[sys_writev] write bytes: {:?}", write_bytes);
+    Ok(write_bytes)
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct PollFd {
+    fd: i32,
+    events: i16,
+    revents: i16,
+}
+
+pub type Async<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
+pub struct PollFuture<'a> {
+    futures: Vec<Async<'a, PollEvents>>,
+    ready_cnt: usize,
+}
+
+impl Future for PollFuture<'_> {
+    type Output = Vec<(usize, PollEvents)>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = unsafe { self.get_unchecked_mut() };
+        let mut ret_vec = Vec::new();
+        for (i, future) in this.futures.iter_mut().enumerate() {
+            let result = unsafe { Pin::new_unchecked(future).poll(cx) };
+            if let Poll::Ready(result) = result {
+                this.ready_cnt += 1;
+                ret_vec.push((i, result))
+            }
+        }
+        if this.ready_cnt > 0 {
+            Poll::Ready(ret_vec)
+        } else {
+            Poll::Pending
+        }
+    }
+}
+
+pub fn dyn_future<'a, T: Future + Send + 'a>(async_blk: T) -> Async<'a, T::Output> {
+    Box::pin(async_blk)
+}
+
+/// `sys_ppoll` waits for one of a set of file descriptors to become ready to perform I/O.
+/// The set of file descriptors to be monitored is specified in the `fds` argument, which
+/// is an array of structures of the following form:
+/// ```c
+/// struct pollfd {
+///     int   fd;         /* file descriptor */
+///     short events;     /* requested events */
+///     short revents;    /* returned events */
+/// };
+/// ```
+/// The caller should specify the number of items in the `fds` array in `nfds`.
+///
+/// The field `fd` contains a file descriptor for an open file. If this field is negative,
+/// then the corresponding `events` field is ignored and the `revents` field returns zero.
+///
+/// The field `events` is an input parameter, a bit mask specifying the `events` the application is
+/// interested in for the file descriptor fd. This field may be specified as zero, in which case
+/// the only `events` that can be returned in `revents` are POLLHUP, POLLERR, and POLLNVAL
+///
+/// The field `revents` is an output parameter, filled by the kernel with the `events` that actually
+/// occurred. The bits returned in `revents` can include any of those specified in `events`, or one
+/// of the values POLLERR, POLLHUP, or POLLNVAL.
+///
+/// If none of the events requested (and no error) has occurred for any of the file descriptors,
+/// then `poll()` blocks until one of the events occurs.
+///
+/// The timeout argument specifies the number of milliseconds that poll() should block waiting
+/// for a file descriptor to become ready. The call will block until either:
+/// - a file descriptor becomes ready
+/// - the call is interrupted by a signal handler
+/// - the timeout expires.
+///
+/// Being "ready" means that the requested operation will not block;
+/// thus, poll()ing regular files, block devices, and other files with no reasonable polling
+/// semantic always returns instantly as ready to read and write.
+///
+/// ppoll() allows an application to safely wait until either a file descriptor
+/// becomes ready or until a signal is caught.
+///
+/// If the sigmask argument is specified as NULL, then no signal mask manipulation is
+/// performed (and thus ppoll() differs from poll() only in the precision of the timeout argument).
+///
+/// The tmo_p argument specifies an upper limit on the amount of time that ppoll() will block.
+///
+/// If tmo_p is specified as NULL, then ppoll() can block indefinitely.
+pub async fn sys_ppoll(fds: usize, nfds: usize, tmo_p: usize, sigmask: usize) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+
+    let mut poll_fds = unsafe { UserReadPtr::<PollFd>::new(fds, &addrspace).read_array(nfds)? };
+    // log::debug!("[sys_ppoll] fds: {:?}", fds);
+
+    let time_out = if tmo_p == 0 {
+        None
+    } else {
+        let timespec = unsafe { UserReadPtr::<TimeSpec>::new(tmo_p, &addrspace).read()? };
+        Some(Duration::from_micros(timespec.into_ms() as u64))
+    };
+
+    let mut futures = Vec::<Async<PollEvents>>::with_capacity(nfds);
+    for poll_fd in poll_fds.iter() {
+        let fd = poll_fd.fd as usize;
+        let events = PollEvents::from_bits(poll_fd.events).unwrap();
+        let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
+        let future = dyn_future(async move { file.poll(events).await });
+        futures.push(future);
+    }
+
+    let poll_future = PollFuture {
+        futures,
+        ready_cnt: 0,
+    };
+
+    let ret_vec = if let Some(timeout) = time_out {
+        match TimeoutFuture::new(timeout, poll_future).await {
+            TimedTaskResult::Completed(ret_vec) => ret_vec,
+            TimedTaskResult::Timeout => {
+                log::debug!("[sys_ppoll]: timeout");
+                return Ok(0);
+            }
+        }
+    } else {
+        poll_future.await
+    };
+
+    let ret = ret_vec.len();
+    for (i, result) in ret_vec {
+        poll_fds[i].revents |= result.bits() as i16;
+    }
+
+    unsafe { UserWritePtr::<PollFd>::new(fds, &addrspace).write_array(&poll_fds)? };
+
+    Ok(ret)
+}
+
+#[derive(Default, Debug, Clone, Copy)]
+#[repr(C)]
+pub struct StatFs {
+    /// 是个 magic number，每个知名的 fs 都各有定义，但显然我们没有
+    pub f_type: i64,
+    /// 最优传输块大小
+    pub f_bsize: i64,
+    /// 总的块数
+    pub f_blocks: u64,
+    /// 还剩多少块未分配
+    pub f_bfree: u64,
+    /// 对用户来说，还有多少块可用
+    pub f_bavail: u64,
+    /// 总的 inode 数
+    pub f_files: u64,
+    /// 空闲的 inode 数
+    pub f_ffree: u64,
+    /// 文件系统编号，但实际上对于不同的OS差异很大，所以不会特地去用
+    pub f_fsid: [i32; 2],
+    /// 文件名长度限制，这个OS默认FAT已经使用了加长命名
+    pub f_namelen: isize,
+    /// 片大小
+    pub f_frsize: isize,
+    /// 一些选项，但其实也没用到
+    pub f_flags: isize,
+    /// 空余 padding
+    pub f_spare: [isize; 4],
+}
+
+pub fn sys_statfs(path: usize, buf: usize) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+
+    let cpath = UserReadPtr::<u8>::new(path, &addrspace).read_c_string(256)?;
+    let path = cpath.into_string().expect("cstring fail to convert");
+
+    log::info!("[sys_statfs] path: {path}");
+
+    let stfs = StatFs {
+        f_type: 0x20259527 as i64,
+        f_bsize: BLOCK_SIZE as i64,
+        f_blocks: 1 << 27,
+        f_bfree: 1 << 26,
+        f_bavail: 1 << 20,
+        f_files: 1 << 10,
+        f_ffree: 1 << 9,
+        f_fsid: [0; 2],
+        f_namelen: 1 << 8,
+        f_frsize: 1 << 9,
+        f_flags: 1 << 1 as i64,
+        f_spare: [0; 4],
+    };
+
+    unsafe {
+        UserWritePtr::<StatFs>::new(buf, &addrspace).write(stfs)?;
+    }
+
+    Ok(0)
+}
+
+/// The utime() system call changes the access and modification times of the
+/// inode specified by filename to the actime and modtime fields of times
+/// respectively. The status change time (ctime) will be set to the current
+/// time, even if the other time stamps don't actually change.
+///
+/// If the tv_nsec field of one of the timespec structures has the special
+/// value UTIME_NOW, then the corresponding file timestamp is set to the
+/// current time. If the tv_nsec field of one of the timespec structures has
+/// the special value UTIME_OMIT, then the corresponding file timestamp
+/// is left unchanged. In both of these cases, the value of the
+/// corresponding tv_sec field is ignored.
+///
+/// If times is NULL, then the access and modification times of the file are
+/// set to the current time.
+pub fn sys_utimensat(dirfd: usize, pathname: usize, times: usize, flags: i32) -> SyscallResult {
+    const UTIME_NOW: usize = 0x3fffffff;
+    const UTIME_OMIT: usize = 0x3ffffffe;
+
+    let task = current_task();
+    let addrspace = task.addr_space();
+    let mut pathname = UserReadPtr::<u8>::new(pathname, &addrspace);
+    let mut times = UserReadPtr::<TimeSpec>::new(times, &addrspace);
+    let dirfd = AtFd::from(dirfd);
+
+    let inode = if !pathname.is_null() {
+        let path = pathname
+            .read_c_string(256)?
+            .into_string()
+            .expect("cstring convert failed");
+        log::info!("[sys_utimensat] dirfd: {dirfd}, path: {path}");
+        let flags = OpenFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
+        let dentry = task.walk_at(dirfd, path)?;
+        dentry.inode().ok_or(SysError::ENOENT)?
+    } else {
+        // NOTE: if `pathname` is NULL, acts as futimens
+        log::info!("[sys_utimensat] fd: {dirfd}");
+        match dirfd {
+            AtFd::FdCwd => return Err(SysError::EINVAL),
+            AtFd::Normal(fd) => {
+                let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
+                file.inode()
+            }
+        }
+    };
+
+    let mut inner = inode.get_meta().inner.lock();
+    let current_time = TimeSpec::from(get_time_duration());
+    if times.is_null() {
+        log::info!("[sys_utimensat] times is null, update with current time");
+        inner.atime = current_time;
+        inner.mtime = current_time;
+        inner.ctime = current_time;
+    } else {
+        let times = unsafe { times.read_array(2)? };
+        log::info!("[sys_utimensat] times {:?}", times);
+        match times[0].tv_nsec {
+            UTIME_NOW => inner.atime = current_time,
+            UTIME_OMIT => {}
+            _ => inner.atime = times[0],
+        };
+        match times[1].tv_nsec {
+            UTIME_NOW => inner.mtime = current_time,
+            UTIME_OMIT => {}
+            _ => inner.mtime = times[1],
+        };
+        inner.ctime = current_time;
+    }
+
+    Ok(0)
+}
+
+/// `renameat2` renames old path name as new path name.
+///
+pub fn sys_renameat2(
+    olddirfd: usize,
+    oldpath: usize,
+    newdirfd: usize,
+    newpath: usize,
+    flags: i32,
+) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+    let olddirfd = AtFd::from(olddirfd);
+    let newdirfd = AtFd::from(newdirfd);
+
+    let mut oldpath = UserReadPtr::<u8>::new(oldpath, &addrspace);
+    let mut newpath = UserReadPtr::<u8>::new(newpath, &addrspace);
+
+    let flags = RenameFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
+
+    let coldpath = oldpath.read_c_string(256)?;
+    let cnewpath = newpath.read_c_string(256)?;
+
+    let oldpath = coldpath.into_string().expect("convert to string failed");
+    let newpath = cnewpath.into_string().expect("convert to string failed");
+
+    log::info!(
+        "[sys_renameat2] olddirfd:{olddirfd:?}, oldpath:{oldpath}, newdirfd:{newdirfd:?}, newpath:{newpath}, flags:{flags:?}"
+    );
+
+    //OpenFlag::NO_FOLLOW
+    let old_dentry = task.walk_at(olddirfd, oldpath)?;
+    let new_dentry = task.walk_at(newdirfd, newpath)?;
+
+    let parent_dentry = old_dentry.parent().expect("can not rename root dentry");
+    // old_dentry.rename_to(&new_dentry, flags).map(|_| 0)
+    parent_dentry.rename(
+        old_dentry.as_ref(),
+        parent_dentry.as_ref(),
+        new_dentry.as_ref(),
+    )?;
+
+    log::error!("[sys_renameat2] implement rename");
+    Ok(0)
+}
+
+/// `linkat()` makes a new name for a file. It creates a new link (also known as a hard link)
+/// to an existing file. If `newpath` exists, it will not be overwritten.
+///
+/// If the pathname given in `oldpath` is relative, then it is interpreted relative to
+/// the directory referred to by the file descriptor `olddirfd` (rather than relative to
+/// the current working directory of the calling process, as is done by link() for a
+/// relative pathname).
+///
+/// If `oldpath` is relative and `olddirfd` is the special value AT_FDCWD, then `oldpath` is
+/// interpreted relative to the current working directory of the calling process (like
+/// link()).
+///
+/// If `oldpath` is absolute, then `olddirfd` is ignored.
+pub fn sys_linkat(
+    olddirfd: usize,
+    oldpath: usize,
+    newdirfd: usize,
+    newpath: usize,
+    flags: i32,
+) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+    let flags = OpenFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
+
+    let coldpath = UserReadPtr::<u8>::new(oldpath, &addrspace).read_c_string(256)?;
+    let cnewpath = UserReadPtr::<u8>::new(newpath, &addrspace).read_c_string(256)?;
+
+    let oldpath = coldpath.into_string().map_err(|_| SysError::EINVAL)?;
+    let newpath = cnewpath.into_string().map_err(|_| SysError::EINVAL)?;
+
+    let olddirfd = AtFd::from(olddirfd);
+    let newdirfd = AtFd::from(newdirfd);
+
+    let old_dentry = task.walk_at(olddirfd, oldpath)?;
+    let new_dentry = task.walk_at(newdirfd, newpath)?;
+
+    new_dentry.link(old_dentry.as_ref(), new_dentry.as_ref())?;
+    Ok(0)
+}
+
+/// `symlink()` creates a symbolic link named `linkpath` which contains the string `target`.
+///
+/// Symbolic links are interpreted at run time as if the contents of the link had been
+/// substituted into the path being followed to find a file or directory.
+///
+/// A symbolic link (also known as a soft link) may point to an existing file or to
+/// a nonexistent one; the latter case is known as a dangling link.
+///
+/// The permissions of a symbolic link are irrelevant; the ownership is ignored when
+/// following the link (except when the protected_symlinks feature is enabled, as
+/// explained in proc(5)), but is checked when removal or renaming of the link is
+/// requested and the link is in a directory with the sticky bit (S_ISVTX) set.
+///
+/// If `linkpath` exists, it will not be overwritten.
+pub fn sys_symlinkat(target: usize, newdirfd: usize, linkpath: usize) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+
+    let ctarget = UserReadPtr::<u8>::new(target, &addrspace).read_c_string(256)?;
+    let clinkpath = UserReadPtr::<u8>::new(linkpath, &addrspace).read_c_string(256)?;
+
+    let target = ctarget.into_string().map_err(|_| SysError::EINVAL)?;
+    let linkpath = clinkpath.into_string().map_err(|_| SysError::EINVAL)?;
+
+    let newdirfd = AtFd::from(newdirfd);
+
+    let dentry = task.walk_at(newdirfd, linkpath)?;
+    dentry.parent().unwrap().symlink(dentry.as_ref(), &target)?;
     Ok(0)
 }

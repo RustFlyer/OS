@@ -122,49 +122,50 @@ impl AddrSpace {
         find_from: VirtAddr,
         find_to: VirtAddr,
     ) -> Option<VirtAddr> {
-        let start_va = start_va.round_up();
         let length = VirtAddr::new(length).round_up().to_usize();
+        let mem_start = start_va.round_up();
+        let mem_end = VirtAddr::new(mem_start.to_usize() + length);
         let vm_areas_lock = self.vm_areas.lock();
 
         // Check if the specified range is vacant.
-        if start_va.to_usize() >= find_from.to_usize()
-            && start_va.to_usize() + length <= find_to.to_usize()
+        if mem_start.to_usize() >= find_from.to_usize() && mem_end.to_usize() <= find_to.to_usize()
         {
-            let gap = vm_areas_lock.upper_bound(Bound::Included(&start_va));
+            let gap = vm_areas_lock.upper_bound(Bound::Included(&mem_start));
             let vma_prev = gap.peek_prev().map(|(_, vma)| vma);
             let vma_next = gap.peek_next().map(|(_, vma)| vma);
-            if vma_prev.map(|vma| vma.end_va() <= start_va).unwrap_or(true)
-                && vma_next
-                    .map(|vma| vma.start_va() >= VirtAddr::new(start_va.to_usize() + length))
-                    .unwrap_or(true)
-            {
-                return Some(start_va);
+            let vacant_lower = vma_prev
+                .map(|vma| vma.end_va() <= mem_start)
+                .unwrap_or(true);
+            let vacant_upper = vma_next
+                .map(|vma| vma.start_va() >= mem_end)
+                .unwrap_or(true);
+            if vacant_lower && vacant_upper {
+                return Some(mem_start);
             }
         }
 
-        // Find a vacant region after `start_va`.
-        let start_va = cmp::max(find_from, start_va);
+        // Find a vacant region after `start_va` in the range from `find_from` to `find_to`.
+        let mem_start = cmp::max(find_from, mem_start);
+        let mem_end = VirtAddr::new(mem_start.to_usize() + length);
         let mut iter = vm_areas_lock
             .iter()
-            .skip_while(|&(_, vma)| vma.end_va() <= start_va)
+            .map(|(_, vma)| vma)
+            .skip_while(|&vma| vma.end_va() <= mem_start)
+            .filter(|&vma| vma.start_va() < find_to)
             .peekable();
-        // If there is no VMA after `start_va`, we can use the space between `start_va` and
-        // `find_to`.
-        if iter.peek().is_none() {
-            if start_va.to_usize() + length <= find_to.to_usize() {
-                return Some(start_va);
-            } else {
-                return None;
-            }
+        // Try the range from `mem_start` to `mem_end`.
+        if iter
+            .peek()
+            .map(|&vma| mem_end <= cmp::min(vma.start_va(), find_to))
+            .unwrap_or(true)
+        {
+            return Some(mem_start);
         }
         // Otherwise, try to find a vacant region after one of the VMAs.
-        while let Some((_, vma)) = iter.next() {
+        while let Some(vma) = iter.next() {
             let end_va = vma.end_va();
-            let next_start_va = iter
-                .peek()
-                .map(|&(&start_va, _)| start_va)
-                .unwrap_or(find_to);
-            if next_start_va.to_usize() - end_va.to_usize() >= length {
+            let next_start_va = iter.peek().map(|&vma| vma.start_va()).unwrap_or(find_to);
+            if next_start_va.to_usize().saturating_sub(end_va.to_usize()) >= length {
                 return Some(end_va);
             }
         }
@@ -362,6 +363,19 @@ impl AddrSpace {
     /// when handling the page fault.
     pub fn handle_page_fault(&self, fault_addr: VirtAddr, access: MemPerm) -> SysResult<()> {
         let mut vm_areas_lock = self.vm_areas.lock();
+
+        if fault_addr.to_usize() == 0x68094 {
+            vm_areas_lock.iter().for_each(|(_, vma)| {
+                log::debug!(
+                    "[{:?}][{:?}]: {:#x} ~ {:#x}",
+                    vma.map_type,
+                    vma.flags(),
+                    vma.start_va().to_usize(),
+                    vma.end_va().to_usize()
+                )
+            });
+        }
+
         let vma = vm_areas_lock
             .range_mut(..=fault_addr)
             .next_back()

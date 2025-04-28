@@ -7,6 +7,13 @@ SECTIONS
         _skernel = .;
         _stext = .;
         *(.text.entry)
+
+        . = ALIGN(4K);
+        _strampoline = .;
+        *(.text.trampoline)
+        _etrampoline = .;
+
+        . = ALIGN(4K);
         *(.text .text.*)
         _etext = .;
     } > VIRT AT> RAM

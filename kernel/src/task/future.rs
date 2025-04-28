@@ -160,7 +160,7 @@ pub async fn task_executor_unit(task: Arc<Task>) {
 
         match task.get_state() {
             TaskState::Zombie => break,
-            TaskState::Waiting => {
+            TaskState::Sleeping => {
                 suspend_now().await;
             }
             _ => {}
@@ -174,7 +174,7 @@ pub async fn task_executor_unit(task: Arc<Task>) {
 
         match task.get_state() {
             TaskState::Zombie => break,
-            TaskState::Waiting => {
+            TaskState::Sleeping => {
                 suspend_now().await;
             }
             _ => {}
@@ -186,7 +186,7 @@ pub async fn task_executor_unit(task: Arc<Task>) {
         // threads may be killed or stopped in sig_check.
         match task.get_state() {
             TaskState::Zombie => break,
-            TaskState::Waiting => {
+            TaskState::Sleeping => {
                 suspend_now().await;
             }
             _ => {}
@@ -202,7 +202,6 @@ pub async fn task_executor_unit(task: Arc<Task>) {
 /// When a task is initialized, it can be passed into this function and spawn a future
 /// to schedule.
 pub fn spawn_user_task(task: Arc<Task>) {
-    log::info!("New Task [{}] spawns!", task.get_name());
     let future = UserFuture::new(task.clone(), task_executor_unit(task));
     let (task, handle) = executor::spawn(future);
     task.schedule();

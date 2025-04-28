@@ -15,7 +15,7 @@ use config::{
 };
 use mm::page_cache::page::Page;
 use mutex::SpinNoIrqLock;
-use systype::{SysError, SysResult};
+use systype::{SysError, SysResult, SyscallResult};
 
 use crate::{dentry::Dentry, direntry::DirEntry, inode::Inode, superblock::SuperBlock};
 
@@ -113,25 +113,6 @@ pub trait File: Send + Sync + DowncastSync {
         todo!()
     }
 
-    #[deprecated = "Legacy function from Phoenix OS."]
-    fn ioctl(&self, _cmd: usize, _arg: usize) -> SysResult<()> {
-        Err(SysError::ENOTTY)
-    }
-
-    /// Given interested events, keep track of these events and return events
-    /// that is ready.
-    #[deprecated = "Legacy function from Phoenix OS."]
-    async fn base_poll(&self, events: PollEvents) -> PollEvents {
-        let mut res = PollEvents::empty();
-        if events.contains(PollEvents::IN) {
-            res |= PollEvents::IN;
-        }
-        if events.contains(PollEvents::OUT) {
-            res |= PollEvents::OUT;
-        }
-        res
-    }
-
     fn inode(&self) -> Arc<dyn Inode> {
         self.meta().dentry.inode().unwrap()
     }
@@ -201,6 +182,23 @@ pub trait File: Send + Sync + DowncastSync {
 
     fn set_flags(&self, flags: OpenFlags) {
         *self.meta().flags.lock() = flags;
+    }
+
+    fn ioctl(&self, _cmd: usize, _arg: usize) -> SyscallResult {
+        Err(SysError::ENOTTY)
+    }
+
+    /// Given interested events, keep track of these events and return events
+    /// that is ready.
+    async fn base_poll(&self, events: PollEvents) -> PollEvents {
+        let mut res = PollEvents::empty();
+        if events.contains(PollEvents::IN) {
+            res |= PollEvents::IN;
+        }
+        if events.contains(PollEvents::OUT) {
+            res |= PollEvents::OUT;
+        }
+        res
     }
 }
 
@@ -385,8 +383,8 @@ impl dyn File {
     /// Given interested events, keep track of these events and return events
     /// that is ready.
     pub async fn poll(&self, events: PollEvents) -> PollEvents {
-        unimplemented!();
-        log::info!("[File::poll] path:{}", self.dentry().path());
+        // unimplemented!();
+        // log::info!("[File::poll] path:{}", self.dentry().path());
         self.base_poll(events).await
     }
 
@@ -462,6 +460,7 @@ impl dyn File {
             buf_it = &mut buf_it[rec_len..];
             writen_len += rec_len;
         }
+        log::debug!("[read_dir] read {writen_len} bytes");
         Ok(writen_len)
     }
 
@@ -471,7 +470,7 @@ impl dyn File {
     pub fn readlink(&self) -> SysResult<String> {
         let mut path_buf: Vec<u8> = vec![0; 512];
         let len = self.base_readlink(&mut path_buf)?;
-        path_buf.truncate(len + 1);
+        path_buf.truncate(len);
         let path = CString::from_vec_with_nul(path_buf)
             .unwrap()
             .into_string()

@@ -23,7 +23,7 @@ pub fn trap_return(task: &Arc<Task>) {
     trap_context_mut.sstatus.set_fs(FS::Clean);
 
     assert!(!(trap_context_mut.sstatus.sie()));
-    assert!(!(task.is_in_state(TaskState::Zombie) || task.is_in_state(TaskState::Waiting)));
+    assert!(!(task.is_in_state(TaskState::Zombie) || task.is_in_state(TaskState::Sleeping)));
 
     task.timer_mut().switch_to_user();
     // log::info!("[trap_return] go to user space");

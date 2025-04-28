@@ -2,15 +2,13 @@ use alloc::sync::Arc;
 
 use downcast_rs::{DowncastSync, impl_downcast};
 
-use config::{
-    inode::{InodeMode, InodeState, InodeType},
-    vfs::{Stat, TimeSpec},
-};
+use config::inode::{InodeMode, InodeState, InodeType};
 use mm::page_cache::PageCache;
 use mutex::SpinNoIrqLock;
 use systype::SysResult;
+use time::TimeSpec;
 
-use crate::superblock::SuperBlock;
+use crate::{stat::Stat, superblock::SuperBlock};
 
 /// Data that is common to all inodes.
 pub struct InodeMeta {

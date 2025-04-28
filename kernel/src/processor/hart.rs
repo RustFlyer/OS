@@ -95,7 +95,7 @@ impl Hart {
         disable_interrupt();
         pps.auto_sum(); // `pps` is the hart's original PPS which is to be enabled.
         core::mem::swap(self.get_mut_pps(), pps);
-        let _task = self.get_task();
+        // let _task = self.get_task();
         unsafe {
             vm::switch_to_kernel_page_table();
         }

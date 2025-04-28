@@ -1,13 +1,11 @@
 use alloc::sync::Arc;
-use config::{
-    inode::{InodeMode, InodeType},
-    vfs::Stat,
-};
+use config::inode::InodeType;
 use mutex::{ShareMutex, new_share_mutex};
 use systype::SysResult;
 use vfs::{
     inode::{Inode, InodeMeta},
     inoid::alloc_ino,
+    stat::Stat,
     superblock::SuperBlock,
 };
 

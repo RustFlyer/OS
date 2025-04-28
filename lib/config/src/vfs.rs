@@ -167,27 +167,6 @@ pub struct TimeSpec {
     pub nsec: u64,
 }
 
-#[derive(Debug, Clone, Copy, Default, Eq, PartialEq)]
-#[repr(C)]
-pub struct Stat {
-    pub st_dev: u64,
-    pub st_ino: u64,
-    pub st_mode: u32,
-    pub st_nlink: u32,
-    pub st_uid: u32,
-    pub st_gid: u32,
-    pub st_rdev: u64,
-    pub __pad: u64,
-    pub st_size: u64,
-    pub st_blksize: u32,
-    pub __pad2: u32,
-    pub st_blocks: u64,
-    pub st_atime: TimeSpec,
-    pub st_mtime: TimeSpec,
-    pub st_ctime: TimeSpec,
-    pub unused: u64,
-}
-
 bitflags! {
     /// renameat flag
    pub struct RenameFlag: u32 {
@@ -369,5 +348,18 @@ bitflags! {
         const MGTIME = 0x40;
         /// The file systen will handle `d_move` during `rename` internally.
         const RENAME_DOES_D_MOVE = 0x8000; //32768
+    }
+}
+
+bitflags::bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    // Defined in <stdio.h>.
+    pub struct RenameFlags: i32 {
+        /// Don't overwrite newpath of the rename. Return an error if newpath already exists.
+        const RENAME_NOREPLACE = 1 << 0;
+        /// Atomically exchange oldpath and newpath.
+        const RENAME_EXCHANGE = 1 << 1;
+        /// This operation makes sense only for overlay/union filesystem implementations.
+        const RENAME_WHITEOUT = 1 << 2;
     }
 }

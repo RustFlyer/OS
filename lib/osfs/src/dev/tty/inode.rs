@@ -1,10 +1,11 @@
 use alloc::sync::Arc;
-use config::{inode::InodeMode, vfs::Stat};
+use config::inode::InodeMode;
 use driver::{CHAR_DEVICE, CharDevice};
 use systype::SysResult;
 use vfs::{
     inode::{Inode, InodeMeta},
     inoid::alloc_ino,
+    stat::Stat,
     superblock::SuperBlock,
 };
 

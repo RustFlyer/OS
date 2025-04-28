@@ -1,10 +1,11 @@
 use alloc::sync::Arc;
 
-use config::{device::BLOCK_SIZE, vfs::Stat};
+use config::device::BLOCK_SIZE;
 use mutex::{ShareMutex, new_share_mutex};
 use systype::SysResult;
 use vfs::{
     inode::{Inode, InodeMeta},
+    stat::Stat,
     superblock::SuperBlock,
 };
 
@@ -21,7 +22,7 @@ unsafe impl Sync for ExtDirInode {}
 impl ExtDirInode {
     pub fn new(superblock: Arc<dyn SuperBlock>, dir: ExtDir) -> Arc<Self> {
         Arc::new(Self {
-            meta: InodeMeta::new(0, superblock),
+            meta: InodeMeta::new(dir.as_file().ino() as usize, superblock),
             dir: new_share_mutex(dir),
         })
     }

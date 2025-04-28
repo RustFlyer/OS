@@ -4,19 +4,24 @@
 //! This module provides functions to open, create, and remove directories, and read
 //! directory entries, along with other directory-related operations.
 
-use core::{ffi::CStr, mem::MaybeUninit, panic};
 use alloc::string::String;
+use core::{
+    cell::SyncUnsafeCell,
+    ffi::CStr,
+    mem::{ManuallyDrop, MaybeUninit},
+    panic,
+};
 
 use lwext4_rust::{
-    InodeTypes,
     bindings::{
-        ext4_dir, ext4_dir_close, ext4_dir_entry_next, ext4_dir_entry_rewind, ext4_dir_mk,
-        ext4_dir_mv, ext4_dir_open, ext4_direntry,
-    },
+        ext4_dir, ext4_dir_close, ext4_dir_entry_next, ext4_dir_entry_rewind, ext4_dir_mk, ext4_dir_mv, ext4_dir_open, ext4_dir_rm, ext4_direntry
+    }, InodeTypes
 };
 
 use config::inode::InodeType;
 use systype::{SysError, SysResult};
+
+use super::file::ExtFile;
 
 /// Wrapper for `lwext4_rust` crate's `ext4_dir` struct which represents a directory
 /// file which can reads and writes directory entries.
@@ -40,6 +45,17 @@ impl Drop for ExtDir {
 }
 
 impl ExtDir {
+    /// Returns an [`ExtFile`] which is a handle to the directory file to allow
+    /// file operations on it.
+    ///
+    /// The returned [`ExtFile`] is wrapped in a [`ManuallyDrop`]; do not drop it, e.g.,
+    /// by calling [`ManuallyDrop::drop`]! Also be careful when calling functions like
+    /// [`ExtFile::write`] or [`ExtFile::truncate`] on the returned [`ExtFile`]; this is
+    /// usually not what you want to do.
+    pub fn as_file(&self) -> ManuallyDrop<ExtFile> {
+        ManuallyDrop::new(ExtFile(SyncUnsafeCell::new(self.0.f)))
+    }
+
     /// Opens a directory file at the given path and returns a handle to it.
     ///
     /// `path` is the absolute path to the file to be opened.
@@ -93,8 +109,8 @@ impl ExtDir {
     }
 
     /// Recursively removes a directory and all its contents.
-    pub fn remove_recursively(path: &CStr) -> SysResult<()> {
-        let err = unsafe { ext4_dir_mk(path.as_ptr()) };
+    pub fn remove_recur(path: &CStr) -> SysResult<()> {
+        let err = unsafe { ext4_dir_rm(path.as_ptr()) };
         match err {
             0 => Ok(()),
             _ => {

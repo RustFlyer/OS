@@ -1,7 +1,8 @@
 pub mod dentry;
 pub mod file;
 pub mod inode;
-pub mod queuebuffer;
+pub mod ioctl;
+// pub mod queuebuffer;
 
 use alloc::{string::String, sync::Arc};
 use dentry::TtyDentry;
@@ -10,6 +11,8 @@ use inode::TtyInode;
 use spin::Once;
 use systype::SysResult;
 use vfs::{dentry::Dentry, path::Path};
+
+pub use ioctl::TtyIoctlCmd;
 
 use crate::sys_root_dentry;
 

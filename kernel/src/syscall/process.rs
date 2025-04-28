@@ -17,7 +17,7 @@ use systype::{SysError, SyscallResult};
 use vfs::file::File;
 use vfs::path::Path;
 
-/// `gettid()` returns the caller's thread ID (TID).  
+/// `gettid` returns the caller's thread ID (TID).  
 ///
 /// # Type
 /// - In a single-threaded process, the thread ID is equal to the process ID (PID, as returned by getpid(2)).
@@ -26,17 +26,17 @@ pub fn sys_gettid() -> SyscallResult {
     Ok(current_task().tid())
 }
 
-/// getpid() returns the process ID (PID) of the calling process.
+/// `getpid` returns the process ID (PID) of the calling process.
 pub fn sys_getpid() -> SyscallResult {
     Ok(current_task().pid())
 }
 
-/// `getppid()` returns the process ID of the parent of the calling process. This will be either the
-/// ID of the process that created this process using `fork()`, or, if that process has already terminated,
+/// `getppid` returns the process ID of the parent of the calling process. This will be either the
+/// ID of the process that created this process using `fork`, or, if that process has already terminated,
 /// the ID of the process to which this process has been reparented.
 ///
 /// # Tips
-/// - If the caller's parent is in a different PID namespace, `getppid()` returns 0.
+/// - If the caller's parent is in a different PID namespace, `getppid` returns 0.
 /// - From a kernel perspective, the PID is sometimes also known as the thread group ID (TGID).
 ///   This contrasts with the kernel thread ID (TID), which is unique for each thread.
 pub fn sys_getppid() -> SyscallResult {
@@ -48,21 +48,39 @@ pub fn sys_getppid() -> SyscallResult {
 /// `exit()` system call terminates only the calling thread, and actions such as
 /// reparenting child processes or sending SIGCHLD to the parent process are performed
 /// only if this is the last thread in the thread group.
-pub fn sys_exit(_exit_code: i32) -> SyscallResult {
+pub fn sys_exit(status: i32) -> SyscallResult {
     let task = current_task();
     task.set_state(TaskState::Zombie);
     if task.is_process() {
-        task.set_exit_code((_exit_code & 0xFF) << 8);
+        task.set_exit_code((status & 0xFF) << 8);
     }
     Ok(0)
 }
 
-/// `sched_yield()`  causes the calling thread to relinquish the CPU.  The thread is moved to the end
+/// `exit_group` system call terminates all threads in the calling thread group.
+///
+/// # Note
+/// The current implementation now supports multi-threading.
+pub fn sys_exit_group(status: i32) -> SyscallResult {
+    let thread_group = current_task().thread_group_mut();
+    let thread_group_lock = thread_group.lock();
+
+    thread_group_lock.iter().for_each(|thread| {
+        thread.set_state(TaskState::Zombie);
+        if thread.is_process() {
+            thread.set_exit_code((status & 0xFF) << 8);
+        }
+    });
+
+    Ok(0)
+}
+
+/// `sched_yield`  causes the calling thread to relinquish the CPU.  The thread is moved to the end
 /// of the queue for its static priority and a new thread gets to run.
 ///
 /// # Tips
 /// - If the calling thread is the only thread in the highest priority list at that time, it will continue
-///   to run after a call to `sched_yield()`.
+///   to run after a call to `sched_yield`.
 pub async fn sys_sched_yield() -> SyscallResult {
     yield_now().await;
     Ok(0)
@@ -83,7 +101,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
     let res_task = {
         let children = task.children_mut().lock();
         if children.is_empty() {
-            log::info!("[sys_wait4] fail: no child");
+            log::info!("[sys_wait4] task [{}] fail: no child", task.get_name());
             return Err(SysError::ECHILD);
         }
         // TODO: check if PG has
@@ -92,11 +110,12 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
                 .values()
                 // Question: How to handle &&Weak<Task>
                 .find(|c| {
-                    c.is_in_state(TaskState::Zombie) && c.with_thread_group(|tg| tg.len() == 1)
+                    c.is_in_state(TaskState::WaitForRecycle)
+                        && c.with_thread_group(|tg| tg.len() == 1)
                 }),
             WaitFor::Pid(pid) => {
                 if let Some(child) = children.get(&pid) {
-                    if child.is_in_state(TaskState::Zombie)
+                    if child.is_in_state(TaskState::WaitForRecycle)
                         && child.with_thread_group(|tg| tg.len() == 1)
                     {
                         Some(child)
@@ -131,8 +150,14 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
             }
         }
         let tid = zombie_task.tid();
+        log::error!(
+            "[sys_wait4] remove tid [{}] task [{}]",
+            tid,
+            zombie_task.get_name()
+        );
+
         task.remove_child(zombie_task.clone());
-        // log::error!("[sys_wait4] remove tid {}", tid);
+
         TASK_MANAGER.remove_task(tid);
         PROCESS_GROUP_MANAGER.remove(&zombie_task);
         Ok(tid)
@@ -156,12 +181,13 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
 
                 let child = match target {
                     WaitFor::AnyChild => children.values().find(|c| {
-                        c.is_in_state(TaskState::Zombie) && c.with_thread_group(|tg| tg.len() == 1)
+                        c.is_in_state(TaskState::WaitForRecycle)
+                            && c.with_thread_group(|tg| tg.len() == 1)
                     }),
 
                     WaitFor::Pid(pid) => {
                         let child = children.get(&pid).unwrap();
-                        if child.is_in_state(TaskState::Zombie)
+                        if child.is_in_state(TaskState::WaitForRecycle)
                             && child.with_thread_group(|tg| tg.len() == 1)
                         {
                             Some(child)
@@ -204,8 +230,13 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
             }
         }
         let child = TASK_MANAGER.get_task(child_pid).unwrap();
+        log::error!(
+            "[sys_wait4] remove tid [{}] task [{}]",
+            child_pid,
+            child.get_name()
+        );
         task.remove_child(child);
-        log::info!("[sys_wait4] remove child_pid {}", child_pid);
+
         TASK_MANAGER.remove_task(child_pid);
         PROCESS_GROUP_MANAGER.remove(&task);
         // log::error!("[sys_wait4] out");
@@ -213,7 +244,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
     }
 }
 
-/// `clone()` create a new ("child") process.
+/// `clone` create a new ("child") process.
 /// The system call provides more precise control over what pieces of execution
 /// context are shared between the calling process and the child process.
 ///
@@ -241,34 +272,46 @@ pub async fn sys_clone(
     log::info!(
         "[sys_clone] flags:{flags:?}, stack:{stack:#x}, tls:{tls_ptr:?}, parent_tid:{parent_tid_ptr:?}, child_tid:{chilren_tid_ptr:?}"
     );
+    let task = current_task();
+    let addrspace = task.addr_space();
     let _exit_signal = flags & 0xff;
     let flags = CloneFlags::from_bits(flags as u64 & !0xff).ok_or(SysError::EINVAL)?;
     log::info!("[sys_clone] flags {flags:?}");
 
-    let new_task = current_task().fork(flags).await;
+    let new_task = task.fork(flags).await;
     new_task.trap_context_mut().set_user_a0(0);
     let new_tid = new_task.tid();
     log::info!("[sys_clone] clone a new thread, tid {new_tid}, clone flags {flags:?}",);
 
-    current_task().add_child(new_task.clone());
+    task.add_child(new_task.clone());
 
     if stack != 0 {
         new_task.trap_context_mut().set_user_sp(stack);
     }
 
-    if flags.contains(CloneFlags::PARENT_SETTID) {}
-    if flags.contains(CloneFlags::CHILD_SETTID) {}
-    if flags.contains(CloneFlags::CHILD_CLEARTID) {}
+    if flags.contains(CloneFlags::PARENT_SETTID) {
+        let mut parent_tid = UserWritePtr::<usize>::new(parent_tid_ptr, &addrspace);
+        unsafe { parent_tid.write(new_tid)? };
+    }
+    if flags.contains(CloneFlags::CHILD_SETTID) {
+        let mut chilren_tid = UserWritePtr::<usize>::new(chilren_tid_ptr, &addrspace);
+        unsafe { chilren_tid.write(new_tid)? };
+        new_task.tid_address_mut().set_child_tid = Some(chilren_tid_ptr);
+    }
+    if flags.contains(CloneFlags::CHILD_CLEARTID) {
+        new_task.tid_address_mut().clear_child_tid = Some(chilren_tid_ptr);
+    }
     if flags.contains(CloneFlags::SETTLS) {
         new_task.trap_context_mut().set_user_tp(tls_ptr);
     }
 
     spawn_user_task(new_task);
+    log::info!("[sys_clone] clone success",);
 
     Ok(new_tid)
 }
 
-/// `execve()` executes the program referred to by `path`. This causes the program that is
+/// `execve` executes the program referred to by `path`. This causes the program that is
 /// being run by the calling process to be replaced with a new program, with new stack, heap
 /// and (initialized and uninitialized) data segments.
 /// # Args
@@ -280,7 +323,7 @@ pub async fn sys_clone(
 ///
 /// # Tips
 /// - The argv and envp arrays must each include a null pointer at the end of the array.
-/// - If the current program is being ptraced, a SIGTRAP signal is sent to it after a successful `execve()`.
+/// - If the current program is being ptraced, a SIGTRAP signal is sent to it after a successful `execve`.
 ///
 /// # Type
 /// - If the executable is an a.out dynamically linked binary executable containing shared-library
@@ -336,14 +379,25 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
     log::info!("[sys_execve] envs: {envs:?}");
     log::info!("[sys_execve] path: {path:?}");
 
+    envs.push(String::from(
+        r#"PATH=/:/bin:/sbin:/usr/bin:/usr/local/bin:/usr/local/sbin:"#,
+    ));
+
     let dentry = {
         let path = Path::new(sys_root_dentry(), path.clone());
         path.walk()?
     };
 
-    // log::info!("[sys_execve]: open file");
     let file = <dyn File>::open(dentry)?;
-    task.execve(file, args, envs, path)?;
+    // log::info!("[sys_execve]: open file");
+
+    let mut name = String::new();
+    args.iter().for_each(|arg| {
+        name.push_str(&arg);
+        name.push(' ');
+    });
+
+    task.execve(file, args, envs, name)?;
     // log::info!("[sys_execve]: finish execve and convert to a new task");
     Ok(0)
 }
@@ -373,7 +427,7 @@ enum WaitFor {
     Pid(Pid),
 }
 
-/// `sys_set_tid_address()` set pointer to thread ID.
+/// `sys_set_tid_address` set pointer to thread ID.
 ///  For each thread, the kernel maintains two attributes (addresses) called `set_child_tid` and
 ///  `clear_child_tid`. These two attributes contain the value **NULL** by default.
 ///
@@ -398,4 +452,85 @@ pub fn sys_set_tid_address(tidptr: usize) -> SyscallResult {
     // log::info!("[sys_set_tid_address] tidptr:{tidptr:#x}");
     task.tid_address_mut().clear_child_tid = Some(tidptr);
     Ok(task.tid())
+}
+
+/// `setgid` sets the effective group ID of the calling process.
+/// If the calling process is privileged, the real GID and saved set-group-ID are also set.
+///
+/// more precisely: has the CAP_SETGID capability in its user namespace.
+///
+/// In linux, every processes (tasks) has its own **real group ID (RGID), effective group ID (EGID)
+/// and saved set-group-ID (SGID)**.
+/// Therefore, any process is under its main group and this group's id is GID.
+///
+/// For threads, they will share the gid of their process.
+///
+/// Typical application: After the daemon process starts, it first starts as root,
+/// and then sets gid/gid to a regular user to reduce permissions and enhance system security.
+pub fn sys_setgid(gid: usize) -> SyscallResult {
+    log::error!("[sys_setgid] unimplemented call gid: {gid}");
+    Ok(0)
+}
+
+/// `setuid` sets user id of current system account.
+/// `uid` is a number used by the operating system to uniquely identify a user.
+///
+/// Each process is running with a "UID" identity.
+///
+/// Typical application: A daemon process first performs sensitive tasks as root,
+/// and then setuid(1000) returns to a regular user to continue working stably
+/// and enhance security.
+pub fn sys_setuid(uid: usize) -> SyscallResult {
+    log::error!("[sys_setuid] unimplemented call uid: {uid}");
+    Ok(0)
+}
+
+/// `getpgid` gets pgid from thread with specified id `pid`.
+/// If `pid` is zero, the function will return current task pgid.
+pub fn sys_getpgid(pid: usize) -> SyscallResult {
+    let task = if pid != 0 {
+        TASK_MANAGER.get_task(pid).ok_or(SysError::ENOMEM)?
+    } else {
+        current_task()
+    };
+    let pgid = task.get_pgid();
+
+    Ok(pgid)
+}
+
+/// setpgid() sets the PGID of the process specified by pid to pgid.
+///
+/// # Exception
+/// - If `pid` is zero, then the process ID of the calling process is used.
+/// - If `pgid` is zero, then the PGID of the process specified by pid is made the
+///   same as its process ID.
+///
+/// If setpgid() is used to move a process from one process group to another (as is
+/// done by some shells when creating pipelines), both process groups must be part of
+/// the same session (see setsid(2) and credentials(7)).
+///
+/// In this case, the pgid specifies an existing process group to be joined
+/// and the session ID of that group must match the session ID of the joining process.
+pub fn sys_setpgid(pid: usize, pgid: usize) -> SyscallResult {
+    let task = if pid != 0 {
+        TASK_MANAGER.get_task(pid).ok_or(SysError::ENOMEM)?
+    } else {
+        current_task()
+    };
+
+    let pgid = if pgid == 0 {
+        task.process().get_pgid()
+    } else {
+        pgid
+    };
+
+    *task.pgid_mut().lock() = pgid;
+
+    Ok(0)
+}
+
+/// geteuid() returns the effective user ID of the calling process.
+pub fn sys_geteuid() -> SyscallResult {
+    log::error!("[geteuid] unimplemented call");
+    Ok(0)
 }

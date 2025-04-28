@@ -27,6 +27,7 @@ use vfs::path::Path;
 use super::future::{self};
 use super::manager::TASK_MANAGER;
 use super::process_manager::PROCESS_GROUP_MANAGER;
+use super::sig_members::SigHandlers;
 use super::sig_members::SigManager;
 use super::task::*;
 use super::threadgroup::ThreadGroup;
@@ -104,7 +105,7 @@ impl Task {
     ) -> SysResult<()> {
         let addrspace = AddrSpace::build_user()?;
         let (entry_point, auxv) = addrspace.load_elf(elf_file.clone())?;
-        log::debug!("[execve] load elf: over");
+        // log::debug!("[execve] load elf: over");
         let stack_top = addrspace.map_stack()?;
         addrspace.map_heap()?;
 
@@ -193,6 +194,7 @@ impl Task {
         let mut name = self.get_name() + "(fork)";
 
         if cloneflags.contains(CloneFlags::THREAD) {
+            name += "(thread)";
             is_process = false;
             process = Some(Arc::downgrade(self));
             threadgroup = self.thread_group_mut().clone();
@@ -209,13 +211,12 @@ impl Task {
         }
 
         let sig_mask = SyncUnsafeCell::new(self.get_sig_mask());
-        let sig_handlers = (*self.sig_handlers_mut()).clone();
+        let sig_handlers = new_share_mutex(SigHandlers::new());
         let sig_manager = SyncUnsafeCell::new(SigManager::new());
         let sig_stack = SyncUnsafeCell::new(*self.sig_stack_mut());
         let sig_cx_ptr = AtomicUsize::new(0);
 
         let addr_space = if cloneflags.contains(CloneFlags::VM) {
-            name += "(thread)";
             self.addr_space()
         } else {
             let cow_address_space = self.addr_space().clone_cow().unwrap();
@@ -362,7 +363,7 @@ impl Task {
                     "[Task::do_eixt] reparent child process pid {} to init",
                     child.pid()
                 );
-                if child.get_state() == TaskState::Zombie {
+                if child.get_state() == TaskState::WaitForRecycle {
                     // NOTE: self has not called wait to clear zombie children, we need to notify
                     // init to clear these zombie children.
                     root.receive_siginfo(SigInfo {
@@ -403,9 +404,9 @@ impl Task {
         // self.with_mut_fd_table(|table| table.clear());
 
         if self.is_process() {
-            self.set_state(TaskState::Zombie);
+            self.set_state(TaskState::WaitForRecycle);
         } else {
-            self.process().set_state(TaskState::Zombie);
+            self.process().set_state(TaskState::WaitForRecycle);
         }
         // When the task is not leader, which means its is not a process, it
         // will get dropped when hart leaves this task.

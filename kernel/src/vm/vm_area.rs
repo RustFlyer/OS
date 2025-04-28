@@ -64,14 +64,14 @@ pub struct VmArea {
     /// Allocated physical pages.
     pages: BTreeMap<VirtPageNum, Arc<Page>>,
     /// Unique data of a specific type of VMA.
-    map_type: TypedArea,
+    pub map_type: TypedArea,
     /// Page fault handler.
     handler: Option<PageFaultHandler>,
 }
 
 /// Unique data of a specific type of VMA. This enum is used in [`VmArea`].
 #[derive(Debug, Clone)]
-enum TypedArea {
+pub enum TypedArea {
     /// A fixed-offset VMA.
     ///
     /// A fixed-offset VMA is used to map physical addresses to virtual addresses
@@ -137,7 +137,8 @@ impl VmArea {
     ///
     /// `start_va` must be page-aligned.
     ///
-    /// `pte_flags` needs to have `RWX` bits set properly; other bits must be zero.
+    /// `pte_flags` needs to have `RWX` bits set properly; other bits except `U` must be
+    /// zero.
     pub fn new_kernel(start_va: VirtAddr, end_va: VirtAddr, prot: MemPerm) -> Self {
         debug_assert!(start_va.to_usize() % PAGE_SIZE == 0);
         Self::new_fixed_offset(
@@ -154,9 +155,6 @@ impl VmArea {
     /// an area in the kernel space. This function is used to map a MMIO region.
     ///
     /// `start_va` must be page-aligned.
-    ///
-    /// `prot` should have `U` bit cleared, because fixed-offset VMAs are supposed to be
-    /// used in kernel space.
     pub fn new_fixed_offset(
         start_va: VirtAddr,
         end_va: VirtAddr,
@@ -165,7 +163,6 @@ impl VmArea {
         offset: usize,
     ) -> Self {
         debug_assert!(start_va.to_usize() % PAGE_SIZE == 0);
-        debug_assert!(!prot.contains(MemPerm::U));
         Self {
             start: start_va,
             end: end_va.round_up(),
@@ -427,7 +424,7 @@ impl VmArea {
     ///
     /// `new_prot` should always have `U` bit set, because this function is supposed to be
     /// used in user space.
-    pub fn change_prot(&mut self, page_table: &PageTable, new_prot: MemPerm) -> SysResult<()> {
+    pub fn change_prot(&mut self, page_table: &PageTable, new_prot: MemPerm) {
         debug_assert!(new_prot.contains(MemPerm::U));
 
         let old_prot = self.prot;
@@ -441,7 +438,6 @@ impl VmArea {
         if !new_prot.contains(old_prot) {
             sfence_vma_all_except_global();
         }
-        Ok(())
     }
 
     /// Handles a page fault happened in this VMA.

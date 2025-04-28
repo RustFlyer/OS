@@ -66,6 +66,7 @@ impl Dentry for ExtDentry {
             _ => unimplemented!("Unsupported file type"),
         };
         dentry.set_inode(new_inode);
+        // log::error!("[base_create] {} set inode", dentry.path());
         Ok(())
     }
 
@@ -146,8 +147,51 @@ impl Dentry for ExtDentry {
 
     fn base_rmdir(&self, dentry: &dyn Dentry) -> SysResult<()> {
         let path = CString::new(dentry.path()).unwrap();
-        ExtDir::remove_recursively(&path)?;
+        let mut dir = ExtDir::open(&path)?;
+        // Skip "." and ".."
+        dir.next().unwrap();
+        dir.next().unwrap();
+        if dir.next().is_some() {
+            return Err(SysError::ENOTEMPTY);
+        }
+        ExtDir::remove_recur(&path)?;
         dentry.unset_inode();
+        Ok(())
+    }
+
+    fn base_rmdir_recur(&self, dentry: &dyn Dentry) -> SysResult<()> {
+        let path = CString::new(dentry.path()).unwrap();
+        ExtDir::remove_recur(&path)?;
+        dentry.unset_inode();
+        Ok(())
+    }
+
+    fn base_rename(
+        &self,
+        dentry: &dyn Dentry,
+        _new_dir: &dyn Dentry,
+        new_dentry: &dyn Dentry,
+    ) -> SysResult<()> {
+        let old_path = CString::new(dentry.path()).unwrap();
+        let new_path = CString::new(new_dentry.path()).unwrap();
+
+        let old_type = dentry.inode().unwrap().inotype();
+        if let Some(inode) = new_dentry.inode() {
+            let new_type = inode.inotype();
+            if old_type != InodeType::Dir && new_type == InodeType::Dir {
+                return Err(SysError::EISDIR);
+            } else if old_type == InodeType::Dir && new_type != InodeType::Dir {
+                return Err(SysError::ENOTDIR);
+            }
+        }
+        if old_type == InodeType::Dir {
+            ExtDir::rename(&old_path, &new_path)?;
+        } else {
+            ExtFile::rename(&old_path, &new_path)?;
+        }
+        new_dentry.set_inode(dentry.inode().unwrap());
+        dentry.unset_inode();
+        dentry.get_meta().children.lock().clear();
         Ok(())
     }
 }

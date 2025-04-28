@@ -35,7 +35,7 @@ use crate::{trap::trap_context::TrapContext, vm::addr_space::AddrSpace};
 pub enum TaskState {
     Running,
     Zombie,
-    Waiting,
+    WaitForRecycle,
     Sleeping,
     Interruptable,
     UnInterruptable,
@@ -465,6 +465,19 @@ impl Task {
 impl Drop for Task {
     fn drop(&mut self) {
         let str = format!("Task [{}] is drop", self.get_name());
+
+        let lock = self.parent_mut().lock();
+        log::trace!(
+            "Task [{}] parent [{}]",
+            self.get_name(),
+            lock.clone().unwrap().upgrade().unwrap().get_name()
+        );
+
+        self.children
+            .lock()
+            .values()
+            .for_each(|c| log::debug!("children: tid [{}] name [{}]", c.tid(), c.get_name()));
+
         // log::info!("{}", str);
         // log::error!("{}", str);
         // log::debug!("{}", str);

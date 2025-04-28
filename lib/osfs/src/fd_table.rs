@@ -3,7 +3,7 @@ use core::fmt::Debug;
 
 use config::{fs::MAX_FDS, vfs::OpenFlags};
 use log::info;
-use systype::{SysError, SysResult};
+use systype::{RLimit, SysError, SysResult};
 use vfs::file::File;
 
 use crate::dev::tty::TTY;
@@ -19,6 +19,7 @@ pub struct FdInfo {
 #[derive(Clone)]
 pub struct FdTable {
     table: Vec<Option<FdInfo>>,
+    rlimit: RLimit,
 }
 
 impl FdInfo {
@@ -56,19 +57,31 @@ impl FdTable {
         let fdinfo = FdInfo::new(TTY.get().unwrap().clone(), OpenFlags::empty());
         table.push(Some(fdinfo));
 
-        Self { table }
+        Self {
+            table,
+            rlimit: RLimit {
+                rlim_cur: MAX_FDS,
+                rlim_max: MAX_FDS,
+            },
+        }
     }
 
-    fn get_available_slot(&mut self) -> Option<usize> {
+    fn get_available_slot(&mut self, start: usize) -> Option<usize> {
+        while start >= self.table.len() && start < self.rlimit.rlim_cur {
+            self.table.push(None);
+        }
+
         let inner_slot = self
             .table
             .iter()
             .enumerate()
+            .skip_while(|(i, _e)| *i < start)
             .find(|(_i, e)| e.is_none())
             .map(|(i, _)| i);
+
         if inner_slot.is_some() {
             return inner_slot;
-        } else if inner_slot.is_none() && self.table.len() < MAX_FDS {
+        } else if inner_slot.is_none() && self.table.len() < self.rlimit.rlim_cur {
             self.table.push(None);
             return Some(self.table.len() - 1);
         } else {
@@ -78,7 +91,7 @@ impl FdTable {
 
     pub fn alloc(&mut self, file: Arc<dyn File>, flags: OpenFlags) -> SysResult<Fd> {
         let fdinfo = FdInfo::new(file, flags);
-        if let Some(fd) = self.get_available_slot() {
+        if let Some(fd) = self.get_available_slot(0) {
             info!("alloc fd [{}]", fd);
             self.table[fd] = Some(fdinfo);
             Ok(fd)
@@ -159,6 +172,28 @@ impl FdTable {
     pub fn dup3_with_flags(&mut self, old_fd: Fd, new_fd: Fd) -> SysResult<Fd> {
         let old_fd_info = self.get(old_fd)?;
         self.put(new_fd, old_fd_info.clone())?;
+        Ok(new_fd)
+    }
+
+    pub fn dup_with_bound(
+        &mut self,
+        old_fd: Fd,
+        lower_bound: usize,
+        flags: OpenFlags,
+    ) -> SysResult<Fd> {
+        let file = self.get_file(old_fd)?;
+        let new_fd = self
+            .get_available_slot(lower_bound)
+            .ok_or_else(|| SysError::EMFILE)?;
+        log::debug!(
+            "[dup_with_bound] old fd {}, lowerbound {}, new fd {}",
+            old_fd,
+            lower_bound,
+            new_fd
+        );
+        let fd_info = FdInfo::new(file, flags.into());
+        self.put(new_fd, fd_info)?;
+        debug_assert!(new_fd >= lower_bound);
         Ok(new_fd)
     }
 }

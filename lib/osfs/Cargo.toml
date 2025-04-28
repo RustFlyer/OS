@@ -17,3 +17,5 @@ async-trait = { workspace = true }
 bitflags = { workspace = true }
 spin = { workspace = true }
 log = { workspace = true }
+strum = { workspace = true }
+crate_interface = { workspace = true }

@@ -37,6 +37,25 @@ impl CharDevice for UartDevice {
         }
     }
 
+    fn read(&self, buf: &mut [u8]) -> usize {
+        let rlen = buf.len();
+        let mut r = 0;
+        while r < rlen {
+            buf[r] = self.device.lock().receive();
+            r += 1;
+        }
+        r
+    }
+
+    fn write(&self, buf: &[u8]) -> usize {
+        let mut r = 0;
+        for data in buf {
+            self.device.lock().send(*data);
+            r += 1;
+        }
+        r
+    }
+
     fn handle_irq(&self) {
         todo!()
     }

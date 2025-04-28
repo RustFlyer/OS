@@ -9,6 +9,11 @@ use user_lib::{execve, fork, waitpid};
 fn main() {
     let mut i = 0;
     if fork() == 0 {
+        // execve(
+        //     "busybox",
+        //     &["busybox", "sh"],
+        //     &["PATH=/:/bin:/sbin:/usr/bin:/usr/local/bin:/usr/local/sbin:"],
+        // );
         execve("shell", &[], &[]);
     } else {
         loop {

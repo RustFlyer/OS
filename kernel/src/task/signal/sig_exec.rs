@@ -6,6 +6,7 @@ use crate::task::signal::sig_info::SigSet;
 use crate::task::{Task, sig_members::ActionType};
 use crate::vm::user_ptr::UserWritePtr;
 use alloc::sync::Arc;
+use systype::SysResult;
 
 use super::sig_info::{Sig, SigInfo};
 
@@ -16,36 +17,49 @@ pub async fn sig_check(task: Arc<Task>, mut _intr: bool) {
 
     while let Some(si) = task.sig_manager_mut().dequeue_signal(&old_mask) {
         // if sig_exec turns to user handler, it will return true to break the loop and run user handler.
-        if sig_exec(task.clone(), si).await {
-            break;
+        let ret = sig_exec(task.clone(), si).await;
+
+        match ret {
+            Ok(b) if b => break,
+            Ok(_) => continue,
+            Err(e) => {
+                log::error!("[sig_check] sig_exec: {:?}", e);
+            }
         }
     }
 }
 
-async fn sig_exec(task: Arc<Task>, si: SigInfo) -> bool {
+async fn sig_exec(task: Arc<Task>, si: SigInfo) -> SysResult<bool> {
     let action = task.sig_handlers_mut().lock().get(si.sig);
     let cx = task.trap_context_mut();
     let old_mask = task.get_sig_mask();
 
-    log::info!("[do signal] Handling signal: {:?} {:?}", si, action);
+    log::debug!(
+        "[sig_exec] task [{}] Handling signal: {:?} {:?}",
+        task.get_name(),
+        si,
+        action
+    );
+
     if action.flags.contains(SigActionFlag::SA_RESTART) {
         cx.sepc -= 4;
         cx.restore_last_user_a0();
-        log::info!("[do_signal] restart syscall");
+        log::info!("[sig_exec] restart syscall");
     }
+
     match action.atype {
-        ActionType::Ignore => false,
+        ActionType::Ignore => Ok(false),
         ActionType::Kill => {
             kill(&task, si.sig);
-            false
+            Ok(false)
         }
         ActionType::Stop => {
             stop(&task, si.sig);
-            false
+            Ok(false)
         }
         ActionType::Cont => {
             cont(&task, si.sig);
-            false
+            Ok(false)
         }
         ActionType::User { entry } => {
             // The signal being delivered is also added to the signal mask, unless
@@ -88,13 +102,13 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo) -> bool {
                 fpstate: [0; 66],
             };
             sig_cx.user_reg[0] = cx.sepc;
-            log::trace!("[save_context_into_sigstack] sig_cx_ptr: {sig_cx_ptr:?}");
-            unsafe {
-                let _ = sig_cx_ptr.write(sig_cx);
-            }
+            // log::trace!("[save_context_into_sigstack] sig_cx_ptr: {sig_cx_ptr:?}");
+            unsafe { sig_cx_ptr.write(sig_cx)? };
+
             task.set_sig_cx_ptr(new_sp);
             // user defined void (*sa_handler)(int);
             cx.user_reg[10] = si.sig.raw();
+
             // if sa_flags contains SA_SIGINFO, It means user defined function is
             // void (*sa_sigaction)(int, siginfo_t *, void *sig_cx); which two more
             // parameters
@@ -114,9 +128,11 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo) -> bool {
                     pub _pad: [i32; 29],
                     _align: [u64; 0],
                 }
-                let mut siginfo_v = LinuxSigInfo::default();
-                siginfo_v.si_signo = si.sig.raw() as _;
-                siginfo_v.si_code = si.code;
+                let siginfo_v = LinuxSigInfo {
+                    si_signo: si.sig.raw() as _,
+                    si_code: si.code,
+                    ..Default::default()
+                };
                 new_sp -= size_of::<LinuxSigInfo>();
                 let mut siginfo_ptr = UserWritePtr::<LinuxSigInfo>::new(new_sp, &addr_space);
                 unsafe {
@@ -124,16 +140,23 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo) -> bool {
                 }
                 cx.user_reg[11] = new_sp;
             }
+
             cx.sepc = entry;
             // ra (when the sigaction set by user finished,it will return to
             // _sigreturn_trampoline, which calls sys_sigreturn)
             cx.user_reg[1] = _sigreturn_trampoline as usize;
             // sp (it will be used later by sys_sigreturn to restore sig_cx)
             cx.user_reg[2] = new_sp;
-            cx.user_reg[4] = sig_cx.user_reg[4];
             cx.user_reg[3] = sig_cx.user_reg[3];
-            // log::error!("{:#x}", new_sp);
-            true
+            cx.user_reg[4] = sig_cx.user_reg[4];
+
+            log::debug!("cx.sepc: {:#x}", cx.sepc);
+            log::debug!("cx.user_reg[1]: {:#x}", cx.user_reg[1]);
+            log::debug!("cx.user_reg[2]: {:#x}", cx.user_reg[2]);
+            log::debug!("cx.user_reg[3]: {:#x}", cx.user_reg[3]);
+            log::debug!("cx.user_reg[4]: {:#x}", cx.user_reg[4]);
+
+            Ok(true)
         }
     }
 }
@@ -158,7 +181,7 @@ fn stop(task: &Arc<Task>, sig: Sig) {
     log::warn!("[do_signal] task stopped!");
     task.with_thread_group(|tg| {
         for t in tg.iter() {
-            t.set_state(TaskState::Waiting);
+            t.set_state(TaskState::Sleeping);
             t.set_wake_up_signal(SigSet::SIGCONT);
         }
     });

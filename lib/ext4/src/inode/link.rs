@@ -1,10 +1,11 @@
 use alloc::sync::Arc;
 
-use config::{device::BLOCK_SIZE, vfs::Stat};
+use config::device::BLOCK_SIZE;
 use mutex::{ShareMutex, new_share_mutex};
 use systype::SysResult;
 use vfs::{
     inode::{Inode, InodeMeta},
+    stat::Stat,
     superblock::SuperBlock,
 };
 
@@ -17,7 +18,7 @@ pub struct ExtLinkInode {
 impl ExtLinkInode {
     pub fn new(superblock: Arc<dyn SuperBlock>, file: ExtFile) -> Arc<Self> {
         Arc::new(Self {
-            meta: InodeMeta::new(0, superblock),
+            meta: InodeMeta::new(file.ino() as usize, superblock),
             file: new_share_mutex(file),
         })
     }

@@ -13,6 +13,42 @@ use crate::task::{TaskState, signal::sig_info::*};
 
 use super::Task;
 
+#[derive(Debug, Clone, Copy, Default)]
+#[repr(C)]
+pub struct SigAction {
+    /// sa_handler specifies the action to be associated with signum and can be
+    /// one of the following:
+    /// 1. SIG_DFL for the default action
+    /// 2. SIG_IGN to ignore this signal
+    /// 3. A pointer to a signal handling function. This function receives the
+    ///    signal number as its only argument.
+    pub sa_handler: usize,
+    pub sa_flags: SigActionFlag,
+    pub restorer: usize,
+    /// sa_mask specifies a mask of signals which should be blocked during
+    /// execution of the signal handler.
+    pub sa_mask: SigSet,
+}
+
+pub const SIG_DFL: usize = 0;
+pub const SIG_IGN: usize = 1;
+
+impl From<Action> for SigAction {
+    fn from(action: Action) -> Self {
+        let sa_handler = match action.atype {
+            ActionType::Ignore => SIG_IGN,
+            ActionType::Kill | ActionType::Stop | ActionType::Cont => SIG_DFL,
+            ActionType::User { entry } => entry.into(),
+        };
+        Self {
+            sa_handler,
+            sa_flags: action.flags,
+            restorer: 0,
+            sa_mask: action.mask,
+        }
+    }
+}
+
 impl Task {
     ///BODGE: regardless of threads in a group for now.
     pub fn receive_siginfo(&self, si: SigInfo) {
@@ -24,11 +60,11 @@ impl Task {
     /// Interrupt state, task will be waken and handle the
     /// signal.
     fn recv(&self, si: SigInfo) {
-        log::info!(
-            "[Task::recv] tid {} recv {si:?} {:?}",
-            self.tid(),
-            self.sig_handlers_mut().lock().get(si.sig)
-        );
+        // log::info!(
+        //     "[Task::recv] tid {} recv {si:?} {:?}",
+        //     self.tid(),
+        //     self.sig_handlers_mut().lock().get(si.sig)
+        // );
 
         let manager = self.sig_manager_mut();
         manager.add(si);

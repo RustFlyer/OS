@@ -1,3 +1,5 @@
+use core::ptr;
+
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::sync::{Arc, Weak};
@@ -87,11 +89,52 @@ pub trait Dentry: Send + Sync {
     /// `self`. After this call, `dentry` will become invalid. `dentry` must not be a directory.
     fn base_unlink(&self, dentry: &dyn Dentry) -> SysResult<()>;
 
-    /// Removes the child directory `dentry` from directory `self`.
+    /// Removes the child directory `dentry` from directory `self` if it is empty.
+    ///
+    /// `self` must be a valid directory. `dentry` must be a valid dentry and a child of
+    /// `self`. After this call, `dentry` will become invalid.
+    ///
+    /// Returns `ENOTEMPTY` if `dentry` is not empty. Other errors may be returned.
+    fn base_rmdir(&self, dentry: &dyn Dentry) -> SysResult<()> {
+        todo!()
+    }
+
+    /// Removes the child directory `dentry` recursively from directory `self`.
     ///
     /// `self` must be a valid directory. `dentry` must be a valid dentry and a child of
     /// `self`. After this call, `dentry` will become invalid. `dentry` must be a empty directory.
-    fn base_rmdir(&self, dentry: &dyn Dentry) -> SysResult<()>;
+    #[deprecated(note = "This function is not expected to be used in any syscall")]
+    fn base_rmdir_recur(&self, _dentry: &dyn Dentry) -> SysResult<()> {
+        unimplemented!("`base_rmdir_recur` is not implemented for this file system")
+    }
+
+    /// Renames the child dentry `dentry` in directory `self` to the new name given in
+    /// `new_dentry`. If `new_dentry` is not in directory `self`, it will be moved to
+    /// wherever `new_dentry` is in.
+    ///
+    /// `self` must be a valid directory. `dentry` must be a valid dentry and a child of
+    /// `self`. `new_dir` must be a valid directory. `new_dentry` must be a child of
+    /// `new_dir`. After this call, `dentry` will become invalid. After this call,
+    /// `new_dentry` is sure to be valid. `dentry` and `new_dentry` must be in the same
+    /// filesystem.
+    ///
+    /// If `new_dentry` is valid, the file it points to will be replaced by the file
+    /// `dentry` points to. An implementation of this function should first create a
+    /// hard link to `dentry` in `new_dentry`, and then remove the old dentry.
+    ///
+    /// `new_dentry` and `dentry` are sure not to be the same dentry. This constraint
+    /// may be changed in the future.
+    ///
+    /// `dentry` can be a directory, but in which case `new_dentry` must be a negative
+    /// dentry. In other words, this operation never replaces an existing directory.
+    ///
+    /// This function does not follow symbolic links.
+    fn base_rename(
+        &self,
+        dentry: &dyn Dentry,
+        new_dir: &dyn Dentry,
+        new_dentry: &dyn Dentry,
+    ) -> SysResult<()>;
 
     /// Constructs a new negative child dentry with the given name in directory `self`.
     ///
@@ -260,16 +303,68 @@ impl dyn Dentry {
         self.base_unlink(dentry)
     }
 
-    /// Removes the child directory `dentry` recursively from directory `self`.
+    /// Removes the child directory `dentry` from directory `self` if it is empty.
     ///
     /// `self` must be a valid directory. `dentry` must be a valid dentry and a child of
     /// `self`. After this call, `dentry` will become invalid. `dentry` must be a directory.
+    ///
+    /// Returns `ENOTEMPTY` if `dentry` is not empty. Other errors may be returned.
     pub fn rmdir(&self, dentry: &dyn Dentry) -> SysResult<()> {
         debug_assert!(!self.is_negative());
         debug_assert!(self.inode().unwrap().inotype().is_dir());
         debug_assert!(!dentry.is_negative());
         debug_assert!(dentry.inode().unwrap().inotype().is_dir());
         self.base_rmdir(dentry)
+    }
+
+    /// Removes the child directory `dentry` recursively from directory `self`.
+    ///
+    /// `self` must be a valid directory. `dentry` must be a valid dentry and a child of
+    /// `self`. After this call, `dentry` will become invalid. `dentry` must be a directory.
+    #[deprecated(note = "This function is not expected to be used in any syscall")]
+    pub fn rmdir_recur(&self, dentry: &dyn Dentry) -> SysResult<()> {
+        debug_assert!(!self.is_negative());
+        debug_assert!(self.inode().unwrap().inotype().is_dir());
+        debug_assert!(!dentry.is_negative());
+        debug_assert!(dentry.inode().unwrap().inotype().is_dir());
+        self.base_rmdir_recur(dentry)
+    }
+
+    /// Renames the child dentry `dentry` in directory `self` to the new path specified
+    /// by `new_dentry`.
+    ///
+    /// `self` must be a valid directory. `dentry` must be a valid dentry and a child of
+    /// `self`. `new_dir` must be a valid directory. `new_dentry` must be a child of
+    /// `new_dir`. After this call, `dentry` will become invalid. After this call,
+    /// `new_dentry` is sure to be valid. `dentry` and `new_dentry` must be in the same
+    /// filesystem.
+    ///
+    /// If `new_dentry` is valid, the file it points to will be replaced by the file
+    /// `dentry` points to. An implementation of this function should first create a
+    /// hard link to `dentry` in `new_dentry`, and then remove the old dentry.
+    ///
+    /// If `new_dentry` and `dentry` points to the same file, this function does nothing.
+    ///
+    /// `dentry` can be a directory, but in which case `new_dentry` must be a negative
+    /// dentry. In other words, this operation never replaces an existing directory.
+    ///
+    /// This function does not follow symbolic links.
+    pub fn rename(
+        &self,
+        dentry: &dyn Dentry,
+        new_dir: &dyn Dentry,
+        new_dentry: &dyn Dentry,
+    ) -> SysResult<()> {
+        debug_assert!(!self.is_negative());
+        debug_assert!(self.inode().unwrap().inotype().is_dir());
+        debug_assert!(!dentry.is_negative());
+        debug_assert!(!new_dir.is_negative());
+        debug_assert!(new_dir.inode().unwrap().inotype().is_dir());
+
+        if ptr::eq(self, dentry) {
+            return Ok(());
+        }
+        self.base_rename(dentry, new_dir, new_dentry)
     }
 
     /// Creates a new negative child dentry with the given name in directory `self`.

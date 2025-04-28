@@ -1,9 +1,10 @@
 use alloc::boxed::Box;
 use alloc::sync::{Arc, Weak};
 use async_trait::async_trait;
-use config::{inode::InodeType, vfs::Stat};
+use config::inode::InodeType;
 use driver::print;
 use systype::SysResult;
+use vfs::stat::Stat;
 use vfs::{
     dentry::{Dentry, DentryMeta},
     file::{File, FileMeta},
@@ -73,11 +74,16 @@ impl Dentry for StdOutDentry {
         todo!()
     }
 
-    fn base_rmdir(&self, _dentry: &dyn Dentry) -> SysResult<()> {
+    fn base_unlink(&self, _dentry: &dyn Dentry) -> SysResult<()> {
         todo!()
     }
 
-    fn base_unlink(&self, _dentry: &dyn Dentry) -> SysResult<()> {
+    fn base_rename(
+        &self,
+        _dentry: &dyn Dentry,
+        _new_dir: &dyn Dentry,
+        _new_dentry: &dyn Dentry,
+    ) -> SysResult<()> {
         todo!()
     }
 }
