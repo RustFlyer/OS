@@ -19,9 +19,9 @@ rustflags = ["-Cforce-frame-pointers=yes"]
 [source.crates-io]
 replace-with = "vendored-sources"
 
-[source."git+https://github.com/EchudeT/lwext4_rust.git?rev=405b"]
+[source."git+https://github.com/EchudeT/lwext4_rust.git?rev=91ee"]
 git = "https://github.com/EchudeT/lwext4_rust.git"
-rev = "405b"
+rev = "91ee"
 replace-with = "vendored-sources"
 
 [source."git+https://github.com/EchudeT/rust-fatfs.git?rev=e656"]

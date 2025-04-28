@@ -32,6 +32,6 @@ fatfs = { default-features = false,  git = "https://github.com/EchudeT/rust-fatf
 elf = { git = "https://github.com/adong660/rust-elf.git", branch = "no-std-elfstream", default-features = false, features = [
     "alloc",
 ] }
-lwext4_rust = { git = "https://github.com/EchudeT/lwext4_rust.git", rev = "405b"}
+lwext4_rust = { git = "https://github.com/EchudeT/lwext4_rust.git", rev = "91ee"}
 
 fdt = "0.1.5"

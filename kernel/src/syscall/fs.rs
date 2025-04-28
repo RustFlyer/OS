@@ -688,6 +688,8 @@ pub async fn sys_faccessat(
     };
     log::info!("[sys_faccessat] dirfd: {dirfd}, path: {path}, mode: {_mode:?}, flags: {flags:?}");
 
+    simdebug::stop();
+
     let mut dentry = task.walk_at(AtFd::from(dirfd), path.clone())?;
     if dentry.is_negative() {
         // let parent = dentry.parent().unwrap();
