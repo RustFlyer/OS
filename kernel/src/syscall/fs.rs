@@ -666,20 +666,20 @@ pub async fn sys_umount2(target: usize, flags: u32) -> SyscallResult {
 /// - `pathname`: Path string (relative to `dirfd` if not absolute)
 /// - `mode`: Permission mask
 /// - `flags`: Behavior flags
-pub async fn sys_faccessat(
-    dirfd: usize,
-    pathname: usize,
-    mode: i32,
-    flags: usize,
-) -> SyscallResult {
+pub async fn sys_faccessat(dirfd: usize, pathname: usize, mode: i32, flag: usize) -> SyscallResult {
     log::info!(
-        "[sys_faccessat] dirfd: {dirfd}, pathname: {pathname:#x}, mode: {mode:#x}, flags: {flags:#x}"
+        "[sys_faccessat] dirfd: {dirfd}, pathname: {pathname:#x}, mode: {mode:#x}, flags: {flag:#x}"
     );
     let task = current_task();
     let addr_space = task.addr_space();
     let _mode = AccessFlags::from_bits(mode).ok_or(SysError::EINVAL)?;
 
-    // let flags = AtFlags::from_bits(flags as i32).unwrap();
+    let flags;
+    if let Some(f) = AtFlags::from_bits(flag as i32) {
+        flags = f;
+    } else {
+        flags = unsafe { UserReadPtr::<AtFlags>::new(flag, &addr_space).read()? };
+    }
 
     let path = {
         let mut user_ptr = UserReadPtr::<u8>::new(pathname, &addr_space);
@@ -688,19 +688,13 @@ pub async fn sys_faccessat(
     };
     log::info!("[sys_faccessat] dirfd: {dirfd}, path: {path}, mode: {_mode:?}, flags: {flags:?}");
 
-    simdebug::stop();
-
     let mut dentry = task.walk_at(AtFd::from(dirfd), path.clone())?;
     if dentry.is_negative() {
-        // let parent = dentry.parent().unwrap();
-        // parent.create(dentry.as_ref(), InodeMode::REG)?;
-        // log::debug!("is negative? :{}", dentry.is_negative());
-        // return Ok(0);
         return Err(SysError::ENOENT);
     }
 
     if dentry.inode().unwrap().inotype().is_symlink()
-    // && !flags.contains(AtFlags::AT_SYMLINK_NOFOLLOW)
+        && !flags.contains(AtFlags::AT_SYMLINK_NOFOLLOW)
     {
         dentry = Path::resolve_symlink_through(dentry)?;
         if dentry.is_negative() {
@@ -1237,5 +1231,76 @@ pub fn sys_renameat2(
     )?;
 
     log::error!("[sys_renameat2] implement rename");
+    Ok(0)
+}
+
+/// `linkat()` makes a new name for a file. It creates a new link (also known as a hard link)
+/// to an existing file. If `newpath` exists, it will not be overwritten.
+///
+/// If the pathname given in `oldpath` is relative, then it is interpreted relative to
+/// the directory referred to by the file descriptor `olddirfd` (rather than relative to
+/// the current working directory of the calling process, as is done by link() for a
+/// relative pathname).
+///
+/// If `oldpath` is relative and `olddirfd` is the special value AT_FDCWD, then `oldpath` is
+/// interpreted relative to the current working directory of the calling process (like
+/// link()).
+///
+/// If `oldpath` is absolute, then `olddirfd` is ignored.
+pub fn sys_linkat(
+    olddirfd: usize,
+    oldpath: usize,
+    newdirfd: usize,
+    newpath: usize,
+    flags: i32,
+) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+    let flags = OpenFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
+
+    let coldpath = UserReadPtr::<u8>::new(oldpath, &addrspace).read_c_string(256)?;
+    let cnewpath = UserReadPtr::<u8>::new(newpath, &addrspace).read_c_string(256)?;
+
+    let oldpath = coldpath.into_string().map_err(|_| SysError::EINVAL)?;
+    let newpath = cnewpath.into_string().map_err(|_| SysError::EINVAL)?;
+
+    let olddirfd = AtFd::from(olddirfd);
+    let newdirfd = AtFd::from(newdirfd);
+
+    let old_dentry = task.walk_at(olddirfd, oldpath)?;
+    let new_dentry = task.walk_at(newdirfd, newpath)?;
+
+    new_dentry.link(old_dentry.as_ref(), new_dentry.as_ref())?;
+    Ok(0)
+}
+
+/// `symlink()` creates a symbolic link named `linkpath` which contains the string `target`.
+///
+/// Symbolic links are interpreted at run time as if the contents of the link had been
+/// substituted into the path being followed to find a file or directory.
+///
+/// A symbolic link (also known as a soft link) may point to an existing file or to
+/// a nonexistent one; the latter case is known as a dangling link.
+///
+/// The permissions of a symbolic link are irrelevant; the ownership is ignored when
+/// following the link (except when the protected_symlinks feature is enabled, as
+/// explained in proc(5)), but is checked when removal or renaming of the link is
+/// requested and the link is in a directory with the sticky bit (S_ISVTX) set.
+///
+/// If `linkpath` exists, it will not be overwritten.
+pub fn sys_symlinkat(target: usize, newdirfd: usize, linkpath: usize) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+
+    let ctarget = UserReadPtr::<u8>::new(target, &addrspace).read_c_string(256)?;
+    let clinkpath = UserReadPtr::<u8>::new(linkpath, &addrspace).read_c_string(256)?;
+
+    let target = ctarget.into_string().map_err(|_| SysError::EINVAL)?;
+    let linkpath = clinkpath.into_string().map_err(|_| SysError::EINVAL)?;
+
+    let newdirfd = AtFd::from(newdirfd);
+
+    let dentry = task.walk_at(newdirfd, linkpath)?;
+    dentry.parent().unwrap().symlink(dentry.as_ref(), &target)?;
     Ok(0)
 }
