@@ -110,11 +110,12 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
                 .values()
                 // Question: How to handle &&Weak<Task>
                 .find(|c| {
-                    c.is_in_state(TaskState::Zombie) && c.with_thread_group(|tg| tg.len() == 1)
+                    c.is_in_state(TaskState::WaitForRecycle)
+                        && c.with_thread_group(|tg| tg.len() == 1)
                 }),
             WaitFor::Pid(pid) => {
                 if let Some(child) = children.get(&pid) {
-                    if child.is_in_state(TaskState::Zombie)
+                    if child.is_in_state(TaskState::WaitForRecycle)
                         && child.with_thread_group(|tg| tg.len() == 1)
                     {
                         Some(child)
@@ -174,12 +175,13 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
 
                 let child = match target {
                     WaitFor::AnyChild => children.values().find(|c| {
-                        c.is_in_state(TaskState::Zombie) && c.with_thread_group(|tg| tg.len() == 1)
+                        c.is_in_state(TaskState::WaitForRecycle)
+                            && c.with_thread_group(|tg| tg.len() == 1)
                     }),
 
                     WaitFor::Pid(pid) => {
                         let child = children.get(&pid).unwrap();
-                        if child.is_in_state(TaskState::Zombie)
+                        if child.is_in_state(TaskState::WaitForRecycle)
                             && child.with_thread_group(|tg| tg.len() == 1)
                         {
                             Some(child)

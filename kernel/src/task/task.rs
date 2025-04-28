@@ -35,7 +35,7 @@ use crate::{trap::trap_context::TrapContext, vm::addr_space::AddrSpace};
 pub enum TaskState {
     Running,
     Zombie,
-    Waiting,
+    WaitForRecycle,
     Sleeping,
     Interruptable,
     UnInterruptable,

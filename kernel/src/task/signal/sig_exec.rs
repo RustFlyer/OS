@@ -181,7 +181,7 @@ fn stop(task: &Arc<Task>, sig: Sig) {
     log::warn!("[do_signal] task stopped!");
     task.with_thread_group(|tg| {
         for t in tg.iter() {
-            t.set_state(TaskState::Waiting);
+            t.set_state(TaskState::Sleeping);
             t.set_wake_up_signal(SigSet::SIGCONT);
         }
     });

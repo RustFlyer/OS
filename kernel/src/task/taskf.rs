@@ -363,7 +363,7 @@ impl Task {
                     "[Task::do_eixt] reparent child process pid {} to init",
                     child.pid()
                 );
-                if child.get_state() == TaskState::Zombie {
+                if child.get_state() == TaskState::WaitForRecycle {
                     // NOTE: self has not called wait to clear zombie children, we need to notify
                     // init to clear these zombie children.
                     root.receive_siginfo(SigInfo {
@@ -404,9 +404,9 @@ impl Task {
         // self.with_mut_fd_table(|table| table.clear());
 
         if self.is_process() {
-            self.set_state(TaskState::Zombie);
+            self.set_state(TaskState::WaitForRecycle);
         } else {
-            self.process().set_state(TaskState::Zombie);
+            self.process().set_state(TaskState::WaitForRecycle);
         }
         // When the task is not leader, which means its is not a process, it
         // will get dropped when hart leaves this task.
