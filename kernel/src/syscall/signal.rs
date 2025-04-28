@@ -45,7 +45,8 @@ pub fn sys_kill(pid: isize, sig_code: i32) -> SyscallResult {
                     });
                 }
             } else {
-                return Err(SysError::ESRCH);
+                log::error!("[sys_kill] can't find assigned pid.");
+                return Ok(0);
             }
         }
 
