@@ -479,7 +479,6 @@ pub async fn sys_unlinkat(dirfd: usize, pathname: usize, flags: i32) -> SyscallR
             return Err(SysError::ENOTDIR);
         }
         parent.rmdir(dentry.as_ref())?;
-        log::error!("remove directory recursively");
     } else if is_dir {
         return Err(SysError::EISDIR);
     }

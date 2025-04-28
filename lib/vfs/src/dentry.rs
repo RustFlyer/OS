@@ -89,11 +89,24 @@ pub trait Dentry: Send + Sync {
     /// `self`. After this call, `dentry` will become invalid. `dentry` must not be a directory.
     fn base_unlink(&self, dentry: &dyn Dentry) -> SysResult<()>;
 
-    /// Removes the child directory `dentry` from directory `self`.
+    /// Removes the child directory `dentry` from directory `self` if it is empty.
+    ///
+    /// `self` must be a valid directory. `dentry` must be a valid dentry and a child of
+    /// `self`. After this call, `dentry` will become invalid.
+    ///
+    /// Returns `ENOTEMPTY` if `dentry` is not empty. Other errors may be returned.
+    fn base_rmdir(&self, dentry: &dyn Dentry) -> SysResult<()> {
+        todo!()
+    }
+
+    /// Removes the child directory `dentry` recursively from directory `self`.
     ///
     /// `self` must be a valid directory. `dentry` must be a valid dentry and a child of
     /// `self`. After this call, `dentry` will become invalid. `dentry` must be a empty directory.
-    fn base_rmdir(&self, dentry: &dyn Dentry) -> SysResult<()>;
+    #[deprecated(note = "This function is not expected to be used in any syscall")]
+    fn base_rmdir_recur(&self, _dentry: &dyn Dentry) -> SysResult<()> {
+        unimplemented!("`base_rmdir_recur` is not implemented for this file system")
+    }
 
     /// Renames the child dentry `dentry` in directory `self` to the new name given in
     /// `new_dentry`. If `new_dentry` is not in directory `self`, it will be moved to
@@ -290,16 +303,31 @@ impl dyn Dentry {
         self.base_unlink(dentry)
     }
 
-    /// Removes the child directory `dentry` recursively from directory `self`.
+    /// Removes the child directory `dentry` from directory `self` if it is empty.
     ///
     /// `self` must be a valid directory. `dentry` must be a valid dentry and a child of
     /// `self`. After this call, `dentry` will become invalid. `dentry` must be a directory.
+    ///
+    /// Returns `ENOTEMPTY` if `dentry` is not empty. Other errors may be returned.
     pub fn rmdir(&self, dentry: &dyn Dentry) -> SysResult<()> {
         debug_assert!(!self.is_negative());
         debug_assert!(self.inode().unwrap().inotype().is_dir());
         debug_assert!(!dentry.is_negative());
         debug_assert!(dentry.inode().unwrap().inotype().is_dir());
         self.base_rmdir(dentry)
+    }
+
+    /// Removes the child directory `dentry` recursively from directory `self`.
+    ///
+    /// `self` must be a valid directory. `dentry` must be a valid dentry and a child of
+    /// `self`. After this call, `dentry` will become invalid. `dentry` must be a directory.
+    #[deprecated(note = "This function is not expected to be used in any syscall")]
+    pub fn rmdir_recur(&self, dentry: &dyn Dentry) -> SysResult<()> {
+        debug_assert!(!self.is_negative());
+        debug_assert!(self.inode().unwrap().inotype().is_dir());
+        debug_assert!(!dentry.is_negative());
+        debug_assert!(dentry.inode().unwrap().inotype().is_dir());
+        self.base_rmdir_recur(dentry)
     }
 
     /// Renames the child dentry `dentry` in directory `self` to the new path specified

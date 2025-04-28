@@ -51,10 +51,6 @@ impl Dentry for ExeDentry {
         todo!()
     }
 
-    fn base_rmdir(&self, _dentry: &dyn Dentry) -> SysResult<()> {
-        todo!()
-    }
-
     fn base_rename(
         &self,
         _dentry: &dyn Dentry,

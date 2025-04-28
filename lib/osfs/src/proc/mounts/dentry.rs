@@ -39,10 +39,6 @@ impl Dentry for MountsDentry {
         todo!()
     }
 
-    fn base_rmdir(&self, _dentry: &dyn Dentry) -> SysResult<()> {
-        todo!()
-    }
-
     fn base_new_neg_child(self: Arc<Self>, _name: &str) -> Arc<dyn Dentry> {
         todo!()
     }
