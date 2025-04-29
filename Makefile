@@ -152,6 +152,8 @@ fs-img: user
 	@sudo cp -r $(USER_ELFS) emnt/
 	@sudo cp -r testcase/basic/* emnt/
 	@sudo cp -r testcase/busybox/* emnt/
+	@sudo cp -r testcase/lua/* emnt/
+	@sudo cp -r testcase/UnixBench/* emnt/
 	@sudo cp -r img-data/* emnt/
 	@sudo chmod -R 755 emnt/
 	@sudo umount emnt

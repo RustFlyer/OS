@@ -16,23 +16,23 @@ target = "riscv64gc-unknown-none-elf"
 rustflags = ["-Cforce-frame-pointers=yes"]
 
 
-[source.crates-io]
-replace-with = "vendored-sources"
+# [source.crates-io]
+# replace-with = "vendored-sources"
 
-[source."git+https://github.com/EchudeT/lwext4_rust.git?rev=91ee"]
-git = "https://github.com/EchudeT/lwext4_rust.git"
-rev = "91ee"
-replace-with = "vendored-sources"
+# [source."git+https://github.com/EchudeT/lwext4_rust.git?rev=91ee"]
+# git = "https://github.com/EchudeT/lwext4_rust.git"
+# rev = "91ee"
+# replace-with = "vendored-sources"
 
-[source."git+https://github.com/EchudeT/rust-fatfs.git?rev=e656"]
-git = "https://github.com/EchudeT/rust-fatfs.git"
-rev = "e656"
-replace-with = "vendored-sources"
+# [source."git+https://github.com/EchudeT/rust-fatfs.git?rev=e656"]
+# git = "https://github.com/EchudeT/rust-fatfs.git"
+# rev = "e656"
+# replace-with = "vendored-sources"
 
-[source."git+https://github.com/adong660/rust-elf.git?branch=no-std-elfstream"]
-git = "https://github.com/adong660/rust-elf.git"
-branch = "no-std-elfstream"
-replace-with = "vendored-sources"
+# [source."git+https://github.com/adong660/rust-elf.git?branch=no-std-elfstream"]
+# git = "https://github.com/adong660/rust-elf.git"
+# branch = "no-std-elfstream"
+# replace-with = "vendored-sources"
 
-[source.vendored-sources]
-directory = "vendor"
+# [source.vendored-sources]
+# directory = "vendor"

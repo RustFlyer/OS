@@ -208,6 +208,7 @@ impl dyn File {
     /// Returns an `ENOENT` error if this dentry is a negative dentry.
     pub fn open(dentry: Arc<dyn Dentry>) -> SysResult<Arc<dyn File>> {
         if dentry.is_negative() {
+            log::debug!("dentry is negative");
             return Err(SysError::ENOENT);
         }
         Arc::clone(&dentry).base_open()
@@ -471,10 +472,7 @@ impl dyn File {
         let mut path_buf: Vec<u8> = vec![0; 512];
         let len = self.base_readlink(&mut path_buf)?;
         path_buf.truncate(len);
-        let path = CString::new(path_buf)
-            .unwrap()
-            .into_string()
-            .unwrap();
+        let path = CString::new(path_buf).unwrap().into_string().unwrap();
         Ok(path)
     }
 }

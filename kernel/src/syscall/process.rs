@@ -395,7 +395,7 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
     };
 
     let file = <dyn File>::open(dentry)?;
-    // log::info!("[sys_execve]: open file");
+    log::info!("[sys_execve]: open file");
 
     let mut name = String::new();
     args.iter().for_each(|arg| {
@@ -403,7 +403,7 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
         name.push(' ');
     });
     task.execve(file, args, envs, name)?;
-    // log::info!("[sys_execve]: finish execve and convert to a new task");
+    log::info!("[sys_execve]: finish execve and convert to a new task");
     Ok(0)
 }
 
