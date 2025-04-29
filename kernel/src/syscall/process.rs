@@ -8,8 +8,10 @@ use crate::task::{
 use crate::vm::user_ptr::{UserReadPtr, UserWritePtr};
 use crate::{processor::current_task, task::future::spawn_user_task};
 use alloc::string::String;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use bitflags::*;
+use config::inode::InodeType;
 use config::process::CloneFlags;
 use osfs::sys_root_dentry;
 use osfuture::{suspend_now, yield_now};
@@ -354,7 +356,8 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
 
     // Reads strings from a null-terminated array of pointers to strings, adding them to
     // the specified vector.
-    let read_string_array = |addr: usize, vec: &mut Vec<String>| {
+    let read_string_array = |addr: usize| {
+        let mut args = Vec::new();
         let addr_space = task.addr_space();
         let mut user_ptr = UserReadPtr::<usize>::new(addr, &addr_space);
         let pointers = user_ptr.read_ptr_array(256)?;
@@ -364,16 +367,14 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
                 .read_c_string(256)?
                 .into_string()
                 .map_err(|_| SysError::EINVAL)?;
-            vec.push(string);
+            args.push(string);
         }
-        Ok(())
+        Ok(args)
     };
 
     let path = read_string(path)?;
-    let mut args = vec![path.clone()];
-    read_string_array(argv, &mut args)?;
-    let mut envs = Vec::new();
-    read_string_array(envp, &mut envs)?;
+    let args = read_string_array(argv)?;
+    let mut envs = read_string_array(envp)?;
 
     log::info!("[sys_execve] args: {args:?}");
     log::info!("[sys_execve] envs: {envs:?}");
@@ -384,8 +385,13 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
     ));
 
     let dentry = {
-        let path = Path::new(sys_root_dentry(), path.clone());
-        path.walk()?
+        let path = Path::new(sys_root_dentry(), path);
+        let dentry = path.walk()?;
+        if !dentry.is_negative() && dentry.inode().unwrap().inotype() == InodeType::SymLink {
+            Path::resolve_symlink_through(Arc::clone(&dentry))?
+        } else {
+            dentry
+        }
     };
 
     let file = <dyn File>::open(dentry)?;
@@ -393,10 +399,9 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
 
     let mut name = String::new();
     args.iter().for_each(|arg| {
-        name.push_str(&arg);
+        name.push_str(arg);
         name.push(' ');
     });
-
     task.execve(file, args, envs, name)?;
     // log::info!("[sys_execve]: finish execve and convert to a new task");
     Ok(0)

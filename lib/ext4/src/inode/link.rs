@@ -1,7 +1,6 @@
 use alloc::sync::Arc;
 
 use config::device::BLOCK_SIZE;
-use mutex::{ShareMutex, new_share_mutex};
 use systype::SysResult;
 use vfs::{
     inode::{Inode, InodeMeta},
@@ -9,17 +8,16 @@ use vfs::{
     superblock::SuperBlock,
 };
 
-use crate::ext::file::ExtFile;
 pub struct ExtLinkInode {
     meta: InodeMeta,
-    pub(crate) file: ShareMutex<ExtFile>,
 }
 
 impl ExtLinkInode {
-    pub fn new(superblock: Arc<dyn SuperBlock>, file: ExtFile) -> Arc<Self> {
+    pub fn new(superblock: Arc<dyn SuperBlock>) -> Arc<Self> {
         Arc::new(Self {
-            meta: InodeMeta::new(file.ino() as usize, superblock),
-            file: new_share_mutex(file),
+            // Lwext4 does not provide a way to get metadata of a symlink.
+            // We set the inode number to 100 for now.
+            meta: InodeMeta::new(999, superblock),
         })
     }
 }

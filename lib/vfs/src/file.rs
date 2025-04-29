@@ -471,7 +471,7 @@ impl dyn File {
         let mut path_buf: Vec<u8> = vec![0; 512];
         let len = self.base_readlink(&mut path_buf)?;
         path_buf.truncate(len);
-        let path = CString::from_vec_with_nul(path_buf)
+        let path = CString::new(path_buf)
             .unwrap()
             .into_string()
             .unwrap();

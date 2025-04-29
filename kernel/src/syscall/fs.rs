@@ -1288,6 +1288,10 @@ pub fn sys_symlinkat(target: usize, newdirfd: usize, linkpath: usize) -> Syscall
     let target = ctarget.into_string().map_err(|_| SysError::EINVAL)?;
     let linkpath = clinkpath.into_string().map_err(|_| SysError::EINVAL)?;
 
+    log::info!(
+        "[sys_symlinkat] target: {target}, newdirfd: {newdirfd:?}, linkpath: {linkpath}"
+    );
+
     let newdirfd = AtFd::from(newdirfd);
 
     let dentry = task.walk_at(newdirfd, linkpath)?;

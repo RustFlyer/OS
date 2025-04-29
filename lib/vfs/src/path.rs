@@ -101,7 +101,6 @@ impl Path {
         {
             loop {
                 if dentry.is_negative() {
-                    log::error!("[walk_recursive] dentry {} is negative", dentry.path());
                     return Err(SysError::ENOENT);
                 }
                 let inode_type = dentry.inode().unwrap().inotype();
@@ -110,10 +109,6 @@ impl Path {
                 } else if inode_type == InodeType::Dir {
                     break;
                 } else {
-                    log::error!(
-                        "[walk_recursive] dentry {} is not SymLink or Dir",
-                        dentry.path()
-                    );
                     return Err(SysError::ENOTDIR);
                 }
             }
