@@ -1,6 +1,6 @@
 pub mod addr_space;
 pub mod elf;
-pub mod mem_perm;
+pub mod mapping_flags;
 pub mod mmap;
 pub mod user_ptr;
 

@@ -38,7 +38,7 @@ use config::mm::{PAGE_SIZE, USER_END};
 use mm::address::VirtAddr;
 use systype::{SysError, SysResult};
 
-use super::{addr_space::AddrSpace, mem_perm::MemPerm};
+use super::{addr_space::AddrSpace, mapping_flags::MappingFlags};
 use crate::{
     processor::current_hart,
     trap::trap_env::{set_kernel_stvec, set_kernel_stvec_user_rw},
@@ -159,7 +159,7 @@ where
             self.addr_space,
             self.ptr as usize,
             size_of::<T>(),
-            MemPerm::R,
+            MappingFlags::R,
         )?;
         Ok(unsafe { self.ptr.read() })
     }
@@ -194,7 +194,7 @@ where
             self.addr_space,
             self.ptr as usize,
             len * size_of::<T>(),
-            MemPerm::R,
+            MappingFlags::R,
         )?;
         let mut vec: Vec<T> = Vec::with_capacity(len);
         unsafe {
@@ -219,7 +219,7 @@ where
             self.addr_space,
             self.ptr as usize,
             size_of::<T>(),
-            MemPerm::R,
+            MappingFlags::R,
         )?;
         Ok(unsafe { &*self.ptr })
     }
@@ -245,7 +245,7 @@ where
             self.addr_space,
             self.ptr as usize,
             len * size_of::<T>(),
-            MemPerm::R,
+            MappingFlags::R,
         )?;
         Ok(unsafe { slice::from_raw_parts(self.ptr, len) })
     }
@@ -298,7 +298,7 @@ where
                 self.addr_space,
                 self.ptr as usize,
                 (len - 1) * size_of::<usize>(),
-                MemPerm::R,
+                MappingFlags::R,
                 &mut push_and_check,
             )?;
         }
@@ -347,7 +347,7 @@ where
                 self.addr_space,
                 self.ptr as usize,
                 len - 1,
-                MemPerm::R,
+                MappingFlags::R,
                 &mut push_and_check,
             )?;
         }
@@ -376,7 +376,7 @@ where
             self.addr_space,
             self.ptr as usize,
             size_of::<T>(),
-            MemPerm::W,
+            MappingFlags::W,
         )?;
         unsafe { self.ptr.write(value) };
         Ok(())
@@ -414,7 +414,7 @@ where
             self.addr_space,
             self.ptr as usize,
             size_of_val(values),
-            MemPerm::W,
+            MappingFlags::W,
         )?;
         unsafe {
             self.ptr
@@ -438,7 +438,7 @@ where
             self.addr_space,
             self.ptr as usize,
             size_of::<T>(),
-            MemPerm::W,
+            MappingFlags::W,
         )?;
         Ok(unsafe { &mut *self.ptr })
     }
@@ -465,7 +465,7 @@ where
             self.addr_space,
             self.ptr as usize,
             len * size_of::<T>(),
-            MemPerm::W,
+            MappingFlags::W,
         )?;
         Ok(unsafe { slice::from_raw_parts_mut(self.ptr, len) })
     }
@@ -486,7 +486,7 @@ fn check_user_access(
     addr_space: &AddrSpace,
     mut addr: usize,
     len: usize,
-    perm: MemPerm,
+    perm: MappingFlags,
 ) -> SysResult<()> {
     if len == 0 {
         return Ok(());
@@ -505,7 +505,7 @@ fn check_user_access(
 
     set_kernel_stvec_user_rw();
 
-    let checker = if perm.contains(MemPerm::W) {
+    let checker = if perm.contains(MappingFlags::W) {
         try_write
     } else {
         try_read
@@ -557,7 +557,7 @@ unsafe fn access_with_checking<F, T>(
     addr_space: &AddrSpace,
     mut addr: usize,
     len: usize,
-    perm: MemPerm,
+    perm: MappingFlags,
     f: &mut F,
 ) -> SysResult<()>
 where
@@ -581,7 +581,7 @@ where
 
     set_kernel_stvec_user_rw();
 
-    let checker = if perm.contains(MemPerm::W) {
+    let checker = if perm.contains(MappingFlags::W) {
         try_write
     } else {
         try_read

@@ -11,7 +11,7 @@ use timer::TIMER_MANAGER;
 use crate::processor::current_hart;
 use crate::task::{Task, TaskState};
 use crate::trap::load_trap_handler;
-use crate::vm::mem_perm::MemPerm;
+use crate::vm::mapping_flags::MappingFlags;
 use crate::vm::user_ptr::UserReadPtr;
 
 /// handle exception or interrupt from a task, return if success.
@@ -51,9 +51,9 @@ pub fn user_exception_handler(task: &Task, e: Exception, stval: usize) {
         }
         Exception::StorePageFault | Exception::InstructionPageFault | Exception::LoadPageFault => {
             let access = match e {
-                Exception::InstructionPageFault => MemPerm::X,
-                Exception::LoadPageFault => MemPerm::R,
-                Exception::StorePageFault => MemPerm::W,
+                Exception::InstructionPageFault => MappingFlags::X,
+                Exception::LoadPageFault => MappingFlags::R,
+                Exception::StorePageFault => MappingFlags::W,
                 _ => unreachable!(),
             };
             let fault_addr = VirtAddr::new(stval);

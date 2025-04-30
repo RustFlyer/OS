@@ -514,6 +514,5 @@ pub fn sys_setpgid(pid: usize, pgid: usize) -> SyscallResult {
 
 /// geteuid() returns the effective user ID of the calling process.
 pub fn sys_geteuid() -> SyscallResult {
-    log::error!("[geteuid] unimplemented call");
     Ok(0)
 }

@@ -93,9 +93,9 @@ pub const PA_WIDTH_SV39: usize = 56;
 /// Width of a virtual address in Sv39
 pub const VA_WIDTH_SV39: usize = 39;
 /// Width of a physical page number in Sv39
-pub const PPN_WIDTH_SV39: usize = PA_WIDTH_SV39 - PAGE_OFFSET_WIDTH;
+pub const PPN_WIDTH: usize = PA_WIDTH_SV39 - PAGE_OFFSET_WIDTH;
 /// Width of a virtual page number in Sv39
-pub const VPN_WIDTH_SV39: usize = VA_WIDTH_SV39 - PAGE_OFFSET_WIDTH;
+pub const VPN_WIDTH: usize = VA_WIDTH_SV39 - PAGE_OFFSET_WIDTH;
 
 /// Width of a page table entry in Sv39 (64-bit)
 pub const PTE_WIDTH: usize = 8;

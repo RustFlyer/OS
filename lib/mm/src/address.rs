@@ -7,8 +7,8 @@
 use core::fmt::{self, Debug, Formatter};
 
 use config::mm::{
-    KERNEL_MAP_OFFSET, PA_WIDTH_SV39, PAGE_SIZE, PPN_WIDTH_SV39, USER_END, VA_WIDTH_SV39,
-    VPN_WIDTH_SV39,
+    KERNEL_MAP_OFFSET, PA_WIDTH_SV39, PAGE_SIZE, PPN_WIDTH, USER_END, VA_WIDTH_SV39,
+    VPN_WIDTH,
 };
 
 /// An address in physical memory defined in Sv39.
@@ -58,7 +58,7 @@ impl PhysAddr {
 
     /// Gets the page number where the address resides.
     pub fn page_number(self) -> PhysPageNum {
-        let ppn_mask = (1 << PPN_WIDTH_SV39) - 1;
+        let ppn_mask = (1 << PPN_WIDTH) - 1;
         let page_num = (self.addr / PAGE_SIZE) & ppn_mask;
         PhysPageNum::new(page_num)
     }
@@ -136,7 +136,7 @@ impl VirtAddr {
 
     /// Gets the page number where the address resides.
     pub fn page_number(self) -> VirtPageNum {
-        let vpn_mask = (1 << VPN_WIDTH_SV39) - 1;
+        let vpn_mask = (1 << VPN_WIDTH) - 1;
         let page_num = (self.addr / PAGE_SIZE) & vpn_mask;
         VirtPageNum::new(page_num)
     }
@@ -195,7 +195,7 @@ impl PhysPageNum {
 
     /// Checks the validity of the page number.
     pub fn check_validity(page_num: usize) -> bool {
-        let tmp = page_num >> PPN_WIDTH_SV39;
+        let tmp = page_num >> PPN_WIDTH;
         tmp == 0
     }
 
@@ -206,7 +206,7 @@ impl PhysPageNum {
 
     /// Gets the starting address of the page.
     pub fn address(self) -> PhysAddr {
-        let addr = self.page_num << (64 - PPN_WIDTH_SV39) >> (64 - PA_WIDTH_SV39);
+        let addr = self.page_num << (64 - PPN_WIDTH) >> (64 - PA_WIDTH_SV39);
         PhysAddr::new(addr)
     }
 
@@ -249,7 +249,7 @@ impl VirtPageNum {
 
     /// Checks the validity of the page number.
     pub fn check_validity(page_num: usize) -> bool {
-        let tmp = page_num >> VPN_WIDTH_SV39;
+        let tmp = page_num >> VPN_WIDTH;
         tmp == 0
     }
 
@@ -261,7 +261,7 @@ impl VirtPageNum {
     /// Gets the starting address of the page.
     pub fn address(self) -> VirtAddr {
         let addr =
-            ((self.page_num as isize) << (64 - VPN_WIDTH_SV39) >> (64 - VA_WIDTH_SV39)) as usize;
+            ((self.page_num as isize) << (64 - VPN_WIDTH) >> (64 - VA_WIDTH_SV39)) as usize;
         VirtAddr::new(addr)
     }
 
