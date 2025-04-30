@@ -10,7 +10,7 @@ use timer::TIMER_MANAGER;
 
 use crate::processor::current_task;
 use crate::task::signal::sig_info::{Sig, SigDetails, SigInfo};
-use crate::vm::mem_perm::MemPerm;
+use crate::vm::mapping_flags::MappingFlags;
 
 /// Kernel trap handler
 #[unsafe(no_mangle)]
@@ -35,9 +35,9 @@ pub fn kernel_exception_handler(e: Exception, stval: usize) {
                     "[trap_handler] encounter page fault, addr {stval:#x}, instruction {sepc:#x} scause {cause:?}",
             );
             let access_type = match e {
-                Exception::InstructionPageFault => MemPerm::X,
-                Exception::LoadPageFault => MemPerm::R,
-                Exception::StorePageFault => MemPerm::X,
+                Exception::InstructionPageFault => MappingFlags::X,
+                Exception::LoadPageFault => MappingFlags::R,
+                Exception::StorePageFault => MappingFlags::X,
                 _ => unreachable!(),
             };
 
