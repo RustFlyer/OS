@@ -1,10 +1,8 @@
-use core::arch::asm;
-
 use arch::riscv64::{
     interrupt::disable_interrupt,
     sstatus::{self, Sstatus},
 };
-use riscv::register::sstatus::{FS, SPP};
+use riscv::register::sstatus::SPP;
 
 /// when sp points to user stack of a task/process,
 /// sscratch(in RISCV) points to the start

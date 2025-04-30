@@ -4,9 +4,9 @@ use arch::riscv64::interrupt::set_trap_handler;
 use riscv::register::stvec::TrapMode;
 
 #[cfg(target_arch = "riscv64")]
-global_asm!(include_str!("rv_trap.asm"));
+global_asm!(include_str!("rv_trap.s"));
 #[cfg(target_arch = "loongarch64")]
-global_asm!(include_str!("loong_trap.asm"));
+global_asm!(include_str!("loong_trap.s"));
 
 unsafe extern "C" {
     fn __trap_from_kernel();
