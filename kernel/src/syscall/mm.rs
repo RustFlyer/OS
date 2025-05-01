@@ -108,7 +108,8 @@ pub async fn sys_brk(addr: usize) -> SyscallResult {
 }
 
 pub fn sys_mprotect(addr: usize, len: usize, prot: i32) -> SyscallResult {
-    if addr == 0 || addr % PAGE_SIZE != 0 {
+    log::info!("[sys_mprotect] addr: {addr:#x}, len: {len:#x}, prot: {prot:#x}");
+    if addr % PAGE_SIZE != 0 {
         return Err(SysError::EINVAL);
     }
     let task = current_task();

@@ -30,7 +30,7 @@ use osfs::{
     },
     pipe::{inode::PIPE_BUF_LEN, new_pipe},
 };
-use systype::{SysError, SysResult, SyscallResult};
+use systype::{SysError, SyscallResult};
 use vfs::{
     file::File,
     kstat::Kstat,
@@ -143,6 +143,10 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
 ///   `lock` carefully and do not pass the `lock` across `await` as possible.
 pub async fn sys_write(fd: usize, addr: usize, len: usize) -> SyscallResult {
     // log::trace!("[sys_write] fd: {fd}, addr: {addr:#x}, len: {len:#x}");
+
+    if len == 0x52 {
+        simdebug::stop();
+    }
 
     let task = current_task();
     let addr_space = task.addr_space();
@@ -307,25 +311,39 @@ pub fn sys_fstatat(dirfd: usize, pathname: usize, stat_buf: usize, flags: i32) -
     let path = UserReadPtr::<u8>::new(pathname, &addr_space).read_c_string(256)?;
     let path = path.into_string().map_err(|_| SysError::EINVAL)?;
 
-    log::info!("[sys_fstat_at] dirfd: {dirfd:#x}, path: {path}, flags: {flags}");
+    log::info!("[sys_fstat_at] dirfd: {dirfd:#x}, path: {path}");
 
-    if !(flags == 0 || flags == AtFlags::AT_SYMLINK_NOFOLLOW.bits()) {
+    if !(flags == 0
+        || flags == AtFlags::AT_SYMLINK_NOFOLLOW.bits()
+        || flags == AtFlags::AT_EMPTY_PATH.bits())
+    {
         log::warn!("[sys_fstatat] flags: {flags} is not supported");
         return Err(SysError::EINVAL);
     }
     let flags = AtFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
+    log::info!("[sys_fstat_at] dirfd: {dirfd:#x}, path: {path}, flags: {flags:?}");
 
     let dentry = {
-        let dentry = task.walk_at(AtFd::from(dirfd), path)?;
-        if !flags.contains(AtFlags::AT_SYMLINK_NOFOLLOW)
-            && !dentry.is_negative()
-            && dentry.inode().unwrap().inotype().is_symlink()
-        {
-            Path::resolve_symlink_through(dentry)?
+        if flags.contains(AtFlags::AT_EMPTY_PATH) {
+            let dirfd: AtFd = AtFd::from(dirfd);
+            log::info!("[sys_fstat_at] dirfd: {dirfd:?}");
+            match dirfd {
+                AtFd::FdCwd => Err(SysError::EINVAL)?,
+                AtFd::Normal(fd) => task.with_mut_fdtable(|t| t.get_file(fd))?.dentry(),
+            }
         } else {
-            dentry
+            let dentry = task.walk_at(AtFd::from(dirfd), path)?;
+            if !flags.contains(AtFlags::AT_SYMLINK_NOFOLLOW)
+                && !dentry.is_negative()
+                && dentry.inode().unwrap().inotype().is_symlink()
+            {
+                Path::resolve_symlink_through(dentry)?
+            } else {
+                dentry
+            }
         }
     };
+    log::info!("[sys_fstat_at] dentry path: {}", dentry.path());
     let inode = dentry.inode().ok_or(SysError::ENOENT)?;
     let kstat = Kstat::from_vfs_file(inode)?;
     unsafe {

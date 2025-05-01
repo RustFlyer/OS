@@ -91,6 +91,7 @@ impl AddrSpace {
             .map(|(_, vma)| vma.end_va() > area.start_va())
             .unwrap_or(false)
         {
+            log::info!("prev overlap {:?}", area);
             return Err(SysError::EINVAL);
         }
         if lower_gap
@@ -98,6 +99,7 @@ impl AddrSpace {
             .map(|(&start_va, _)| start_va < area.end_va())
             .unwrap_or(false)
         {
+            log::info!("next overlap {:?}", area);
             return Err(SysError::EINVAL);
         }
 

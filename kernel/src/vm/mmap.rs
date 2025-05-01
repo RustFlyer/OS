@@ -130,9 +130,14 @@ impl AddrSpace {
             None => VmArea::new_anonymous(va_start, va_end, vma_flag, mem_prot),
         };
 
-        log::debug!("[map_file] try to add new area");
+        log::info!("[map_file] try to add new area");
 
         if flags.contains(MmapFlags::MAP_FIXED) {
+            log::debug!(
+                "[map_file] MmapFlags::MAP_FIXED remove area {:?} -{}",
+                va_start,
+                length
+            );
             self.remove_mapping(va_start, length);
         }
 
