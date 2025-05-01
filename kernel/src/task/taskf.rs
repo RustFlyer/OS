@@ -9,6 +9,7 @@ use core::cell::SyncUnsafeCell;
 use core::sync::atomic::AtomicUsize;
 use core::time::Duration;
 use osfuture::suspend_now;
+use time::itime::ITimer;
 
 use arch::riscv64::time::get_time_duration;
 use config::process::CloneFlags;
@@ -52,7 +53,7 @@ impl Task {
     pub async fn suspend_timeout(&self, limit: Duration) -> Duration {
         let expire = limit;
         let mut timer = Timer::new(expire);
-        timer.set_callback(self.get_waker().clone());
+        timer.set_waker_callback(self.get_waker().clone());
         TIMER_MANAGER.add_timer(timer);
         suspend_now().await;
         let now = get_time_duration();
@@ -216,6 +217,8 @@ impl Task {
         let sig_stack = SyncUnsafeCell::new(*self.sig_stack_mut());
         let sig_cx_ptr = AtomicUsize::new(0);
 
+        let itimers = new_share_mutex([ITimer::default(); 3]);
+
         let addr_space = if cloneflags.contains(CloneFlags::VM) {
             self.addr_space()
         } else {
@@ -254,6 +257,7 @@ impl Task {
             fd_table,
             cwd,
             elf,
+            itimers,
             name,
         ));
 

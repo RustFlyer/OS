@@ -132,6 +132,10 @@ impl ExtFile {
     /// Returns the number of bytes written.
     pub fn write(&mut self, buf: &[u8]) -> SysResult<usize> {
         let mut count = 0;
+        log::debug!("[ext4::write] {}", buf.len());
+        if buf.len() == 4096 {
+            simdebug::stop();
+        }
         let err = unsafe {
             ext4_fwrite(
                 self.0.get_mut(),
@@ -208,6 +212,10 @@ impl ExtFile {
     /// Returns the size of the file in bytes.
     pub fn size(&self) -> u64 {
         unsafe { ext4_fsize(self.0.get()) }
+    }
+
+    pub fn setsize(&self) -> u64 {
+        0
     }
 
     /* I'm not sure if we need the following two functions. Maybe remove it later. */

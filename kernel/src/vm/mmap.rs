@@ -105,12 +105,15 @@ impl AddrSpace {
         let vma_flag = match flags.intersection(MmapFlags::MAP_TYPE_MASK) {
             MmapFlags::MAP_PRIVATE => Ok(VmaFlags::PRIVATE),
             MmapFlags::MAP_SHARED => Ok(VmaFlags::SHARED),
-            _ => Err(SysError::EINVAL),
+            e => {
+                log::error!("[map_file] invalid flag: {:?}", e);
+                Err(SysError::EINVAL)
+            }
         }?;
 
         let mem_prot = MemPerm::from_mmapprot(prot);
 
-        // info!("[map_file] vma_flag: [{vma_flag:?}], mem_prot: [{mem_prot:?}]");
+        log::info!("[map_file] vma_flag: [{vma_flag:?}], mem_prot: [{mem_prot:?}]");
         // info!("[map_file] offset: [{offset:?}], length: [{length:?}]");
         // info!("[map_file] va_start: [{va_start:?}], va_end: [{va_end:?}]");
 
@@ -126,6 +129,12 @@ impl AddrSpace {
             ),
             None => VmArea::new_anonymous(va_start, va_end, vma_flag, mem_prot),
         };
+
+        log::debug!("[map_file] try to add new area");
+
+        if flags.contains(MmapFlags::MAP_FIXED) {
+            self.remove_mapping(va_start, length);
+        }
 
         self.add_area(area)?;
 

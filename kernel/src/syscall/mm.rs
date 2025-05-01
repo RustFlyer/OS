@@ -41,6 +41,11 @@ use crate::{
 ///   to other processes mapping the same file, and are not carried through to the underlying
 ///   file. It is unspecified whether changes made to the file after the mmap() call are visible
 ///   in the mapped region.
+/// - `MAP_FIXED`: Don't interpret addr as a hint: place the mapping at exactly that address.
+///   addr must be suitably aligned: for most architectures a multiple of the page size is sufficient;
+///   however, some architectures may impose additional restrictions. If the memory region specified by
+///   addr and length overlaps pages of any existing mapping(s), then the overlapped part of the existing
+///   mapping(s) will be discarded. If the specified address cannot be used, mmap() will fail.
 pub async fn sys_mmap(
     addr: usize,
     length: usize,

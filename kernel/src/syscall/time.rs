@@ -1,13 +1,15 @@
 use core::time::Duration;
 
+use alloc::sync::Arc;
 use arch::riscv64::time::{get_time_duration, get_time_us};
 use osfuture::{Select2Futures, SelectOutput};
 use systype::{SysError, SyscallResult};
-use time::{TMS, TimeSpec, TimeVal};
+use time::{TMS, TimeSpec, TimeVal, TimeValue, itime::ITimerVal};
+use timer::{TIMER_MANAGER, Timer};
 
 use crate::{
     processor::current_task,
-    task::{TaskState, sig_members::IntrBySignalFuture},
+    task::{TaskState, sig_members::IntrBySignalFuture, time::RealITimer, timeid::timeid_alloc},
     vm::user_ptr::{UserReadPtr, UserWritePtr},
 };
 
@@ -208,13 +210,11 @@ pub async fn sys_clock_nanosleep(
     /// for clock_nanosleep
     pub const TIMER_ABSTIME: usize = 1;
     match clockid {
-        // FIXME: what is CLOCK_MONOTONIC
         CLOCK_REALTIME | CLOCK_MONOTONIC => {
             let ts = unsafe { t.read()? };
             let req: Duration = ts.into();
             let remain = if flags == TIMER_ABSTIME {
                 let current = get_time_duration();
-                // request time is absolutely
                 if req.le(&current) {
                     return Ok(0);
                 }
@@ -239,4 +239,123 @@ pub async fn sys_clock_nanosleep(
             return Err(SysError::EINVAL);
         }
     }
+}
+
+/// The function setitimer() arms or disarms the timer specified by which, by setting the
+/// timer to the value specified by new_value. If old_value is non-NULL, the buffer it
+/// points to is used to return the previous value of the timer (i.e., the same information
+/// that is returned by getitimer()).
+///
+/// If either field in new_value.it_value is nonzero, then the timer is armed to initially
+/// expire at the specified time. If both fields in new_value.it_value are zero, then
+/// the timer is disarmed.
+///
+/// The new_value.it_interval field specifies the new interval for the timer; if both
+/// of its subfields are zero, the timer is single-shot.
+/// ```c
+/// struct itimerval {
+///     struct timeval it_interval; /* Interval for periodic timer */
+///     struct timeval it_value;    /* Time until next expiration */
+/// };
+///
+/// struct timeval {
+///     time_t      tv_sec;         /* seconds */
+///     suseconds_t tv_usec;        /* microseconds */
+/// };
+/// ```
+pub fn sys_setitimer(which: usize, new_itimeval: usize, old_itimeval: usize) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+
+    let mut old_itimeval = UserWritePtr::<ITimerVal>::new(old_itimeval, &addrspace);
+    let mut new_itimeval = UserReadPtr::<ITimerVal>::new(new_itimeval, &addrspace);
+
+    let nitimeval = unsafe { new_itimeval.read() }?;
+
+    if !nitimeval.is_valid() {
+        return Err(SysError::EINVAL);
+    }
+    let timerid = timeid_alloc();
+
+    match which {
+        CLOCK_REALTIME => {
+            let (old, next_expire) = task.with_mut_itimers(|itimers| {
+                let itimer = &mut itimers[which];
+                let old = ITimerVal {
+                    it_interval: itimer.interval.into(),
+                    it_value: itimer
+                        .next_expire
+                        .saturating_sub(get_time_duration())
+                        .into(),
+                };
+
+                itimer.id = timerid.0;
+                itimer.interval = nitimeval.it_interval.into();
+
+                if nitimeval.it_value.is_zero() {
+                    itimer.next_expire = Duration::ZERO;
+                    (old, Duration::ZERO)
+                } else {
+                    itimer.next_expire = get_time_duration() + nitimeval.it_value.into();
+                    (old, nitimeval.it_value.into())
+                }
+            });
+            if !nitimeval.it_value.is_zero() {
+                let rtimer = RealITimer {
+                    task: Arc::downgrade(&task),
+                    id: timerid.0,
+                };
+                let mut timer = Timer::new(next_expire);
+                timer.set_callback(Arc::new(rtimer));
+                TIMER_MANAGER.add_timer(timer);
+            }
+
+            if !old_itimeval.is_null() {
+                unsafe { old_itimeval.write(old)? };
+            }
+        }
+        _ => {
+            log::error!("[sys_setitimer] not implemented");
+        }
+    }
+    Ok(0)
+}
+
+/// The function getitimer() places the current value of the timer specified by which in
+/// the buffer pointed to by curr_value.
+///
+/// The it_value substructure is populated with the amount of time remaining until
+/// the next expiration of the specified timer. This value changes as the timer
+/// counts down, and will be reset to it_interval when the timer expires.
+/// If both fields of it_value are zero, then this timer is currently disarmed
+/// (inactive).
+///
+/// The it_interval substructure is populated with the timer interval. If both fields
+/// of it_interval are zero, then this is a single-shot timer (i.e., it expires just once).
+pub fn sys_getitimer(which: usize, curr_value: usize) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+
+    let mut curr_value = UserWritePtr::<ITimerVal>::new(curr_value, &addrspace);
+
+    if curr_value.is_null() {
+        return Ok(0);
+    }
+
+    let itimerval = task.with_mut_itimers(|itimers| {
+        let itimer = &itimers[which];
+        ITimerVal {
+            it_interval: itimer.interval.into(),
+            it_value: itimer
+                .next_expire
+                .saturating_sub(get_time_duration())
+                .into(),
+        }
+    });
+
+    unsafe {
+        curr_value.write(itimerval)?;
+    }
+
+    Ok(0)
 }

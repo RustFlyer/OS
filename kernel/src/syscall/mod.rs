@@ -99,6 +99,10 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         RENAMEAT2 => sys_renameat2(args[0], args[1], args[2], args[3], args[4] as i32),
         LINKAT => sys_linkat(args[0], args[1], args[2], args[3], args[4] as i32),
         SYMLINKAT => sys_symlinkat(args[0], args[1], args[2]),
+        SYNC => sys_sync(),
+        SETITIMER => sys_setitimer(args[0], args[1], args[2]),
+        GETITIMER => sys_getitimer(args[0], args[1]),
+        UMASK => sys_umask(args[0] as i32),
         _ => {
             log::error!("Syscall not implemented: {}", syscall_no.as_str());
             unimplemented!()

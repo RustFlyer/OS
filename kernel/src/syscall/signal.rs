@@ -87,12 +87,14 @@ pub fn sys_sigaction(sig_code: i32, new_sa: usize, prev_sa: usize) -> SyscallRes
 
     let mut handlers = task.sig_handlers_mut().lock();
     let sig = Sig::from_i32(sig_code);
-    if !sig.is_valid() || matches!(sig, Sig::SIGKILL | Sig::SIGSTOP) {
-        return Err(SysError::EINVAL);
-    }
+
     log::info!(
         "[sys_sigaction] for {sig_code:?} signal in task {tid}, new handler:{new_sa:?}, save previous handler in:{prev_sa:?}"
     );
+
+    if !sig.is_valid() || matches!(sig, Sig::SIGKILL | Sig::SIGSTOP) {
+        return Err(SysError::EINVAL);
+    }
 
     if !prev_sa.is_null() {
         let prev = handlers.get(sig);

@@ -1,8 +1,51 @@
 use core::time::Duration;
 
+use alloc::sync::{Arc, Weak};
 use bitflags::bitflags;
+use timer::{IEvent, TimerState};
 
-use super::Task;
+use super::{
+    Task,
+    signal::sig_info::{Sig, SigDetails, SigInfo},
+};
+
+#[derive(Default, Debug)]
+pub struct RealITimer {
+    pub task: Weak<Task>,
+    pub id: usize,
+}
+
+impl IEvent for RealITimer {
+    fn callback(self: Arc<Self>) -> TimerState {
+        if let Some(task) = self.task.upgrade() {
+            task.with_mut_itimers(|itimers| {
+                log::debug!("[RealITimer] IEvent is called");
+                let real = &mut itimers[0];
+
+                if real.id != self.id {
+                    log::debug!("[RealITimer] IEvent id wrong");
+                    return TimerState::Cancelled;
+                }
+
+                task.receive_siginfo(SigInfo {
+                    sig: Sig::SIGALRM,
+                    code: SigInfo::KERNEL,
+                    details: SigDetails::None,
+                });
+
+                if real.interval == Duration::ZERO {
+                    log::debug!("[RealITimer] task timer interval is zero");
+                    TimerState::Cancelled
+                } else {
+                    log::debug!("[RealITimer] IEvent wake next timer");
+                    TimerState::Active
+                }
+            })
+        } else {
+            TimerState::Cancelled
+        }
+    }
+}
 
 impl Task {
     pub fn get_process_ustime(&self) -> (Duration, Duration) {

@@ -218,7 +218,7 @@ pub fn sys_readlinkat(dirfd: usize, pathname: usize, buf: usize, bufsiz: usize) 
 ///   the `size` of the file).  If data is **later written** at this point, **subsequent reads** of the data in
 ///   the gap (a "hole") return `null` bytes ('\0') until data is actually written into the gap.
 pub fn sys_lseek(fd: usize, offset: isize, whence: usize) -> SyscallResult {
-    log::info!("[sys_lseek] fd: {fd}, offset: {offset}, whence: {whence}");
+    // log::info!("[sys_lseek] fd: {fd}, offset: {offset}, whence: {whence}");
 
     #[derive(FromRepr)]
     #[repr(usize)]
@@ -867,6 +867,10 @@ pub fn sys_fcntl(fd: usize, op: isize, arg: usize) -> SyscallResult {
         F_DUPFD_CLOEXEC => {
             task.with_mut_fdtable(|table| table.dup_with_bound(fd, arg, OpenFlags::O_CLOEXEC))
         }
+        F_GETFL => {
+            let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
+            Ok(file.flags().bits() as _)
+        }
         _ => {
             log::error!("[sys_fcntl] not implemented {op:?}");
             Ok(0)
@@ -1288,9 +1292,7 @@ pub fn sys_symlinkat(target: usize, newdirfd: usize, linkpath: usize) -> Syscall
     let target = ctarget.into_string().map_err(|_| SysError::EINVAL)?;
     let linkpath = clinkpath.into_string().map_err(|_| SysError::EINVAL)?;
 
-    log::info!(
-        "[sys_symlinkat] target: {target}, newdirfd: {newdirfd:?}, linkpath: {linkpath}"
-    );
+    log::info!("[sys_symlinkat] target: {target}, newdirfd: {newdirfd:?}, linkpath: {linkpath}");
 
     let newdirfd = AtFd::from(newdirfd);
 
@@ -1300,4 +1302,23 @@ pub fn sys_symlinkat(target: usize, newdirfd: usize, linkpath: usize) -> Syscall
     }
     dentry.parent().unwrap().symlink(dentry.as_ref(), &target)?;
     Ok(0)
+}
+
+/// `sync()` causes all pending modifications to filesystem metadata and
+/// cached file data to be written to the underlying filesystems.
+pub fn sys_sync() -> SyscallResult {
+    log::error!("[sys_sync] not implemented.");
+    Ok(0)
+}
+
+/// umask() sets the calling process's file mode creation mask (umask) to
+/// mask & 0777 (i.e., only the file permission bits of mask are used),
+/// and returns the previous value of the mask.
+///
+/// The umask is used by open(2), mkdir(2), and other system calls that
+/// create files to modify the permissions placed on newly created files
+/// or directories. Specifically, permissions in the umask are turned off
+/// from the mode argument to open(2) and mkdir(2).
+pub fn sys_umask(_mask: i32) -> SyscallResult {
+    Ok(0x777)
 }

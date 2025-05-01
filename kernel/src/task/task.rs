@@ -12,6 +12,7 @@ use core::cell::SyncUnsafeCell;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use core::task::Waker;
 use mutex::{ShareMutex, SpinNoIrqLock, new_share_mutex};
+use time::itime::ITimer;
 use vfs::{dentry::Dentry, file::File};
 
 use osfs::{fd_table::FdTable, sys_root_dentry};
@@ -133,6 +134,8 @@ pub struct Task {
 
     is_yield: AtomicBool,
 
+    itimers: ShareMutex<[ITimer; 3]>,
+
     // name, used for debug
     name: SyncUnsafeCell<String>,
 }
@@ -174,6 +177,7 @@ impl Task {
             elf: SyncUnsafeCell::new(elf_file),
             is_syscall: AtomicBool::new(false),
             is_yield: AtomicBool::new(false),
+            itimers: new_share_mutex([ITimer::default(); 3]),
             name: SyncUnsafeCell::new(name),
         };
         task
@@ -209,6 +213,8 @@ impl Task {
         cwd: ShareMutex<Arc<dyn Dentry>>,
         elf: SyncUnsafeCell<Arc<dyn File>>,
 
+        itimers: ShareMutex<[ITimer; 3]>,
+
         name: SyncUnsafeCell<String>,
     ) -> Self {
         Task {
@@ -241,6 +247,7 @@ impl Task {
             elf,
             is_syscall: AtomicBool::new(false),
             is_yield: AtomicBool::new(false),
+            itimers,
             name,
         }
     }
@@ -343,6 +350,10 @@ impl Task {
 
     pub fn with_mut_sig_manager<T>(&self, f: impl FnOnce(&mut SigManager) -> T) -> T {
         f(&mut self.sig_manager_mut())
+    }
+
+    pub fn with_mut_itimers<T>(&self, f: impl FnOnce(&mut [ITimer; 3]) -> T) -> T {
+        f(&mut self.itimers.lock())
     }
 
     pub fn cwd_mut(&self) -> Arc<dyn Dentry> {

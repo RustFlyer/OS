@@ -49,7 +49,7 @@ impl<F: Future + Send + 'static> Future for TimeoutFuture<F> {
 
         // Register the timer if we haven't already
         if !this.registered {
-            this.timer.set_callback(cx.waker().clone());
+            this.timer.set_waker_callback(cx.waker().clone());
             TIMER_MANAGER.add_timer(this.timer.clone());
             this.registered = true;
             log::debug!("[TimeoutFuture] Registered new timer");
@@ -84,7 +84,7 @@ impl Future for SleepFuture {
         }
 
         if !this.registered {
-            this.timer.set_callback(cx.waker().clone());
+            this.timer.set_waker_callback(cx.waker().clone());
             TIMER_MANAGER.add_timer(this.timer.clone());
             this.registered = true;
             log::debug!("[SleepFuture] Registered new timer");
@@ -126,7 +126,7 @@ impl Future for IntervalFuture {
         let this = unsafe { self.get_unchecked_mut() };
 
         if !this.registered {
-            this.timer.set_callback(cx.waker().clone());
+            this.timer.set_waker_callback(cx.waker().clone());
             TIMER_MANAGER.add_timer(this.timer.clone());
             this.registered = true;
             log::debug!("[IntervalFuture] Registered new periodic timer");

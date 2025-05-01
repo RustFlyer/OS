@@ -342,6 +342,11 @@ impl dyn File {
         self.set_pos(new_position);
         inode.set_size(usize::max(inode.size(), new_position));
         inode.set_state(InodeState::DirtyAll);
+        log::debug!(
+            "[File::write] bytes_written: {}, inode type: {:?}",
+            bytes_written,
+            inode.inotype(),
+        );
         Ok(bytes_written)
     }
 
