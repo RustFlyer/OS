@@ -12,10 +12,12 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use bitflags::*;
 use config::inode::InodeType;
+use config::mm::USER_STACK_SIZE;
 use config::process::CloneFlags;
 use osfs::sys_root_dentry;
 use osfuture::{suspend_now, yield_now};
-use systype::{SysError, SyscallResult};
+use strum::FromRepr;
+use systype::{RLimit, SysError, SyscallResult};
 use vfs::file::File;
 use vfs::path::Path;
 
@@ -534,8 +536,120 @@ pub fn sys_setpgid(pid: usize, pgid: usize) -> SyscallResult {
     Ok(0)
 }
 
-/// geteuid() returns the effective user ID of the calling process.
+/// `geteuid()` returns the effective user ID of the calling process.
 pub fn sys_geteuid() -> SyscallResult {
     log::error!("[geteuid] unimplemented call");
+    Ok(0)
+}
+
+#[derive(FromRepr, Clone, Copy, Debug, Eq, PartialEq)]
+#[repr(i32)]
+pub enum Resource {
+    // Per-process CPU limit, in seconds.
+    CPU = 0,
+    // Largest file that can be created, in bytes.
+    FSIZE = 1,
+    // Maximum size of data segment, in bytes.
+    DATA = 2,
+    // Maximum size of stack segment, in bytes.
+    STACK = 3,
+    // Largest core file that can be created, in bytes.
+    CORE = 4,
+    // Largest resident set size, in bytes.
+    // This affects swapping; processes that are exceeding their
+    // resident set size will be more likely to have physical memory
+    // taken from them.
+    RSS = 5,
+    // Number of processes.
+    NPROC = 6,
+    // Number of open files.
+    NOFILE = 7,
+    // Locked-in-memory address space.
+    MEMLOCK = 8,
+    // Address space limit.
+    AS = 9,
+    // Maximum number of file locks.
+    LOCKS = 10,
+    // Maximum number of pending signals.
+    SIGPENDING = 11,
+    // Maximum bytes in POSIX message queues.
+    MSGQUEUE = 12,
+    // Maximum nice priority allowed to raise to.
+    // Nice levels 19 .. -20 correspond to 0 .. 39
+    // values of this resource limit.
+    NICE = 13,
+    // Maximum realtime priority allowed for non-priviledged
+    // processes.
+    RTPRIO = 14,
+    // Maximum CPU time in microseconds that a process scheduled under a real-time
+    // scheduling policy may consume without making a blocking system
+    // call before being forcibly descheduled.
+    RTTIME = 15,
+}
+
+/// `prlimit()` system call combines and extends the functionality of `setrlimit()` and `getrlimit()`.
+/// It can be used to both set and get the resource limits of an arbitrary process.
+///
+/// If the `new_limit` argument is not NULL, then the rlimit structure to which it points is
+/// used to set new values for the soft and hard limits for resource.
+///
+/// If the `old_limit` argument is not NULL, then a successful call to `prlimit()` places the
+/// previous soft and hard limits for resource in the rlimit structure pointed to by `old_limit`.
+///
+///
+/// The pid argument specifies the ID of the process on which the call is to operate.
+/// If pid is 0, then the call applies to the calling process.
+///```c
+/// struct rlimit {
+///     rlim_t rlim_cur;  /* Soft limit */
+///     rlim_t rlim_max;  /* Hard limit (ceiling for rlim_cur) */
+/// };
+/// ```
+pub fn sys_prlimit64(
+    pid: usize,
+    resource: i32,
+    new_limit: usize,
+    old_limit: usize,
+) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+
+    let mut nlimit = UserReadPtr::<RLimit>::new(new_limit, &addrspace);
+    let mut olimit = UserWritePtr::<RLimit>::new(old_limit, &addrspace);
+
+    let ptask = if pid == 0 {
+        task.clone()
+    } else {
+        TASK_MANAGER.get_task(pid).ok_or(SysError::EINVAL)?
+    };
+
+    let resource = Resource::from_repr(resource).ok_or(SysError::EINVAL)?;
+
+    log::debug!("[prlimit64] pid: {pid}, resource: {resource:?}");
+
+    if !olimit.is_null() {
+        match resource {
+            Resource::STACK => {
+                let rstack = RLimit::one(USER_STACK_SIZE, USER_STACK_SIZE);
+                unsafe { olimit.write(rstack)? };
+            }
+            r => {
+                log::error!("[sys_prlimit64] old limit {:?} not implemented", r);
+            }
+        }
+    }
+
+    if !nlimit.is_null() {
+        match resource {
+            Resource::STACK => {
+                let rstack = unsafe { nlimit.read()? };
+                log::debug!("[sys_prlimit64] new limit STACK: {:?}", rstack);
+            }
+            r => {
+                log::error!("[sys_prlimit64] new limit {:?} not implemented", r);
+            }
+        }
+    }
+
     Ok(0)
 }

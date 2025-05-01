@@ -27,4 +27,8 @@ impl RLimit {
             rlim_max: RLIM_INFINITY,
         }
     }
+
+    pub fn one(rlim_cur: usize, rlim_max: usize) -> Self {
+        Self { rlim_cur, rlim_max }
+    }
 }

@@ -1,6 +1,7 @@
 use crate::{
     processor::current_task,
     task::{
+        TaskState,
         manager::TASK_MANAGER,
         sig_members::{Action, ActionType, SIG_DFL, SIG_IGN, SigAction, SigContext},
         signal::sig_info::*,
@@ -8,7 +9,9 @@ use crate::{
     vm::user_ptr::{UserReadPtr, UserWritePtr},
 };
 use config::process::INIT_PROC_ID;
+use osfuture::suspend_now;
 use systype::{SysError, SyscallResult};
+use time::{TimeSpec, TimeValue};
 
 /// - if pid > 0, send a SigInfo built on sig_code to the process with pid
 /// - If pid = -1, then sig is sent to every process for which the calling
@@ -349,4 +352,60 @@ pub fn sys_tgkill(tgid: isize, tid: isize, signum: i32) -> SyscallResult {
         }
         return Err(SysError::ESRCH);
     })
+}
+
+/// Suspends execution of the calling thread until one of the signals in set
+/// is pending (If one of the signals in set is already pending for the
+/// calling thread, sigwaitinfo() will return immediately.). It removes the
+/// signal from the set of pending signals and returns the signal number
+/// as its function result.
+pub async fn sys_rt_sigtimedwait(set: usize, info: usize, timeout: usize) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+
+    let mut set = UserReadPtr::<SigSet>::new(set, &addrspace);
+    let mut info = UserWritePtr::<SigInfo>::new(info, &addrspace);
+    let mut timeout = UserReadPtr::<TimeSpec>::new(timeout, &addrspace);
+
+    let mut set = unsafe { set.read()? };
+    set.remove(SigSet::SIGKILL | SigSet::SIGSTOP);
+    let sig = task.with_mut_sig_manager(|pending| {
+        if let Some(si) = pending.get_expect(set) {
+            Some(si.sig)
+        } else {
+            pending.should_wake = set | SigSet::SIGKILL | SigSet::SIGSTOP;
+            None
+        }
+    });
+
+    if let Some(sig) = sig {
+        return Ok(sig.raw());
+    }
+
+    task.set_state(TaskState::Interruptable);
+    if !timeout.is_null() {
+        let timeout = unsafe { timeout.read()? };
+        if !timeout.is_valid() {
+            return Err(SysError::EINVAL);
+        }
+        log::warn!("[sys_rt_sigtimedwait] {:?}", timeout);
+        task.suspend_timeout(timeout.into()).await;
+    } else {
+        suspend_now().await;
+    }
+
+    task.set_state(TaskState::Running);
+    let si = task.with_mut_sig_manager(|pending| pending.dequeue_expect(set));
+    if let Some(si) = si {
+        log::warn!("[sys_rt_sigtimedwait] I'm woken by {:?}", si);
+        if !info.is_null() {
+            unsafe {
+                info.write(si)?;
+            }
+        }
+        Ok(si.sig.raw())
+    } else {
+        log::warn!("[sys_rt_sigtimedwait] I'm woken by timeout");
+        Err(SysError::EAGAIN)
+    }
 }

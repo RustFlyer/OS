@@ -9,7 +9,7 @@ mod user;
 
 use consts::SyscallNo::{self, *};
 use fs::*;
-use misc::{sys_sysinfo, sys_syslog, sys_uname};
+use misc::{sys_getrandom, sys_sysinfo, sys_syslog, sys_uname};
 use mm::*;
 use process::*;
 use signal::*;
@@ -103,6 +103,9 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         SETITIMER => sys_setitimer(args[0], args[1], args[2]),
         GETITIMER => sys_getitimer(args[0], args[1]),
         UMASK => sys_umask(args[0] as i32),
+        PRLIMIT64 => sys_prlimit64(args[0], args[1] as i32, args[2], args[3]),
+        GETRANDOM => sys_getrandom(args[0], args[1], args[2] as i32),
+        RT_SIGTIMEDWAIT => sys_rt_sigtimedwait(args[0], args[1], args[2]).await,
         _ => {
             log::error!("Syscall not implemented: {}", syscall_no.as_str());
             unimplemented!()
