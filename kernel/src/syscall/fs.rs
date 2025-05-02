@@ -142,7 +142,7 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
 /// - This is a `async` syscall, which means that it likely `yield` or `suspend` when called. Therefore, use
 ///   `lock` carefully and do not pass the `lock` across `await` as possible.
 pub async fn sys_write(fd: usize, addr: usize, len: usize) -> SyscallResult {
-    // log::trace!("[sys_write] fd: {fd}, addr: {addr:#x}, len: {len:#x}");
+    // log::info!("[sys_write] fd: {fd}, addr: {addr:#x}, len: {len:#x}");
 
     if len == 0x52 {
         simdebug::stop();
@@ -298,7 +298,7 @@ pub fn sys_fstat(fd: usize, stat_buf: usize) -> SyscallResult {
     let task = current_task();
     let addr_space = task.addr_space();
     let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
-    let kstat = Kstat::from_vfs_file(file.inode())?;
+    let kstat = Kstat::from_vfs_inode(file.inode())?;
     unsafe {
         UserWritePtr::<Kstat>::new(stat_buf, &addr_space).write(kstat)?;
     }
@@ -311,8 +311,6 @@ pub fn sys_fstatat(dirfd: usize, pathname: usize, stat_buf: usize, flags: i32) -
     let path = UserReadPtr::<u8>::new(pathname, &addr_space).read_c_string(256)?;
     let path = path.into_string().map_err(|_| SysError::EINVAL)?;
 
-    log::info!("[sys_fstat_at] dirfd: {dirfd:#x}, path: {path}");
-
     if !(flags == 0
         || flags == AtFlags::AT_SYMLINK_NOFOLLOW.bits()
         || flags == AtFlags::AT_EMPTY_PATH.bits())
@@ -320,13 +318,13 @@ pub fn sys_fstatat(dirfd: usize, pathname: usize, stat_buf: usize, flags: i32) -
         log::warn!("[sys_fstatat] flags: {flags} is not supported");
         return Err(SysError::EINVAL);
     }
+
     let flags = AtFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
     log::info!("[sys_fstat_at] dirfd: {dirfd:#x}, path: {path}, flags: {flags:?}");
 
     let dentry = {
         if flags.contains(AtFlags::AT_EMPTY_PATH) {
             let dirfd: AtFd = AtFd::from(dirfd);
-            log::info!("[sys_fstat_at] dirfd: {dirfd:?}");
             match dirfd {
                 AtFd::FdCwd => Err(SysError::EINVAL)?,
                 AtFd::Normal(fd) => task.with_mut_fdtable(|t| t.get_file(fd))?.dentry(),
@@ -345,7 +343,7 @@ pub fn sys_fstatat(dirfd: usize, pathname: usize, stat_buf: usize, flags: i32) -
     };
     log::info!("[sys_fstat_at] dentry path: {}", dentry.path());
     let inode = dentry.inode().ok_or(SysError::ENOENT)?;
-    let kstat = Kstat::from_vfs_file(inode)?;
+    let kstat = Kstat::from_vfs_inode(inode)?;
     unsafe {
         UserWritePtr::<Kstat>::new(stat_buf, &addr_space).write(kstat)?;
     }

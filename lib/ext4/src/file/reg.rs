@@ -32,6 +32,12 @@ impl File for ExtRegFile {
 
     async fn base_read(&self, buf: &mut [u8], pos: usize) -> SysResult<usize> {
         let mut ext4_file = self.file.lock();
+        if pos >= self.meta().dentry.inode().unwrap().size() {
+            // `lwext4` will return an `EINVAL` error if the position is beyond the end
+            // of the file when calling `seek`, which is not consistent with the `fseek`
+            // function in `libc`. This is a workaround to fix it.
+            return Ok(0);
+        }
         ext4_file.seek(SeekFrom::Start(pos as u64))?;
         ext4_file.read(buf)
     }

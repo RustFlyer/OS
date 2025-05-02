@@ -132,10 +132,6 @@ impl ExtFile {
     /// Returns the number of bytes written.
     pub fn write(&mut self, buf: &[u8]) -> SysResult<usize> {
         let mut count = 0;
-        log::debug!("[ext4::write] {}", buf.len());
-        if buf.len() == 4096 {
-            simdebug::stop();
-        }
         let err = unsafe {
             ext4_fwrite(
                 self.0.get_mut(),

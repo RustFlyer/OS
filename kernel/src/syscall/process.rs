@@ -378,13 +378,13 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
     let args = read_string_array(argv)?;
     let mut envs = read_string_array(envp)?;
 
-    log::info!("[sys_execve] args: {args:?}");
-    log::info!("[sys_execve] envs: {envs:?}");
-    log::info!("[sys_execve] path: {path:?}");
-
     envs.push(String::from(
         r#"PATH=/:/bin:/sbin:/usr/bin:/usr/local/bin:/usr/local/sbin:"#,
     ));
+
+    log::info!("[sys_execve] args: {args:?}");
+    log::info!("[sys_execve] envs: {envs:?}");
+    log::info!("[sys_execve] path: {path:?}");
 
     let dentry = {
         let path = Path::new(sys_root_dentry(), path);
