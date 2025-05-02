@@ -108,6 +108,17 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         RT_SIGTIMEDWAIT => sys_rt_sigtimedwait(args[0], args[1], args[2]).await,
         FTRUNCATE => sys_ftruncate(args[0], args[1]),
         FSYNC => sys_fsync(args[0]),
+        FUTEX => {
+            sys_futex(
+                args[0],
+                args[1] as i32,
+                args[2] as u32,
+                args[3],
+                args[4],
+                args[5] as u32,
+            )
+            .await
+        }
         _ => {
             log::error!("Syscall not implemented: {}", syscall_no.as_str());
             unimplemented!()

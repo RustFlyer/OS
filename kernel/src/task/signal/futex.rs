@@ -1,14 +1,24 @@
 use alloc::vec::Vec;
 use bitflags::bitflags;
+use core::{
+    cmp::min,
+    ops::{ControlFlow, DerefMut},
+    sync::atomic::{AtomicU32, Ordering},
+    task::Waker,
+};
 use hashbrown::HashMap;
 use mutex::SpinNoIrqLock;
 use spin::Lazy;
-use core::{cmp::min, ops::{ControlFlow, DerefMut}, sync::atomic::{AtomicU32, Ordering}, task::Waker};
 
 use mm::address::{PhysAddr, VirtAddr, VirtPageNum};
 use systype::{SysError, SysResult, SyscallResult};
 
-use crate::{processor::current_task, task::{tid::Tid, Task}, trap::trap_env::{set_kernel_stvec, set_kernel_stvec_user_rw, will_read_fail, will_write_fail}, vm::{mem_perm::MemPerm, user_ptr::SumGuard}};
+use crate::{
+    processor::current_task,
+    task::{Task, tid::Tid},
+    trap::trap_env::{set_kernel_stvec, set_kernel_stvec_user_rw, will_read_fail, will_write_fail},
+    vm::{mem_perm::MemPerm, user_ptr::SumGuard},
+};
 
 pub struct FutexAddr {
     pub addr: VirtAddr,
@@ -130,12 +140,7 @@ impl FutexManager {
 }
 
 impl Task {
-    fn just_ensure_user_area(
-        &self,
-        begin: VirtAddr,
-        len: usize,
-        access: MemPerm,
-    ) -> SysResult<()> {
+    fn just_ensure_user_area(&self, begin: VirtAddr, len: usize, access: MemPerm) -> SysResult<()> {
         self.ensure_user_area(begin, len, access, |_, _| ControlFlow::Continue(()))
     }
 
@@ -166,7 +171,8 @@ impl Task {
                 self.addr_space().handle_page_fault(curr_vaddr, access)?
             }
 
-            let next_page_beg: VirtAddr = VirtAddr::from(VirtPageNum::new(curr_vaddr.page_number().to_usize() + 1));
+            let next_page_beg: VirtAddr =
+                VirtAddr::from(VirtPageNum::new(curr_vaddr.page_number().to_usize() + 1));
             let len = next_page_beg.to_usize() - curr_vaddr.to_usize();
 
             match f(curr_vaddr, len) {

@@ -1,16 +1,22 @@
 use crate::{
     processor::current_task,
     task::{
-        manager::TASK_MANAGER, sig_members::{Action, ActionType, SigAction, SigContext, SIG_DFL, SIG_IGN}, signal::{futex::{futex_manager, FutexAddr, FutexHashKey, FutexOp, FutexWaiter}, sig_info::*}, TaskState
+        TaskState,
+        manager::TASK_MANAGER,
+        sig_members::{Action, ActionType, SIG_DFL, SIG_IGN, SigAction, SigContext},
+        signal::{
+            futex::{FutexAddr, FutexHashKey, FutexOp, FutexWaiter, futex_manager},
+            sig_info::*,
+        },
     },
     vm::user_ptr::{UserReadPtr, UserWritePtr},
 };
 use config::process::INIT_PROC_ID;
+use mm::address::PhysAddr;
 use mm::address::VirtAddr;
 use osfuture::suspend_now;
 use systype::{SysError, SyscallResult};
 use time::{TimeSpec, TimeValue};
-use mm::address::PhysAddr;
 
 /// futex - fast user-space locking
 /// # Arguments
@@ -27,13 +33,14 @@ use mm::address::PhysAddr;
 ///   operation.
 /// - `val3`: depends on the operation.
 pub async fn sys_futex(
-    uaddr: FutexAddr,
+    uaddr: usize,
     futex_op: i32,
     val: u32,
     timeout: usize,
     uaddr2: usize,
     val3: u32,
 ) -> SyscallResult {
+    let uaddr = FutexAddr::from(uaddr);
     let mut futex_op = FutexOp::from_bits_truncate(futex_op);
     let task = current_task();
     uaddr.check()?;
@@ -47,7 +54,10 @@ pub async fn sys_futex(
     } else {
         // to physical address
         let vaddr = VirtAddr::new(uaddr.raw());
-        let ppn = task.addr_space().page_table.find_entry(vaddr.page_number())
+        let ppn = task
+            .addr_space()
+            .page_table
+            .find_entry(vaddr.page_number())
             .ok_or(SysError::EFAULT)?
             .ppn();
         let paddr = PhysAddr::new(ppn.address().to_usize() + vaddr.page_offset());
@@ -77,7 +87,7 @@ pub async fn sys_futex(
                     waker: task.get_waker(),
                 },
             );
-            
+
             task.set_state(TaskState::Interruptable);
 
             let wake_up_signal = !*task.sig_mask_mut();
@@ -85,7 +95,9 @@ pub async fn sys_futex(
             if timeout == 0 {
                 suspend_now().await;
             } else {
-                let timeout = unsafe { UserReadPtr::<TimeSpec>::new(timeout as usize, &task.addr_space()).read() }?;
+                let timeout = unsafe {
+                    UserReadPtr::<TimeSpec>::new(timeout as usize, &task.addr_space()).read()
+                }?;
                 log::info!("[futex_wait] waiting for {:?}", timeout);
                 if !timeout.is_valid() {
                     return Err(SysError::EINVAL);
@@ -118,7 +130,10 @@ pub async fn sys_futex(
             } else {
                 // to physical address
                 let vaddr = VirtAddr::new(uaddr2);
-                let ppn = task.addr_space().page_table.find_entry(vaddr.page_number())
+                let ppn = task
+                    .addr_space()
+                    .page_table
+                    .find_entry(vaddr.page_number())
                     .ok_or(SysError::EFAULT)?
                     .ppn();
                 let paddr = PhysAddr::new(ppn.address().to_usize() + vaddr.page_offset());
@@ -140,7 +155,10 @@ pub async fn sys_futex(
             } else {
                 // to physical address
                 let vaddr = VirtAddr::new(uaddr2);
-                let ppn = task.addr_space().page_table.find_entry(vaddr.page_number())
+                let ppn = task
+                    .addr_space()
+                    .page_table
+                    .find_entry(vaddr.page_number())
                     .ok_or(SysError::EFAULT)?
                     .ppn();
                 let paddr = PhysAddr::new(ppn.address().to_usize() + vaddr.page_offset());
