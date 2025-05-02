@@ -5,7 +5,9 @@ use crate::{TimeVal, TimeValue};
 #[derive(Debug, Clone, Copy, Default)]
 #[repr(C)]
 pub struct ITimerVal {
+    /// Interval for periodic timer
     pub it_interval: TimeVal,
+    /// time until next expired
     pub it_value: TimeVal,
 }
 

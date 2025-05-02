@@ -34,10 +34,10 @@ impl IEvent for RealITimer {
                 });
 
                 if real.interval == Duration::ZERO {
-                    log::debug!("[RealITimer] task timer interval is zero");
+                    log::debug!("[RealITimer] IEvent is Once");
                     TimerState::Cancelled
                 } else {
-                    log::debug!("[RealITimer] IEvent wake next timer");
+                    log::debug!("[RealITimer] IEvent wakes next timer");
                     TimerState::Active
                 }
             })

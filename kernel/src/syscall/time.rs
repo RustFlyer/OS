@@ -271,6 +271,7 @@ pub fn sys_setitimer(which: usize, new_itimeval: usize, old_itimeval: usize) -> 
     let mut new_itimeval = UserReadPtr::<ITimerVal>::new(new_itimeval, &addrspace);
 
     let nitimeval = unsafe { new_itimeval.read() }?;
+    log::debug!("[sys_setitimer] new itimer: {:?}", nitimeval);
 
     if !nitimeval.is_valid() {
         return Err(SysError::EINVAL);
@@ -279,7 +280,7 @@ pub fn sys_setitimer(which: usize, new_itimeval: usize, old_itimeval: usize) -> 
 
     match which {
         CLOCK_REALTIME => {
-            let (old, next_expire) = task.with_mut_itimers(|itimers| {
+            let (old, interval) = task.with_mut_itimers(|itimers| {
                 let itimer = &mut itimers[which];
                 let old = ITimerVal {
                     it_interval: itimer.interval.into(),
@@ -300,12 +301,13 @@ pub fn sys_setitimer(which: usize, new_itimeval: usize, old_itimeval: usize) -> 
                     (old, nitimeval.it_value.into())
                 }
             });
+
             if !nitimeval.it_value.is_zero() {
                 let rtimer = RealITimer {
                     task: Arc::downgrade(&task),
                     id: timerid.0,
                 };
-                let mut timer = Timer::new(next_expire);
+                let mut timer = Timer::new(interval);
                 timer.set_callback(Arc::new(rtimer));
                 TIMER_MANAGER.add_timer(timer);
             }

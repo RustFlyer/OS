@@ -142,11 +142,7 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
 /// - This is a `async` syscall, which means that it likely `yield` or `suspend` when called. Therefore, use
 ///   `lock` carefully and do not pass the `lock` across `await` as possible.
 pub async fn sys_write(fd: usize, addr: usize, len: usize) -> SyscallResult {
-    // log::info!("[sys_write] fd: {fd}, addr: {addr:#x}, len: {len:#x}");
-
-    if len == 0x52 {
-        simdebug::stop();
-    }
+    // log::debug!("[sys_write] fd: {fd}, addr: {addr:#x}, len: {len:#x}");
 
     let task = current_task();
     let addr_space = task.addr_space();
@@ -170,7 +166,7 @@ pub async fn sys_write(fd: usize, addr: usize, len: usize) -> SyscallResult {
 /// - This is a `async` syscall, which means that it likely `yield` or `suspend` when called. Therefore, use
 ///   `lock` carefully and do not pass the `lock` across `await` as possible.
 pub async fn sys_read(fd: usize, buf: usize, len: usize) -> SyscallResult {
-    // log::trace!("[sys_read] fd: {fd}, buf: {buf:#x}, len: {len:#x}");
+    // log::debug!("[sys_read] fd: {fd}, buf: {buf:#x}, len: {len:#x}");
 
     let task = current_task();
     let addr_space = task.addr_space();

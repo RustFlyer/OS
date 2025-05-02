@@ -186,6 +186,7 @@ pub async fn sys_sigreturn() -> SyscallResult {
         trap_cx.sepc = sig_cx.user_reg[0];
         trap_cx.user_reg = sig_cx.user_reg;
     }
+    // log::debug!("[sys_sigreturn] trap context: {:?}", trap_cx.user_reg);
     Ok(trap_cx.user_reg[10])
 }
 
