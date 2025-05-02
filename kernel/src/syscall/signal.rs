@@ -13,6 +13,131 @@ use osfuture::suspend_now;
 use systype::{SysError, SyscallResult};
 use time::{TimeSpec, TimeValue};
 
+/// futex - fast user-space locking
+/// # Arguments
+/// - `uaddr`: points  to the futex word.  On all platforms, futexes are
+///   four-byte integers that must be aligned on a four-byte boundary.
+/// - `futex_op`: The operation to perform on the futex. The argument
+///   consists of two parts: a command that specifies the operation to be
+///   performed, bitwise ORed with zero or more options that modify the
+///   behaviour of the operation.
+/// - `val`: a value whose meaning and  purpose  depends on futex_op.
+/// - `timeout`: a pointer to a timespec structure that specifies a timeout
+///   for the operation.
+/// - `uaddr2`: a pointer to a second futex word that is employed by the
+///   operation.
+/// - `val3`: depends on the operation.
+pub async fn sys_futex(
+    uaddr: FutexAddr,
+    futex_op: i32,
+    val: u32,
+    timeout: usize,
+    uaddr2: usize,
+    val3: u32,
+) -> SyscallResult {
+    let mut futex_op = FutexOp::from_bits_truncate(futex_op);
+    let task = current_task();
+    uaddr.check(&task)?;
+    let is_private = futex_op.contains(FutexOp::Private);
+    futex_op.remove(FutexOp::Private);
+    let key = if is_private {
+        FutexHashKey::Private {
+            mm: task.raw_mm_pointer(),
+            vaddr: uaddr.addr,
+        }
+    } else {
+        let paddr = VirtAddr::from(uaddr.raw()).to_paddr();
+        FutexHashKey::Shared { paddr }
+    };
+    log::info!(
+        "[sys_futex] {:?} uaddr:{:#x} key:{:?}",
+        futex_op,
+        uaddr.raw(),
+        key
+    );
+
+    match futex_op {
+        FutexOp::Wait => {
+            let res = uaddr.read();
+            if res != val {
+                log::info!(
+                    "[futex_wait] value in {} addr is {res} but expect {val}",
+                    uaddr.addr.0
+                );
+                return Err(SysError::EAGAIN);
+            }
+            futex_manager().add_waiter(
+                &key,
+                FutexWaiter {
+                    tid: task.tid(),
+                    waker: task.waker().clone().unwrap(),
+                },
+            );
+            task.set_interruptable();
+            let wake_up_signal = !*task.sig_mask_ref();
+            task.set_wake_up_signal(wake_up_signal);
+            if timeout == 0 {
+                suspend_now().await;
+            } else {
+                let timeout = UserReadPtr::<TimeSpec>::from(timeout as usize).read(&task)?;
+                log::info!("[futex_wait] waiting for {:?}", timeout);
+                if !timeout.is_valid() {
+                    return Err(SysError::EINVAL);
+                }
+                let rem = task.suspend_timeout(timeout.into()).await;
+                if rem.is_zero() {
+                    futex_manager().remove_waiter(&key, task.tid());
+                }
+            }
+            if task.with_sig_pending(|p| p.has_expect_signals(wake_up_signal)) {
+                log::info!("[sys_futex] Woken by signal");
+                futex_manager().remove_waiter(&key, task.tid());
+                return Err(SysError::EINTR);
+            }
+            log::info!("[sys_futex] I was woken");
+            task.set_running();
+            Ok(0)
+        }
+        FutexOp::Wake => {
+            let n_wake = futex_manager().wake(&key, val)?;
+            return Ok(n_wake);
+        }
+        FutexOp::Requeue => {
+            let n_wake = futex_manager().wake(&key, val)?;
+            let new_key = if is_private {
+                FutexHashKey::Private {
+                    mm: task.raw_mm_pointer(),
+                    vaddr: uaddr2.into(),
+                }
+            } else {
+                let paddr = VirtAddr::from(uaddr2).to_paddr();
+                FutexHashKey::Shared { paddr }
+            };
+            futex_manager().requeue_waiters(key, new_key, timeout)?;
+            Ok(n_wake)
+        }
+        FutexOp::CmpRequeue => {
+            if uaddr.read() as u32 != val3 {
+                return Err(SysError::EAGAIN);
+            }
+            let n_wake = futex_manager().wake(&key, val)?;
+            let new_key = if is_private {
+                FutexHashKey::Private {
+                    mm: task.raw_mm_pointer(),
+                    vaddr: uaddr2.into(),
+                }
+            } else {
+                let paddr = VirtAddr::from(uaddr2).to_paddr();
+                FutexHashKey::Shared { paddr }
+            };
+            futex_manager().requeue_waiters(key, new_key, timeout)?;
+            Ok(n_wake)
+        }
+
+        _ => panic!("unimplemented futexop {:?}", futex_op),
+    }
+}
+
 /// - if pid > 0, send a SigInfo built on sig_code to the process with pid
 /// - If pid = -1, then sig is sent to every process for which the calling
 ///   process has permission to send signals, except for process 1 (init)

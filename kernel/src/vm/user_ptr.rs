@@ -36,7 +36,9 @@ use core::{cmp, fmt::Debug, marker::PhantomData, ops::ControlFlow, slice};
 use alloc::{ffi::CString, vec::Vec};
 use config::mm::{PAGE_SIZE, USER_END};
 use mm::address::VirtAddr;
+use riscv::{interrupt::supervisor, register::scause};
 use systype::{SysError, SysResult};
+use bitflags::bitflags;
 
 use super::{addr_space::AddrSpace, mem_perm::MemPerm};
 use crate::{
@@ -656,7 +658,7 @@ unsafe fn try_write(va: usize) -> bool {
 }
 
 #[derive(Debug)]
-struct SumGuard;
+pub struct SumGuard;
 
 impl SumGuard {
     pub fn new() -> Self {
@@ -676,4 +678,38 @@ where
     T: Send,
     M: Send + AccessType,
 {
+}
+
+bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+    pub struct PageFaultAccessType: u8 {
+        const READ = 1 << 0;
+        const WRITE = 1 << 1;
+        const EXECUTE = 1 << 2;
+    }
+}
+
+impl PageFaultAccessType {
+    pub const RO: Self = Self::READ;
+    pub const RW: Self = Self::RO.union(Self::WRITE);
+    pub const RX: Self = Self::RO.union(Self::EXECUTE);
+
+    pub fn from_exception(e: supervisor::Exception) -> Self {
+        match e {
+            supervisor::Exception::InstructionPageFault => Self::RX,
+            supervisor::Exception::LoadPageFault => Self::RO,
+            supervisor::Exception::StorePageFault => Self::RW,
+            _ => panic!("unexcepted exception type for PageFaultAccessType"),
+        }
+    }
+
+    pub fn can_access(self, flag: MemPerm) -> bool {
+        if self.contains(Self::WRITE) && !flag.contains(MemPerm::W) {
+            return false;
+        }
+        if self.contains(Self::EXECUTE) && !flag.contains(MemPerm::X) {
+            return false;
+        }
+        true
+    }
 }
