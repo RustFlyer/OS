@@ -471,7 +471,7 @@ dependencies = [
 [[package]]
 name = "lwext4_rust"
 version = "0.2.0"
-source = "git+https://github.com/EchudeT/lwext4_rust.git?rev=91ee#91eecd509f8a686b72ba077b3b76df0e31a5be75"
+source = "git+https://github.com/EchudeT/lwext4_rust.git?rev=268a#268a652b107269f27e86fa7c336a4f4c00526008"
 dependencies = [
  "bindgen",
  "log",

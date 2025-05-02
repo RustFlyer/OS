@@ -55,17 +55,17 @@ pub async fn sys_mmap(
     offset: usize,
 ) -> SyscallResult {
     let task = current_task();
-    log::trace!("[sys_mmap] fd: {fd:#x}");
-    let file = match fd {
-        -1 => None,
-        fd => Some(task.with_mut_fdtable(|table| table.get_file(fd as usize))?),
-    };
     let flags = MmapFlags::from_bits_truncate(flags);
     let prot = MmapProt::from_bits_truncate(prot);
     let perm = MemPerm::from_mmapprot(prot);
     let va = VirtAddr::new(addr);
+    let file = if !flags.contains(MmapFlags::MAP_ANONYMOUS) {
+        Some(task.with_mut_fdtable(|table| table.get_file(fd as usize))?)
+    } else {
+        None
+    };
 
-    log::info!("[sys_mmap] addr: {addr:#x} prot: {prot:?}, flags: {flags:?}, perm: {perm:?}");
+    log::info!("[sys_mmap] addr: {addr:#x}, length: {length:#x}, perm: {perm:?}, flags: {flags:?}");
 
     if addr == 0 && flags.contains(MmapFlags::MAP_FIXED) {
         return Err(SysError::EINVAL);
@@ -108,7 +108,6 @@ pub async fn sys_brk(addr: usize) -> SyscallResult {
 }
 
 pub fn sys_mprotect(addr: usize, len: usize, prot: i32) -> SyscallResult {
-    log::info!("[sys_mprotect] addr: {addr:#x}, len: {len:#x}, prot: {prot:#x}");
     if addr % PAGE_SIZE != 0 {
         return Err(SysError::EINVAL);
     }
