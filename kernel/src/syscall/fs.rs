@@ -1323,6 +1323,13 @@ pub fn sys_sync() -> SyscallResult {
     Ok(0)
 }
 
+/// `fsync()` causes all pending modifications to filesystem metadata and
+/// cached file data to be written to the underlying filesystems.
+pub fn sys_fsync(_fd: usize) -> SyscallResult {
+    log::error!("[sys_fsync] not implemented.");
+    Ok(0)
+}
+
 /// umask() sets the calling process's file mode creation mask (umask) to
 /// mask & 0777 (i.e., only the file permission bits of mask are used),
 /// and returns the previous value of the mask.
@@ -1333,4 +1340,28 @@ pub fn sys_sync() -> SyscallResult {
 /// from the mode argument to open(2) and mkdir(2).
 pub fn sys_umask(_mask: i32) -> SyscallResult {
     Ok(0x777)
+}
+
+/// The `ftruncate()` functions cause the regular file named by path or
+/// referenced by fd to be truncated to a size of precisely length bytes.
+///
+/// If the file previously was larger than this size, the extra data is lost. If the file
+/// previously was shorter, it is extended, and the extended part reads as null bytes ('\0').
+/// The file offset is not changed.
+///
+/// If the size changed, then the st_ctime and st_mtime fields (respectively, time of last
+/// status change and time of last modification; see inode(7)) for the file are updated, and
+/// the set-user-ID and set-group-ID mode bits may be cleared.
+///
+/// With ftruncate(), the file must be open for writing; with truncate(), the file
+/// must be writable.
+pub fn sys_ftruncate(fd: usize, length: usize) -> SyscallResult {
+    let task = current_task();
+    let file = task.with_mut_fdtable(|t| t.get_file(fd))?;
+
+    let inode = file.dentry().inode().ok_or(SysError::ENOENT)?;
+
+    inode.set_size(length);
+
+    Ok(0)
 }
