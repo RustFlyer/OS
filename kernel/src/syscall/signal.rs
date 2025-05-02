@@ -1,17 +1,20 @@
 use crate::{
     processor::current_task,
     task::{
-        TaskState,
-        manager::TASK_MANAGER,
-        sig_members::{Action, ActionType, SIG_DFL, SIG_IGN, SigAction, SigContext},
-        signal::sig_info::*,
+        manager::TASK_MANAGER, sig_members::{Action, ActionType, SigAction, SigContext, SIG_DFL, SIG_IGN}, signal::{futex::{FutexAddr, FutexHashKey, FutexOp}, sig_info::*}, TaskState
     },
     vm::user_ptr::{UserReadPtr, UserWritePtr},
 };
 use config::process::INIT_PROC_ID;
+use mm::address::VirtAddr;
 use osfuture::suspend_now;
-use systype::{SysError, SyscallResult};
+use systype::{SysError, SysResult, SyscallResult};
 use time::{TimeSpec, TimeValue};
+use alloc::vec::Vec;
+use core::task::Waker;
+use mutex::SpinLock;
+use lazy_static::lazy_static;
+use mm::address::PhysAddr;
 
 /// futex - fast user-space locking
 /// # Arguments
@@ -37,16 +40,20 @@ pub async fn sys_futex(
 ) -> SyscallResult {
     let mut futex_op = FutexOp::from_bits_truncate(futex_op);
     let task = current_task();
-    uaddr.check(&task)?;
+    uaddr.check()?;
     let is_private = futex_op.contains(FutexOp::Private);
     futex_op.remove(FutexOp::Private);
     let key = if is_private {
         FutexHashKey::Private {
-            mm: task.raw_mm_pointer(),
+            mm: task.raw_space_ptr(),
             vaddr: uaddr.addr,
         }
     } else {
-        let paddr = VirtAddr::from(uaddr.raw()).to_paddr();
+        let vaddr = VirtAddr::new(uaddr.raw());
+        let ppn = task.addr_space().page_table.find_entry(vaddr.page_number())
+            .ok_or(SysError::EFAULT)?
+            .ppn();
+        let paddr = PhysAddr::new(ppn.address().to_usize() + vaddr.page_offset());
         FutexHashKey::Shared { paddr }
     };
     log::info!(
@@ -62,7 +69,7 @@ pub async fn sys_futex(
             if res != val {
                 log::info!(
                     "[futex_wait] value in {} addr is {res} but expect {val}",
-                    uaddr.addr.0
+                    uaddr.addr.to_usize()
                 );
                 return Err(SysError::EAGAIN);
             }
@@ -73,13 +80,15 @@ pub async fn sys_futex(
                     waker: task.waker().clone().unwrap(),
                 },
             );
-            task.set_interruptable();
-            let wake_up_signal = !*task.sig_mask_ref();
+            
+            task.set_state(TaskState::Interruptable);
+
+            let wake_up_signal = !*task.sig_mask_mut();
             task.set_wake_up_signal(wake_up_signal);
             if timeout == 0 {
                 suspend_now().await;
             } else {
-                let timeout = UserReadPtr::<TimeSpec>::from(timeout as usize).read(&task)?;
+                let timeout = unsafe { UserReadPtr::<TimeSpec>::from(timeout as usize).read(&task) }?;
                 log::info!("[futex_wait] waiting for {:?}", timeout);
                 if !timeout.is_valid() {
                     return Err(SysError::EINVAL);
@@ -95,7 +104,7 @@ pub async fn sys_futex(
                 return Err(SysError::EINTR);
             }
             log::info!("[sys_futex] I was woken");
-            task.set_running();
+            task.set_state(TaskState::Running);
             Ok(0)
         }
         FutexOp::Wake => {

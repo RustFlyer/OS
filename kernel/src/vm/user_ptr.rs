@@ -626,7 +626,7 @@ where
 /// # Safety
 /// This function must be called after calling `set_kernel_stvec_user_rw` to
 /// enable kernel memory access to user space.
-unsafe fn try_read(va: usize) -> bool {
+pub unsafe fn try_read(va: usize) -> bool {
     unsafe extern "C" {
         fn __try_read_user(va: usize) -> usize;
     }
@@ -646,7 +646,7 @@ unsafe fn try_read(va: usize) -> bool {
 /// # Safety
 /// This function must be called after calling `set_kernel_stvec_user_rw` to
 /// enable kernel memory access to user space.
-unsafe fn try_write(va: usize) -> bool {
+pub unsafe fn try_write(va: usize) -> bool {
     unsafe extern "C" {
         fn __try_write_user(va: usize) -> usize;
     }
@@ -678,38 +678,4 @@ where
     T: Send,
     M: Send + AccessType,
 {
-}
-
-bitflags! {
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-    pub struct PageFaultAccessType: u8 {
-        const READ = 1 << 0;
-        const WRITE = 1 << 1;
-        const EXECUTE = 1 << 2;
-    }
-}
-
-impl PageFaultAccessType {
-    pub const RO: Self = Self::READ;
-    pub const RW: Self = Self::RO.union(Self::WRITE);
-    pub const RX: Self = Self::RO.union(Self::EXECUTE);
-
-    pub fn from_exception(e: supervisor::Exception) -> Self {
-        match e {
-            supervisor::Exception::InstructionPageFault => Self::RX,
-            supervisor::Exception::LoadPageFault => Self::RO,
-            supervisor::Exception::StorePageFault => Self::RW,
-            _ => panic!("unexcepted exception type for PageFaultAccessType"),
-        }
-    }
-
-    pub fn can_access(self, flag: MemPerm) -> bool {
-        if self.contains(Self::WRITE) && !flag.contains(MemPerm::W) {
-            return false;
-        }
-        if self.contains(Self::EXECUTE) && !flag.contains(MemPerm::X) {
-            return false;
-        }
-        true
-    }
 }

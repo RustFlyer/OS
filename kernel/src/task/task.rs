@@ -310,6 +310,10 @@ impl Task {
         unsafe { Arc::clone(&*self.addr_space.get()) }
     }
 
+    pub fn raw_space_ptr(&self) -> usize {
+        Arc::as_ptr(&self.addr_space()) as usize
+    }
+
     pub fn elf_mut(&self) -> &mut Arc<dyn File> {
         unsafe { &mut *self.elf.get() }
     }

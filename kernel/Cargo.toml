@@ -24,7 +24,9 @@ polyhal = { path = "../lib/polyhal" }
 
 bitflags = { workspace = true }
 elf = { workspace = true }
+hashbrown = { workspace = true }
 riscv-rt = { workspace = true }
+spin = { workspace = true }
 sbi-rt = { workspace = true }
 log = { workspace = true }
 crate_interface = { workspace = true }
