@@ -1,7 +1,7 @@
 use crate::{
     processor::current_task,
     task::{
-        manager::TASK_MANAGER, sig_members::{Action, ActionType, SigAction, SigContext, SIG_DFL, SIG_IGN}, signal::{futex::{FutexAddr, FutexHashKey, FutexOp}, sig_info::*}, TaskState
+        manager::TASK_MANAGER, sig_members::{Action, ActionType, SigAction, SigContext, SIG_DFL, SIG_IGN}, signal::{futex::{futex_manager, FutexAddr, FutexHashKey, FutexOp, FutexWaiter}, sig_info::*}, TaskState
     },
     vm::user_ptr::{UserReadPtr, UserWritePtr},
 };

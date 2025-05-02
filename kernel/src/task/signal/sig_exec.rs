@@ -178,7 +178,7 @@ fn kill(task: &Arc<Task>, sig: Sig) {
 }
 
 fn stop(task: &Arc<Task>, sig: Sig) {
-    log::warn!("[do_signal] task stopped!");
+    log::warn!("[sig_exec] task stopped!");
     task.with_thread_group(|tg| {
         for t in tg.iter() {
             t.set_state(TaskState::Sleeping);
@@ -190,7 +190,7 @@ fn stop(task: &Arc<Task>, sig: Sig) {
 
 /// continue the process if it is currently stopped
 fn cont(task: &Arc<Task>, sig: Sig) {
-    log::warn!("[do_signal] task continue");
+    log::warn!("[sig_exec] task continue");
     task.with_thread_group(|tg| {
         for t in tg.iter() {
             t.set_state(TaskState::Running);
