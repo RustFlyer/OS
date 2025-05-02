@@ -3,13 +3,13 @@
 //! This module provides a `PageTableEntry` struct, which represents a page table entry,
 //! along with functions for creating and manipulating page table entries.
 
-define_arch_mods!();
-
 use core::fmt::{self, Debug, Formatter};
 
 use config::mm::PPN_WIDTH;
 use mm::address::PhysPageNum;
 use polyhal_macro::define_arch_mods;
+
+define_arch_mods!();
 
 /// A page table entry.
 #[derive(Clone, Copy)]

@@ -25,8 +25,6 @@ pub fn trap_handler(task: &Task) -> bool {
 
     unsafe { load_trap_handler() };
 
-    // log::info!("[trap_handler] enter");
-
     // Here task updates global timer manager and checks if there
     // are any expired timer. If there is, the task will wake up
     // the relevant thread.
