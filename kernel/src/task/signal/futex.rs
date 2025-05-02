@@ -97,6 +97,36 @@ impl FutexManager {
             Err(SysError::EINVAL)
         }
     }
+
+    pub fn requeue_waiters(
+        &mut self,
+        old: FutexHashKey,
+        new: FutexHashKey,
+        n_req: usize,
+    ) -> SyscallResult {
+        let mut old_waiters = self.0.remove(&old).ok_or_else(|| {
+            log::info!("[futex] no waiters in key {:?}", old);
+            SysError::EINVAL
+        })?;
+        let n = min(n_req as usize, old_waiters.len());
+        if let Some(new_waiters) = self.0.get_mut(&new) {
+            for _ in 0..n {
+                new_waiters.push(old_waiters.pop().unwrap());
+            }
+        } else {
+            let mut new_waiters = Vec::with_capacity(n);
+            for _ in 0..n {
+                new_waiters.push(old_waiters.pop().unwrap());
+            }
+            self.0.insert(new, new_waiters);
+        }
+
+        if !old_waiters.is_empty() {
+            self.0.insert(old, old_waiters);
+        }
+
+        Ok(n)
+    }
 }
 
 impl Task {
