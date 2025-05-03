@@ -1262,7 +1262,7 @@ pub fn sys_linkat(
 ) -> SyscallResult {
     let task = current_task();
     let addrspace = task.addr_space();
-    let flags = OpenFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
+    let _flags = OpenFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
 
     let coldpath = UserReadPtr::<u8>::new(oldpath, &addrspace).read_c_string(256)?;
     let cnewpath = UserReadPtr::<u8>::new(newpath, &addrspace).read_c_string(256)?;

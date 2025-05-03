@@ -14,7 +14,7 @@ fn main() {
         //     &["busybox", "sh"],
         //     &["PATH=/:/bin:/sbin:/usr/bin:/usr/local/bin:/usr/local/sbin:"],
         // );
-        execve("shell", &[], &[]);
+        execve("shell", &["shell"], &[]);
     } else {
         loop {
             waitpid(-1, &mut i);

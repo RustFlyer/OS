@@ -2,35 +2,49 @@ use crate::{
     processor::current_task,
     task::{
         TaskState,
+        futex::{FutexAddr, FutexHashKey, FutexOp, FutexWaiter, futex_manager},
         manager::TASK_MANAGER,
         sig_members::{Action, ActionType, SIG_DFL, SIG_IGN, SigAction, SigContext},
-        signal::{
-            futex::{FutexAddr, FutexHashKey, FutexOp, FutexWaiter, futex_manager},
-            sig_info::*,
-        },
+        signal::sig_info::*,
     },
     vm::user_ptr::{UserReadPtr, UserWritePtr},
 };
 use config::process::INIT_PROC_ID;
-use mm::address::PhysAddr;
-use mm::address::VirtAddr;
 use osfuture::suspend_now;
 use systype::{SysError, SyscallResult};
 use time::{TimeSpec, TimeValue};
 
 /// futex - fast user-space locking
+///
+/// The futex() system call provides a method for waiting until a certain condition becomes true.
+/// It is typically used as a blocking construct in the context of shared-memory synchronization.
+/// When using futexes, the majority of the synchronization operations are performed in user space.
+/// A user-space program employs the futex() system call only when it is likely that the program
+/// has to block for a longer time until the condition becomes true. Other futex() operations can
+/// be used to wake any processes or threads waiting for a particular condition.
+///
+/// A futex is a 32-bit value—referred to below as a futex word—whose address is supplied to the
+/// futex() system call. (Futexes are 32 bits in size on all platforms, including 64-bit systems.)
+/// All futex operations are governed by this value. In order to share a futex between processes,
+/// the futex is placed in a region of shared memory, created using (for example) mmap(2) or shmat(2).
+/// (Thus, the futex word may have different virtual addresses in different processes, but these
+/// addresses all refer to the same location in physical memory.) In a multithreaded program, it
+/// is sufficient to place the futex word in a global variable shared by all threads.
+///
 /// # Arguments
-/// - `uaddr`: points  to the futex word.  On all platforms, futexes are
-///   four-byte integers that must be aligned on a four-byte boundary.
-/// - `futex_op`: The operation to perform on the futex. The argument
-///   consists of two parts: a command that specifies the operation to be
-///   performed, bitwise ORed with zero or more options that modify the
-///   behaviour of the operation.
-/// - `val`: a value whose meaning and  purpose  depends on futex_op.
-/// - `timeout`: a pointer to a timespec structure that specifies a timeout
-///   for the operation.
-/// - `uaddr2`: a pointer to a second futex word that is employed by the
-///   operation.
+/// - `uaddr`: points  to the futex word.  On all platforms, futexes are four-byte integers that
+///   must be aligned on a four-byte boundary.
+/// - `futex_op`: The operation to perform on the futex. The argument consists of two parts: a
+///   command that specifies the operation to be performed, bitwise ORed with zero or more options
+///   that modify the behaviour of the operation.
+/// - `val`: a value whose meaning and purpose depends on `futex_op`.
+/// - `timeout`: a pointer to a timespec structure that specifies a timeout for the operation.
+///   However, notwithstanding the prototype shown above, for some operations, the least significant
+///   four bytes of this argument are instead used as an integer whose meaning is determined by the
+///   operation. For these operations, the kernel casts the timeout value first to unsigned long,
+///   then to uint32_t, and in the remainder of this page, this argument is referred to as val2 when
+///   interpreted in this fashion.
+/// - `uaddr2`: a pointer to a second futex word that is employed by the operation.
 /// - `val3`: depends on the operation.
 pub async fn sys_futex(
     uaddr: usize,
@@ -40,79 +54,45 @@ pub async fn sys_futex(
     uaddr2: usize,
     val3: u32,
 ) -> SyscallResult {
-    let uaddr = FutexAddr::from(uaddr);
-    let mut futex_op = FutexOp::from_bits_truncate(futex_op);
     let task = current_task();
-    uaddr.check()?;
-    let is_private = futex_op.contains(FutexOp::Private);
-    futex_op.remove(FutexOp::Private);
-    let key = if is_private {
-        FutexHashKey::Private {
-            mm: task.raw_space_ptr(),
-            vaddr: uaddr.addr,
-        }
-    } else {
-        // to physical address
-        let vaddr = VirtAddr::new(uaddr.raw());
-        let ppn = task
-            .addr_space()
-            .page_table
-            .find_entry(vaddr.page_number())
-            .ok_or(SysError::EFAULT)?
-            .ppn();
-        let paddr = PhysAddr::new(ppn.address().to_usize() + vaddr.page_offset());
-        FutexHashKey::Shared { paddr }
-    };
-    log::info!(
-        "[sys_futex] {:?} uaddr:{:#x} key:{:?}",
-        futex_op,
-        uaddr.raw(),
-        key
-    );
+    let addrspace = task.addr_space();
+    let mut op = FutexOp::from_bits_truncate(futex_op);
+    let futex_addr = FutexAddr::new_with_check(uaddr, &addrspace)?;
+    let is_private = op.contains(FutexOp::Private);
+    op.remove(FutexOp::Private);
 
-    match futex_op {
+    let key = FutexHashKey::new_key(futex_addr.addr(), addrspace.clone(), is_private)?;
+
+    let faddr = futex_addr.addr();
+    log::info!("[sys_futex] {:?} uaddr:{:#x} key:{:?}", op, faddr, key);
+
+    match op.intersection(FutexOp::MAINOPMASK) {
         FutexOp::Wait => {
-            let res = uaddr.read();
-            if res != val {
-                log::info!(
-                    "[futex_wait] value in {} addr is {res} but expect {val}",
-                    uaddr.addr.to_usize()
-                );
+            if futex_addr.read() != val {
                 return Err(SysError::EAGAIN);
             }
-            futex_manager().add_waiter(
-                &key,
-                FutexWaiter {
-                    tid: task.tid(),
-                    waker: task.get_waker(),
-                },
-            );
 
+            let new_waker = FutexWaiter::new(&task);
+            futex_manager().add_waiter(&key, new_waker)?;
             task.set_state(TaskState::Interruptable);
-
             let wake_up_signal = !*task.sig_mask_mut();
             task.set_wake_up_signal(wake_up_signal);
-            if timeout == 0 {
-                suspend_now().await;
+            if timeout != 0 {
+                let ts = unsafe { UserReadPtr::<TimeSpec>::new(timeout, &addrspace).read() }?;
+                (!ts.is_valid()).then(|| return SysError::EINVAL);
+
+                let rem = task.suspend_timeout(ts.into()).await;
+                let tid = task.tid();
+                rem.is_zero().then(|| futex_manager().rm_waiter(&key, tid));
             } else {
-                let timeout = unsafe {
-                    UserReadPtr::<TimeSpec>::new(timeout as usize, &task.addr_space()).read()
-                }?;
-                log::info!("[futex_wait] waiting for {:?}", timeout);
-                if !timeout.is_valid() {
-                    return Err(SysError::EINVAL);
-                }
-                let rem = task.suspend_timeout(timeout.into()).await;
-                if rem.is_zero() {
-                    futex_manager().remove_waiter(&key, task.tid());
-                }
+                suspend_now().await;
             }
+
             if task.sig_manager_mut().has_expect_signals(wake_up_signal) {
-                log::info!("[sys_futex] Woken by signal");
-                futex_manager().remove_waiter(&key, task.tid());
+                futex_manager().rm_waiter(&key, task.tid())?;
                 return Err(SysError::EINTR);
             }
-            log::info!("[sys_futex] I was woken");
+
             task.set_state(TaskState::Running);
             Ok(0)
         }
@@ -120,55 +100,22 @@ pub async fn sys_futex(
             let n_wake = futex_manager().wake(&key, val)?;
             return Ok(n_wake);
         }
-        FutexOp::Requeue => {
-            let n_wake = futex_manager().wake(&key, val)?;
-            let new_key = if is_private {
-                FutexHashKey::Private {
-                    mm: task.raw_space_ptr(),
-                    vaddr: VirtAddr::new(uaddr2),
-                }
-            } else {
-                // to physical address
-                let vaddr = VirtAddr::new(uaddr2);
-                let ppn = task
-                    .addr_space()
-                    .page_table
-                    .find_entry(vaddr.page_number())
-                    .ok_or(SysError::EFAULT)?
-                    .ppn();
-                let paddr = PhysAddr::new(ppn.address().to_usize() + vaddr.page_offset());
-                FutexHashKey::Shared { paddr }
-            };
-            futex_manager().requeue_waiters(key, new_key, timeout)?;
-            Ok(n_wake)
-        }
-        FutexOp::CmpRequeue => {
-            if uaddr.read() as u32 != val3 {
+        FutexOp::Requeue | FutexOp::CmpRequeue => {
+            if op.contains(FutexOp::CmpRequeue) && futex_addr.read() as u32 != val3 {
                 return Err(SysError::EAGAIN);
             }
+
             let n_wake = futex_manager().wake(&key, val)?;
-            let new_key = if is_private {
-                FutexHashKey::Private {
-                    mm: task.raw_space_ptr(),
-                    vaddr: VirtAddr::new(uaddr2),
-                }
-            } else {
-                // to physical address
-                let vaddr = VirtAddr::new(uaddr2);
-                let ppn = task
-                    .addr_space()
-                    .page_table
-                    .find_entry(vaddr.page_number())
-                    .ok_or(SysError::EFAULT)?
-                    .ppn();
-                let paddr = PhysAddr::new(ppn.address().to_usize() + vaddr.page_offset());
-                FutexHashKey::Shared { paddr }
-            };
+            let new_key = FutexHashKey::new_key(uaddr2, addrspace.clone(), is_private)?;
             futex_manager().requeue_waiters(key, new_key, timeout)?;
             Ok(n_wake)
         }
 
-        _ => panic!("unimplemented futexop {:?}", futex_op),
+        _ => {
+            log::error!("unimplemented futexop {:?}", op);
+            log::error!("unimplemented futexop {:#x}", futex_op);
+            Err(SysError::EINVAL)
+        }
     }
 }
 

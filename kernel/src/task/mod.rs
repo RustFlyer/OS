@@ -1,3 +1,4 @@
+pub mod futex;
 pub mod future;
 pub mod kernelproc;
 pub mod manager;
