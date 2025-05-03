@@ -54,7 +54,7 @@ fn main() {
         let apppath = core::str::from_utf8(&buf_slice).unwrap();
         let argstring = apppath.to_string();
 
-        // let argstring = easy_cmd(argstring);
+        let argstring = easy_cmd(argstring);
 
         let raws: Vec<String> = argstring.split(' ').map(|s| s.to_string()).collect();
         let mut args: Vec<String> = Vec::new();

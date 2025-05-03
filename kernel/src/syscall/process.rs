@@ -266,7 +266,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
 /// - `CLONE_PARENT_SETTID`: Store the child thread ID at the location pointed to by parent_tid (clone())
 ///   in the parent's memory. The store operation completes before the clone call returns
 ///   control to user space.
-pub async fn sys_clone(
+pub fn sys_clone(
     flags: usize,
     stack: usize,
     parent_tid_ptr: usize,
@@ -274,7 +274,7 @@ pub async fn sys_clone(
     chilren_tid_ptr: usize,
 ) -> SyscallResult {
     log::info!(
-        "[sys_clone] flags:{flags:?}, stack:{stack:#x}, tls:{tls_ptr:?}, parent_tid:{parent_tid_ptr:?}, child_tid:{chilren_tid_ptr:?}"
+        "[sys_clone] flags:{flags:?}, stack:{stack:#x}, tls:{tls_ptr:x}, parent_tid:{parent_tid_ptr:x}, child_tid:{chilren_tid_ptr:x}"
     );
     let task = current_task();
     let addrspace = task.addr_space();
@@ -282,7 +282,7 @@ pub async fn sys_clone(
     let flags = CloneFlags::from_bits(flags as u64 & !0xff).ok_or(SysError::EINVAL)?;
     log::info!("[sys_clone] flags {flags:?}");
 
-    let new_task = task.fork(flags).await;
+    let new_task = task.fork(flags);
     new_task.trap_context_mut().set_user_a0(0);
     let new_tid = new_task.tid();
     log::info!("[sys_clone] clone a new thread, tid {new_tid}, clone flags {flags:?}",);

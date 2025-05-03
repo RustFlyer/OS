@@ -1,8 +1,13 @@
 use osfuture::yield_now;
 
-use crate::{syscall::syscall, task::Task};
+use crate::{processor::current_hart, syscall::syscall, task::Task};
 
 pub async fn async_syscall(task: &Task) {
+    if task.timer_mut().schedule_time_out() && executor::has_waiting_task_alone(current_hart().id) {
+        // log::trace!("[trap_handler] {} yield", task.get_name());
+        task.set_is_yield(true);
+    }
+
     if task.is_yield() {
         yield_now().await;
     }

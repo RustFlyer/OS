@@ -28,7 +28,6 @@ use vfs::path::Path;
 use super::future::{self};
 use super::manager::TASK_MANAGER;
 use super::process_manager::PROCESS_GROUP_MANAGER;
-use super::sig_members::SigHandlers;
 use super::sig_members::SigManager;
 use super::task::*;
 use super::threadgroup::ThreadGroup;
@@ -134,6 +133,7 @@ impl Task {
         *self.elf_mut() = elf_file;
         *self.name_mut() = name;
         self.with_mut_fdtable(|table| table.close());
+        self.with_mut_sig_handler(|handlers| handlers.reset_user_defined());
 
         Ok(())
     }
@@ -171,10 +171,7 @@ impl Task {
     }
 
     /// fork a application
-    ///
-    /// - todo1: Thread Control
-    /// - todo2: Sig Clone?
-    pub async fn fork(self: &Arc<Self>, cloneflags: CloneFlags) -> Arc<Self> {
+    pub fn fork(self: &Arc<Self>, cloneflags: CloneFlags) -> Arc<Self> {
         let tid = tid_alloc();
         let trap_context = SyncUnsafeCell::new(*self.trap_context_mut());
         let state = SpinNoIrqLock::new(self.get_state());
@@ -182,42 +179,48 @@ impl Task {
         let process;
         let is_process;
         let threadgroup;
-
         let parent;
         let children;
-
         let pgid;
-
-        let cwd = new_share_mutex(self.cwd_mut());
+        let cwd;
+        let itimers;
 
         let elf = SyncUnsafeCell::new((*self.elf_mut()).clone());
 
-        let mut name = self.get_name() + "(fork)";
+        let mut name = self.get_name();
 
         if cloneflags.contains(CloneFlags::THREAD) {
             name += "(thread)";
             is_process = false;
             process = Some(Arc::downgrade(self));
             threadgroup = self.thread_group_mut().clone();
-            parent = self.parent_mut().clone();
-            children = self.children_mut().clone();
-            pgid = self.pgid_mut().clone();
+            parent = (*self.parent_mut()).clone();
+            children = (*self.children_mut()).clone();
+            pgid = (*self.pgid_mut()).clone();
+            cwd = self.cwd();
+            itimers = new_share_mutex(self.with_mut_itimers(|t| t.clone()));
         } else {
+            name += "(fork)";
             is_process = true;
             process = None;
             threadgroup = new_share_mutex(ThreadGroup::new());
             parent = new_share_mutex(Some(Arc::downgrade(self)));
             children = new_share_mutex(BTreeMap::new());
             pgid = new_share_mutex(self.get_pgid());
+            cwd = new_share_mutex(self.cwd_mut());
+            itimers = new_share_mutex([ITimer::default(); 3]);
         }
 
         let sig_mask = SyncUnsafeCell::new(self.get_sig_mask());
-        let sig_handlers = new_share_mutex(SigHandlers::new());
-        let sig_manager = SyncUnsafeCell::new(SigManager::new());
-        let sig_stack = SyncUnsafeCell::new(*self.sig_stack_mut());
-        let sig_cx_ptr = AtomicUsize::new(0);
+        let sig_handlers = if cloneflags.contains(CloneFlags::SIGHAND) {
+            self.sig_handlers_mut().clone()
+        } else {
+            new_share_mutex(self.with_mut_sig_handler(|handlers| (*handlers).clone()))
+        };
 
-        let itimers = new_share_mutex([ITimer::default(); 3]);
+        let sig_manager = SyncUnsafeCell::new(SigManager::new());
+        let sig_stack = SyncUnsafeCell::new(None);
+        let sig_cx_ptr = AtomicUsize::new(0);
 
         let addr_space = if cloneflags.contains(CloneFlags::VM) {
             self.addr_space()
@@ -233,7 +236,6 @@ impl Task {
         };
 
         let name = SyncUnsafeCell::new(name);
-
         let new = Arc::new(Self::new_fork_clone(
             tid,
             process,

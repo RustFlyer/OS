@@ -41,7 +41,7 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo) -> SysResult<bool> {
         action
     );
 
-    // log::debug!("trap context: {:?}", cx.user_reg);
+    log::debug!("trap context: {:?}", cx.user_reg);
 
     if action.flags.contains(SigActionFlag::SA_RESTART) {
         cx.sepc -= 4;

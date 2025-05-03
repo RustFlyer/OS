@@ -112,8 +112,12 @@ pub async fn sys_futex(
         }
 
         _ => {
-            log::error!("unimplemented futexop {:?}", op);
-            log::error!("unimplemented futexop {:#x}", futex_op);
+            log::error!(
+                "[panic?] unimplemented futexop({:#x}) {:?} called by {}",
+                futex_op,
+                op,
+                task.get_name()
+            );
             Err(SysError::EINVAL)
         }
     }
@@ -292,7 +296,7 @@ pub async fn sys_sigreturn() -> SyscallResult {
         trap_cx.sepc = sig_cx.user_reg[0];
         trap_cx.user_reg = sig_cx.user_reg;
     }
-    // log::debug!("[sys_sigreturn] trap context: {:?}", trap_cx.user_reg);
+    log::debug!("[sys_sigreturn] trap context: {:?}", trap_cx.user_reg);
     Ok(trap_cx.user_reg[10])
 }
 
@@ -436,6 +440,7 @@ pub fn sys_rt_sigmask(
 /// (By contrast, kill(2) can be used to send a signal only to a process (i.e., thread group)
 /// as a whole, and the signal will be delivered to an arbitrary thread within that process.)
 pub fn sys_tgkill(tgid: isize, tid: isize, signum: i32) -> SyscallResult {
+    log::debug!("[sys_tgkill] tgid: {tgid}, tid: {tid}, signum: {signum}");
     let sig = Sig::from_i32(signum);
     if !sig.is_valid() || tgid < 0 || tid < 0 {
         return Err(SysError::EINVAL);
@@ -443,12 +448,14 @@ pub fn sys_tgkill(tgid: isize, tid: isize, signum: i32) -> SyscallResult {
     let task = TASK_MANAGER
         .get_task(tgid as usize)
         .ok_or(SysError::ESRCH)?;
+
     if !task.is_process() {
         return Err(SysError::ESRCH);
     }
     task.with_thread_group(|tg| -> SyscallResult {
         for thread in tg.iter() {
             if thread.tid() == tid as usize {
+                log::debug!("thread [{}] recv sig {:?}", thread.get_name(), sig);
                 thread.receive_siginfo(SigInfo {
                     sig,
                     code: SigInfo::TKILL,

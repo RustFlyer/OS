@@ -22,6 +22,10 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         unimplemented!()
     };
 
+    // if args.iter().find(|t| **t as i32 == 0x109).is_some() {
+    //     log::error!("[{}] args: {:?}", syscall_no.as_str(), args);
+    // }
+
     // log::info!("[{}] call function", syscall_no.as_str());
 
     let result = match syscall_no {
@@ -33,7 +37,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         TIMES => sys_times(args[0]).await,
         NANOSLEEP => sys_nanosleep(args[0], args[1]).await,
         WAIT4 => sys_wait4(args[0] as i32, args[1], args[2] as i32).await,
-        CLONE => sys_clone(args[0], args[1], args[2], args[3], args[4]).await,
+        CLONE => sys_clone(args[0], args[1], args[2], args[3], args[4]),
         OPENAT => sys_openat(args[0], args[1], args[2] as i32, args[3] as u32).await,
         READ => sys_read(args[0], args[1], args[2]).await,
         READLINKAT => sys_readlinkat(args[0], args[1], args[2], args[3]),
@@ -119,6 +123,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
             )
             .await
         }
+        MADVISE => sys_madvise(args[0], args[1], args[2]),
         _ => {
             log::error!("Syscall not implemented: {}", syscall_no.as_str());
             unimplemented!()

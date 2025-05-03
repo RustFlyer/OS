@@ -120,3 +120,17 @@ pub fn sys_mprotect(addr: usize, len: usize, prot: i32) -> SyscallResult {
     addr_space.change_prot(VirtAddr::new(addr), len, MemPerm::from_mmapprot(prot));
     Ok(0)
 }
+
+/// The madvise() system call is used to give advice or directions to the kernel about the
+/// address range beginning at address addr and with size length. madvise() only operates
+/// on whole pages, therefore addr must be page-aligned. The value of length is rounded up
+/// to a multiple of page size. In most cases, the goal of such advice is to improve system
+/// or application performance.
+///
+/// Initially, the system call supported a set of "conventional" advice values, which are
+/// also available on several other implementations. (Note, though, that madvise() is not
+/// specified in POSIX.) Subsequently, a number of Linux-specific advice values have been added.
+pub fn sys_madvise(add: usize, length: usize, _advice: usize) -> SyscallResult {
+    log::trace!("[sys_madvise] not implemented add: {add:#x}, length: {length:#x}");
+    Ok(0)
+}

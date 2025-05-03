@@ -356,6 +356,10 @@ impl Task {
         f(&mut self.sig_manager_mut())
     }
 
+    pub fn with_mut_sig_handler<T>(&self, f: impl FnOnce(&mut SigHandlers) -> T) -> T {
+        f(&mut self.sig_handlers_mut().lock())
+    }
+
     pub fn with_mut_itimers<T>(&self, f: impl FnOnce(&mut [ITimer; 3]) -> T) -> T {
         f(&mut self.itimers.lock())
     }
@@ -395,6 +399,10 @@ impl Task {
             .upgrade()
             .unwrap()
             .get_pgid()
+    }
+
+    pub fn cwd(&self) -> ShareMutex<Arc<dyn Dentry>> {
+        self.cwd.clone()
     }
 
     pub fn get_sig_mask(&self) -> SigSet {

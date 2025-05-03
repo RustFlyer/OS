@@ -142,7 +142,7 @@ impl FutexManager {
 #[derive(Debug, Hash, PartialEq, PartialOrd, Eq, Copy, Clone)]
 pub enum FutexHashKey {
     Shared { paddr: PhysAddr },
-    Private { mm: usize, vaddr: VirtAddr },
+    Private { mm: VirtAddr, vaddr: VirtAddr },
 }
 
 impl FutexHashKey {
@@ -159,7 +159,7 @@ impl FutexHashKey {
 
     pub fn new_private_key(vaddr: usize, addrspace: Arc<AddrSpace>) -> SysResult<FutexHashKey> {
         Ok(FutexHashKey::Private {
-            mm: Arc::as_ptr(&addrspace) as usize,
+            mm: VirtAddr::new(Arc::as_ptr(&addrspace) as usize),
             vaddr: VirtAddr::new(vaddr),
         })
     }

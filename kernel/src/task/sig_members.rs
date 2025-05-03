@@ -217,6 +217,7 @@ impl SigManager {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct SigHandlers {
     /// 注意信号编号与数组索引有1个offset，因此在Sig中有个index()函数负责-1
     actions: [Action; NSIG],
