@@ -1,9 +1,10 @@
 use loongArch64::register::estat::{self, Exception, Trap};
-use loongArch64::register::{badv, ecfg, eentry, prmd, ticlr, era};
+use loongArch64::register::{badv, ecfg, eentry, era, prmd, ticlr};
 
 use arch::loongarch64::time::{get_time_duration, set_nx_timer_irq};
 use mm::address::VirtAddr;
 use timer::TIMER_MANAGER;
+
 use crate::irq::TIMER_IRQ;
 use crate::vm::mapping_flags::MappingFlags;
 
@@ -13,14 +14,14 @@ use crate::vm::mapping_flags::MappingFlags;
 pub fn kernel_trap_handler() {
     let estat_val = estat::read();
     let badv_val = badv::read().vaddr();
-    
+
     match estat_val.cause() {
         Trap::Exception(e) => kernel_exception_handler(e, badv_val),
         Trap::Interrupt(_) => {
             // Get the IRQ number from estat register
             let irq_num: usize = estat_val.is().trailing_zeros() as usize;
             kernel_interrupt_handler(irq_num, badv_val)
-        },
+        }
         _ => kernel_panic(),
     }
 }
@@ -87,13 +88,13 @@ fn handle_kernel_page_fault(fault_addr: VirtAddr, access: MappingFlags) -> bool 
     // 2. Allocate physical memory if needed
     // 3. Update kernel page tables
     // 4. Flush TLB entries
-    
+
     log::warn!(
         "[kernel] Page fault in kernel at {:#x}, access: {:?}",
         fault_addr.to_usize(),
         access
     );
-    
+
     // For now, we don't handle kernel page faults
     false
 }

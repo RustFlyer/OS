@@ -5,12 +5,12 @@ use arch::loongarch64::time::{get_time_duration, set_nx_timer_irq};
 use mm::address::VirtAddr;
 use timer::TIMER_MANAGER;
 
+use crate::irq::TIMER_IRQ;
 use crate::processor::current_hart;
 use crate::task::{Task, TaskState};
 use crate::trap::load_trap_handler;
 use crate::vm::mapping_flags::MappingFlags;
 use crate::vm::user_ptr::UserReadPtr;
-use crate::irq::TIMER_IRQ;
 
 /// handle exception or interrupt from a task, return if success.
 /// Similar to the RISC-V implementation, this function is called after
@@ -33,7 +33,7 @@ pub fn trap_handler(task: &Task) -> bool {
             // Get the IRQ number from estat register
             let irq_num: usize = estat_val.is().trailing_zeros() as usize;
             user_interrupt_handler(task, irq_num)
-        },
+        }
         _ => {
             log::error!("Unknown trap cause");
             false
@@ -89,7 +89,7 @@ pub fn user_exception_handler(task: &Task, e: Exception, badv_val: usize) -> boo
             // SAFETY: Reading the instruction that caused the fault
             let inst = unsafe { user_ptr.read().unwrap_or(0) };
             log::warn!("The illegal instruction is {:#x}", inst);
-            
+
             task.set_state(TaskState::Zombie);
             false
         }
@@ -103,7 +103,7 @@ pub fn user_exception_handler(task: &Task, e: Exception, badv_val: usize) -> boo
 /// Helper function for handling page faults
 fn handle_page_fault(task: &Task, fault_addr: VirtAddr, access: MappingFlags) -> bool {
     let addr_space = task.addr_space();
-    
+
     if let Err(e) = addr_space.handle_page_fault(fault_addr, access) {
         // Should send a `SIGSEGV` signal to the task
         log::error!(
