@@ -16,7 +16,7 @@ use crate::vm::user_ptr::UserReadPtr;
 /// Similar to the RISC-V implementation, this function is called after
 /// the trap context is saved and we're ready to handle the trap.
 #[unsafe(no_mangle)]
-pub fn trap_handler(task: &Task) -> bool {
+pub fn trap_handler(task: &Task) {
     let badv_val = badv::read().vaddr();
     let estat_val = estat::read();
     let cause = estat_val.cause();
@@ -36,93 +36,66 @@ pub fn trap_handler(task: &Task) -> bool {
         }
         _ => {
             log::error!("Unknown trap cause");
-            false
         }
     }
-    true
 }
 
 /// Handler for user exceptions
-pub fn user_exception_handler(task: &Task, e: Exception, badv_val: usize) -> bool {
+pub fn user_exception_handler(task: &Task, e: Exception, badv_val: usize) {
     match e {
         Exception::Syscall => {
             task.set_is_syscall(true);
-            true
         }
-        // LoongArch specific TLB miss exceptions - these correspond to page faults in RISC-V
-        Exception::FetchPageFault | Exception::PageNonExecutableFault => {
-            let access = MappingFlags::X;
+        Exception::FetchPageFault
+        | Exception::PageNonExecutableFault
+        | Exception::LoadPageFault
+        | Exception::PageNonReadableFault
+        | Exception::StorePageFault
+        | Exception::PageModifyFault => {
+            let access = match e {
+                Exception::FetchPageFault | Exception::PageNonExecutableFault => MappingFlags::X,
+                Exception::LoadPageFault | Exception::PageNonReadableFault => MappingFlags::R,
+                Exception::StorePageFault | Exception::PageModifyFault => MappingFlags::W,
+                _ => unreachable!(),
+            };
             let fault_addr = VirtAddr::new(badv_val);
-            handle_page_fault(task, fault_addr, access)
-        }
-        Exception::LoadPageFault | Exception::PageNonReadableFault => {
-            let access = MappingFlags::R;
-            let fault_addr = VirtAddr::new(badv_val);
-            handle_page_fault(task, fault_addr, access)
-        }
-        Exception::StorePageFault | Exception::PageModifyFault => {
-            let access = MappingFlags::W;
-            let fault_addr = VirtAddr::new(badv_val);
-            handle_page_fault(task, fault_addr, access)
+            let addr_space = task.addr_space();
+            if let Err(e) = addr_space.handle_page_fault(fault_addr, access) {
+                // TODO: Send SIGSEGV to the task
+                log::error!(
+                    "[user_exception_handler] unsolved page fault at {:#x}, access: {:?}, error: {:?}",
+                    fault_addr.to_usize(),
+                    access,
+                    e.as_str()
+                );
+                task.set_state(TaskState::Zombie);
+            }
         }
         Exception::Breakpoint => {
             // Handle breakpoint exceptions
             // Note: In LoongArch, we might need to adjust PC similar to RISC-V
             // For now, just log the event
             log::debug!("Breakpoint exception at address: {:#x}", badv_val);
-            true
         }
         Exception::AddressNotAligned => {
             log::warn!("[trap_handler] address not aligned at {:#x}", badv_val);
             // TODO: Implement proper handling for unaligned access
-            // Could potentially emulate the instruction like in polyhal
-            task.set_state(TaskState::Zombie);
-            false
         }
         Exception::IllegalInstruction => {
             log::warn!("[trap_handler] illegal instruction at {:#x}", badv_val);
-            // Read the illegal instruction - this is similar to RISC-V code
-            let addr_space = task.addr_space();
-            let mut user_ptr = UserReadPtr::<u32>::new(badv_val, &addr_space);
-
-            // TODO: Set MXR bit equivalent if needed in LoongArch
-            // SAFETY: Reading the instruction that caused the fault
-            let inst = unsafe { user_ptr.read().unwrap_or(0) };
-            log::warn!("The illegal instruction is {:#x}", inst);
-
+            // TODO: Send SIGILL signal to the task; don't just kill the task
             task.set_state(TaskState::Zombie);
-            false
         }
         _ => {
             log::warn!("Unknown user exception: {:?}", e);
-            false
         }
     }
 }
 
-/// Helper function for handling page faults
-fn handle_page_fault(task: &Task, fault_addr: VirtAddr, access: MappingFlags) -> bool {
-    let addr_space = task.addr_space();
-
-    if let Err(e) = addr_space.handle_page_fault(fault_addr, access) {
-        // Should send a `SIGSEGV` signal to the task
-        log::error!(
-            "[user_exception_handler] unsolved page fault at {:#x}, access: {:?}, error: {:?}",
-            fault_addr.to_usize(),
-            access,
-            e.as_str()
-        );
-        // TODO: Implement proper signal handling
-        return false;
-    }
-    true
-}
-
 /// Handler for user interrupts
-pub fn user_interrupt_handler(task: &Task, irq_num: usize) -> bool {
+pub fn user_interrupt_handler(task: &Task, irq_num: usize) {
     match irq_num {
         TIMER_IRQ => {
-            // Handle timer interrupt - similar to RISC-V
             ticlr::clear_timer_interrupt();
             set_nx_timer_irq();
 
@@ -132,15 +105,11 @@ pub fn user_interrupt_handler(task: &Task, irq_num: usize) -> bool {
             {
                 task.set_is_yield(true);
             }
-            true
         }
-        // External interrupt handling - similar to supervisor external in RISC-V
-        // The actual IRQ number may differ in LoongArch
         _ => {
             log::info!("[trap_handler] Received external interrupt: {}", irq_num);
             // TODO: Implement proper device IRQ handling
             // driver::get_device_manager_mut().handle_irq();
-            true
         }
     }
 }
