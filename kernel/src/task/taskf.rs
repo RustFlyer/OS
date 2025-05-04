@@ -5,6 +5,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use arch::riscv64::time::get_time_ms;
 use arch::riscv64::time::get_time_us;
+use shm::manager::SHARED_MEMORY_MANAGER;
 use core::cell::SyncUnsafeCell;
 use core::sync::atomic::AtomicUsize;
 use core::time::Duration;
@@ -183,6 +184,8 @@ impl Task {
         let is_process;
         let threadgroup;
 
+        let shm_maps;
+
         let parent;
         let children;
 
@@ -202,6 +205,7 @@ impl Task {
             parent = self.parent_mut().clone();
             children = self.children_mut().clone();
             pgid = self.pgid_mut().clone();
+            shm_maps = self.shm_maps_mut().clone();
         } else {
             is_process = true;
             process = None;
@@ -209,6 +213,11 @@ impl Task {
             parent = new_share_mutex(Some(Arc::downgrade(self)));
             children = new_share_mutex(BTreeMap::new());
             pgid = new_share_mutex(self.get_pgid());
+
+            shm_maps = new_share_mutex(BTreeMap::clone(&self.shm_maps_mut().lock()));
+            for (_, shm_id) in shm_maps.lock().iter() {
+                SHARED_MEMORY_MANAGER.attach(*shm_id, tid.0);
+            }
         }
 
         let sig_mask = SyncUnsafeCell::new(self.get_sig_mask());
@@ -244,6 +253,7 @@ impl Task {
             SyncUnsafeCell::new(None),
             state,
             SyncUnsafeCell::new(addr_space),
+            shm_maps,
             parent,
             children,
             pgid,

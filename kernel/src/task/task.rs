@@ -8,6 +8,7 @@ use alloc::{
     string::String,
     sync::{Arc, Weak},
 };
+use mm::address::VirtAddr;
 use core::cell::SyncUnsafeCell;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use core::task::Waker;
@@ -76,6 +77,10 @@ pub struct Task {
     // addr_space is task memory space, which is mapping
     // and organizing virtual address of a task.
     addr_space: SyncUnsafeCell<Arc<AddrSpace>>,
+
+    /// Map of start address of shared memory areas to their keys in the shared
+    /// memory manager.
+    shm_maps: ShareMutex<BTreeMap<VirtAddr, usize>>,
 
     // parent is task spawner. It spawn the task by fork or
     // clone and then parent is set as it.
@@ -161,6 +166,7 @@ impl Task {
             waker: SyncUnsafeCell::new(None),
             state: SpinNoIrqLock::new(TaskState::Running),
             addr_space: SyncUnsafeCell::new(Arc::new(addr_space)),
+            shm_maps: new_share_mutex(BTreeMap::new()),
             parent: new_share_mutex(None),
             children: new_share_mutex(BTreeMap::new()),
             pgid: new_share_mutex(pgid),
@@ -195,6 +201,7 @@ impl Task {
         waker: SyncUnsafeCell<Option<Waker>>,
         state: SpinNoIrqLock<TaskState>,
         addr_space: SyncUnsafeCell<Arc<AddrSpace>>,
+        shm_maps: ShareMutex<BTreeMap<VirtAddr, usize>>,
 
         parent: ShareMutex<Option<Weak<Task>>>,
         children: ShareMutex<BTreeMap<Tid, Arc<Task>>>,
@@ -228,6 +235,7 @@ impl Task {
             waker,
             state,
             addr_space,
+            shm_maps,
 
             parent,
             children,
@@ -308,6 +316,10 @@ impl Task {
 
     pub fn addr_space(&self) -> Arc<AddrSpace> {
         unsafe { Arc::clone(&*self.addr_space.get()) }
+    }
+
+    pub fn shm_maps_mut(&self) -> &ShareMutex<BTreeMap<VirtAddr, usize>> {
+        &self.shm_maps
     }
 
     pub fn raw_space_ptr(&self) -> usize {
