@@ -501,9 +501,6 @@ impl Drop for Task {
             .values()
             .for_each(|c| log::debug!("children: tid [{}] name [{}]", c.tid(), c.get_name()));
 
-        // log::info!("{}", str);
-        // log::error!("{}", str);
-        // log::debug!("{}", str);
-        log::trace!("{}", str);
+        log::debug!("{}", str);
     }
 }

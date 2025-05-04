@@ -115,7 +115,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         FUTEX => {
             sys_futex(
                 args[0],
-                args[1] as i32,
+                args[1] as _,
                 args[2] as u32,
                 args[3],
                 args[4],

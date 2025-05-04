@@ -8,6 +8,7 @@ use arch::riscv64::time::get_time_us;
 use core::cell::SyncUnsafeCell;
 use core::sync::atomic::AtomicUsize;
 use core::time::Duration;
+use mm::address::VirtAddr;
 use osfuture::suspend_now;
 use time::itime::ITimer;
 
@@ -34,8 +35,12 @@ use super::threadgroup::ThreadGroup;
 use super::tid::TidAddress;
 use super::tid::tid_alloc;
 
+use crate::task::futex::FutexHashKey;
+use crate::task::futex::futex_manager;
+use crate::task::futex::single_futex_manager;
 use crate::task::signal::sig_info::{Sig, SigDetails, SigInfo};
 use crate::vm::addr_space::{AddrSpace, switch_to};
+use crate::vm::user_ptr::UserWritePtr;
 
 impl Task {
     /// Switches Task to User
@@ -321,13 +326,30 @@ impl Task {
     }
 
     pub fn exit(self: &Arc<Self>) {
-        log::info!("thread {} do exit", self.tid());
+        log::info!("thread {}, name: {} do exit", self.tid(), self.get_name());
         assert_ne!(
             self.tid(),
             INIT_PROC_ID,
             "initproc die!!!, sepc {:#x}",
             self.trap_context_mut().sepc
         );
+
+        if let Some(address) = self.tid_address_mut().clear_child_tid {
+            log::info!("[do_exit] clear_child_tid: {:x}", address);
+            unsafe {
+                UserWritePtr::<u8>::new(address, &self.addr_space())
+                    .write(0)
+                    .expect("fail to write in clear_child_tid")
+            };
+
+            let key = FutexHashKey::new_share_key(address, &self.addr_space()).unwrap();
+            let _ = futex_manager(false, 0xffffffff).wake(&key, 1);
+            let _ = futex_manager(true, 0xffffffff).wake(&key, 1);
+
+            let key = FutexHashKey::new_private_key(address, self.addr_space()).unwrap();
+            let _ = futex_manager(false, 0xffffffff).wake(&key, 1);
+            let _ = futex_manager(true, 0xffffffff).wake(&key, 1);
+        }
 
         let tg_lock = self.thread_group_mut();
         let mut guard = tg_lock.lock();

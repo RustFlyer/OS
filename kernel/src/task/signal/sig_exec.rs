@@ -137,9 +137,7 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo) -> SysResult<bool> {
                 };
                 new_sp -= size_of::<LinuxSigInfo>();
                 let mut siginfo_ptr = UserWritePtr::<LinuxSigInfo>::new(new_sp, &addr_space);
-                unsafe {
-                    let _ = siginfo_ptr.write(siginfo_v);
-                }
+                unsafe { siginfo_ptr.write(siginfo_v)? };
                 cx.user_reg[11] = new_sp;
             }
 
