@@ -40,7 +40,7 @@ impl VecIdAllocator {
     /// # Panics
     ///
     /// Panics if `from >= to`.
-    pub fn new(from: usize, to: usize) -> Self {
+    pub const fn new(from: usize, to: usize) -> Self {
         debug_assert!(from < to);
         VecIdAllocator {
             next: from,
