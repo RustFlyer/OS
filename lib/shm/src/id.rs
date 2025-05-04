@@ -2,59 +2,59 @@ use arch::riscv64::time::get_time_s;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct ShmIdDs {
+pub struct ShmStat {
     // Ownership and permissions
-    pub shm_perm: IpcPerm,
+    pub perm: ShmPerm,
     // Size of segment (bytes). In our system, this must be aligned
-    pub shm_segsz: usize,
+    pub segsz: usize,
     // Last attach time
-    pub shm_atime: usize,
+    pub atime: usize,
     // Last detach time
-    pub shm_dtime: usize,
+    pub dtime: usize,
     // Creation time/time of last modification via shmctl()
-    pub shm_ctime: usize,
+    pub ctime: usize,
     // PID of creator
-    pub shm_cpid: usize,
+    pub cpid: usize,
     // PID of last shmat(2)/shmdt(2)
-    pub shm_lpid: usize,
+    pub lpid: usize,
     // No. of current attaches
-    pub shm_nattch: usize,
+    pub nattch: usize,
 }
 
-impl ShmIdDs {
+impl ShmStat {
     pub fn new(sz: usize, cpid: usize) -> Self {
         Self {
-            shm_perm: IpcPerm::default(),
-            shm_segsz: sz,
-            shm_atime: 0,
-            shm_dtime: 0,
-            shm_ctime: get_time_s(),
-            shm_cpid: cpid,
-            shm_lpid: 0,
-            shm_nattch: 0,
+            perm: ShmPerm::default(),
+            segsz: sz,
+            atime: 0,
+            dtime: 0,
+            ctime: get_time_s(),
+            cpid: cpid,
+            lpid: 0,
+            nattch: 0,
         }
     }
 
     pub fn attach(&mut self, lpid: usize) {
-        // shm_atime is set to the current time.
-        self.shm_atime = get_time_s();
-        // shm_lpid is set to the process-ID of the calling process.
-        self.shm_lpid = lpid;
-        // shm_nattch is incremented by one.
-        self.shm_nattch += 1;
+        // atime is set to the current time.
+        self.atime = get_time_s();
+        // lpid is set to the process-ID of the calling process.
+        self.lpid = lpid;
+        // nattch is incremented by one.
+        self.nattch += 1;
     }
 
     /// return whether the SHARED_MEMORY_MANAGER should remove the SharedMemory
-    /// which self ShmIdDs belongs to;
+    /// which self ShmStat belongs to;
     pub fn detach(&mut self, lpid: usize) -> bool {
-        // shm_dtime is set to the current time.
-        self.shm_dtime = get_time_s();
-        // shm_lpid is set to the process-ID of the calling process.
-        self.shm_lpid = lpid;
-        // shm_nattch is decremented by one.
-        self.shm_nattch -= 1;
-        //debug_assert!(self.shm_nattch >= 0);
-        if self.shm_nattch == 0 {
+        // dtime is set to the current time.
+        self.dtime = get_time_s();
+        // lpid is set to the process-ID of the calling process.
+        self.lpid = lpid;
+        // nattch is decremented by one.
+        self.nattch -= 1;
+        //debug_assert!(self.nattch >= 0);
+        if self.nattch == 0 {
             return true;
         }
         false
@@ -63,7 +63,7 @@ impl ShmIdDs {
 
 #[repr(C)]
 #[derive(Default, Clone, Copy, Debug)]
-pub struct IpcPerm {
+pub struct ShmPerm {
     key: i32,
     uid: u32,
     gid: u32,

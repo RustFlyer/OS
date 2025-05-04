@@ -12,19 +12,19 @@ impl SharedMemoryManager {
         Self(SpinNoIrqLock::new(HashMap::new()))
     }
 
-    pub fn attach(&self, shm_id: usize, lpid: usize) {
-        let mut shm_manager = self.0.lock();
-        let shm = shm_manager.get_mut(&shm_id).unwrap();
-        shm.shmid_ds.attach(lpid);
+    pub fn attach(&self, id: usize, lpid: usize) {
+        let mut manager = self.0.lock();
+        let shm = manager.get_mut(&id).unwrap();
+        shm.stat.attach(lpid);
     }
 
-    pub fn detach(&self, shm_id: usize, lpid: usize) {
-        let mut shm_manager = self.0.lock();
-        let shm = shm_manager.get_mut(&shm_id).unwrap();
-        if shm.shmid_ds.detach(lpid) {
-            shm_manager.remove(&shm_id);
+    pub fn detach(&self, id: usize, lpid: usize) {
+        let mut manager = self.0.lock();
+        let shm = manager.get_mut(&id).unwrap();
+        if shm.stat.detach(lpid) {
+            manager.remove(&id);
             unsafe {
-                SHARED_MEMORY_KEY_ALLOCATOR.lock().dealloc(shm_id);
+                SHARED_MEMORY_KEY_ALLOCATOR.lock().dealloc(id);
             }
         }
     }
