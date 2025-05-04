@@ -1,5 +1,12 @@
 use config::mm::PAGE_SIZE;
+use id_allocator::IdAllocator;
 use mm::address::VirtAddr;
+use shm::{
+    SharedMemory,
+    flags::{ShmAtFlags, ShmGetFlags},
+    id::ShmStat,
+    manager::{SHARED_MEMORY_KEY_ALLOCATOR, SHARED_MEMORY_MANAGER},
+};
 use systype::{SysError, SyscallResult};
 
 use crate::{
@@ -7,6 +14,7 @@ use crate::{
     vm::{
         mem_perm::MemPerm,
         mmap::{MmapFlags, MmapProt},
+        user_ptr::UserWritePtr,
     },
 };
 
@@ -133,4 +141,173 @@ pub fn sys_mprotect(addr: usize, len: usize, prot: i32) -> SyscallResult {
 pub fn sys_madvise(add: usize, length: usize, _advice: usize) -> SyscallResult {
     log::trace!("[sys_madvise] not implemented add: {add:#x}, length: {length:#x}");
     Ok(0)
+}
+
+/// `shmget()` returns the identifier of the System V shared memory segment associated with
+/// the value of the argument key. It may be used either to obtain the identifier of a previously
+/// created shared memory segment (when `shmflg` is zero and key does not have the value IPC_PRIVATE),
+/// or to create a new set.
+///
+/// A new shared memory segment, with size equal to the value of size rounded up to a multiple of
+/// PAGE_SIZE, is created if key has the value IPC_PRIVATE or key isn't IPC_PRIVATE, no shared memory
+/// segment corresponding to key exists, and IPC_CREAT is specified in shmflg.
+///
+/// If shmflg specifies both IPC_CREAT and IPC_EXCL and a shared memory segment already exists for key,
+/// then `shmget()` fails with errno set to EEXIST.
+pub fn sys_shmget(key: usize, size: usize, shmflg: i32) -> SyscallResult {
+    let shmflg = ShmGetFlags::from_bits_truncate(shmflg);
+    let task = current_task();
+    log::info!("[sys_shmget] {key} {size} {:?}", shmflg);
+
+    // Create a new shared memory. When it is specified, the shmflg is invalid
+    const PAGE_MASK: usize = PAGE_SIZE - 1;
+    const IPC_PRIVATE: usize = 0;
+
+    let rounded_up_sz = (size + PAGE_MASK) & !PAGE_MASK;
+
+    if key == IPC_PRIVATE {
+        let new_key = SHARED_MEMORY_KEY_ALLOCATOR.lock().alloc().unwrap();
+        let new_shm = SharedMemory::new(rounded_up_sz, task.pid());
+        SHARED_MEMORY_MANAGER.0.lock().insert(new_key, new_shm);
+        return Ok(new_key);
+    }
+
+    let mut shm_manager = SHARED_MEMORY_MANAGER.0.lock();
+    if let Some(shm) = shm_manager.get(&key) {
+        // IPC_CREAT and IPC_EXCL were specified in shmflg, but a shared memory segment
+        // already exists for key.
+        if shmflg.contains(ShmGetFlags::IPC_CREAT | ShmGetFlags::IPC_EXCL) {
+            return Err(SysError::EEXIST);
+        }
+        // A segment for the given key exists, but size is greater than the size of that
+        // segment.
+        if shm.size() < size {
+            return Err(SysError::EINVAL);
+        }
+        return Ok(key);
+    }
+    if shmflg.contains(ShmGetFlags::IPC_CREAT) {
+        let new_shm = SharedMemory::new(rounded_up_sz, task.pid());
+        shm_manager.insert(key, new_shm);
+        return Ok(key);
+    } else {
+        // No segment exists for the given key, and IPC_CREAT was not specified.
+        return Err(SysError::ENOENT);
+    }
+}
+
+/// `shmat()` attaches the System V shared memory segment identified by `shmid` to the address space of the
+/// calling process. The attaching address is specified by `shmaddr` with one of the following criteria:
+///
+/// - If `shmaddr` is NULL, the system chooses a suitable (unused) page-aligned address to attach the segment.
+/// - If `shmaddr` isn't NULL and SHM_RND is specified in `shmflg`, the attach occurs at the address equal to
+///   `shmaddr` rounded down to the nearest multiple of SHMLBA.
+/// - Otherwise, `shmaddr` must be a page-aligned address at which the attach occurs.
+pub fn sys_shmat(shmid: usize, shmaddr: VirtAddr, shmflg: i32) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+    let shmflg = ShmAtFlags::from_bits_truncate(shmflg as i32);
+    log::info!("[sys_shmat] {shmid} {shmaddr:?} {:?}", shmflg);
+
+    if shmaddr.page_offset() != 0 && !shmflg.contains(ShmAtFlags::SHM_RND) {
+        return Err(SysError::EINVAL);
+    }
+
+    let shmaddr_aligned = shmaddr.round_down();
+    let mut mem_perm = MemPerm::RW;
+    if shmflg.contains(ShmAtFlags::SHM_EXEC) {
+        mem_perm.insert(MemPerm::X);
+    }
+    if shmflg.contains(ShmAtFlags::SHM_RDONLY) {
+        mem_perm.remove(MemPerm::W);
+    }
+
+    let mut _ret = 0;
+    if let Some(shm) = SHARED_MEMORY_MANAGER.0.lock().get_mut(&shmid) {
+        let ret_addr = addrspace.attach_shm(shm.size(), shmaddr_aligned, mem_perm, &mut shm.pages);
+        task.with_mut_shm_stats(|ids| {
+            ids.insert(ret_addr, shmid);
+        });
+        _ret = ret_addr.into();
+    } else {
+        return Err(SysError::EINVAL);
+    }
+    SHARED_MEMORY_MANAGER.attach(shmid, task.pid());
+    return Ok(_ret);
+}
+
+/// `shmdt()` detaches the shared memory segment located at the address specified by `shmaddr`
+/// from the address space of the calling process. The to-be-detached segment must be currently
+/// attached with shmaddr equal to the value returned by the attaching shmat() call.
+///
+/// On a successful `shmdt()` call, the system updates the members of the shmid_ds structure
+/// associated with the shared memory segment as follows:
+/// - `shm_dtime` is set to the current time.
+/// - `shm_lpid` is set to the process-ID of the calling process.
+/// - `shm_nattch` is decremented by one. If it becomes 0 and the segment is marked for deletion, the segment is deleted.
+pub fn sys_shmdt(shmaddr: VirtAddr) -> SyscallResult {
+    log::info!("[sys_shmdt] {:?}", shmaddr);
+    let task = current_task();
+    let addrspace = task.addr_space();
+    if shmaddr.page_offset() != 0 {
+        // shmaddr is not aligned on a page boundary
+        return Err(SysError::EINVAL);
+    }
+    let shm_id = task.with_mut_shm_stats(|ids| ids.remove(&shmaddr));
+    if let Some(shm_id) = shm_id {
+        addrspace.detach_shm(shmaddr);
+        SHARED_MEMORY_MANAGER.detach(shm_id, task.pid());
+        Ok(0)
+    } else {
+        Err(SysError::EINVAL)
+    }
+}
+
+/// `shmctl()` performs the control operation specified by op on the System V shared memory segment whose
+/// identifier is given in shmid.
+///
+/// The `buf` argument is a pointer to a shmid_ds structure, defined in <sys/shm.h> as follows:
+/// ```c
+/// struct shmid_ds {
+///     struct ipc_perm shm_perm;    /* Ownership and permissions */
+///     size_t          shm_segsz;   /* Size of segment (bytes) */
+///     time_t          shm_atime;   /* Last attach time */
+///     time_t          shm_dtime;   /* Last detach time */
+///     time_t          shm_ctime;   /* Creation time/time of last
+///                                     modification via `shmctl()` */
+///     pid_t           shm_cpid;    /* PID of creator */
+///     pid_t           shm_lpid;    /* PID of last shmat(2)/shmdt(2) */
+///     shmatt_t        shm_nattch;  /* No. of current attaches */
+///     ...
+/// };
+/// ```
+pub fn sys_shmctl(shmid: usize, cmd: i32, buf: usize) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+    const IPC_RMID: i32 = 0;
+    const IPC_SET: i32 = 1;
+    const IPC_STAT: i32 = 2;
+
+    match cmd {
+        IPC_STAT => {
+            let shm_manager = SHARED_MEMORY_MANAGER.0.lock();
+            if let Some(shm) = shm_manager.get(&shmid) {
+                let mut buf = UserWritePtr::<ShmStat>::new(buf, &addrspace);
+                unsafe { buf.write(shm.stat) }?;
+                Ok(0)
+            } else {
+                // shmid is not a valid identifier
+                Err(SysError::EINVAL)
+            }
+        }
+        IPC_RMID => {
+            log::warn!("[sys_shmctl] IPC_RMID, do nothing");
+            Ok(0)
+        }
+        cmd => {
+            log::error!("[sys_shmctl] unimplemented cmd {cmd}");
+            // cmd is not a valid command
+            Err(SysError::EINVAL)
+        }
+    }
 }

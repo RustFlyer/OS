@@ -190,6 +190,8 @@ impl Task {
         let cwd;
         let itimers;
 
+        let shm_ids = new_share_mutex(BTreeMap::new());
+
         let elf = SyncUnsafeCell::new((*self.elf_mut()).clone());
 
         let mut name = self.get_name();
@@ -264,6 +266,7 @@ impl Task {
             fd_table,
             cwd,
             elf,
+            shm_ids,
             itimers,
             name,
         ));

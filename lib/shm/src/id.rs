@@ -1,4 +1,5 @@
 use arch::riscv64::time::get_time_s;
+use bitflags::bitflags;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -72,5 +73,3 @@ pub struct ShmPerm {
     mode: u16,
     seq: u16,
 }
-
-

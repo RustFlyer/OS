@@ -11,7 +11,9 @@ use alloc::{
 use core::cell::SyncUnsafeCell;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use core::task::Waker;
+use mm::address::VirtAddr;
 use mutex::{ShareMutex, SpinNoIrqLock, new_share_mutex};
+use shm::id::ShmStat;
 use time::itime::ITimer;
 use vfs::{dentry::Dentry, file::File};
 
@@ -130,6 +132,10 @@ pub struct Task {
     // with loading elf-file datas.
     elf: SyncUnsafeCell<Arc<dyn File>>,
 
+    /// Map of start address of shared memory areas to their keys in the shared
+    /// memory manager.
+    shm_stats: ShareMutex<BTreeMap<VirtAddr, usize>>,
+
     is_syscall: AtomicBool,
 
     is_yield: AtomicBool,
@@ -175,6 +181,7 @@ impl Task {
             fd_table: new_share_mutex(FdTable::new()),
             cwd: new_share_mutex(sys_root_dentry()),
             elf: SyncUnsafeCell::new(elf_file),
+            shm_stats: new_share_mutex(BTreeMap::new()),
             is_syscall: AtomicBool::new(false),
             is_yield: AtomicBool::new(false),
             itimers: new_share_mutex([ITimer::default(); 3]),
@@ -212,6 +219,7 @@ impl Task {
         fd_table: ShareMutex<FdTable>,
         cwd: ShareMutex<Arc<dyn Dentry>>,
         elf: SyncUnsafeCell<Arc<dyn File>>,
+        shm_stats: ShareMutex<BTreeMap<VirtAddr, usize>>,
 
         itimers: ShareMutex<[ITimer; 3]>,
 
@@ -245,6 +253,7 @@ impl Task {
             fd_table,
             cwd,
             elf,
+            shm_stats,
             is_syscall: AtomicBool::new(false),
             is_yield: AtomicBool::new(false),
             itimers,
@@ -362,6 +371,10 @@ impl Task {
 
     pub fn with_mut_itimers<T>(&self, f: impl FnOnce(&mut [ITimer; 3]) -> T) -> T {
         f(&mut self.itimers.lock())
+    }
+
+    pub fn with_mut_shm_stats<T>(&self, f: impl FnOnce(&mut BTreeMap<VirtAddr, usize>) -> T) -> T {
+        f(&mut self.shm_stats.lock())
     }
 
     pub fn cwd_mut(&self) -> Arc<dyn Dentry> {

@@ -2,6 +2,7 @@ pub mod addr_space;
 pub mod elf;
 pub mod mem_perm;
 pub mod mmap;
+pub mod shm;
 pub mod user_ptr;
 
 mod page_table;

@@ -821,6 +821,7 @@ name = "shm"
 version = "0.1.0"
 dependencies = [
  "arch",
+ "bitflags 2.9.0",
  "config",
  "hashbrown",
  "id_allocator",

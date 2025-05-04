@@ -1,7 +1,7 @@
 use hashbrown::HashMap;
 use id_allocator::{IdAllocator, VecIdAllocator};
-use spin::Lazy;
 use mutex::SpinNoIrqLock;
+use spin::Lazy;
 
 use crate::SharedMemory;
 

@@ -124,6 +124,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
             .await
         }
         MADVISE => sys_madvise(args[0], args[1], args[2]),
+        SHMGET => sys_shmget(args[0], args[1], args[2] as i32),
         _ => {
             log::error!("Syscall not implemented: {}", syscall_no.as_str());
             unimplemented!()
