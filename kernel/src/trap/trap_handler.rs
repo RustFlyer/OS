@@ -19,7 +19,7 @@ use crate::vm::user_ptr::UserReadPtr;
 /// the middle of trap_return(), and then return to
 /// task_executor_unit(), which calls this trap_handler() function.
 #[unsafe(no_mangle)]
-pub fn trap_handler(task: &Task) -> bool {
+pub fn trap_handler(task: &Task) {
     let stval = register::stval::read();
     let cause = register::scause::read().cause();
 
@@ -39,9 +39,10 @@ pub fn trap_handler(task: &Task) -> bool {
         Trap::Exception(e) => {
             user_exception_handler(task, Exception::from_number(e).unwrap(), stval)
         }
-        Trap::Interrupt(i) => user_interrupt_handler(task, Interrupt::from_number(i).unwrap()),
+        Trap::Interrupt(i) => {
+            user_interrupt_handler(task, Interrupt::from_number(i).unwrap())
+        }
     }
-    true
 }
 
 pub fn user_exception_handler(task: &Task, e: Exception, stval: usize) {
@@ -107,7 +108,7 @@ pub fn user_interrupt_handler(task: &Task, i: Interrupt) {
             if task.timer_mut().schedule_time_out()
                 && executor::has_waiting_task_alone(current_hart().id)
             {
-                log::trace!("[trap_handler] {} yield", task.get_name());
+                log::trace!("[trap_handler] task {} yield, contain signal: {:?}", task.tid(), task.sig_manager_mut().bitmap.bits());
                 task.set_is_yield(true);
             }
         }

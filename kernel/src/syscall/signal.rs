@@ -341,14 +341,17 @@ pub async fn sys_sigreturn() -> SyscallResult {
     let addr_space = task.addr_space();
     let mut sig_cx_ptr = UserReadPtr::<SigContext>::new(sig_cx_ptr, &addr_space);
     log::trace!("[sys_rt_sigreturn] sig_cx_ptr: {sig_cx_ptr:?}");
+    //恢复信号处理前的状态
     unsafe {
         let sig_cx = sig_cx_ptr.read()?;
         *mask = sig_cx.mask;
         // TODO: no sig_stack for now so don't need to restore
         trap_cx.sepc = sig_cx.user_reg[0];
+        //log::debug!("[sys_sigreturn] restore trap_cx a0: {} with backup in sig_cx: {}", trap_cx.user_reg[10], sig_cx.user_reg[10]);
         trap_cx.user_reg = sig_cx.user_reg;
     }
     log::debug!("[sys_sigreturn] trap context: {:?}", trap_cx.user_reg);
+    // its return value is the a0 before signal interrupt, so that it won't be changed in async_syscall
     Ok(trap_cx.user_reg[10])
 }
 

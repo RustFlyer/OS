@@ -12,12 +12,13 @@ use super::sig_info::{Sig, SigInfo};
 
 global_asm!(include_str!("_sigreturn_trampoline.asm"));
 
-pub async fn sig_check(task: Arc<Task>, mut _intr: bool) {
+pub async fn sig_check(task: Arc<Task>, mut interrupted: bool) {
+    
     let old_mask = task.get_sig_mask();
 
     while let Some(si) = task.sig_manager_mut().dequeue_signal(&old_mask) {
         // if sig_exec turns to user handler, it will return true to break the loop and run user handler.
-        let ret = sig_exec(task.clone(), si).await;
+        let ret = sig_exec(task.clone(), si, interrupted).await;
 
         match ret {
             Ok(b) if b => break,
@@ -29,7 +30,7 @@ pub async fn sig_check(task: Arc<Task>, mut _intr: bool) {
     }
 }
 
-async fn sig_exec(task: Arc<Task>, si: SigInfo) -> SysResult<bool> {
+async fn sig_exec(task: Arc<Task>, si: SigInfo, mut interrupted: bool) -> SysResult<bool> {
     let action = task.sig_handlers_mut().lock().get(si.sig);
     let cx = task.trap_context_mut();
     let old_mask = task.get_sig_mask();
@@ -41,12 +42,12 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo) -> SysResult<bool> {
         action
     );
 
-    log::debug!("trap context: {:?}", cx.user_reg);
 
-    if action.flags.contains(SigActionFlag::SA_RESTART) {
+    if interrupted && action.flags.contains(SigActionFlag::SA_RESTART) {
         cx.sepc -= 4;
+        log::info!("[sig_exec] restart interrupted syscall, orignal a0: {}, last_a0: {}", cx.user_reg[10], cx.last_a0);
         cx.restore_last_user_a0();
-        log::info!("[sig_exec] restart syscall");
+        interrupted = false;
     }
 
     match action.atype {
