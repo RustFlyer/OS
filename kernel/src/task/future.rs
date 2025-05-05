@@ -171,7 +171,7 @@ pub async fn task_executor_unit(task: Arc<Task>) {
         // be some instructions with risks between trap_return and trap_handle.
         trap::trap_handler(&task);
 
-        let interrupted = asyscall(&task).await;
+        let interrupted = async_syscall(&task).await;
 
         match task.get_state() {
             TaskState::Zombie => break,
