@@ -328,7 +328,6 @@ impl Task {
     }
 
     pub fn exit(self: &Arc<Self>) {
-        log::info!("thread {}, name: {} do exit", self.tid(), self.get_name());
         assert_ne!(
             self.tid(),
             INIT_PROC_ID,
@@ -356,6 +355,7 @@ impl Task {
 
         let tg_lock = self.thread_group_mut();
         let mut threadgroup = tg_lock.lock();
+        log::info!("thread {}, name: {} do exit, is_process: {}, tg_len: {}", self.tid(), self.get_name(), self.is_process(), threadgroup.len());
 
         // 1. main-thread is not zombie
         // 2. process has at least one child(if you are process and dead)
@@ -366,6 +366,7 @@ impl Task {
         {
             if !self.is_process() {
                 // NOTE: process will be removed by parent calling `sys_wait4`
+                log::info!("remove not-process and not last thread {} from threadgroup", self.tid());
                 threadgroup.remove(self);
                 TASK_MANAGER.remove_task(self.tid());
             }
@@ -374,6 +375,7 @@ impl Task {
 
         if self.is_process() {
             assert!(threadgroup.len() == 1);
+            log::info!("process {} do exit, tg_len: {}", self.tid(), threadgroup.len());
         } else {
             assert!(threadgroup.len() == 2);
             // NOTE: leader will be removed by parent calling `sys_wait4`
