@@ -91,8 +91,8 @@ pub async fn sys_sched_yield() -> SyscallResult {
 }
 
 pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult {
-    // log::error!("[sys_wait4] in in in in in in in in in in in");
     let task = current_task();
+    log::error!("[sys_wait4] {} wait for recycling", task.get_name());
     let option = WaitOptions::from_bits_truncate(options);
     let target = match pid {
         -1 => WaitFor::AnyChild,
@@ -286,8 +286,6 @@ pub fn sys_clone(
     new_task.trap_context_mut().set_user_a0(0);
     let new_tid = new_task.tid();
     log::info!("[sys_clone] clone a new thread, tid {new_tid}, clone flags {flags:?}",);
-
-    task.add_child(new_task.clone());
 
     if stack != 0 {
         new_task.trap_context_mut().set_user_sp(stack);

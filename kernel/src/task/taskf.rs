@@ -184,7 +184,7 @@ impl Task {
         let is_process;
         let threadgroup;
         let parent;
-        let children;
+        let children = new_share_mutex(BTreeMap::new());
         let pgid;
         let cwd;
         let itimers;
@@ -201,7 +201,6 @@ impl Task {
             process = Some(Arc::downgrade(self));
             threadgroup = self.thread_group_mut().clone();
             parent = (*self.parent_mut()).clone();
-            children = (*self.children_mut()).clone();
             pgid = (*self.pgid_mut()).clone();
             cwd = self.cwd();
             itimers = new_share_mutex(self.with_mut_itimers(|t| t.clone()));
@@ -211,7 +210,6 @@ impl Task {
             process = None;
             threadgroup = new_share_mutex(ThreadGroup::new());
             parent = new_share_mutex(Some(Arc::downgrade(self)));
-            children = new_share_mutex(BTreeMap::new());
             pgid = new_share_mutex(self.get_pgid());
             cwd = new_share_mutex(self.cwd_mut());
             itimers = new_share_mutex([ITimer::default(); 3]);
@@ -369,6 +367,13 @@ impl Task {
                 threadgroup.remove(self);
                 TASK_MANAGER.remove_task(self.tid());
             }
+            // log::warn!("[do_exit] {} leaves before setting state", self.get_name());
+            // log::warn!(
+            //     "[do_exit] {} process {:?}'s state {:?}",
+            //     self.get_name(),
+            //     self.process().get_name(),
+            //     self.process().get_state()
+            // );
             return;
         }
 

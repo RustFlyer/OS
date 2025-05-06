@@ -90,9 +90,9 @@ pub async fn sys_futex(
     let futex_addr = FutexAddr::new_with_check(uaddr, &addrspace)?;
     let is_private = allop.contains(FutexOp::Private);
     // For Debug
-    let is_multi_group = false;
+    // let is_multi_group = false;
     // let val3 = 0xffffffff;
-    // let is_multi_group = allop.contains(FutexOp::WaitBitset) | allop.contains(FutexOp::WaitBitset);
+    let is_multi_group = allop.contains(FutexOp::WaitBitset) | allop.contains(FutexOp::WaitBitset);
 
     let key = FutexHashKey::new_key(futex_addr.addr(), addrspace.clone(), is_private)?;
 
@@ -354,8 +354,7 @@ pub async fn sys_sigreturn() -> SyscallResult {
     log::debug!("[sys_sigreturn] trap context: {:?}", trap_cx.user_reg);
     log::debug!("sig: {:#x}", task.sig_manager_mut().bitmap.bits());
     // its return value is the a0 before signal interrupt, so that it won't be changed in async_syscall
-    simdebug::stop();
-    trap_cx.display();
+    // trap_cx.display();
     Ok(trap_cx.user_reg[10])
 }
 

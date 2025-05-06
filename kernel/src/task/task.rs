@@ -490,6 +490,7 @@ impl Task {
     }
     // ========== This Part You Can Change the Member of Task  ===========
     pub fn add_child(&self, child: Arc<Task>) {
+        log::debug!("addchild: tid {} -> tid {} ", child.tid(), self.tid());
         self.children.lock().insert(child.tid(), child);
     }
 
