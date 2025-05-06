@@ -336,6 +336,7 @@ impl Task {
             self.trap_context_mut().sepc
         );
 
+        // release futexes in dropped threads.
         if let Some(address) = self.tid_address_mut().clear_child_tid {
             log::info!("[do_exit] clear_child_tid: {:x}", address);
             unsafe {
@@ -354,28 +355,30 @@ impl Task {
         }
 
         let tg_lock = self.thread_group_mut();
-        let mut guard = tg_lock.lock();
+        let mut threadgroup = tg_lock.lock();
 
+        // 1. main-thread is not zombie
+        // 2. process has at least one child(if you are process and dead)
+        // 3. not-process but has at least one brother(if you are not process)
         if (!(self.process().get_state() == TaskState::Zombie))
-            || (self.is_process() && guard.len() > 1)
-            || (!self.is_process() && guard.len() > 2)
+            || (self.is_process() && threadgroup.len() > 1)
+            || (!self.is_process() && threadgroup.len() > 2)
         {
             if !self.is_process() {
                 // NOTE: process will be removed by parent calling `sys_wait4`
-                guard.remove(self);
+                threadgroup.remove(self);
                 TASK_MANAGER.remove_task(self.tid());
             }
             return;
         }
 
         if self.is_process() {
-            // log::error!("{}", guard.len());
-            assert!(guard.len() == 1);
+            assert!(threadgroup.len() == 1);
         } else {
-            assert!(guard.len() == 2);
+            assert!(threadgroup.len() == 2);
             // NOTE: leader will be removed by parent calling `sys_wait4`
-            log::error!("[exit] remove1 {}", self.tid());
-            guard.remove(self);
+            log::error!("[exit] remove {}", self.tid());
+            threadgroup.remove(self);
             TASK_MANAGER.remove_task(self.tid());
         }
 
@@ -384,25 +387,21 @@ impl Task {
         log::debug!("[Task::do_exit] reparent children to init");
         debug_assert_ne!(self.tid(), INIT_PROC_ID);
 
-        //Question: Is mut safe here?
-        let mut children = self.children_mut().lock().clone();
+        let mut children = self.children_mut().lock();
         if !children.is_empty() {
             let root = TASK_MANAGER.get_task(INIT_PROC_ID).unwrap();
             for child in children.values() {
                 log::debug!(
-                    "[Task::do_eixt] reparent child process pid {} to init",
+                    "[Task::do_exit] reparent child process pid {} to init",
                     child.pid()
                 );
                 if child.get_state() == TaskState::WaitForRecycle {
-                    // NOTE: self has not called wait to clear zombie children, we need to notify
-                    // init to clear these zombie children.
                     root.receive_siginfo(SigInfo {
                         sig: Sig::SIGCHLD,
                         code: SigInfo::CLD_EXITED,
                         details: SigDetails::None,
                     })
                 }
-                // Question: Why Deref doesn't work here
                 *child.parent_mut().lock() = Some(Arc::downgrade(&root));
             }
             root.children_mut().lock().extend(children.clone());

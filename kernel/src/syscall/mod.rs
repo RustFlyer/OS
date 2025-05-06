@@ -16,8 +16,6 @@ use signal::*;
 use time::*;
 use user::{sys_getgid, sys_getuid};
 
-use crate::processor::current_task;
-
 pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
     let Some(syscall_no) = SyscallNo::from_repr(syscall_no) else {
         log::error!("Syscall number not included: {syscall_no}");
@@ -131,6 +129,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         }
         MADVISE => sys_madvise(args[0], args[1], args[2]),
         SHMGET => sys_shmget(args[0], args[1], args[2] as i32),
+        TKILL => sys_tkill(args[0] as isize, args[1] as i32),
         _ => {
             log::error!("Syscall not implemented: {}", syscall_no.as_str());
             unimplemented!()

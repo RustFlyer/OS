@@ -91,7 +91,6 @@ impl Task {
     /// - except for `except` signals, `SIGKILL` and `SIGSTOP` are in should_wake
     ///   by default.
     pub fn set_wake_up_signal(&self, except: SigSet) {
-        self.set_state(TaskState::Interruptable);
         let manager = self.sig_manager_mut();
         manager.should_wake = except | SigSet::SIGKILL | SigSet::SIGSTOP
     }

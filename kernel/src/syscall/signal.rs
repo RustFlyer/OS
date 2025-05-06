@@ -527,6 +527,25 @@ pub fn sys_tgkill(tgid: isize, tid: isize, signum: i32) -> SyscallResult {
     })
 }
 
+/// tkill() is an obsolete predecessor to tgkill(). It allows
+/// only the target thread ID to be specified, which may result in
+/// the wrong thread being signaled if a thread terminates and its
+/// thread ID is recycled. Avoid using this system call.
+pub fn sys_tkill(tid: isize, sig: i32) -> SyscallResult {
+    let sig = Sig::from_i32(sig);
+    if !sig.is_valid() || tid < 0 {
+        return Err(SysError::EINVAL);
+    }
+
+    let task = TASK_MANAGER.get_task(tid as usize).ok_or(SysError::ESRCH)?;
+    task.receive_siginfo(SigInfo {
+        sig,
+        code: SigInfo::TKILL,
+        details: SigDetails::None,
+    });
+    Ok(0)
+}
+
 /// Suspends execution of the calling thread until one of the signals in set
 /// is pending (If one of the signals in set is already pending for the
 /// calling thread, sigwaitinfo() will return immediately.). It removes the

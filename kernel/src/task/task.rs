@@ -494,6 +494,7 @@ impl Task {
     }
 
     pub fn remove_child(&self, child: Arc<Task>) {
+        log::debug!("child: tid [{}] will be removed", child.get_name());
         self.children.lock().remove(&child.tid());
     }
 }
