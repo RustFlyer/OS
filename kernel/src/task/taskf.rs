@@ -37,7 +37,6 @@ use super::tid::tid_alloc;
 
 use crate::task::futex::FutexHashKey;
 use crate::task::futex::futex_manager;
-use crate::task::futex::single_futex_manager;
 use crate::task::signal::sig_info::{Sig, SigDetails, SigInfo};
 use crate::vm::addr_space::{AddrSpace, switch_to};
 use crate::vm::user_ptr::UserWritePtr;

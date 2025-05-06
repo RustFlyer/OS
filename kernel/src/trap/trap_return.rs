@@ -27,6 +27,7 @@ pub fn trap_return(task: &Arc<Task>) {
 
     task.timer_mut().switch_to_user();
     // log::info!("[trap_return] go to user space");
+
     unsafe {
         let ptr = trap_context_mut as *mut TrapContext;
         __return_to_user(ptr);

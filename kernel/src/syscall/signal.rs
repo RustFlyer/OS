@@ -98,7 +98,8 @@ pub async fn sys_futex(
 
     let faddr = futex_addr.addr();
     log::info!(
-        "[sys_futex] uaddr:{:#x} key:{:?}, op: {:#x} {:?} val: {:#X}",
+        "[sys_futex] {} uaddr:{:#x} key:{:?}, op: {:#x} {:?} val: {:#X}",
+        task.get_name(),
         faddr,
         key,
         futex_op,
@@ -340,7 +341,7 @@ pub async fn sys_sigreturn() -> SyscallResult {
     let sig_cx_ptr = task.get_sig_cx_ptr();
     let addr_space = task.addr_space();
     let mut sig_cx_ptr = UserReadPtr::<SigContext>::new(sig_cx_ptr, &addr_space);
-    log::trace!("[sys_rt_sigreturn] sig_cx_ptr: {sig_cx_ptr:?}");
+    log::debug!("[sys_rt_sigreturn] sig_cx_ptr: {sig_cx_ptr:?}");
     //恢复信号处理前的状态
     unsafe {
         let sig_cx = sig_cx_ptr.read()?;
@@ -351,7 +352,10 @@ pub async fn sys_sigreturn() -> SyscallResult {
         trap_cx.user_reg = sig_cx.user_reg;
     }
     log::debug!("[sys_sigreturn] trap context: {:?}", trap_cx.user_reg);
+    log::debug!("sig: {:#x}", task.sig_manager_mut().bitmap.bits());
     // its return value is the a0 before signal interrupt, so that it won't be changed in async_syscall
+    simdebug::stop();
+    trap_cx.display();
     Ok(trap_cx.user_reg[10])
 }
 
@@ -467,7 +471,7 @@ pub fn sys_rt_sigmask(
     if !input_mask.is_null() {
         unsafe {
             let input = input_mask.read()?;
-            log::info!("[sys_rt_sigmask] input:{input:#x}");
+            log::info!("[sys_rt_sigmask] task {} input:{input:#x}", task.get_name());
 
             match how {
                 SIGBLOCK => {

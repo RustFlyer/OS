@@ -39,9 +39,7 @@ pub fn trap_handler(task: &Task) {
         Trap::Exception(e) => {
             user_exception_handler(task, Exception::from_number(e).unwrap(), stval)
         }
-        Trap::Interrupt(i) => {
-            user_interrupt_handler(task, Interrupt::from_number(i).unwrap())
-        }
+        Trap::Interrupt(i) => user_interrupt_handler(task, Interrupt::from_number(i).unwrap()),
     }
 }
 
@@ -108,7 +106,11 @@ pub fn user_interrupt_handler(task: &Task, i: Interrupt) {
             if task.timer_mut().schedule_time_out()
                 && executor::has_waiting_task_alone(current_hart().id)
             {
-                log::trace!("[trap_handler] task {} yield, contain signal: {:?}", task.tid(), task.sig_manager_mut().bitmap.bits());
+                log::trace!(
+                    "[trap_handler] task {} yield, contain signal: {:?}",
+                    task.tid(),
+                    task.sig_manager_mut().bitmap.bits()
+                );
                 task.set_is_yield(true);
             }
         }

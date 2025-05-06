@@ -11,6 +11,7 @@ pub async fn async_syscall(task: &Task) -> bool {
 
     if task.is_yield() {
         yield_now().await;
+        task.set_is_yield(false);
     }
 
     if !task.is_syscall() {
