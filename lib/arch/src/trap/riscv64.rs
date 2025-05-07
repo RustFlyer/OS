@@ -2,6 +2,15 @@ use riscv::interrupt;
 use riscv::register::mtvec::TrapMode;
 use riscv::register::stvec::{self, Stvec};
 
+pub fn init() {
+    unsafe {
+        // Enable timer interrupt
+        riscv::register::sie::set_stimer();
+        // Enable interrupt
+        riscv::register::sstatus::set_sie();
+    }
+}
+
 pub fn enable_interrupt() {
     unsafe {
         interrupt::enable();
