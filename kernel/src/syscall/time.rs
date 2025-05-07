@@ -1,6 +1,6 @@
 use core::time::Duration;
 
-use arch::riscv64::time::{get_time_duration, get_time_us};
+use arch::time::{get_time_duration, get_time_us};
 use osfuture::{Select2Futures, SelectOutput};
 use systype::{SysError, SyscallResult};
 use time::{TMS, TimeSpec, TimeVal};

@@ -2,7 +2,7 @@ use alloc::boxed::Box;
 use alloc::sync::{Arc, Weak};
 use async_trait::async_trait;
 use config::inode::InodeType;
-use driver::sbi::getchar;
+use driver::console::getchar;
 use systype::SysResult;
 use vfs::stat::Stat;
 use vfs::{

@@ -1,21 +1,18 @@
-use alloc::{sync::Arc, vec::Vec};
-use async_trait::async_trait;
-use driver::{print, sbi::getchar};
-use mutex::SpinNoIrqLock;
+use alloc::sync::Arc;
 
-use osfuture::yield_now;
+use async_trait::async_trait;
+use mutex::SpinNoIrqLock;
 use systype::{SysResult, SyscallResult};
 use vfs::{
     dentry::Dentry,
     file::{File, FileMeta},
 };
 
+use super::ioctl::TtyInner;
 use crate::dev::tty::{
     inode::TtyInode,
     ioctl::{Pid, Termios, TtyIoctlCmd, WinSize},
 };
-
-use super::ioctl::TtyInner;
 use alloc::boxed::Box;
 pub struct TtyFile {
     // buf: SpinNoIrqLock<QueueBuffer>,

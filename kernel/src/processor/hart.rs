@@ -10,7 +10,7 @@ use core::arch::asm;
 use riscv::register::sstatus;
 use riscv::register::sstatus::FS;
 
-use arch::riscv64::interrupt::{disable_interrupt, enable_interrupt};
+use arch::trap::{disable_interrupt, enable_interrupt};
 
 const HART_ONE: Hart = Hart::new(0);
 

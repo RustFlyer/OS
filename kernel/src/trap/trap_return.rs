@@ -3,6 +3,7 @@ use crate::task::{Task, TaskState};
 use crate::trap::trap_env;
 use alloc::sync::Arc;
 
+use arch::trap::disable_interrupt;
 use riscv::register::sstatus::FS;
 
 unsafe extern "C" {
@@ -12,7 +13,7 @@ unsafe extern "C" {
 /// Trap return to user mode.
 #[unsafe(no_mangle)]
 pub fn trap_return(task: &Arc<Task>) {
-    arch::riscv64::interrupt::disable_interrupt();
+    disable_interrupt();
     trap_env::set_user_stvec();
 
     // restore registers situations:

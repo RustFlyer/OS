@@ -1,4 +1,4 @@
-use arch::riscv64::time::get_time_duration;
+use arch::time::get_time_duration;
 use systype::SyscallResult;
 
 use crate::{processor::current_task, vm::user_ptr::UserWritePtr};

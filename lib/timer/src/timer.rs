@@ -1,4 +1,4 @@
-use arch::riscv64::time::get_time_duration;
+use arch::time::get_time_duration;
 use core::task::Waker;
 use core::time::Duration;
 

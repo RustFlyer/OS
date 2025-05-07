@@ -36,5 +36,8 @@ riscv = { workspace = true }
 riscv-rt = { workspace = true }
 sbi-rt = { workspace = true }
 
+[target.'cfg(target_arch = "loongarch64")'.dependencies]
+loongArch64 = { workspace = true }
+
 [build-dependencies]
 config = { path = "../lib/config/" }

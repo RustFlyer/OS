@@ -1,5 +1,5 @@
 use alloc::{boxed::Box, ffi::CString, string::ToString, vec::Vec};
-use arch::riscv64::time::get_time_duration;
+use arch::time::get_time_duration;
 use core::{
     cmp,
     pin::Pin,

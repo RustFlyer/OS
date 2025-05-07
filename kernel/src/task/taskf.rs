@@ -3,14 +3,14 @@ use alloc::string::String;
 use alloc::string::ToString;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use arch::riscv64::time::get_time_ms;
-use arch::riscv64::time::get_time_us;
+use arch::time::get_time_ms;
+use arch::time::get_time_us;
 use core::cell::SyncUnsafeCell;
 use core::sync::atomic::AtomicUsize;
 use core::time::Duration;
 use osfuture::suspend_now;
 
-use arch::riscv64::time::get_time_duration;
+use arch::time::get_time_duration;
 use config::process::CloneFlags;
 use config::process::INIT_PROC_ID;
 use config::vfs::AtFd;

@@ -10,7 +10,7 @@ pub mod threadgroup;
 pub mod tid;
 pub mod time;
 
-use arch::riscv64::time::get_time_duration;
+use arch::time::get_time_duration;
 use future::spawn_kernel_task;
 use osfuture::yield_now;
 pub use task::{Task, TaskState};

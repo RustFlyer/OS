@@ -1,4 +1,4 @@
-use arch::riscv64::time::get_time_duration;
+use arch::time::get_time_duration;
 use config::time::TIME_SLICE_DUATION;
 use core::time::Duration;
 

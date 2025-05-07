@@ -10,7 +10,7 @@ struct Stdout;
 impl Write for Stdout {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         for c in s.as_bytes() {
-            driver::sbi::console_putchar(*c as usize);
+            driver::console::console_putchar(*c);
         }
         Ok(())
     }

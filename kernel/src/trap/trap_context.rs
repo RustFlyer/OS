@@ -1,6 +1,6 @@
-use arch::riscv64::{
-    interrupt::disable_interrupt,
+use arch::{
     sstatus::{self, Sstatus},
+    trap::disable_interrupt,
 };
 use riscv::register::sstatus::SPP;
 

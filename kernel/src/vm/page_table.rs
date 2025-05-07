@@ -8,7 +8,6 @@ use alloc::vec::Vec;
 use lazy_static::lazy_static;
 use riscv::register::satp::{self, Satp};
 
-use arch::riscv64::mm::{fence, sfence_vma_addr, sfence_vma_all_except_global, tlb_shootdown};
 use config::mm::{
     KERNEL_MAP_OFFSET, MMIO_END, MMIO_PHYS_RANGES, MMIO_START, PTE_PER_TABLE, VIRT_END, bss_end,
     bss_start, data_end, data_start, kernel_end, kernel_start, rodata_end, rodata_start, text_end,
@@ -21,6 +20,9 @@ use mm::{
 use mutex::SpinLock;
 use simdebug::when_debug;
 use systype::SysResult;
+
+#[cfg(target_arch = "riscv64")]
+use arch::mm::{fence, sfence_vma_addr, sfence_vma_all_except_global, tlb_shootdown};
 
 use super::{
     mapping_flags::MappingFlags,

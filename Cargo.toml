@@ -15,6 +15,7 @@ downcast-rs = { version = "1.2", default-features = false }
 hashbrown = "0.14"
 lazy_static = { version = "1.5", features = ["spin_no_std"] }
 log = "0.4"
+loongArch64 = "0.2.5"
 riscv = { version = "0.13", features = ["s-mode"] }
 riscv-rt = "0.14"
 sbi-rt = { version = "0.0.3", features = ["legacy"] }

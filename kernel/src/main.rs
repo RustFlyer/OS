@@ -14,7 +14,6 @@ mod link_app;
 mod loader;
 mod logging;
 mod processor;
-mod sbi;
 mod syscall;
 mod task;
 mod trap;
@@ -22,6 +21,7 @@ mod vm;
 
 use core::ptr;
 
+use arch::hart::hart_shutdown;
 use config::mm::{DTB_END, DTB_START};
 use mm::{self, frame, heap};
 use processor::hart;
@@ -119,6 +119,4 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
     loop {
         executor::task_run_always_alone(hart_id);
     }
-    #[allow(unused)]
-    sbi::shutdown(false);
 }

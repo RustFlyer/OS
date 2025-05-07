@@ -28,7 +28,6 @@ use core::{cmp, fmt::Debug, mem};
 
 use bitflags::bitflags;
 
-use arch::riscv64::mm::{sfence_vma_addr, sfence_vma_all_except_global};
 use config::mm::{KERNEL_MAP_OFFSET, PAGE_SIZE};
 use mm::{
     address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum},
@@ -37,6 +36,9 @@ use mm::{
 use osfuture::block_on;
 use systype::{SysError, SysResult};
 use vfs::file::File;
+
+#[cfg(target_arch = "riscv64")]
+use arch::mm::{sfence_vma_addr, sfence_vma_all_except_global};
 
 use super::{
     mapping_flags::MappingFlags,

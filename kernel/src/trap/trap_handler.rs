@@ -4,7 +4,7 @@ use riscv::{
     register,
 };
 
-use arch::riscv64::time::{get_time_duration, set_nx_timer_irq};
+use arch::time::{get_time_duration, set_nx_timer_irq};
 use mm::address::VirtAddr;
 use timer::TIMER_MANAGER;
 

@@ -6,7 +6,7 @@ use core::{
 };
 
 use crate::{timer::Timer, timer_manager::TIMER_MANAGER};
-use arch::riscv64::time::get_time_duration;
+use arch::time::get_time_duration;
 
 #[derive(Debug)]
 pub enum TimedTaskResult<T> {

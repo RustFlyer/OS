@@ -7,7 +7,7 @@ use qemu::{UartDevice, VirtBlkDevice};
 use spin::Once;
 
 pub mod qemu;
-pub mod sbi;
+pub mod console;
 
 extern crate alloc;
 
@@ -65,7 +65,7 @@ pub fn block_device_test() {
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => {{
-        $crate::sbi::console_print(format_args!($($arg)*));
+        $crate::console::console_print(format_args!($($arg)*));
     }};
 }
 

@@ -1,6 +1,6 @@
 use core::arch::global_asm;
 
-use arch::riscv64::interrupt::set_trap_handler;
+use arch::trap::set_trap_handler;
 use riscv::register::stvec::TrapMode;
 
 #[cfg(target_arch = "riscv64")]
