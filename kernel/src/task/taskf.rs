@@ -184,7 +184,7 @@ impl Task {
         let is_process;
         let threadgroup;
         let parent;
-        let children = new_share_mutex(BTreeMap::new());
+        let children;
         let pgid;
         let cwd;
         let itimers;
@@ -198,6 +198,8 @@ impl Task {
         if cloneflags.contains(CloneFlags::THREAD) {
             name += "(thread)";
             is_process = false;
+            children = (*self.children_mut()).clone();
+
             process = Some(Arc::downgrade(self));
             threadgroup = self.thread_group_mut().clone();
             parent = (*self.parent_mut()).clone();
@@ -207,6 +209,8 @@ impl Task {
         } else {
             name += "(fork)";
             is_process = true;
+            children = new_share_mutex(BTreeMap::new());
+
             process = None;
             threadgroup = new_share_mutex(ThreadGroup::new());
             parent = new_share_mutex(Some(Arc::downgrade(self)));
@@ -367,13 +371,7 @@ impl Task {
                 threadgroup.remove(self);
                 TASK_MANAGER.remove_task(self.tid());
             }
-            // log::warn!("[do_exit] {} leaves before setting state", self.get_name());
-            // log::warn!(
-            //     "[do_exit] {} process {:?}'s state {:?}",
-            //     self.get_name(),
-            //     self.process().get_name(),
-            //     self.process().get_state()
-            // );
+
             return;
         }
 

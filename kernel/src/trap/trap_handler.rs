@@ -59,12 +59,14 @@ pub fn user_exception_handler(task: &Task, e: Exception, stval: usize) {
             let addr_space = task.addr_space();
             // log::debug!("pass sleep lock {:?}", addrspace.change_heap_size(0, 0));
             if let Err(e) = addr_space.handle_page_fault(fault_addr, access) {
-                if fault_addr.to_usize() == 0x68094 {
+                // Should send a `SIGSEGV` signal to the task
+                if fault_addr.to_usize() == 0 {
                     simdebug::stop();
                 }
-                // Should send a `SIGSEGV` signal to the task
                 log::error!(
-                    "[user_exception_handler] unsolved page fault at {:#x}, access: {:?}, error: {:?}",
+                    "[user_exception_handler] task [{}] {} unsolved page fault at {:#x}, access: {:?}, error: {:?}",
+                    task.tid(),
+                    task.get_name(),
                     fault_addr.to_usize(),
                     access,
                     e.as_str()
