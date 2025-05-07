@@ -5,8 +5,13 @@ edition = "2024"
 
 [dependencies]
 config = { path = "../config" }
+polyhal-macro = { path = "../polyhal/polyhal-macro" }
 bit_field = { workspace = true }
+spin = { workspace = true }
 
 [target.'cfg(target_arch = "riscv64")'.dependencies]
 riscv = { workspace = true }
 sbi-rt = { workspace = true }
+
+[target.'cfg(target_arch = "loongarch64")'.dependencies]
+loongArch64 = { workspace = true }
