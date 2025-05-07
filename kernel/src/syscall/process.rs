@@ -274,7 +274,7 @@ pub fn sys_clone(
     chilren_tid_ptr: usize,
 ) -> SyscallResult {
     log::info!(
-        "[sys_clone] flags:{flags:?}, stack:{stack:#x}, tls:{tls_ptr:x}, parent_tid:{parent_tid_ptr:x}, child_tid:{chilren_tid_ptr:x}"
+        "[sys_clone] flags:{flags:?}, stack:{stack:#x}, tls:{tls_ptr:#x}, parent_tid:{parent_tid_ptr:#x}, child_tid:{chilren_tid_ptr:x}"
     );
     let task = current_task();
     let addrspace = task.addr_space();
@@ -309,6 +309,8 @@ pub fn sys_clone(
 
     spawn_user_task(new_task);
     log::info!("[sys_clone] clone success",);
+
+    task.set_is_yield(true);
 
     Ok(new_tid)
 }
@@ -380,6 +382,7 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
         r#"PATH=/:/bin:/sbin:/usr/bin:/usr/local/bin:/usr/local/sbin:"#,
     ));
 
+    log::info!("[sys_execve] task: {:?}", task.get_name());
     log::info!("[sys_execve] args: {args:?}");
     log::info!("[sys_execve] envs: {envs:?}");
     log::info!("[sys_execve] path: {path:?}");
@@ -454,7 +457,7 @@ enum WaitFor {
 /// memory location. Errors from the futex wake operation are ignored.
 pub fn sys_set_tid_address(tidptr: usize) -> SyscallResult {
     let task = current_task();
-    // log::info!("[sys_set_tid_address] tidptr:{tidptr:#x}");
+    log::info!("[sys_set_tid_address] tidptr:{tidptr:#x}");
     task.tid_address_mut().clear_child_tid = Some(tidptr);
     Ok(task.tid())
 }

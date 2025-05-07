@@ -50,6 +50,18 @@ impl VecIdAllocator {
     }
 }
 
+impl VecIdAllocator {
+    pub fn alloc_incr(&mut self) -> Option<usize> {
+        let id = self.next;
+        if id < self.end {
+            self.next += 1;
+            Some(id)
+        } else {
+            None
+        }
+    }
+}
+
 impl IdAllocator for VecIdAllocator {
     fn alloc(&mut self) -> Option<usize> {
         match self.ids.pop() {

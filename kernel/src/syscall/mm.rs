@@ -74,6 +74,7 @@ pub async fn sys_mmap(
     };
 
     log::info!("[sys_mmap] addr: {addr:#x}, length: {length:#x}, perm: {perm:?}, flags: {flags:?}");
+    log::info!("[sys_mmap] addr: {addr:#x}, length: {length:#x}, prot: {prot:?}, flags: {flags:?}");
 
     if addr == 0 && flags.contains(MmapFlags::MAP_FIXED) {
         return Err(SysError::EINVAL);

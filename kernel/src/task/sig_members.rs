@@ -60,7 +60,7 @@ impl Task {
     /// Interrupt state, task will be waken and handle the
     /// signal.
     fn recv(&self, si: SigInfo) {
-        // log::info!(
+        // log::error!(
         //     "[Task::recv] tid {} recv {si:?} {:?}",
         //     self.tid(),
         //     self.sig_handlers_mut().lock().get(si.sig)

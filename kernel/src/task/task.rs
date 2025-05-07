@@ -13,7 +13,6 @@ use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use core::task::Waker;
 use mm::address::VirtAddr;
 use mutex::{ShareMutex, SpinNoIrqLock, new_share_mutex};
-use shm::id::ShmStat;
 use time::itime::ITimer;
 use vfs::{dentry::Dentry, file::File};
 
@@ -160,7 +159,7 @@ impl Task {
         let task = Task {
             tid,
             process: None,
-            is_process: false,
+            is_process: true,
             threadgroup: new_share_mutex(ThreadGroup::new()),
             trap_context: SyncUnsafeCell::new(TrapContext::new(entry, sp)),
             timer: SyncUnsafeCell::new(TaskTimeStat::new()),

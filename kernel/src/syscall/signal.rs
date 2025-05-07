@@ -140,7 +140,7 @@ pub async fn sys_futex(
             }
 
             if task.sig_manager_mut().has_expect_signals(wake_up_signal) {
-                futex_manager(is_multi_group, val3).rm_waiter(&key, task.tid())?;
+                let _ = futex_manager(is_multi_group, val3).rm_waiter(&key, task.tid());
                 return Err(SysError::EINTR);
             }
 
@@ -353,7 +353,7 @@ pub async fn sys_sigreturn() -> SyscallResult {
     }
     log::debug!("[sys_sigreturn] trap context: {:?}", trap_cx.user_reg);
     log::debug!("sig: {:#x}", task.sig_manager_mut().bitmap.bits());
-    log::error!("[sys_sigreturn] trap context sepc: {:#x}", trap_cx.sepc);
+
     // its return value is the a0 before signal interrupt, so that it won't be changed in async_syscall
     // trap_cx.display();
     Ok(trap_cx.user_reg[10])
@@ -402,7 +402,7 @@ pub fn sys_rt_sigaction(
     if !new_sa.is_null() {
         let mut action = unsafe { new_sa.read()? };
 
-        // log::info!("[sys_rt_sigaction] new action: {:?}", action);
+        log::info!("[sys_rt_sigaction] new action: {:?}", action);
 
         action.sa_mask.remove(SigSet::SIGKILL | SigSet::SIGSTOP);
 
@@ -471,7 +471,8 @@ pub fn sys_rt_sigmask(
     if !input_mask.is_null() {
         unsafe {
             let input = input_mask.read()?;
-            log::info!("[sys_rt_sigmask] task {} input:{input:#x}", task.get_name());
+            log::warn!("[sys_rt_sigmask] task {} input:{input:#x}", task.get_name());
+            log::warn!("[sys_rt_sigmask] how: {how:#x}");
 
             match how {
                 SIGBLOCK => {
@@ -532,6 +533,7 @@ pub fn sys_tgkill(tgid: isize, tid: isize, signum: i32) -> SyscallResult {
 /// the wrong thread being signaled if a thread terminates and its
 /// thread ID is recycled. Avoid using this system call.
 pub fn sys_tkill(tid: isize, sig: i32) -> SyscallResult {
+    log::debug!("[sys_tkill] tid: {tid}, signum: {sig}");
     let sig = Sig::from_i32(sig);
     if !sig.is_valid() || tid < 0 {
         return Err(SysError::EINVAL);

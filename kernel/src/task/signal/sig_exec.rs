@@ -43,7 +43,7 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
 
     if *interrupted && action.flags.contains(SigActionFlag::SA_RESTART) {
         cx.sepc -= 4;
-        log::error!(
+        log::warn!(
             "[sig_exec] restart interrupted syscall, orignal a0: {}, last_a0: {}",
             cx.user_reg[10],
             cx.last_a0
@@ -67,8 +67,6 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
             Ok(false)
         }
         ActionType::User { entry } => {
-            log::error!("[sys_sigreturn] trap context sepc: {:#x}", cx.sepc);
-
             // The signal being delivered is also added to the signal mask, unless
             // SA_NODEFER was specified when registering the handler.
             if !action.flags.contains(SigActionFlag::SA_NODEFER) {

@@ -89,6 +89,23 @@ impl AddrSpace {
         offset: usize,
     ) -> SysResult<usize> {
         if addr.to_usize() == 0 {
+            // static mut base: usize = 0;
+            // unsafe { base = base + length };
+            // addr = self
+            //     .find_vacant_memory(
+            //         addr,
+            //         length,
+            //         VirtAddr::new(MMAP_START),
+            //         VirtAddr::new(MMAP_END),
+            //     )
+            //     .ok_or(SysError::ENOMEM)?;
+            // addr = VirtAddr::new(addr.to_usize() + unsafe { base });
+            // log::error!(
+            //     "[map_file] new addr is {:#x} ~ {:#x}",
+            //     addr.to_usize(),
+            //     addr.to_usize() + length
+            // );
+
             addr = self
                 .find_vacant_memory(
                     addr,
@@ -113,6 +130,7 @@ impl AddrSpace {
         }?;
 
         let mem_prot = MemPerm::from_mmapprot(prot);
+        log::debug!("[map_file] mem_prot: {:?}", mem_prot);
 
         let area = match file {
             Some(file) => VmArea::new_file_backed(

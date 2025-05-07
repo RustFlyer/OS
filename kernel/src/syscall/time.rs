@@ -98,6 +98,8 @@ pub async fn sys_times(tms: usize) -> SyscallResult {
 /// };
 /// ```
 pub async fn sys_nanosleep(req: usize, rem: usize) -> SyscallResult {
+    log::warn!("[sys_nanosleep] called");
+
     let task = current_task();
     let req_time = {
         let addr_space = task.addr_space();
@@ -123,9 +125,11 @@ pub async fn sys_nanosleep(req: usize, rem: usize) -> SyscallResult {
     }?;
 
     if remain.is_zero() {
+        log::debug!("[sys_nanosleep] sleep enough");
         return Ok(0);
     }
 
+    log::debug!("[sys_nanosleep] not sleep enough");
     let addr_space = task.addr_space();
     let mut rem_write = UserWritePtr::<TimeSpec>::new(rem, &addr_space);
     if !rem_write.is_null() {

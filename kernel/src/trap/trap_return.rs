@@ -23,14 +23,15 @@ pub fn trap_return(task: &Arc<Task>) {
     trap_context_mut.sstatus.set_fs(FS::Clean);
 
     assert!(!(trap_context_mut.sstatus.sie()));
+
+    if (task.is_in_state(TaskState::Zombie) || task.is_in_state(TaskState::Sleeping)) {
+        log::warn!("task state: {:?}", task.get_state());
+    }
+
     assert!(!(task.is_in_state(TaskState::Zombie) || task.is_in_state(TaskState::Sleeping)));
 
     task.timer_mut().switch_to_user();
     // log::info!("[trap_return] go to user space");
-
-    if trap_context_mut.sepc == 0x3f03c {
-        simdebug::stop();
-    }
 
     unsafe {
         let ptr = trap_context_mut as *mut TrapContext;

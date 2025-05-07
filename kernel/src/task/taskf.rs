@@ -340,9 +340,9 @@ impl Task {
 
         // release futexes in dropped threads.
         if let Some(address) = self.tid_address_mut().clear_child_tid {
-            log::info!("[do_exit] clear_child_tid: {:x}", address);
+            log::info!("[do_exit] clear_child_tid: {:#x}", address);
             unsafe {
-                UserWritePtr::<u8>::new(address, &self.addr_space())
+                UserWritePtr::<i32>::new(address, &self.addr_space())
                     .write(0)
                     .expect("fail to write in clear_child_tid")
             };

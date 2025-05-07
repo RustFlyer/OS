@@ -722,6 +722,7 @@ pub async fn sys_faccessat(dirfd: usize, pathname: usize, mode: i32) -> SyscallR
 /// # Attention
 /// - Not Implemented
 pub fn sys_set_robust_list(_robust_list_head: usize, _len: usize) -> SyscallResult {
+    log::warn!("[sys_set_robust_list] unimplemented");
     Ok(0)
 }
 
