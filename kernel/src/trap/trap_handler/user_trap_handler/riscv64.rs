@@ -72,7 +72,7 @@ pub fn user_exception_handler(task: &Task, e: Exception, stval: usize) {
             task.set_state(TaskState::Zombie);
         }
         e => {
-            log::warn!("Unknown user exception: {:?}", e);
+            log::error!("Unknown user exception: {:?}", e);
         }
     }
 }

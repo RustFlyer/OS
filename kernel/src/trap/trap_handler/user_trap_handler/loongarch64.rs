@@ -12,9 +12,6 @@ use crate::trap::load_trap_handler;
 use crate::vm::mapping_flags::MappingFlags;
 use crate::vm::user_ptr::UserReadPtr;
 
-/// handle exception or interrupt from a task, return if success.
-/// Similar to the RISC-V implementation, this function is called after
-/// the trap context is saved and we're ready to handle the trap.
 #[unsafe(no_mangle)]
 pub fn trap_handler(task: &Task) {
     let badv_val = badv::read().vaddr();
@@ -71,23 +68,13 @@ pub fn user_exception_handler(task: &Task, e: Exception, badv_val: usize) {
                 task.set_state(TaskState::Zombie);
             }
         }
-        Exception::Breakpoint => {
-            // Handle breakpoint exceptions
-            // Note: In LoongArch, we might need to adjust PC similar to RISC-V
-            // For now, just log the event
-            log::debug!("Breakpoint exception at address: {:#x}", badv_val);
-        }
-        Exception::AddressNotAligned => {
-            log::warn!("[trap_handler] address not aligned at {:#x}", badv_val);
-            // TODO: Implement proper handling for unaligned access
-        }
         Exception::IllegalInstruction => {
             log::warn!("[trap_handler] illegal instruction at {:#x}", badv_val);
             // TODO: Send SIGILL signal to the task; don't just kill the task
             task.set_state(TaskState::Zombie);
         }
         _ => {
-            log::warn!("Unknown user exception: {:?}", e);
+            log::error!("Unknown user exception: {:?}", e);
         }
     }
 }

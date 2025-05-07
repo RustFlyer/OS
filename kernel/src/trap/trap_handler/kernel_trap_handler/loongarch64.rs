@@ -8,13 +8,10 @@ use timer::TIMER_MANAGER;
 use crate::irq::TIMER_IRQ;
 use crate::vm::mapping_flags::MappingFlags;
 
-/// Kernel trap handler for LoongArch
-/// Similar to RISC-V, this handles exceptions and interrupts that occur in kernel mode
 #[unsafe(no_mangle)]
 pub fn kernel_trap_handler() {
     let estat_val = estat::read();
     let badv_val = badv::read().vaddr();
-
     match estat_val.cause() {
         Trap::Exception(e) => kernel_exception_handler(e, badv_val),
         Trap::Interrupt(_) => {
@@ -34,7 +31,6 @@ pub fn kernel_interrupt_handler(irq_num: usize, _badv_val: usize) {
     match irq_num {
         irq_num if irq_num != TIMER_IRQ => {
             log::info!("[kernel] received external interrupt: {}", irq_num);
-            // TODO: Handle external interrupt in kernel mode
         }
         TIMER_IRQ => {
             TIMER_MANAGER.check(get_time_duration());
@@ -46,10 +42,12 @@ pub fn kernel_interrupt_handler(irq_num: usize, _badv_val: usize) {
 }
 
 pub fn kernel_panic() -> ! {
-    panic!(
+    log = format!(
         "[kernel] {:?} in kernel, bad addr = {:#x}, bad instruction = {:#x}, kernel panicked!!",
         estat::read().cause(),
         badv::read().vaddr(),
         era::read()
     );
+    log::error!("{}", log);
+    panic!("{}", log);
 }
