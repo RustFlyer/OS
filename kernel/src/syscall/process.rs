@@ -90,9 +90,17 @@ pub async fn sys_sched_yield() -> SyscallResult {
     Ok(0)
 }
 
+/// "wait4" system call waits for a child process to exit and send SIGCHLD to the waiter.
+/// after receiving SIGCHLD, the waiter should recycle the children on WaitForRecycle state.
+/// (only process can be set to WaitForRecycle state, threads will be dropped when hart leaves this task)
+/// the target "pid" can be:
+/// - -1(AnyChild): wait for any child process of current process
+/// - 0(AnyChildInGroup): wait for any child process in the same process group of the calling process
+/// - >0(Pid): wait for the child process of current process with the specific pid
+/// - <0(PGid): wait for any child process in the process group with the specific pgid
 pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult {
     let task = current_task();
-    log::error!("[sys_wait4] {} wait for recycling", task.get_name());
+    log::info!("[sys_wait4] {} wait for recycling", task.get_name());
     let option = WaitOptions::from_bits_truncate(options);
     let target = match pid {
         -1 => WaitFor::AnyChild,
@@ -102,26 +110,24 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
     };
     log::info!("[sys_wait4] target: {target:?}, option: {option:?}");
 
-    let res_task = {
+    // get the child for recycle according to the target
+    // NOTE: recycle no more than one child per `sys_wait4`
+    let child_for_recycle = {
         let children = task.children_mut().lock();
         if children.is_empty() {
             log::info!("[sys_wait4] task [{}] fail: no child", task.get_name());
             return Err(SysError::ECHILD);
         }
-        // TODO: check if PG has
+        // TODO: PGid and AnyChildInGroup targets
         match target {
             WaitFor::AnyChild => children
                 .values()
-                // Question: How to handle &&Weak<Task>
                 .find(|c| {
                     c.is_in_state(TaskState::WaitForRecycle)
-                        && c.with_thread_group(|tg| tg.len() == 1)
                 }),
             WaitFor::Pid(pid) => {
                 if let Some(child) = children.get(&pid) {
-                    if child.is_in_state(TaskState::WaitForRecycle)
-                        && child.with_thread_group(|tg| tg.len() == 1)
-                    {
+                    if child.is_in_state(TaskState::WaitForRecycle){
                         Some(child)
                     } else {
                         None
@@ -137,10 +143,10 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
         .cloned()
     };
 
-    if let Some(res_task) = res_task {
+    if let Some(child_for_recycle) = child_for_recycle {    // 1. if there is a child for recycle when `sys_wait4` is called
         let addr_space = task.addr_space();
         let mut status = UserWritePtr::<i32>::new(wstatus, &addr_space);
-        let zombie_task = res_task;
+        let zombie_task = child_for_recycle;
         task.timer_mut().update_child_time((
             zombie_task.timer_mut().user_time(),
             zombie_task.timer_mut().kernel_time(),
@@ -165,22 +171,21 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
         TASK_MANAGER.remove_task(tid);
         PROCESS_GROUP_MANAGER.remove(&zombie_task);
         Ok(tid)
-    } else if option.contains(WaitOptions::WNOHANG) {
+    } else if option.contains(WaitOptions::WNOHANG) {   // 2. if WNOHANG option is set and there is no child for recycle, return immediately
         Ok(0)
-    } else {
-        log::info!("[sys_wait4] waiting for sigchld");
-        // 如果等待的进程还不是WaitForRecycle，那么本进程进行await，
-        // 直到等待的进程do_exit然后发送SIGCHLD信号唤醒自己
-        let (child_pid, exit_code, child_utime, child_stime) = loop {
+    } else { // 3. if there is no child for recycle and WNOHANG option is not set, wait for SIGCHLD from target
+        log::info!("[sys_wait4] task [{}] suspend for sigchld", task.get_name());
+        let (child_tid, exit_code, child_utime, child_stime) = loop {
             task.set_state(TaskState::Interruptable);
             task.set_wake_up_signal(!task.get_sig_mask() | SigSet::SIGCHLD);
-            // log::info!("suspend_now again");
             suspend_now().await;
-            // log::info!("return from suspend");
+            // wake up from suspend for any reason(may not be SIGCHLD)
             task.set_state(TaskState::Running);
             let si = task.sig_manager_mut().get_expect(SigSet::SIGCHLD);
-            if let Some(_info) = si {
-                // log::info!("siginfo get");
+            // if it is SIGCHLD, then we can get the child for recycle
+            // TODO: check if the matched child is identical to the SIGCHLD's info
+            if let Some(info) = si {
+                log::info!("[sys_wait4] sigchld received, the child for recycle is announced by signal to be {:?}", info.details);
                 let children = task.children_mut().lock();
 
                 let child = match target {
@@ -212,19 +217,19 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
                         child.timer_mut().kernel_time(),
                     );
                 }
-                // log::info!("siginfo end");
             } else {
                 log::info!("return SysError::EINTR");
                 return Err(SysError::EINTR);
             }
         };
+
         // log::info!("timer_mut get and update_child_time");
         task.timer_mut()
             .update_child_time((child_utime, child_stime));
 
-        // log::info!("addrspace get and write status");
         let addr_space = task.addr_space();
         let mut status = UserWritePtr::<i32>::new(wstatus, &addr_space);
+        // if wstatus is not null, write the exit code of child to wstatus
         if !status.is_null() {
             // status stores signal in the lowest 8 bits and exit code in higher 8 bits
             // status macros can be found in <bits/waitstatus.h>
@@ -233,18 +238,19 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
                 status.write(exit_code)?;
             }
         }
-        let child = TASK_MANAGER.get_task(child_pid).unwrap();
-        log::error!(
-            "[sys_wait4] remove tid [{}] task [{}]",
-            child_pid,
+        // check if the child is still in TASK_MANAGER
+        let child = TASK_MANAGER.get_task(child_tid).unwrap();
+        log::info!(
+            "[sys_wait4] remove task [{}] with tid [{}]",
+            child_tid,
             child.get_name()
         );
+        // remove the child from current task's children, and TASK_MANAGER, thus the child will be dropped after hart leaves child
+        // NOTE: the child's thread group itself will be recycled when the child is dropped, and it use Weak pointer so it won't affect the drop of child
         task.remove_child(child);
-
-        TASK_MANAGER.remove_task(child_pid);
+        TASK_MANAGER.remove_task(child_tid);
         PROCESS_GROUP_MANAGER.remove(&task);
-        // log::error!("[sys_wait4] out");
-        Ok(child_pid)
+        Ok(child_tid)
     }
 }
 

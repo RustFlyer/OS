@@ -422,7 +422,6 @@ impl Task {
 
         // only process will be set to WaitForRecycle state, 
         // threads will be dropped when hart leaves this task so we don't need to set.
-        
         self.process().set_state(TaskState::WaitForRecycle);
 
         // send SIGCHLD to process's parent
@@ -431,7 +430,9 @@ impl Task {
                 parent.receive_siginfo(SigInfo {
                     sig: Sig::SIGCHLD,
                     code: SigInfo::CLD_EXITED,
-                    details: SigDetails::None,
+                    details: SigDetails::Child {
+                        pid: process.pid(),
+                    },
                 })
             } else {
                 log::error!("no arc parent");

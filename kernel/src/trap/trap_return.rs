@@ -28,10 +28,6 @@ pub fn trap_return(task: &Arc<Task>) {
     task.timer_mut().switch_to_user();
     // log::info!("[trap_return] go to user space");
 
-    if trap_context_mut.sepc == 0x3f03c {
-        simdebug::stop();
-    }
-
     unsafe {
         let ptr = trap_context_mut as *mut TrapContext;
         __return_to_user(ptr);
