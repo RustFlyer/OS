@@ -169,7 +169,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
         Ok(0)
     } else {
         log::info!("[sys_wait4] waiting for sigchld");
-        // 如果等待的进程还不是zombie，那么本进程进行await，
+        // 如果等待的进程还不是WaitForRecycle，那么本进程进行await，
         // 直到等待的进程do_exit然后发送SIGCHLD信号唤醒自己
         let (child_pid, exit_code, child_utime, child_stime) = loop {
             task.set_state(TaskState::Interruptable);
