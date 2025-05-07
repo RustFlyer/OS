@@ -1,18 +1,15 @@
 #![no_std]
-#![no_main]
-#![allow(non_upper_case_globals)]
-#![feature(format_args_nl)]
 
-use core::task::Waker;
-extern crate alloc;
 use alloc::sync::Arc;
-use core::fmt::{self};
+use core::task::Waker;
+
 use qemu::{UartDevice, VirtBlkDevice};
 use spin::Once;
+
 pub mod qemu;
 pub mod sbi;
 
-pub use sbi::sbi_print;
+extern crate alloc;
 
 pub static BLOCK_DEVICE: Once<Arc<dyn BlockDevice>> = Once::new();
 pub static CHAR_DEVICE: Once<Arc<dyn CharDevice>> = Once::new();
@@ -40,29 +37,14 @@ pub trait CharDevice: Send + Sync {
 pub fn init() {
     init_block_device();
     init_char_device();
-    log::info!("success init driver");
 }
 
-pub fn init_block_device() {
-    log::info!("BLOCK_DEVICE init");
+fn init_block_device() {
     BLOCK_DEVICE.call_once(|| Arc::new(VirtBlkDevice::new()));
 }
 
-pub fn init_char_device() {
-    log::info!("CHAR_DEVICE init");
+fn init_char_device() {
     CHAR_DEVICE.call_once(|| Arc::new(UartDevice::new()));
-}
-
-pub fn shutdown(failure: bool) -> ! {
-    sbi::hart_shutdown(failure);
-}
-
-pub fn set_timer(timer: usize) {
-    sbi::set_timer(timer);
-}
-
-pub fn print(args: fmt::Arguments<'_>) {
-    sbi_print(args);
 }
 
 pub fn block_device_test() {
@@ -83,7 +65,7 @@ pub fn block_device_test() {
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => {{
-        $crate::print(format_args!($($arg)*));
+        $crate::sbi::console_print(format_args!($($arg)*));
     }};
 }
 
@@ -93,8 +75,7 @@ macro_rules! println {
         $crate::print!("\n")
     };
     ($($arg:tt)*) => {{
-        // $crate::print(format_args_nl!($($arg)*));
-        $crate::print(format_args!($($arg)*));
+        $crate::print!($($arg)*);
         $crate::print!("\n")
     }};
 }

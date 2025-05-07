@@ -7,7 +7,7 @@ edition = "2024"
 config = { path = "../config" }
 mutex = { path = "../mutex" }
 mm = { path = "../mm" }
-
+polyhal-macro = { path = "../polyhal/polyhal-macro" }
 
 spin = { workspace = true }
 virtio-drivers ={ workspace = true }
