@@ -83,7 +83,7 @@ pub struct Task {
     // clone and then parent is set as it.
     parent: ShareMutex<Option<Weak<Task>>>,
 
-    // children controls all the task spawned by this task.
+    // children controls all the process spawned by this task.
     // Attention: the pointer to children task is Arc. It's
     // because parent task should recycle children and free
     // them in wait4 at last.
