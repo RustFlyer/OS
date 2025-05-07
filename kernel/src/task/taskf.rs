@@ -330,7 +330,6 @@ impl Task {
     }
 
     pub fn exit(self: &Arc<Self>) {
-        log::info!("thread {}, name: {} do exit", self.tid(), self.get_name());
         assert_ne!(
             self.tid(),
             INIT_PROC_ID,
@@ -340,7 +339,7 @@ impl Task {
 
         // release futexes in dropped threads.
         if let Some(address) = self.tid_address_mut().clear_child_tid {
-            log::info!("[do_exit] clear_child_tid: {:x}", address);
+            log::info!("[exit] task {} record clear_child_tid in address: {:x} to parent", self.tid(), address);
             unsafe {
                 UserWritePtr::<u8>::new(address, &self.addr_space())
                     .write(0)
@@ -358,39 +357,49 @@ impl Task {
 
         let tg_lock = self.thread_group_mut();
         let mut threadgroup = tg_lock.lock();
+        log::info!("[exit] thread {}, name: {} do exit, is_process: {}, tg_len: {}, leader state: {:?}", self.tid(), self.get_name(), self.is_process(), threadgroup.len(), self.process().get_state());
 
-        // 1. main-thread is not zombie
-        // 2. process has at least one child(if you are process and dead)
-        // 3. not-process but has at least one brother(if you are not process)
+        // do not set WaitForRecycle state if:
+        // 1. main-thread is not zombie(we only recycle when whole process is zombied)
+        // 2. process has at least one child(leader should wait for all children to finish and be zombied)
+        // 3. not-process but has at least one brother thread not zombied(last brother thread will recycle it all)
         if (!(self.process().get_state() == TaskState::Zombie))
-            || (self.is_process() && threadgroup.len() > 1)
-            || (!self.is_process() && threadgroup.len() > 2)
+            || (self.is_process() && (threadgroup.len() > 1))
+            || (!self.is_process() && (threadgroup.len() > 2))
         {
             if !self.is_process() {
                 // NOTE: process will be removed by parent calling `sys_wait4`
+                log::info!("[exit] exiting thread is neither a zombie process nor the last thread in threadgroup with a zombie leader, just return (and remove)");
                 threadgroup.remove(self);
                 TASK_MANAGER.remove_task(self.tid());
             }
-
+            // log::warn!("[do_exit] {} leaves before setting state", self.get_name());
+            // log::warn!(
+            //     "[do_exit] {} process {:?}'s state {:?}",
+            //     self.get_name(),
+            //     self.process().get_name(),
+            //     self.process().get_state()
+            // );
             return;
         }
 
         if self.is_process() {
             assert!(threadgroup.len() == 1);
+            log::info!("[exit] process {} do exit and recycle after all children are zombied, tg_len: {}", self.tid(), threadgroup.len());
         } else {
             assert!(threadgroup.len() == 2);
-            // NOTE: leader will be removed by parent calling `sys_wait4`
-            log::error!("[exit] remove {}", self.tid());
+            // NOTE: leader will be removed from TASK_MANAGER and threadgroup by parent calling `sys_wait4`
+            log::info!("[exit] last non-process thread {} do exit and recycle the whole process", self.tid());
             threadgroup.remove(self);
             TASK_MANAGER.remove_task(self.tid());
         }
 
-        log::info!("[Task::do_exit] exit the whole process");
-
-        log::debug!("[Task::do_exit] reparent children to init");
+        log::debug!("[Task::exit] reparent children to init");
         debug_assert_ne!(self.tid(), INIT_PROC_ID);
 
-        let mut children = self.children_mut().lock();
+        // children of process will be reparented to init
+        let process = self.process();
+        let mut children = process.children_mut().lock();
         if !children.is_empty() {
             let root = TASK_MANAGER.get_task(INIT_PROC_ID).unwrap();
             for child in children.values() {
@@ -411,7 +420,13 @@ impl Task {
             children.clear();
         }
 
-        if let Some(parent) = self.parent_mut().lock().as_ref() {
+        // only process will be set to WaitForRecycle state, 
+        // threads will be dropped when hart leaves this task so we don't need to set.
+        
+        self.process().set_state(TaskState::WaitForRecycle);
+
+        // send SIGCHLD to process's parent
+        if let Some(parent) = process.parent_mut().lock().as_ref() {
             if let Some(parent) = parent.upgrade() {
                 parent.receive_siginfo(SigInfo {
                     sig: Sig::SIGCHLD,
@@ -434,13 +449,5 @@ impl Task {
         // TODO: drop most resources here instead of wait4 function parent
         // called
         // self.with_mut_fd_table(|table| table.clear());
-
-        if self.is_process() {
-            self.set_state(TaskState::WaitForRecycle);
-        } else {
-            self.process().set_state(TaskState::WaitForRecycle);
-        }
-        // When the task is not leader, which means its is not a process, it
-        // will get dropped when hart leaves this task.
     }
 }
