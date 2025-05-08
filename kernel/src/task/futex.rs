@@ -123,10 +123,10 @@ impl FutexManager {
     }
 
     pub fn wake(&mut self, key: &FutexHashKey, n: u32) -> SyscallResult {
-        log::info!("[futex::wake] {:?} in {:?} ", n, key);
+        // log::info!("[futex::wake] {:?} in {:?} ", n, key);
         if let Some(waiters) = self.hash.get_mut(key) {
             let n = min(n as usize, waiters.len());
-            log::debug!("[futex::wake] waiters: {:?}", waiters);
+            // log::debug!("[futex::wake] waiters: {:?}", waiters);
             for _ in 0..n {
                 if self.is_mask {
                     let waiter = waiters.pop().unwrap();
@@ -148,7 +148,7 @@ impl FutexManager {
             }
             Ok(n)
         } else {
-            log::error!("can not find key {key:?}");
+            // log::error!("can not find key {key:?}");
             Err(SysError::EINVAL)
         }
     }

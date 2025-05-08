@@ -1,6 +1,7 @@
 use alloc::sync::Arc;
-use arch::riscv64::time::set_nx_timer_irq;
+use arch::riscv64::time::{get_time_duration, set_nx_timer_irq};
 use osfuture::{block_on_with_result, suspend_now, take_waker, yield_now};
+use timer::TIMER_MANAGER;
 
 use core::future::Future;
 use core::pin::Pin;
@@ -156,9 +157,6 @@ pub async fn task_executor_unit(task: Arc<Task>) {
     set_nx_timer_irq();
 
     loop {
-        if !task.is_process() && task.trap_context_mut().syscall_no() == 135 {
-            simdebug::stop();
-        }
         // trap_return connects user and kernel.
         trap::trap_return(&task);
 
@@ -175,6 +173,8 @@ pub async fn task_executor_unit(task: Arc<Task>) {
         trap::trap_handler(&task);
 
         let mut interrupted = async_syscall(&task).await;
+
+        TIMER_MANAGER.check(get_time_duration());
 
         if task.is_yield() {
             yield_now().await;

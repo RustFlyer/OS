@@ -418,6 +418,7 @@ impl VmArea {
             let pte = page_table.find_entry(vpn).unwrap();
             *pte = PageTableEntry::default();
         }
+        sfence_vma_all_except_global();
     }
 
     /// Changes the protection flags of the VMA, possibly updating page table entries.

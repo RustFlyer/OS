@@ -111,7 +111,7 @@ pub async fn sys_futex(
     let op = FutexOp::exstract_main_futex_flags(futex_op);
     match op {
         FutexOp::WaitBitset | FutexOp::Wait => {
-            log::debug!("[sys_futex] Wait Get Locked op: {:?} mask: {:#x}", op, val3);
+            // log::debug!("[sys_futex] Wait Get Locked op: {:?} mask: {:#x}", op, val3);
             let r = futex_addr.read();
             if r != val {
                 log::debug!("[sys_futex] r: {:#x} val: {:#x}", r, val);
@@ -148,7 +148,7 @@ pub async fn sys_futex(
             Ok(0)
         }
         FutexOp::WakeBitset | FutexOp::Wake => {
-            log::debug!("[sys_futex] wake");
+            // log::debug!("[sys_futex] wake");
             let n_wake = futex_manager(is_multi_group, val3).wake(&key, val)?;
             return Ok(n_wake);
         }
@@ -341,7 +341,7 @@ pub async fn sys_sigreturn() -> SyscallResult {
     let sig_cx_ptr = task.get_sig_cx_ptr();
     let addr_space = task.addr_space();
     let mut sig_cx_ptr = UserReadPtr::<SigContext>::new(sig_cx_ptr, &addr_space);
-    log::debug!("[sys_sigreturn] sig_cx_ptr: {sig_cx_ptr:?}");
+    // log::debug!("[sys_sigreturn] sig_cx_ptr: {sig_cx_ptr:?}");
     //恢复信号处理前的状态
     unsafe {
         let sig_cx = sig_cx_ptr.read()?;
@@ -352,7 +352,7 @@ pub async fn sys_sigreturn() -> SyscallResult {
         trap_cx.user_reg = sig_cx.user_reg;
     }
     log::debug!("[sys_sigreturn] trap context: {:?}", trap_cx.user_reg);
-    log::debug!("sig: {:#x}", task.sig_manager_mut().bitmap.bits());
+    // log::debug!("sig: {:#x}", task.sig_manager_mut().bitmap.bits());
 
     // its return value is the a0 before signal interrupt, so that it won't be changed in async_syscall
     // trap_cx.display();
@@ -471,8 +471,8 @@ pub fn sys_rt_sigmask(
     if !input_mask.is_null() {
         unsafe {
             let input = input_mask.read()?;
-            log::warn!("[sys_rt_sigmask] task {} input:{input:#x}", task.get_name());
-            log::warn!("[sys_rt_sigmask] how: {how:#x}");
+            log::debug!("[sys_rt_sigmask] task {} input:{input:#x}", task.get_name());
+            // log::warn!("[sys_rt_sigmask] how: {how:#x}");
 
             match how {
                 SIGBLOCK => {
@@ -533,7 +533,7 @@ pub fn sys_tgkill(tgid: isize, tid: isize, signum: i32) -> SyscallResult {
 /// the wrong thread being signaled if a thread terminates and its
 /// thread ID is recycled. Avoid using this system call.
 pub fn sys_tkill(tid: isize, sig: i32) -> SyscallResult {
-    log::debug!("[sys_tkill] tid: {tid}, signum: {sig}");
+    // log::debug!("[sys_tkill] tid: {tid}, signum: {sig}");
     let sig = Sig::from_i32(sig);
     if !sig.is_valid() || tid < 0 {
         return Err(SysError::EINVAL);

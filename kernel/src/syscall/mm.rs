@@ -74,7 +74,6 @@ pub async fn sys_mmap(
     };
 
     log::info!("[sys_mmap] addr: {addr:#x}, length: {length:#x}, perm: {perm:?}, flags: {flags:?}");
-    log::info!("[sys_mmap] addr: {addr:#x}, length: {length:#x}, prot: {prot:?}, flags: {flags:?}");
 
     if addr == 0 && flags.contains(MmapFlags::MAP_FIXED) {
         return Err(SysError::EINVAL);
@@ -96,7 +95,7 @@ pub async fn sys_mmap(
 /// to these pages will generate `SIGSEGV`. It is not an error if the indicated range does
 /// not contain any mapped pages.
 pub async fn sys_munmap(addr: usize, length: usize) -> SyscallResult {
-    log::info!("[sys_munmap] addr: {addr:#x}, length: {length:#x}");
+    log::debug!("[sys_munmap] addr: {addr:#x}, length: {length:#x}");
 
     let task = current_task();
     let addr = VirtAddr::new(addr);

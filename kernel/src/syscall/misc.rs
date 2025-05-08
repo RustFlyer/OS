@@ -2,10 +2,7 @@ use alloc::vec::Vec;
 use arch::riscv64::time::get_time_duration;
 use systype::SyscallResult;
 
-use crate::{
-    processor::current_task,
-    vm::user_ptr::{UserReadPtr, UserWritePtr},
-};
+use crate::{processor::current_task, vm::user_ptr::UserWritePtr};
 
 // See in "sys/utsname.h"
 #[derive(Debug, Clone, Copy)]

@@ -34,12 +34,12 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
     let cx = task.trap_context_mut();
     let old_mask = task.get_sig_mask();
 
-    log::debug!(
-        "[sig_exec] task [{}] Handling signal: {:?} {:?}",
-        task.get_name(),
-        si,
-        action
-    );
+    // log::debug!(
+    //     "[sig_exec] task [{}] Handling signal: {:?} {:?}",
+    //     task.get_name(),
+    //     si,
+    //     action
+    // );
 
     if *interrupted && action.flags.contains(SigActionFlag::SA_RESTART) {
         cx.sepc -= 4;

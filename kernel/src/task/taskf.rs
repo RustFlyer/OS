@@ -54,12 +54,20 @@ impl Task {
 
     /// Suspends the Task until it is waken or time out
     pub async fn suspend_timeout(&self, limit: Duration) -> Duration {
-        let expire = limit;
+        // let expire = limit;
+        let expire = get_time_duration() + limit;
+        // log::error!(
+        //     "[sys_nanosleep] now: {:?}, limit {:?}, expire: {:?}",
+        //     get_time_duration(),
+        //     limit,
+        //     expire
+        // );
         let mut timer = Timer::new(expire);
         timer.set_waker_callback(self.get_waker().clone());
         TIMER_MANAGER.add_timer(timer);
         suspend_now().await;
         let now = get_time_duration();
+        // log::error!("[sys_nanosleep] now {:?}", now);
         if expire > now {
             expire - now
         } else {
@@ -196,7 +204,6 @@ impl Task {
         let mut name = self.get_name();
 
         if cloneflags.contains(CloneFlags::THREAD) {
-            name += "(thread)";
             is_process = false;
             children = (*self.children_mut()).clone();
 
@@ -206,8 +213,10 @@ impl Task {
             pgid = (*self.pgid_mut()).clone();
             cwd = self.cwd();
             itimers = new_share_mutex(self.with_mut_itimers(|t| t.clone()));
+
+            let len = threadgroup.lock().len();
+            name += format!("(thread {})", len).as_str();
         } else {
-            name += "(fork)";
             is_process = true;
             children = new_share_mutex(BTreeMap::new());
 
@@ -217,6 +226,8 @@ impl Task {
             pgid = new_share_mutex(self.get_pgid());
             cwd = new_share_mutex(self.cwd_mut());
             itimers = new_share_mutex([ITimer::default(); 3]);
+
+            name += "(fork)";
         }
 
         let sig_mask = SyncUnsafeCell::new(self.get_sig_mask());
@@ -339,7 +350,7 @@ impl Task {
 
         // release futexes in dropped threads.
         if let Some(address) = self.tid_address_mut().clear_child_tid {
-            log::info!("[do_exit] clear_child_tid: {:#x}", address);
+            log::info!("[exit] clear_child_tid: {:#x}", address);
             log::info!(
                 "[exit] task {} record clear_child_tid in address: {:x} to parent",
                 self.tid(),
@@ -362,7 +373,7 @@ impl Task {
 
         let tg_lock = self.thread_group_mut();
         let mut threadgroup = tg_lock.lock();
-        log::info!(
+        log::warn!(
             "[exit] thread {}, name: {} do exit, is_process: {}, tg_len: {}, leader state: {:?}",
             self.tid(),
             self.get_name(),
