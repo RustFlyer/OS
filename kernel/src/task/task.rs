@@ -11,7 +11,9 @@ use alloc::{
 use core::cell::SyncUnsafeCell;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use core::task::Waker;
+use mm::address::VirtAddr;
 use mutex::{ShareMutex, SpinNoIrqLock, new_share_mutex};
+use time::itime::ITimer;
 use vfs::{dentry::Dentry, file::File};
 
 use osfs::{fd_table::FdTable, sys_root_dentry};
@@ -76,11 +78,15 @@ pub struct Task {
     // and organizing virtual address of a task.
     addr_space: SyncUnsafeCell<Arc<AddrSpace>>,
 
+    /// Map of start address of shared memory areas to their keys in the shared
+    /// memory manager.
+    shm_maps: ShareMutex<BTreeMap<VirtAddr, usize>>,
+
     // parent is task spawner. It spawn the task by fork or
     // clone and then parent is set as it.
     parent: ShareMutex<Option<Weak<Task>>>,
 
-    // children controls all the task spawned by this task.
+    // children controls all the process spawned by this task.
     // Attention: the pointer to children task is Arc. It's
     // because parent task should recycle children and free
     // them in wait4 at last.
@@ -133,6 +139,8 @@ pub struct Task {
 
     is_yield: AtomicBool,
 
+    itimers: ShareMutex<[ITimer; 3]>,
+
     // name, used for debug
     name: SyncUnsafeCell<String>,
 }
@@ -151,13 +159,14 @@ impl Task {
         let task = Task {
             tid,
             process: None,
-            is_process: false,
+            is_process: true,
             threadgroup: new_share_mutex(ThreadGroup::new()),
             trap_context: SyncUnsafeCell::new(TrapContext::new(entry, sp)),
             timer: SyncUnsafeCell::new(TaskTimeStat::new()),
             waker: SyncUnsafeCell::new(None),
             state: SpinNoIrqLock::new(TaskState::Running),
             addr_space: SyncUnsafeCell::new(Arc::new(addr_space)),
+            shm_maps: new_share_mutex(BTreeMap::new()),
             parent: new_share_mutex(None),
             children: new_share_mutex(BTreeMap::new()),
             pgid: new_share_mutex(pgid),
@@ -174,6 +183,7 @@ impl Task {
             elf: SyncUnsafeCell::new(elf_file),
             is_syscall: AtomicBool::new(false),
             is_yield: AtomicBool::new(false),
+            itimers: new_share_mutex([ITimer::default(); 3]),
             name: SyncUnsafeCell::new(name),
         };
         task
@@ -191,6 +201,7 @@ impl Task {
         waker: SyncUnsafeCell<Option<Waker>>,
         state: SpinNoIrqLock<TaskState>,
         addr_space: SyncUnsafeCell<Arc<AddrSpace>>,
+        shm_maps: ShareMutex<BTreeMap<VirtAddr, usize>>,
 
         parent: ShareMutex<Option<Weak<Task>>>,
         children: ShareMutex<BTreeMap<Tid, Arc<Task>>>,
@@ -209,6 +220,8 @@ impl Task {
         cwd: ShareMutex<Arc<dyn Dentry>>,
         elf: SyncUnsafeCell<Arc<dyn File>>,
 
+        itimers: ShareMutex<[ITimer; 3]>,
+
         name: SyncUnsafeCell<String>,
     ) -> Self {
         Task {
@@ -222,6 +235,7 @@ impl Task {
             waker,
             state,
             addr_space,
+            shm_maps,
 
             parent,
             children,
@@ -241,6 +255,7 @@ impl Task {
             elf,
             is_syscall: AtomicBool::new(false),
             is_yield: AtomicBool::new(false),
+            itimers,
             name,
         }
     }
@@ -303,6 +318,14 @@ impl Task {
         unsafe { Arc::clone(&*self.addr_space.get()) }
     }
 
+    pub fn shm_maps_mut(&self) -> &ShareMutex<BTreeMap<VirtAddr, usize>> {
+        &self.shm_maps
+    }
+
+    pub fn raw_space_ptr(&self) -> usize {
+        Arc::as_ptr(&self.addr_space()) as usize
+    }
+
     pub fn elf_mut(&self) -> &mut Arc<dyn File> {
         unsafe { &mut *self.elf.get() }
     }
@@ -345,6 +368,18 @@ impl Task {
         f(&mut self.sig_manager_mut())
     }
 
+    pub fn with_mut_sig_handler<T>(&self, f: impl FnOnce(&mut SigHandlers) -> T) -> T {
+        f(&mut self.sig_handlers_mut().lock())
+    }
+
+    pub fn with_mut_itimers<T>(&self, f: impl FnOnce(&mut [ITimer; 3]) -> T) -> T {
+        f(&mut self.itimers.lock())
+    }
+
+    pub fn with_mut_shm_maps<T>(&self, f: impl FnOnce(&mut BTreeMap<VirtAddr, usize>) -> T) -> T {
+        f(&mut self.shm_maps.lock())
+    }
+
     pub fn cwd_mut(&self) -> Arc<dyn Dentry> {
         self.cwd.lock().clone()
     }
@@ -380,6 +415,10 @@ impl Task {
             .upgrade()
             .unwrap()
             .get_pgid()
+    }
+
+    pub fn cwd(&self) -> ShareMutex<Arc<dyn Dentry>> {
+        self.cwd.clone()
     }
 
     pub fn get_sig_mask(&self) -> SigSet {
@@ -454,10 +493,12 @@ impl Task {
     }
     // ========== This Part You Can Change the Member of Task  ===========
     pub fn add_child(&self, child: Arc<Task>) {
+        log::debug!("addchild: tid {} -> tid {} ", child.tid(), self.tid());
         self.children.lock().insert(child.tid(), child);
     }
 
     pub fn remove_child(&self, child: Arc<Task>) {
+        log::debug!("child: tid [{}] will be removed", child.get_name());
         self.children.lock().remove(&child.tid());
     }
 }
@@ -478,9 +519,6 @@ impl Drop for Task {
             .values()
             .for_each(|c| log::debug!("children: tid [{}] name [{}]", c.tid(), c.get_name()));
 
-        // log::info!("{}", str);
-        // log::error!("{}", str);
-        // log::debug!("{}", str);
-        log::trace!("{}", str);
+        log::debug!("{}", str);
     }
 }

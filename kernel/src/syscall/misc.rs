@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use arch::riscv64::time::get_time_duration;
 use systype::SyscallResult;
 
@@ -147,5 +148,46 @@ pub fn sys_sysinfo(info: usize) -> SyscallResult {
     unsafe {
         info.write(Sysinfo::collect())?;
     }
+    Ok(0)
+}
+
+/// The `getrandom()` system call fills the buffer pointed to by `buf` with up to `buflen`
+/// random bytes. These bytes can be used to seed user-space random number generators
+/// or for cryptographic purposes.
+///
+/// The `flags` argument is a bit mask that can contain zero or more of the following values ORed together:
+/// - `GRND_RANDOM`: If this bit is set, then random bytes are drawn from the `random` source
+///   (i.e., the same source as the `/dev/random` device) instead of the `urandom` source. The random
+///   source is limited based on the entropy that can be obtained from `environmental noise`. If
+///   the number of available bytes in the random source is less than requested in `buflen`, the
+///   call returns just the available random bytes. If no random bytes are available, the behavior
+///   depends on the presence of `GRND_NONBLOCK` in the flags argument.
+/// - `GRND_NONBLOCK`:
+///   By default, when reading from the random source, `getrandom()` blocks if no random
+///   bytes are available, and when reading from the urandom source, it blocks if the entropy pool
+///   has not yet been initialized. If the `GRND_NONBLOCK` flag is set, then `getrandom()` does not
+///   block in these cases, but instead immediately returns -1 with errno set to `EAGAIN`.
+///
+/// Attention: For convenience, we choose a simple way to implement it.
+pub fn sys_getrandom(buf: usize, buflen: usize, flags: i32) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+    let mut buf = UserWritePtr::<u8>::new(buf, &addrspace);
+
+    let mut seed = (task.pid() as u64) ^ (buflen as u64) ^ (flags as u64);
+    fn simple_rand(mut state: u64) -> u8 {
+        state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
+        (state >> 24) as u8
+    }
+
+    let mut random_array: Vec<u8> = Vec::with_capacity(buflen);
+    for _ in 0..buflen {
+        let byte = simple_rand(seed);
+        random_array.push(byte);
+        seed = seed.wrapping_add(byte as u64);
+    }
+
+    unsafe { buf.write_array(&random_array)? };
+
     Ok(0)
 }

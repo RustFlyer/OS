@@ -40,12 +40,24 @@ impl VecIdAllocator {
     /// # Panics
     ///
     /// Panics if `from >= to`.
-    pub fn new(from: usize, to: usize) -> Self {
+    pub const fn new(from: usize, to: usize) -> Self {
         debug_assert!(from < to);
         VecIdAllocator {
             next: from,
             end: to,
             ids: Vec::new(),
+        }
+    }
+}
+
+impl VecIdAllocator {
+    pub fn alloc_incr(&mut self) -> Option<usize> {
+        let id = self.next;
+        if id < self.end {
+            self.next += 1;
+            Some(id)
+        } else {
+            None
         }
     }
 }

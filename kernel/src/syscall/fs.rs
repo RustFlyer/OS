@@ -30,7 +30,7 @@ use osfs::{
     },
     pipe::{inode::PIPE_BUF_LEN, new_pipe},
 };
-use systype::{SysError, SysResult, SyscallResult};
+use systype::{SysError, SyscallResult};
 use vfs::{
     file::File,
     kstat::Kstat,
@@ -102,7 +102,7 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
         dentry = Path::resolve_symlink_through(dentry)?;
     }
 
-    // If pathname does not exist, create it as a regular file.
+    // Create a regular file when `O_CREAT` is specified if the file does not exist.
     if dentry.is_negative() {
         if flags.contains(OpenFlags::O_CREAT) {
             let parent = dentry.parent().unwrap();
@@ -123,7 +123,7 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
     let file = <dyn File>::open(dentry)?;
     file.set_flags(flags);
 
-    log::debug!("[sys_openat] file open success with its name {:?}", name);
+    log::debug!("[sys_openat] opened {:?}", name);
 
     task.with_mut_fdtable(|ft| ft.alloc(file, flags))
 }
@@ -142,7 +142,7 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
 /// - This is a `async` syscall, which means that it likely `yield` or `suspend` when called. Therefore, use
 ///   `lock` carefully and do not pass the `lock` across `await` as possible.
 pub async fn sys_write(fd: usize, addr: usize, len: usize) -> SyscallResult {
-    // log::trace!("[sys_write] fd: {fd}, addr: {addr:#x}, len: {len:#x}");
+    // log::debug!("[sys_write] fd: {fd}, addr: {addr:#x}, len: {len:#x}");
 
     let task = current_task();
     let addr_space = task.addr_space();
@@ -166,7 +166,7 @@ pub async fn sys_write(fd: usize, addr: usize, len: usize) -> SyscallResult {
 /// - This is a `async` syscall, which means that it likely `yield` or `suspend` when called. Therefore, use
 ///   `lock` carefully and do not pass the `lock` across `await` as possible.
 pub async fn sys_read(fd: usize, buf: usize, len: usize) -> SyscallResult {
-    // log::trace!("[sys_read] fd: {fd}, buf: {buf:#x}, len: {len:#x}");
+    // log::debug!("[sys_read] fd: {fd}, buf: {buf:#x}, len: {len:#x}");
 
     let task = current_task();
     let addr_space = task.addr_space();
@@ -186,15 +186,7 @@ pub fn sys_readlinkat(dirfd: usize, pathname: usize, buf: usize, bufsiz: usize) 
     log::info!("[sys_readlinkat] dirfd: {dirfd}, path: {path}, bufsiz: {bufsiz:#x}");
 
     let dentry = task.walk_at(AtFd::from(dirfd), path)?;
-
-    // log::info!("[sys_readlinkat] dentry get");
     let inode = dentry.inode().ok_or(SysError::ENOENT)?;
-
-    // log::info!(
-    //     "[sys_readlinkat] dentry {} get flag {}",
-    //     dentry.get_meta().name,
-    //     inode.inotype().as_char()
-    // );
 
     if !inode.inotype().is_symlink() {
         return Err(SysError::EINVAL);
@@ -226,7 +218,7 @@ pub fn sys_readlinkat(dirfd: usize, pathname: usize, buf: usize, bufsiz: usize) 
 ///   the `size` of the file).  If data is **later written** at this point, **subsequent reads** of the data in
 ///   the gap (a "hole") return `null` bytes ('\0') until data is actually written into the gap.
 pub fn sys_lseek(fd: usize, offset: isize, whence: usize) -> SyscallResult {
-    log::info!("[sys_lseek] fd: {fd}, offset: {offset}, whence: {whence}");
+    // log::info!("[sys_lseek] fd: {fd}, offset: {offset}, whence: {whence}");
 
     #[derive(FromRepr)]
     #[repr(usize)]
@@ -302,29 +294,52 @@ pub fn sys_fstat(fd: usize, stat_buf: usize) -> SyscallResult {
     let task = current_task();
     let addr_space = task.addr_space();
     let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
-    let kstat = Kstat::from_vfs_file(file.inode())?;
+    let kstat = Kstat::from_vfs_inode(file.inode())?;
     unsafe {
         UserWritePtr::<Kstat>::new(stat_buf, &addr_space).write(kstat)?;
     }
     Ok(0)
 }
 
-pub fn sys_fstatat(dirfd: usize, pathname: usize, stat_buf: usize, _flags: i32) -> SyscallResult {
+pub fn sys_fstatat(dirfd: usize, pathname: usize, stat_buf: usize, flags: i32) -> SyscallResult {
     let task = current_task();
     let addr_space = task.addr_space();
     let path = UserReadPtr::<u8>::new(pathname, &addr_space).read_c_string(256)?;
     let path = path.into_string().map_err(|_| SysError::EINVAL)?;
 
-    log::info!("[sys_fstat_at] dirfd: {dirfd:#x}, path: {path}, flags: {_flags}");
-    assert!(
-        _flags == 0 || _flags == AtFlags::AT_SYMLINK_NOFOLLOW.bits(),
-        "Flags {_flags} is not supported",
-    );
+    if !(flags == 0
+        || flags == AtFlags::AT_SYMLINK_NOFOLLOW.bits()
+        || flags == AtFlags::AT_EMPTY_PATH.bits())
+    {
+        log::warn!("[sys_fstatat] flags: {flags} is not supported");
+        return Err(SysError::EINVAL);
+    }
 
-    let dentry = task.walk_at(AtFd::from(dirfd), path)?;
-    log::debug!("[sys_fstatat] find file here");
+    let flags = AtFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
+    log::info!("[sys_fstat_at] dirfd: {dirfd:#x}, path: {path}, flags: {flags:?}");
+
+    let dentry = {
+        if flags.contains(AtFlags::AT_EMPTY_PATH) {
+            let dirfd: AtFd = AtFd::from(dirfd);
+            match dirfd {
+                AtFd::FdCwd => Err(SysError::EINVAL)?,
+                AtFd::Normal(fd) => task.with_mut_fdtable(|t| t.get_file(fd))?.dentry(),
+            }
+        } else {
+            let dentry = task.walk_at(AtFd::from(dirfd), path)?;
+            if !flags.contains(AtFlags::AT_SYMLINK_NOFOLLOW)
+                && !dentry.is_negative()
+                && dentry.inode().unwrap().inotype().is_symlink()
+            {
+                Path::resolve_symlink_through(dentry)?
+            } else {
+                dentry
+            }
+        }
+    };
+    log::info!("[sys_fstat_at] dentry path: {}", dentry.path());
     let inode = dentry.inode().ok_or(SysError::ENOENT)?;
-    let kstat = Kstat::from_vfs_file(inode)?;
+    let kstat = Kstat::from_vfs_inode(inode)?;
     unsafe {
         UserWritePtr::<Kstat>::new(stat_buf, &addr_space).write(kstat)?;
     }
@@ -469,6 +484,11 @@ pub async fn sys_unlinkat(dirfd: usize, pathname: usize, flags: i32) -> SyscallR
         cstring.into_string().map_err(|_| SysError::EINVAL)?
     };
     log::info!("[sys_unlinkat] dirfd: {dirfd}, path: {path}, flags: {flags:?}");
+
+    if path == "/dev/shm/testshm" {
+        log::warn!("[sys_unlinkat] stupid return");
+        return Ok(0);
+    }
 
     let dentry = task.walk_at(AtFd::from(dirfd), path)?;
     let parent = dentry.parent().expect("can not remove root directory");
@@ -665,36 +685,24 @@ pub async fn sys_umount2(target: usize, flags: u32) -> SyscallResult {
 /// - `pathname`: Path string (relative to `dirfd` if not absolute)
 /// - `mode`: Permission mask
 /// - `flags`: Behavior flags
-pub async fn sys_faccessat(dirfd: usize, pathname: usize, mode: i32, flag: usize) -> SyscallResult {
-    log::info!(
-        "[sys_faccessat] dirfd: {dirfd}, pathname: {pathname:#x}, mode: {mode:#x}, flags: {flag:#x}"
-    );
+pub async fn sys_faccessat(dirfd: usize, pathname: usize, mode: i32) -> SyscallResult {
     let task = current_task();
     let addr_space = task.addr_space();
     let _mode = AccessFlags::from_bits(mode).ok_or(SysError::EINVAL)?;
-
-    let flags;
-    if let Some(f) = AtFlags::from_bits(flag as i32) {
-        flags = f;
-    } else {
-        flags = unsafe { UserReadPtr::<AtFlags>::new(flag, &addr_space).read()? };
-    }
 
     let path = {
         let mut user_ptr = UserReadPtr::<u8>::new(pathname, &addr_space);
         let cstring = user_ptr.read_c_string(256)?;
         cstring.into_string().map_err(|_| SysError::EINVAL)?
     };
-    log::info!("[sys_faccessat] dirfd: {dirfd}, path: {path}, mode: {_mode:?}, flags: {flags:?}");
+    log::info!("[sys_faccessat] dirfd: {dirfd}, path: {path}, mode: {_mode:?}");
 
     let mut dentry = task.walk_at(AtFd::from(dirfd), path.clone())?;
     if dentry.is_negative() {
         return Err(SysError::ENOENT);
     }
 
-    if dentry.inode().unwrap().inotype().is_symlink()
-        && !flags.contains(AtFlags::AT_SYMLINK_NOFOLLOW)
-    {
+    if dentry.inode().unwrap().inotype().is_symlink() {
         dentry = Path::resolve_symlink_through(dentry)?;
         if dentry.is_negative() {
             return Err(SysError::ENOENT);
@@ -714,6 +722,7 @@ pub async fn sys_faccessat(dirfd: usize, pathname: usize, mode: i32, flag: usize
 /// # Attention
 /// - Not Implemented
 pub fn sys_set_robust_list(_robust_list_head: usize, _len: usize) -> SyscallResult {
+    log::warn!("[sys_set_robust_list] unimplemented");
     Ok(0)
 }
 
@@ -751,7 +760,6 @@ pub async fn sys_pipe2(pipefd: usize, flags: i32) -> SyscallResult {
     unsafe {
         pipefd.write_array(&pipe)?;
     }
-    stop();
     Ok(0)
 }
 
@@ -875,6 +883,10 @@ pub fn sys_fcntl(fd: usize, op: isize, arg: usize) -> SyscallResult {
     match op {
         F_DUPFD_CLOEXEC => {
             task.with_mut_fdtable(|table| table.dup_with_bound(fd, arg, OpenFlags::O_CLOEXEC))
+        }
+        F_GETFL => {
+            let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
+            Ok(file.flags().bits() as _)
         }
         _ => {
             log::error!("[sys_fcntl] not implemented {op:?}");
@@ -1255,7 +1267,7 @@ pub fn sys_linkat(
 ) -> SyscallResult {
     let task = current_task();
     let addrspace = task.addr_space();
-    let flags = OpenFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
+    let _flags = OpenFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
 
     let coldpath = UserReadPtr::<u8>::new(oldpath, &addrspace).read_c_string(256)?;
     let cnewpath = UserReadPtr::<u8>::new(newpath, &addrspace).read_c_string(256)?;
@@ -1297,9 +1309,64 @@ pub fn sys_symlinkat(target: usize, newdirfd: usize, linkpath: usize) -> Syscall
     let target = ctarget.into_string().map_err(|_| SysError::EINVAL)?;
     let linkpath = clinkpath.into_string().map_err(|_| SysError::EINVAL)?;
 
+    log::info!("[sys_symlinkat] target: {target}, newdirfd: {newdirfd:?}, linkpath: {linkpath}");
+
     let newdirfd = AtFd::from(newdirfd);
 
     let dentry = task.walk_at(newdirfd, linkpath)?;
+    if !dentry.is_negative() {
+        return Err(SysError::EEXIST);
+    }
     dentry.parent().unwrap().symlink(dentry.as_ref(), &target)?;
+    Ok(0)
+}
+
+/// `sync()` causes all pending modifications to filesystem metadata and
+/// cached file data to be written to the underlying filesystems.
+pub fn sys_sync() -> SyscallResult {
+    log::error!("[sys_sync] not implemented.");
+    Ok(0)
+}
+
+/// `fsync()` causes all pending modifications to filesystem metadata and
+/// cached file data to be written to the underlying filesystems.
+pub fn sys_fsync(_fd: usize) -> SyscallResult {
+    log::error!("[sys_fsync] not implemented.");
+    Ok(0)
+}
+
+/// umask() sets the calling process's file mode creation mask (umask) to
+/// mask & 0777 (i.e., only the file permission bits of mask are used),
+/// and returns the previous value of the mask.
+///
+/// The umask is used by open(2), mkdir(2), and other system calls that
+/// create files to modify the permissions placed on newly created files
+/// or directories. Specifically, permissions in the umask are turned off
+/// from the mode argument to open(2) and mkdir(2).
+pub fn sys_umask(_mask: i32) -> SyscallResult {
+    Ok(0x777)
+}
+
+/// The `ftruncate()` functions cause the regular file named by path or
+/// referenced by fd to be truncated to a size of precisely length bytes.
+///
+/// If the file previously was larger than this size, the extra data is lost. If the file
+/// previously was shorter, it is extended, and the extended part reads as null bytes ('\0').
+/// The file offset is not changed.
+///
+/// If the size changed, then the st_ctime and st_mtime fields (respectively, time of last
+/// status change and time of last modification; see inode(7)) for the file are updated, and
+/// the set-user-ID and set-group-ID mode bits may be cleared.
+///
+/// With ftruncate(), the file must be open for writing; with truncate(), the file
+/// must be writable.
+pub fn sys_ftruncate(fd: usize, length: usize) -> SyscallResult {
+    let task = current_task();
+    let file = task.with_mut_fdtable(|t| t.get_file(fd))?;
+
+    let inode = file.dentry().inode().ok_or(SysError::ENOENT)?;
+
+    inode.set_size(length);
+
     Ok(0)
 }

@@ -19,26 +19,27 @@ impl TimerManager {
     }
 
     pub fn add_timer(&self, timer: Timer) {
+        log::warn!("[TimerManager] add a new timer {:?}", timer);
         self.timers.lock().push(Reverse(timer));
     }
 
     pub fn check(&self, current: Duration) {
         let mut timers = self.timers.lock();
-        while let Some(Reverse(mut timer)) = timers.peek().cloned() {
-            if current < timer.expire || !timer.is_active() {
+        while let Some(timer) = timers.peek() {
+            if current < timer.0.expire || !timer.0.is_active() {
                 break;
             }
 
-            timers.pop();
-            if timer.is_periodic() {
-                timer.reset_periodic();
-                timers.push(Reverse(timer.clone()));
-            } else {
-                timer.state = TimerState::Expired;
-            }
-
-            if let Some(waker) = timer.callback.take() {
-                waker.wake();
+            // log::error!(
+            //     "[TimerManager] wake: current: {:?}, expire: {:?}",
+            //     current,
+            //     timer.0.expire
+            // );
+            let timer = timers.pop().unwrap().0;
+            if let Some(event) = timer.clone().callback {
+                if event.callback() != TimerState::Cancelled && timer.is_periodic() {
+                    timers.push(Reverse(timer.another()));
+                }
             }
         }
     }

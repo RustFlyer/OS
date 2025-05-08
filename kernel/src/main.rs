@@ -98,7 +98,7 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         log::info!("hart {}: initialized driver", hart_id);
 
         // block_device_test();
-        net_bench();
+        // net_bench();
 
         osfs::init();
         log::info!("hart {}: initialized FS", hart_id);

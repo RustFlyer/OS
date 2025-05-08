@@ -1,3 +1,4 @@
+pub mod futex;
 pub mod future;
 pub mod kernelproc;
 pub mod manager;
@@ -9,6 +10,7 @@ pub mod taskf;
 pub mod threadgroup;
 pub mod tid;
 pub mod time;
+pub mod timeid;
 
 use arch::riscv64::time::get_time_duration;
 use future::spawn_kernel_task;

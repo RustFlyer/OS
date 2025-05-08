@@ -22,7 +22,7 @@ spin = { version = "0.9.8", features = ["lazy", "mutex"] }
 strum = { version = "0.27", default-features = false, features = ["derive"] }
 virtio-drivers = { version = "0.7" }
 uart_16550 = "0.3"
-fatfs = { default-features = false,  git = "https://github.com/EchudeT/rust-fatfs.git", rev = "e656", features = [
+fatfs = { default-features = false, git = "https://github.com/EchudeT/rust-fatfs.git", rev = "e656", features = [
     "alloc",
     "lfn",
     "log_level_info",
@@ -32,8 +32,7 @@ fdt = "0.1.5"
 elf = { git = "https://github.com/adong660/rust-elf.git", branch = "no-std-elfstream", default-features = false, features = [
     "alloc",
 ] }
-lwext4_rust = { git = "https://github.com/EchudeT/lwext4_rust.git", rev = "719c"}
-
+lwext4_rust = { git = "https://github.com/EchudeT/lwext4_rust.git", rev = "d546" }
 
 
 [workspace.dependencies.smoltcp]

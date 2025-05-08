@@ -88,7 +88,6 @@ impl<'a, T: ?Sized, S: MutexSupport> SleepMutexCasFuture<'a, T, S> {
             }
 
             if spin_count >= MAX_SPIN_COUNT {
-                stop();
                 // log::debug!("[sleepCasMutex] step into wait list");
                 unsafe { &mut *this.grant.inner.get() }.1 = Some(take_waker().await);
                 let queue = unsafe { &mut (*inner.queue.get()) };

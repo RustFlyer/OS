@@ -9,6 +9,8 @@ use core::cell::SyncUnsafeCell;
 use core::sync::atomic::AtomicUsize;
 use core::time::Duration;
 use osfuture::suspend_now;
+use shm::manager::SHARED_MEMORY_MANAGER;
+use time::itime::ITimer;
 
 use arch::riscv64::time::get_time_duration;
 use config::process::CloneFlags;
@@ -27,15 +29,17 @@ use vfs::path::Path;
 use super::future::{self};
 use super::manager::TASK_MANAGER;
 use super::process_manager::PROCESS_GROUP_MANAGER;
-use super::sig_members::SigHandlers;
 use super::sig_members::SigManager;
 use super::task::*;
 use super::threadgroup::ThreadGroup;
 use super::tid::TidAddress;
 use super::tid::tid_alloc;
 
+use crate::task::futex::FutexHashKey;
+use crate::task::futex::futex_manager;
 use crate::task::signal::sig_info::{Sig, SigDetails, SigInfo};
 use crate::vm::addr_space::{AddrSpace, switch_to};
+use crate::vm::user_ptr::UserWritePtr;
 
 impl Task {
     /// Switches Task to User
@@ -50,9 +54,9 @@ impl Task {
 
     /// Suspends the Task until it is waken or time out
     pub async fn suspend_timeout(&self, limit: Duration) -> Duration {
-        let expire = limit;
+        let expire = get_time_duration() + limit;
         let mut timer = Timer::new(expire);
-        timer.set_callback(self.get_waker().clone());
+        timer.set_waker_callback(self.get_waker().clone());
         TIMER_MANAGER.add_timer(timer);
         suspend_now().await;
         let now = get_time_duration();
@@ -105,7 +109,7 @@ impl Task {
     ) -> SysResult<()> {
         let addrspace = AddrSpace::build_user()?;
         let (entry_point, auxv) = addrspace.load_elf(elf_file.clone())?;
-        // log::debug!("[execve] load elf: over");
+        log::debug!("[execve] load elf: over");
         let stack_top = addrspace.map_stack()?;
         addrspace.map_heap()?;
 
@@ -133,6 +137,7 @@ impl Task {
         *self.elf_mut() = elf_file;
         *self.name_mut() = name;
         self.with_mut_fdtable(|table| table.close());
+        self.with_mut_sig_handler(|handlers| handlers.reset_user_defined());
 
         Ok(())
     }
@@ -170,10 +175,7 @@ impl Task {
     }
 
     /// fork a application
-    ///
-    /// - todo1: Thread Control
-    /// - todo2: Sig Clone?
-    pub async fn fork(self: &Arc<Self>, cloneflags: CloneFlags) -> Arc<Self> {
+    pub fn fork(self: &Arc<Self>, cloneflags: CloneFlags) -> Arc<Self> {
         let tid = tid_alloc();
         let trap_context = SyncUnsafeCell::new(*self.trap_context_mut());
         let state = SpinNoIrqLock::new(self.get_state());
@@ -182,38 +184,60 @@ impl Task {
         let is_process;
         let threadgroup;
 
+        let shm_maps;
+
         let parent;
         let children;
-
         let pgid;
-
-        let cwd = new_share_mutex(self.cwd_mut());
+        let cwd;
+        let itimers;
 
         let elf = SyncUnsafeCell::new((*self.elf_mut()).clone());
 
-        let mut name = self.get_name() + "(fork)";
+        let mut name = self.get_name();
 
         if cloneflags.contains(CloneFlags::THREAD) {
-            name += "(thread)";
             is_process = false;
+            children = (*self.children_mut()).clone();
+
             process = Some(Arc::downgrade(self));
             threadgroup = self.thread_group_mut().clone();
-            parent = self.parent_mut().clone();
-            children = self.children_mut().clone();
-            pgid = self.pgid_mut().clone();
+            parent = (*self.parent_mut()).clone();
+            pgid = (*self.pgid_mut()).clone();
+            cwd = self.cwd();
+            itimers = new_share_mutex(self.with_mut_itimers(|t| t.clone()));
+
+            shm_maps = (*self.shm_maps_mut()).clone();
+            let len = threadgroup.lock().len();
+            name += format!("(thread {})", len).as_str();
         } else {
             is_process = true;
+            children = new_share_mutex(BTreeMap::new());
+
             process = None;
             threadgroup = new_share_mutex(ThreadGroup::new());
             parent = new_share_mutex(Some(Arc::downgrade(self)));
-            children = new_share_mutex(BTreeMap::new());
             pgid = new_share_mutex(self.get_pgid());
+
+            shm_maps = new_share_mutex(BTreeMap::clone(&self.shm_maps_mut().lock()));
+            for (_, shm_id) in shm_maps.lock().iter() {
+                SHARED_MEMORY_MANAGER.attach(*shm_id, tid.0);
+            }
+            cwd = new_share_mutex(self.cwd_mut());
+            itimers = new_share_mutex([ITimer::default(); 3]);
+
+            name += "(fork)";
         }
 
         let sig_mask = SyncUnsafeCell::new(self.get_sig_mask());
-        let sig_handlers = new_share_mutex(SigHandlers::new());
+        let sig_handlers = if cloneflags.contains(CloneFlags::SIGHAND) {
+            self.sig_handlers_mut().clone()
+        } else {
+            new_share_mutex(self.with_mut_sig_handler(|handlers| (*handlers).clone()))
+        };
+
         let sig_manager = SyncUnsafeCell::new(SigManager::new());
-        let sig_stack = SyncUnsafeCell::new(*self.sig_stack_mut());
+        let sig_stack = SyncUnsafeCell::new(None);
         let sig_cx_ptr = AtomicUsize::new(0);
 
         let addr_space = if cloneflags.contains(CloneFlags::VM) {
@@ -230,7 +254,6 @@ impl Task {
         };
 
         let name = SyncUnsafeCell::new(name);
-
         let new = Arc::new(Self::new_fork_clone(
             tid,
             process,
@@ -241,6 +264,7 @@ impl Task {
             SyncUnsafeCell::new(None),
             state,
             SyncUnsafeCell::new(addr_space),
+            shm_maps,
             parent,
             children,
             pgid,
@@ -254,6 +278,7 @@ impl Task {
             fd_table,
             cwd,
             elf,
+            itimers,
             name,
         ));
 
@@ -315,7 +340,6 @@ impl Task {
     }
 
     pub fn exit(self: &Arc<Self>) {
-        log::info!("thread {} do exit", self.tid());
         assert_ne!(
             self.tid(),
             INIT_PROC_ID,
@@ -323,68 +347,121 @@ impl Task {
             self.trap_context_mut().sepc
         );
 
-        let tg_lock = self.thread_group_mut();
-        let mut guard = tg_lock.lock();
+        // release futexes in dropped threads.
+        if let Some(address) = self.tid_address_mut().clear_child_tid {
+            log::info!("[exit] clear_child_tid: {:#x}", address);
+            log::info!(
+                "[exit] task {} record clear_child_tid in address: {:x} to parent",
+                self.tid(),
+                address
+            );
+            unsafe {
+                UserWritePtr::<i32>::new(address, &self.addr_space())
+                    .write(0)
+                    .expect("fail to write in clear_child_tid")
+            };
 
+            let key = FutexHashKey::new_share_key(address, &self.addr_space()).unwrap();
+            let _ = futex_manager(false, 0xffffffff).wake(&key, 1);
+            let _ = futex_manager(true, 0xffffffff).wake(&key, 1);
+
+            let key = FutexHashKey::new_private_key(address, self.addr_space()).unwrap();
+            let _ = futex_manager(false, 0xffffffff).wake(&key, 1);
+            let _ = futex_manager(true, 0xffffffff).wake(&key, 1);
+        }
+
+        let tg_lock = self.thread_group_mut();
+        let mut threadgroup = tg_lock.lock();
+        log::warn!(
+            "[exit] thread {}, name: {} do exit, is_process: {}, tg_len: {}, leader state: {:?}",
+            self.tid(),
+            self.get_name(),
+            self.is_process(),
+            threadgroup.len(),
+            self.process().get_state()
+        );
+
+        // do not set WaitForRecycle state if:
+        // 1. main-thread is not zombie(we only recycle when whole process is zombied)
+        // 2. process has at least one child(leader should wait for all children to finish and be zombied)
+        // 3. not-process but has at least one brother thread not zombied(last brother thread will recycle it all)
         if (!(self.process().get_state() == TaskState::Zombie))
-            || (self.is_process() && guard.len() > 1)
-            || (!self.is_process() && guard.len() > 2)
+            || (self.is_process() && (threadgroup.len() > 1))
+            || (!self.is_process() && (threadgroup.len() > 2))
         {
             if !self.is_process() {
                 // NOTE: process will be removed by parent calling `sys_wait4`
-                guard.remove(self);
+                log::info!(
+                    "[exit] exiting thread is neither a zombie process nor the last thread in threadgroup with a zombie leader, just return (and remove)"
+                );
+                threadgroup.remove(self);
                 TASK_MANAGER.remove_task(self.tid());
             }
+            // log::warn!("[do_exit] {} leaves before setting state", self.get_name());
+            // log::warn!(
+            //     "[do_exit] {} process {:?}'s state {:?}",
+            //     self.get_name(),
+            //     self.process().get_name(),
+            //     self.process().get_state()
+            // );
             return;
         }
 
         if self.is_process() {
-            // log::error!("{}", guard.len());
-            assert!(guard.len() == 1);
+            assert!(threadgroup.len() == 1);
+            log::info!(
+                "[exit] process {} do exit and recycle after all children are zombied, tg_len: {}",
+                self.tid(),
+                threadgroup.len()
+            );
         } else {
-            assert!(guard.len() == 2);
-            // NOTE: leader will be removed by parent calling `sys_wait4`
-            log::error!("[exit] remove1 {}", self.tid());
-            guard.remove(self);
+            assert!(threadgroup.len() == 2);
+            // NOTE: leader will be removed from TASK_MANAGER and threadgroup by parent calling `sys_wait4`
+            log::info!(
+                "[exit] last non-process thread {} do exit and recycle the whole process",
+                self.tid()
+            );
+            threadgroup.remove(self);
             TASK_MANAGER.remove_task(self.tid());
         }
 
-        log::info!("[Task::do_exit] exit the whole process");
-
-        log::debug!("[Task::do_exit] reparent children to init");
+        log::debug!("[Task::exit] reparent children to init");
         debug_assert_ne!(self.tid(), INIT_PROC_ID);
 
-        //Question: Is mut safe here?
-        let mut children = self.children_mut().lock().clone();
+        // children of process will be reparented to init
+        let process = self.process();
+        let mut children = process.children_mut().lock();
         if !children.is_empty() {
             let root = TASK_MANAGER.get_task(INIT_PROC_ID).unwrap();
             for child in children.values() {
                 log::debug!(
-                    "[Task::do_eixt] reparent child process pid {} to init",
+                    "[Task::do_exit] reparent child process pid {} to init",
                     child.pid()
                 );
                 if child.get_state() == TaskState::WaitForRecycle {
-                    // NOTE: self has not called wait to clear zombie children, we need to notify
-                    // init to clear these zombie children.
                     root.receive_siginfo(SigInfo {
                         sig: Sig::SIGCHLD,
                         code: SigInfo::CLD_EXITED,
                         details: SigDetails::None,
                     })
                 }
-                // Question: Why Deref doesn't work here
                 *child.parent_mut().lock() = Some(Arc::downgrade(&root));
             }
             root.children_mut().lock().extend(children.clone());
             children.clear();
         }
 
-        if let Some(parent) = self.parent_mut().lock().as_ref() {
+        // only process will be set to WaitForRecycle state,
+        // threads will be dropped when hart leaves this task so we don't need to set.
+        self.process().set_state(TaskState::WaitForRecycle);
+
+        // send SIGCHLD to process's parent
+        if let Some(parent) = process.parent_mut().lock().as_ref() {
             if let Some(parent) = parent.upgrade() {
                 parent.receive_siginfo(SigInfo {
                     sig: Sig::SIGCHLD,
                     code: SigInfo::CLD_EXITED,
-                    details: SigDetails::None,
+                    details: SigDetails::Child { pid: process.pid() },
                 })
             } else {
                 log::error!("no arc parent");
@@ -393,22 +470,14 @@ impl Task {
 
         // TODO: Upon _exit(2), all attached shared memory segments are detached from the
         // process.
-        // self.with_shm_ids(|ids| {
-        //     for (_, shm_id) in ids.iter() {
-        //         SHARED_MEMORY_MANAGER.detach(*shm_id, self.pid());
-        //     }
-        // });
+        self.with_mut_shm_maps(|maps| {
+            for (_, shm_id) in maps.iter() {
+                SHARED_MEMORY_MANAGER.detach(*shm_id, self.pid());
+            }
+        });
 
         // TODO: drop most resources here instead of wait4 function parent
         // called
-        // self.with_mut_fd_table(|table| table.clear());
-
-        if self.is_process() {
-            self.set_state(TaskState::WaitForRecycle);
-        } else {
-            self.process().set_state(TaskState::WaitForRecycle);
-        }
-        // When the task is not leader, which means its is not a process, it
-        // will get dropped when hart leaves this task.
+        self.with_mut_fdtable(|table| table.close());
     }
 }

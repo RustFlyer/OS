@@ -36,7 +36,9 @@ use core::{cmp, fmt::Debug, marker::PhantomData, ops::ControlFlow, slice};
 use alloc::{ffi::CString, vec::Vec};
 use config::mm::{PAGE_SIZE, USER_END};
 use mm::address::VirtAddr;
+use riscv::{interrupt::supervisor, register::scause};
 use systype::{SysError, SysResult};
+use bitflags::bitflags;
 
 use super::{addr_space::AddrSpace, mem_perm::MemPerm};
 use crate::{
@@ -624,7 +626,7 @@ where
 /// # Safety
 /// This function must be called after calling `set_kernel_stvec_user_rw` to
 /// enable kernel memory access to user space.
-unsafe fn try_read(va: usize) -> bool {
+pub unsafe fn try_read(va: usize) -> bool {
     unsafe extern "C" {
         fn __try_read_user(va: usize) -> usize;
     }
@@ -644,7 +646,7 @@ unsafe fn try_read(va: usize) -> bool {
 /// # Safety
 /// This function must be called after calling `set_kernel_stvec_user_rw` to
 /// enable kernel memory access to user space.
-unsafe fn try_write(va: usize) -> bool {
+pub unsafe fn try_write(va: usize) -> bool {
     unsafe extern "C" {
         fn __try_write_user(va: usize) -> usize;
     }
@@ -656,7 +658,7 @@ unsafe fn try_write(va: usize) -> bool {
 }
 
 #[derive(Debug)]
-struct SumGuard;
+pub struct SumGuard;
 
 impl SumGuard {
     pub fn new() -> Self {

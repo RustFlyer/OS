@@ -6,6 +6,10 @@ pub fn get_time() -> usize {
     time::read()
 }
 
+pub fn get_time_s() -> usize {
+    time::read() / CLOCK_FREQ
+}
+
 pub fn get_time_ms() -> usize {
     time::read() / (CLOCK_FREQ / 1000)
 }

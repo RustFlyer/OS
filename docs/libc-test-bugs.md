@@ -1,0 +1,15 @@
+- clocale_mbfuncs
+- fscanf
+- fwscanf
+- pthread_cancel_points
+- sscanf
+- strftime
+- strtol
+- swprintf
+- wcstol
+- daemon_failure
+- dn_expand_empty
+- dn_expand_ptr_0
+- pthread_robust_detach
+- regex_ere_backref
+- regex_escaped_high_byte

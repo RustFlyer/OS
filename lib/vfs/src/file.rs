@@ -50,6 +50,9 @@ pub trait File: Send + Sync + DowncastSync {
     ///
     /// Returns the number of bytes read.
     ///
+    /// A position beyond the end of the file is not an error. In this case, this function
+    /// should return 0 as the number of bytes read.
+    ///
     /// This function should be implemented by an underlying file system for every file
     /// type it supports to read from. For example, a file system that supports regular
     /// files should implement this function to read data from a regular file, and a file
@@ -208,6 +211,7 @@ impl dyn File {
     /// Returns an `ENOENT` error if this dentry is a negative dentry.
     pub fn open(dentry: Arc<dyn Dentry>) -> SysResult<Arc<dyn File>> {
         if dentry.is_negative() {
+            log::debug!("dentry is negative");
             return Err(SysError::ENOENT);
         }
         Arc::clone(&dentry).base_open()
@@ -244,9 +248,9 @@ impl dyn File {
     /// This function tries to get the page from the page cache. If the page is not
     /// cached, it will create a new [`Page`] in the page cache and read data from
     /// the underlying file system into the page. If part of the page is beyond the
-    /// end of the file, the rest of the page will be filled with zeros.
+    /// end of the file, this part of the page will be filled with zeros.
     ///
-    /// `pos` must be aligned to the page size and must be less than the file size.
+    /// `pos` must be aligned to the page size.
     ///
     /// This function does not update the file position.
     ///
@@ -254,7 +258,6 @@ impl dyn File {
     /// Consider change this function to a method of `PageCache` instead of `File`.
     pub async fn read_page(&self, pos: usize) -> SysResult<Arc<Page>> {
         debug_assert!(pos % PAGE_SIZE == 0);
-        debug_assert!(pos < self.size());
 
         let inode = self.inode();
         let page_cache = inode.page_cache();
@@ -280,23 +283,12 @@ impl dyn File {
     ///
     /// Returns the number of bytes read.
     async fn read_through_page_cache(&self, mut buf: &mut [u8], pos: usize) -> SysResult<usize> {
-        let inode = self.inode();
-        let page_cache = inode.page_cache();
-
         let size = self.size();
         let mut cur_pos = pos;
         while !buf.is_empty() && cur_pos < size {
             let page_pos = cur_pos / PAGE_SIZE * PAGE_SIZE;
             let page_offset = cur_pos % PAGE_SIZE;
-            let page = match page_cache.get_page(page_pos) {
-                Some(page) => page,
-                None => {
-                    let page = Arc::new(Page::build()?);
-                    self.base_read(page.as_mut_slice(), page_pos).await?;
-                    page_cache.insert_page(page_pos, Arc::clone(&page));
-                    page
-                }
-            };
+            let page = self.read_page(page_pos).await?;
             let len = buf.len().min(size - cur_pos).min(PAGE_SIZE - page_offset);
             buf[0..len].copy_from_slice(&page.as_slice()[page_offset..page_offset + len]);
             cur_pos += len;
@@ -341,6 +333,7 @@ impl dyn File {
         self.set_pos(new_position);
         inode.set_size(usize::max(inode.size(), new_position));
         inode.set_state(InodeState::DirtyAll);
+
         Ok(bytes_written)
     }
 
@@ -356,22 +349,11 @@ impl dyn File {
     ///
     /// Returns the number of bytes written.
     async fn write_through_page_cache(&self, mut buf: &[u8], pos: usize) -> SysResult<usize> {
-        let inode = self.inode();
-        let page_cache = inode.page_cache();
-
         let mut cur_pos = pos;
         while !buf.is_empty() {
             let page_pos = cur_pos / PAGE_SIZE * PAGE_SIZE;
             let page_offset = cur_pos % PAGE_SIZE;
-            let page = match page_cache.get_page(page_pos) {
-                Some(page) => page,
-                None => {
-                    let page = Arc::new(Page::build()?);
-                    self.base_read(page.as_mut_slice(), page_pos).await?;
-                    page_cache.insert_page(page_pos, Arc::clone(&page));
-                    page
-                }
-            };
+            let page = self.read_page(page_pos).await?;
             let len = buf.len().min(PAGE_SIZE - page_offset);
             page.as_mut_slice()[page_offset..page_offset + len].copy_from_slice(&buf[0..len]);
             cur_pos += len;
@@ -471,10 +453,7 @@ impl dyn File {
         let mut path_buf: Vec<u8> = vec![0; 512];
         let len = self.base_readlink(&mut path_buf)?;
         path_buf.truncate(len);
-        let path = CString::from_vec_with_nul(path_buf)
-            .unwrap()
-            .into_string()
-            .unwrap();
+        let path = CString::new(path_buf).unwrap().into_string().unwrap();
         Ok(path)
     }
 }

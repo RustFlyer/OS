@@ -9,6 +9,7 @@ use driver::{BLOCK_DEVICE, BlockDevice};
 use mutex::SpinNoIrqLock;
 use proc::{fs::ProcFsType, init_procfs};
 use systype::{SysError, SysResult};
+use tmp::TmpFsType;
 use vfs::{SYS_ROOT_DENTRY, file::File, fstype::FileSystemType};
 
 extern crate alloc;
@@ -18,7 +19,7 @@ pub mod fd_table;
 pub mod pipe;
 pub mod proc;
 pub mod simple;
-pub mod simplefile;
+pub mod tmp;
 
 pub use vfs::sys_root_dentry;
 
@@ -44,6 +45,9 @@ pub fn register_dev() {
 
     let procfs = ProcFsType::new();
     FS_MANAGER.lock().insert(procfs.name(), procfs);
+
+    let tmpfs = TmpFsType::new();
+    FS_MANAGER.lock().insert(tmpfs.name(), tmpfs);
 }
 
 pub fn init() {
@@ -75,6 +79,12 @@ pub fn init() {
         .unwrap();
     init_procfs(procfs_dentry).unwrap();
     log::debug!("success mount procfs");
+
+    let tmpfs = FS_MANAGER.lock().get("tmpfs").unwrap().clone();
+    tmpfs
+        .mount("tmp", Some(diskfs_root.clone()), MountFlags::empty(), None)
+        .unwrap();
+    log::debug!("success mount tmpfs");
 
     SYS_ROOT_DENTRY.call_once(|| diskfs_root);
 

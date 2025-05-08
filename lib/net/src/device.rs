@@ -46,17 +46,20 @@ impl Device for DeviceWrapper {
         _timestamp: smoltcp::time::Instant,
     ) -> Option<(Self::RxToken<'_>, Self::TxToken<'_>)> {
         let mut dev = self.inner.borrow_mut();
-        if let Err(_e) = dev.recycle_tx_buffers() {
+        if let Err(e) = dev.recycle_tx_buffers() {
+            log::warn!("{e:?}");
             return None;
         }
 
         if !dev.can_transmit() {
+            // log::warn!("can not receive");
             return None;
         }
+
         let rx_buf = match dev.receive() {
             Ok(buf) => buf,
             Err(err) => {
-                if !matches!(err, DevError::Again) {}
+                log::error!("err: {err:?}");
                 return None;
             }
         };

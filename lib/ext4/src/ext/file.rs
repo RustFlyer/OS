@@ -210,6 +210,10 @@ impl ExtFile {
         unsafe { ext4_fsize(self.0.get()) }
     }
 
+    pub fn setsize(&self) -> u64 {
+        0
+    }
+
     /* I'm not sure if we need the following two functions. Maybe remove it later. */
 
     /// Returns the inode number of the file.

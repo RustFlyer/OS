@@ -2,6 +2,9 @@ use core::arch::global_asm;
 
 use arch::riscv64::interrupt::set_trap_handler;
 use riscv::register::stvec::TrapMode;
+use simdebug::when_debug;
+
+use crate::vm::user_ptr::{try_read, try_write};
 
 global_asm!(include_str!("rv_trap.asm"));
 
@@ -32,4 +35,22 @@ pub fn set_user_stvec() {
 /// before any other operations.
 pub fn set_kernel_stvec_user_rw() {
     set_trap_handler(__user_rw_trap_vector as usize, TrapMode::Vectored);
+}
+
+// TODO: Could be safer if match scause.(not for loongArch)
+pub fn will_read_fail(vaddr: usize) -> bool {
+    when_debug!({
+        let curr_stvec = stvec::read().address();
+        debug_assert_eq!(curr_stvec, __user_rw_trap_vector as usize);
+    });
+    // when try_read failed, it return false, and will_read_fail should return true
+    !unsafe{ try_read(vaddr) }
+}
+
+pub fn will_write_fail(vaddr: usize) -> bool {
+    when_debug!({
+        let curr_stvec = stvec::read().address();
+        debug_assert!(curr_stvec == __user_rw_trap_vector as usize);
+    });
+    !unsafe{ try_write(vaddr) }
 }

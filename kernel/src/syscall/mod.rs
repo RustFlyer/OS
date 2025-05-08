@@ -10,8 +10,9 @@ mod user;
 
 use consts::SyscallNo::{self, *};
 use fs::*;
-use misc::{sys_sysinfo, sys_syslog, sys_uname};
+use misc::{sys_getrandom, sys_sysinfo, sys_syslog, sys_uname};
 use mm::*;
+use net::*;
 use process::*;
 use signal::*;
 use time::*;
@@ -23,7 +24,11 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         unimplemented!()
     };
 
-    // log::trace!("[{}] call function", syscall_no.as_str());
+    // log::info!(
+    //     "[{}] task {} call function",
+    //     syscall_no.as_str(),
+    //     current_task().tid()
+    // );
 
     let result = match syscall_no {
         GETTIMEOFDAY => sys_gettimeofday(args[0], args[1]).await,
@@ -34,7 +39,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         TIMES => sys_times(args[0]).await,
         NANOSLEEP => sys_nanosleep(args[0], args[1]).await,
         WAIT4 => sys_wait4(args[0] as i32, args[1], args[2] as i32).await,
-        CLONE => sys_clone(args[0], args[1], args[2], args[3], args[4]).await,
+        CLONE => sys_clone(args[0], args[1], args[2], args[3], args[4]),
         OPENAT => sys_openat(args[0], args[1], args[2] as i32, args[3] as u32).await,
         READ => sys_read(args[0], args[1], args[2]).await,
         READLINKAT => sys_readlinkat(args[0], args[1], args[2], args[3]),
@@ -67,7 +72,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         UNLINKAT => sys_unlinkat(args[0], args[1], args[2] as i32).await,
         GETDENTS64 => sys_getdents64(args[0], args[1], args[2]).await,
         MOUNT => sys_mount(args[0], args[1], args[2], args[3] as u32, args[4]).await,
-        FACCESSAT => sys_faccessat(args[0], args[1], args[2] as i32, args[3]).await,
+        FACCESSAT => sys_faccessat(args[0], args[1], args[2] as i32).await,
         SET_TID_ADDRESS => sys_set_tid_address(args[0]),
         SET_ROBUST_LIST => sys_set_robust_list(args[0], args[1]),
         UMOUNT2 => sys_umount2(args[0], args[1] as u32).await,
@@ -100,6 +105,30 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         RENAMEAT2 => sys_renameat2(args[0], args[1], args[2], args[3], args[4] as i32),
         LINKAT => sys_linkat(args[0], args[1], args[2], args[3], args[4] as i32),
         SYMLINKAT => sys_symlinkat(args[0], args[1], args[2]),
+        SYNC => sys_sync(),
+        SETITIMER => sys_setitimer(args[0], args[1], args[2]),
+        GETITIMER => sys_getitimer(args[0], args[1]),
+        UMASK => sys_umask(args[0] as i32),
+        PRLIMIT64 => sys_prlimit64(args[0], args[1] as i32, args[2], args[3]),
+        GETRANDOM => sys_getrandom(args[0], args[1], args[2] as i32),
+        RT_SIGTIMEDWAIT => sys_rt_sigtimedwait(args[0], args[1], args[2]).await,
+        FTRUNCATE => sys_ftruncate(args[0], args[1]),
+        FSYNC => sys_fsync(args[0]),
+        FUTEX => {
+            sys_futex(
+                args[0],
+                args[1] as _,
+                args[2] as u32,
+                args[3],
+                args[4],
+                args[5] as u32,
+            )
+            .await
+        }
+        MADVISE => sys_madvise(args[0], args[1], args[2]),
+        SHMGET => sys_shmget(args[0], args[1], args[2] as i32),
+        TKILL => sys_tkill(args[0] as isize, args[1] as i32),
+        SOCKET => sys_socket(args[0], args[1] as i32, args[2]),
         _ => {
             log::error!("Syscall not implemented: {}", syscall_no.as_str());
             unimplemented!()

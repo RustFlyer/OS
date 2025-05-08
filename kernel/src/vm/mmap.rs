@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
 use bitflags::bitflags;
-use config::mm::{MMAP_END, MMAP_START};
+use config::mm::{MMAP_END, MMAP_START, PAGE_SIZE};
 use mm::address::VirtAddr;
 use systype::{SysError, SysResult};
 use vfs::file::File;
@@ -84,14 +84,31 @@ impl AddrSpace {
         file: Option<Arc<dyn File>>,
         flags: MmapFlags,
         prot: MmapProt,
-        mut va: VirtAddr,
+        mut addr: VirtAddr,
         length: usize,
         offset: usize,
     ) -> SysResult<usize> {
-        if va.to_usize() == 0 {
-            va = self
+        if addr.to_usize() == 0 {
+            // static mut base: usize = 0;
+            // unsafe { base = base + length };
+            // addr = self
+            //     .find_vacant_memory(
+            //         addr,
+            //         length,
+            //         VirtAddr::new(MMAP_START),
+            //         VirtAddr::new(MMAP_END),
+            //     )
+            //     .ok_or(SysError::ENOMEM)?;
+            // addr = VirtAddr::new(addr.to_usize() + unsafe { base });
+            // log::error!(
+            //     "[map_file] new addr is {:#x} ~ {:#x}",
+            //     addr.to_usize(),
+            //     addr.to_usize() + length
+            // );
+
+            addr = self
                 .find_vacant_memory(
-                    va,
+                    addr,
                     length,
                     VirtAddr::new(MMAP_START),
                     VirtAddr::new(MMAP_END),
@@ -99,36 +116,46 @@ impl AddrSpace {
                 .ok_or(SysError::ENOMEM)?;
         }
 
-        let va_start = va;
-        let va_end = VirtAddr::new(va.to_usize() + length);
+        let length = (length + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
+        let va_start = addr;
+        let va_end = VirtAddr::new(addr.to_usize() + length);
 
-        let vma_flag = match flags.intersection(MmapFlags::MAP_TYPE_MASK) {
+        let vma_flags = match flags.intersection(MmapFlags::MAP_TYPE_MASK) {
             MmapFlags::MAP_PRIVATE => Ok(VmaFlags::PRIVATE),
             MmapFlags::MAP_SHARED => Ok(VmaFlags::SHARED),
-            _ => Err(SysError::EINVAL),
+            e => {
+                log::error!("[map_file] invalid flag: {:?}", e);
+                Err(SysError::EINVAL)
+            }
         }?;
 
         let mem_prot = MemPerm::from_mmapprot(prot);
-
-        // info!("[map_file] vma_flag: [{vma_flag:?}], mem_prot: [{mem_prot:?}]");
-        // info!("[map_file] offset: [{offset:?}], length: [{length:?}]");
-        // info!("[map_file] va_start: [{va_start:?}], va_end: [{va_end:?}]");
+        log::debug!("[map_file] mem_prot: {:?}", mem_prot);
 
         let area = match file {
             Some(file) => VmArea::new_file_backed(
                 va_start,
                 va_end,
-                vma_flag,
+                vma_flags,
                 mem_prot,
                 Arc::clone(&file),
                 offset,
                 length,
             ),
-            None => VmArea::new_anonymous(va_start, va_end, vma_flag, mem_prot),
+            None => VmArea::new_anonymous(va_start, va_end, vma_flags, mem_prot),
         };
+
+        if flags.contains(MmapFlags::MAP_FIXED) {
+            log::debug!(
+                "[map_file] MmapFlags::MAP_FIXED remove area {:?} - {:?}",
+                va_start,
+                va_end
+            );
+            self.remove_mapping(va_start, length);
+        }
 
         self.add_area(area)?;
 
-        Ok(va.to_usize())
+        Ok(va_start.to_usize())
     }
 }

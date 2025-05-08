@@ -60,7 +60,7 @@ impl Task {
     /// Interrupt state, task will be waken and handle the
     /// signal.
     fn recv(&self, si: SigInfo) {
-        // log::info!(
+        // log::error!(
         //     "[Task::recv] tid {} recv {si:?} {:?}",
         //     self.tid(),
         //     self.sig_handlers_mut().lock().get(si.sig)
@@ -70,10 +70,10 @@ impl Task {
         manager.add(si);
         if manager.should_wake.contain_signal(si.sig) && self.is_in_state(TaskState::Interruptable)
         {
-            log::info!("[Task::recv] tid {} has been woken", self.tid());
+            log::warn!("[Task::recv] tid {} has been woken", self.tid());
             self.wake();
         } else {
-            log::info!(
+            log::warn!(
                 "[Task::recv] tid {} hasn't been woken, should_wake {:?}, state {:?}",
                 self.tid(),
                 manager.should_wake,
@@ -91,7 +91,6 @@ impl Task {
     /// - except for `except` signals, `SIGKILL` and `SIGSTOP` are in should_wake
     ///   by default.
     pub fn set_wake_up_signal(&self, except: SigSet) {
-        debug_assert!(self.get_state() == TaskState::Interruptable);
         let manager = self.sig_manager_mut();
         manager.should_wake = except | SigSet::SIGKILL | SigSet::SIGSTOP
     }
@@ -217,6 +216,7 @@ impl SigManager {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct SigHandlers {
     /// 注意信号编号与数组索引有1个offset，因此在Sig中有个index()函数负责-1
     actions: [Action; NSIG],

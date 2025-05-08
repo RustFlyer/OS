@@ -45,8 +45,8 @@ pub struct Kstat {
 }
 
 impl Kstat {
-    pub fn from_vfs_file(file: Arc<dyn Inode>) -> SysResult<Self> {
-        let stat = file.get_attr()?;
+    pub fn from_vfs_inode(inode: Arc<dyn Inode>) -> SysResult<Self> {
+        let stat = inode.get_attr()?;
         Ok(Kstat {
             st_dev: stat.st_dev,
             st_ino: stat.st_ino,

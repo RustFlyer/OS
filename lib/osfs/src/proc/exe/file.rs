@@ -41,12 +41,11 @@ impl File for ExeFile {
     fn base_readlink(&self, buf: &mut [u8]) -> SysResult<usize> {
         let exe = call_interface!(KernelProcIf::exe());
         log::info!("[/proc/self/exe] run {}", exe);
-        if buf.len() < exe.len() + 1 {
+        if buf.len() < exe.len() {
             log::warn!("readlink buf not big enough");
             return Err(SysError::EINVAL);
         }
-        buf[0..exe.len()].copy_from_slice(exe.as_bytes());
-        buf[exe.len()] = '\0' as u8;
-        Ok(exe.len() + 1)
+        buf[..exe.len()].copy_from_slice(exe.as_bytes());
+        Ok(exe.len())
     }
 }

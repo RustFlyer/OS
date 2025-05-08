@@ -285,7 +285,7 @@ impl Display for AtFd {
 impl From<isize> for AtFd {
     fn from(value: isize) -> Self {
         match value {
-            AT_FDCWD => AtFd::FdCwd,
+            -100 => AtFd::FdCwd,
             _ => AtFd::Normal(value as usize),
         }
     }
@@ -312,6 +312,8 @@ bitflags! {
         const AT_SYMLINK_FOLLOW = 0x400;
         /// Remove directory instead of file.
         const AT_REMOVEDIR = 0x200;
+        /// Empty Path
+        const AT_EMPTY_PATH  = 0x1000;
     }
 }
 

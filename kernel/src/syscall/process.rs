@@ -8,12 +8,16 @@ use crate::task::{
 use crate::vm::user_ptr::{UserReadPtr, UserWritePtr};
 use crate::{processor::current_task, task::future::spawn_user_task};
 use alloc::string::String;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use bitflags::*;
+use config::inode::InodeType;
+use config::mm::USER_STACK_SIZE;
 use config::process::CloneFlags;
 use osfs::sys_root_dentry;
 use osfuture::{suspend_now, yield_now};
-use systype::{SysError, SyscallResult};
+use strum::FromRepr;
+use systype::{RLimit, SysError, SyscallResult};
 use vfs::file::File;
 use vfs::path::Path;
 
@@ -86,9 +90,17 @@ pub async fn sys_sched_yield() -> SyscallResult {
     Ok(0)
 }
 
+/// "wait4" system call waits for a child process to exit and send SIGCHLD to the waiter.
+/// after receiving SIGCHLD, the waiter should recycle the children on WaitForRecycle state.
+/// (only process can be set to WaitForRecycle state, threads will be dropped when hart leaves this task)
+/// the target "pid" can be:
+/// - -1(AnyChild): wait for any child process of current process
+/// - 0(AnyChildInGroup): wait for any child process in the same process group of the calling process
+/// - >0(Pid): wait for the child process of current process with the specific pid
+/// - <0(PGid): wait for any child process in the process group with the specific pgid
 pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult {
-    // log::error!("[sys_wait4] in");
     let task = current_task();
+    log::info!("[sys_wait4] {} wait for recycling", task.get_name());
     let option = WaitOptions::from_bits_truncate(options);
     let target = match pid {
         -1 => WaitFor::AnyChild,
@@ -98,26 +110,24 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
     };
     log::info!("[sys_wait4] target: {target:?}, option: {option:?}");
 
-    let res_task = {
+    // get the child for recycle according to the target
+    // NOTE: recycle no more than one child per `sys_wait4`
+    let child_for_recycle = {
         let children = task.children_mut().lock();
         if children.is_empty() {
             log::info!("[sys_wait4] task [{}] fail: no child", task.get_name());
             return Err(SysError::ECHILD);
         }
-        // TODO: check if PG has
+        // TODO: PGid and AnyChildInGroup targets
         match target {
             WaitFor::AnyChild => children
                 .values()
-                // Question: How to handle &&Weak<Task>
                 .find(|c| {
                     c.is_in_state(TaskState::WaitForRecycle)
-                        && c.with_thread_group(|tg| tg.len() == 1)
                 }),
             WaitFor::Pid(pid) => {
                 if let Some(child) = children.get(&pid) {
-                    if child.is_in_state(TaskState::WaitForRecycle)
-                        && child.with_thread_group(|tg| tg.len() == 1)
-                    {
+                    if child.is_in_state(TaskState::WaitForRecycle){
                         Some(child)
                     } else {
                         None
@@ -133,10 +143,10 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
         .cloned()
     };
 
-    if let Some(res_task) = res_task {
+    if let Some(child_for_recycle) = child_for_recycle {    // 1. if there is a child for recycle when `sys_wait4` is called
         let addr_space = task.addr_space();
         let mut status = UserWritePtr::<i32>::new(wstatus, &addr_space);
-        let zombie_task = res_task;
+        let zombie_task = child_for_recycle;
         task.timer_mut().update_child_time((
             zombie_task.timer_mut().user_time(),
             zombie_task.timer_mut().kernel_time(),
@@ -161,22 +171,21 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
         TASK_MANAGER.remove_task(tid);
         PROCESS_GROUP_MANAGER.remove(&zombie_task);
         Ok(tid)
-    } else if option.contains(WaitOptions::WNOHANG) {
+    } else if option.contains(WaitOptions::WNOHANG) {   // 2. if WNOHANG option is set and there is no child for recycle, return immediately
         Ok(0)
-    } else {
-        log::info!("[sys_wait4] waiting for sigchld");
-        // 如果等待的进程还不是zombie，那么本进程进行await，
-        // 直到等待的进程do_exit然后发送SIGCHLD信号唤醒自己
-        let (child_pid, exit_code, child_utime, child_stime) = loop {
+    } else { // 3. if there is no child for recycle and WNOHANG option is not set, wait for SIGCHLD from target
+        log::info!("[sys_wait4] task [{}] suspend for sigchld", task.get_name());
+        let (child_tid, exit_code, child_utime, child_stime) = loop {
             task.set_state(TaskState::Interruptable);
             task.set_wake_up_signal(!task.get_sig_mask() | SigSet::SIGCHLD);
-            // log::info!("suspend_now again");
             suspend_now().await;
-            // log::info!("return from suspend");
+            // wake up from suspend for any reason(may not be SIGCHLD)
             task.set_state(TaskState::Running);
             let si = task.sig_manager_mut().get_expect(SigSet::SIGCHLD);
-            if let Some(_info) = si {
-                // log::info!("siginfo get");
+            // if it is SIGCHLD, then we can get the child for recycle
+            // TODO: check if the matched child is identical to the SIGCHLD's info
+            if let Some(info) = si {
+                log::info!("[sys_wait4] sigchld received, the child for recycle is announced by signal to be {:?}", info.details);
                 let children = task.children_mut().lock();
 
                 let child = match target {
@@ -208,19 +217,19 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
                         child.timer_mut().kernel_time(),
                     );
                 }
-                // log::info!("siginfo end");
             } else {
                 log::info!("return SysError::EINTR");
                 return Err(SysError::EINTR);
             }
         };
+
         // log::info!("timer_mut get and update_child_time");
         task.timer_mut()
             .update_child_time((child_utime, child_stime));
 
-        // log::info!("addrspace get and write status");
         let addr_space = task.addr_space();
         let mut status = UserWritePtr::<i32>::new(wstatus, &addr_space);
+        // if wstatus is not null, write the exit code of child to wstatus
         if !status.is_null() {
             // status stores signal in the lowest 8 bits and exit code in higher 8 bits
             // status macros can be found in <bits/waitstatus.h>
@@ -229,18 +238,19 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
                 status.write(exit_code)?;
             }
         }
-        let child = TASK_MANAGER.get_task(child_pid).unwrap();
-        log::error!(
-            "[sys_wait4] remove tid [{}] task [{}]",
-            child_pid,
+        // check if the child is still in TASK_MANAGER
+        let child = TASK_MANAGER.get_task(child_tid).unwrap();
+        log::info!(
+            "[sys_wait4] remove task [{}] with tid [{}]",
+            child_tid,
             child.get_name()
         );
+        // remove the child from current task's children, and TASK_MANAGER, thus the child will be dropped after hart leaves child
+        // NOTE: the child's thread group itself will be recycled when the child is dropped, and it use Weak pointer so it won't affect the drop of child
         task.remove_child(child);
-
-        TASK_MANAGER.remove_task(child_pid);
+        TASK_MANAGER.remove_task(child_tid);
         PROCESS_GROUP_MANAGER.remove(&task);
-        // log::error!("[sys_wait4] out");
-        Ok(child_pid)
+        Ok(child_tid)
     }
 }
 
@@ -262,7 +272,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
 /// - `CLONE_PARENT_SETTID`: Store the child thread ID at the location pointed to by parent_tid (clone())
 ///   in the parent's memory. The store operation completes before the clone call returns
 ///   control to user space.
-pub async fn sys_clone(
+pub fn sys_clone(
     flags: usize,
     stack: usize,
     parent_tid_ptr: usize,
@@ -270,7 +280,7 @@ pub async fn sys_clone(
     chilren_tid_ptr: usize,
 ) -> SyscallResult {
     log::info!(
-        "[sys_clone] flags:{flags:?}, stack:{stack:#x}, tls:{tls_ptr:?}, parent_tid:{parent_tid_ptr:?}, child_tid:{chilren_tid_ptr:?}"
+        "[sys_clone] flags:{flags:?}, stack:{stack:#x}, tls:{tls_ptr:#x}, parent_tid:{parent_tid_ptr:#x}, child_tid:{chilren_tid_ptr:x}"
     );
     let task = current_task();
     let addrspace = task.addr_space();
@@ -278,12 +288,10 @@ pub async fn sys_clone(
     let flags = CloneFlags::from_bits(flags as u64 & !0xff).ok_or(SysError::EINVAL)?;
     log::info!("[sys_clone] flags {flags:?}");
 
-    let new_task = task.fork(flags).await;
+    let new_task = task.fork(flags);
     new_task.trap_context_mut().set_user_a0(0);
     let new_tid = new_task.tid();
     log::info!("[sys_clone] clone a new thread, tid {new_tid}, clone flags {flags:?}",);
-
-    task.add_child(new_task.clone());
 
     if stack != 0 {
         new_task.trap_context_mut().set_user_sp(stack);
@@ -307,6 +315,8 @@ pub async fn sys_clone(
 
     spawn_user_task(new_task);
     log::info!("[sys_clone] clone success",);
+
+    task.set_is_yield(true);
 
     Ok(new_tid)
 }
@@ -354,7 +364,8 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
 
     // Reads strings from a null-terminated array of pointers to strings, adding them to
     // the specified vector.
-    let read_string_array = |addr: usize, vec: &mut Vec<String>| {
+    let read_string_array = |addr: usize| {
+        let mut args = Vec::new();
         let addr_space = task.addr_space();
         let mut user_ptr = UserReadPtr::<usize>::new(addr, &addr_space);
         let pointers = user_ptr.read_ptr_array(256)?;
@@ -364,41 +375,44 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
                 .read_c_string(256)?
                 .into_string()
                 .map_err(|_| SysError::EINVAL)?;
-            vec.push(string);
+            args.push(string);
         }
-        Ok(())
+        Ok(args)
     };
 
     let path = read_string(path)?;
-    let mut args = vec![path.clone()];
-    read_string_array(argv, &mut args)?;
-    let mut envs = Vec::new();
-    read_string_array(envp, &mut envs)?;
-
-    log::info!("[sys_execve] args: {args:?}");
-    log::info!("[sys_execve] envs: {envs:?}");
-    log::info!("[sys_execve] path: {path:?}");
+    let args = read_string_array(argv)?;
+    let mut envs = read_string_array(envp)?;
 
     envs.push(String::from(
         r#"PATH=/:/bin:/sbin:/usr/bin:/usr/local/bin:/usr/local/sbin:"#,
     ));
 
+    log::info!("[sys_execve] task: {:?}", task.get_name());
+    log::info!("[sys_execve] args: {args:?}");
+    log::info!("[sys_execve] envs: {envs:?}");
+    log::info!("[sys_execve] path: {path:?}");
+
     let dentry = {
-        let path = Path::new(sys_root_dentry(), path.clone());
-        path.walk()?
+        let path = Path::new(sys_root_dentry(), path);
+        let dentry = path.walk()?;
+        if !dentry.is_negative() && dentry.inode().unwrap().inotype() == InodeType::SymLink {
+            Path::resolve_symlink_through(Arc::clone(&dentry))?
+        } else {
+            dentry
+        }
     };
 
     let file = <dyn File>::open(dentry)?;
-    // log::info!("[sys_execve]: open file");
+    log::info!("[sys_execve]: open file");
 
     let mut name = String::new();
     args.iter().for_each(|arg| {
-        name.push_str(&arg);
+        name.push_str(arg);
         name.push(' ');
     });
-
     task.execve(file, args, envs, name)?;
-    // log::info!("[sys_execve]: finish execve and convert to a new task");
+    log::info!("[sys_execve]: finish execve and convert to a new task");
     Ok(0)
 }
 
@@ -449,7 +463,7 @@ enum WaitFor {
 /// memory location. Errors from the futex wake operation are ignored.
 pub fn sys_set_tid_address(tidptr: usize) -> SyscallResult {
     let task = current_task();
-    // log::info!("[sys_set_tid_address] tidptr:{tidptr:#x}");
+    log::info!("[sys_set_tid_address] tidptr:{tidptr:#x}");
     task.tid_address_mut().clear_child_tid = Some(tidptr);
     Ok(task.tid())
 }
@@ -529,8 +543,120 @@ pub fn sys_setpgid(pid: usize, pgid: usize) -> SyscallResult {
     Ok(0)
 }
 
-/// geteuid() returns the effective user ID of the calling process.
+/// `geteuid()` returns the effective user ID of the calling process.
 pub fn sys_geteuid() -> SyscallResult {
     log::error!("[geteuid] unimplemented call");
+    Ok(0)
+}
+
+#[derive(FromRepr, Clone, Copy, Debug, Eq, PartialEq)]
+#[repr(i32)]
+pub enum Resource {
+    // Per-process CPU limit, in seconds.
+    CPU = 0,
+    // Largest file that can be created, in bytes.
+    FSIZE = 1,
+    // Maximum size of data segment, in bytes.
+    DATA = 2,
+    // Maximum size of stack segment, in bytes.
+    STACK = 3,
+    // Largest core file that can be created, in bytes.
+    CORE = 4,
+    // Largest resident set size, in bytes.
+    // This affects swapping; processes that are exceeding their
+    // resident set size will be more likely to have physical memory
+    // taken from them.
+    RSS = 5,
+    // Number of processes.
+    NPROC = 6,
+    // Number of open files.
+    NOFILE = 7,
+    // Locked-in-memory address space.
+    MEMLOCK = 8,
+    // Address space limit.
+    AS = 9,
+    // Maximum number of file locks.
+    LOCKS = 10,
+    // Maximum number of pending signals.
+    SIGPENDING = 11,
+    // Maximum bytes in POSIX message queues.
+    MSGQUEUE = 12,
+    // Maximum nice priority allowed to raise to.
+    // Nice levels 19 .. -20 correspond to 0 .. 39
+    // values of this resource limit.
+    NICE = 13,
+    // Maximum realtime priority allowed for non-priviledged
+    // processes.
+    RTPRIO = 14,
+    // Maximum CPU time in microseconds that a process scheduled under a real-time
+    // scheduling policy may consume without making a blocking system
+    // call before being forcibly descheduled.
+    RTTIME = 15,
+}
+
+/// `prlimit()` system call combines and extends the functionality of `setrlimit()` and `getrlimit()`.
+/// It can be used to both set and get the resource limits of an arbitrary process.
+///
+/// If the `new_limit` argument is not NULL, then the rlimit structure to which it points is
+/// used to set new values for the soft and hard limits for resource.
+///
+/// If the `old_limit` argument is not NULL, then a successful call to `prlimit()` places the
+/// previous soft and hard limits for resource in the rlimit structure pointed to by `old_limit`.
+///
+///
+/// The pid argument specifies the ID of the process on which the call is to operate.
+/// If pid is 0, then the call applies to the calling process.
+///```c
+/// struct rlimit {
+///     rlim_t rlim_cur;  /* Soft limit */
+///     rlim_t rlim_max;  /* Hard limit (ceiling for rlim_cur) */
+/// };
+/// ```
+pub fn sys_prlimit64(
+    pid: usize,
+    resource: i32,
+    new_limit: usize,
+    old_limit: usize,
+) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+
+    let mut nlimit = UserReadPtr::<RLimit>::new(new_limit, &addrspace);
+    let mut olimit = UserWritePtr::<RLimit>::new(old_limit, &addrspace);
+
+    let ptask = if pid == 0 {
+        task.clone()
+    } else {
+        TASK_MANAGER.get_task(pid).ok_or(SysError::EINVAL)?
+    };
+
+    let resource = Resource::from_repr(resource).ok_or(SysError::EINVAL)?;
+
+    log::debug!("[prlimit64] pid: {pid}, resource: {resource:?}");
+
+    if !olimit.is_null() {
+        match resource {
+            Resource::STACK => {
+                let rstack = RLimit::one(USER_STACK_SIZE, USER_STACK_SIZE);
+                unsafe { olimit.write(rstack)? };
+            }
+            r => {
+                log::error!("[sys_prlimit64] old limit {:?} not implemented", r);
+            }
+        }
+    }
+
+    if !nlimit.is_null() {
+        match resource {
+            Resource::STACK => {
+                let rstack = unsafe { nlimit.read()? };
+                log::debug!("[sys_prlimit64] new limit STACK: {:?}", rstack);
+            }
+            r => {
+                log::error!("[sys_prlimit64] new limit {:?} not implemented", r);
+            }
+        }
+    }
+
     Ok(0)
 }

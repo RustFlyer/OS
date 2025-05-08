@@ -86,8 +86,7 @@ impl Dentry for ExtDentry {
             dentry.set_inode(inode);
             Ok(())
         } else if ExtInode::exists(&path, InodeTypes::EXT4_DE_SYMLINK)? {
-            let new_file = ExtFile::open2(&path, OpenFlags::empty())?;
-            let inode = ExtLinkInode::new(superblock, new_file);
+            let inode = ExtLinkInode::new(superblock);
             inode.set_inotype(InodeType::SymLink);
             dentry.set_inode(inode);
             Ok(())
@@ -142,6 +141,17 @@ impl Dentry for ExtDentry {
         let path = CString::new(dentry.path()).unwrap();
         ExtFile::unlink(&path)?;
         dentry.unset_inode();
+        Ok(())
+    }
+
+    fn base_symlink(&self, dentry: &dyn Dentry, target: &str) -> SysResult<()> {
+        let path = CString::new(dentry.path()).unwrap();
+        let target = CString::new(target).unwrap();
+        ExtFile::symlink(&target, &path)?;
+        let superblock = self.superblock().unwrap();
+        let inode = ExtLinkInode::new(superblock);
+        inode.set_inotype(InodeType::SymLink);
+        dentry.set_inode(inode);
         Ok(())
     }
 

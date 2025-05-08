@@ -43,6 +43,7 @@ pub struct SockAddrUn {
 
 /// socket address family
 #[allow(non_camel_case_types)]
+#[derive(Debug)]
 pub enum SaFamily {
     AF_UNIX = 1,
     /// ipv4

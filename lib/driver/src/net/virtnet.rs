@@ -23,15 +23,11 @@ const NET_BUF_LEN: usize = 1526;
 pub fn create_virt_net_dev(transport: MmioTransport) -> DevResult<Box<VirtIoNetDevImpl>> {
     const NONE_BUF: Option<Box<NetBuf>> = None;
 
-    log::debug!("[create_virt_net_dev] start");
     let inner =
         VirtIONetRaw::<VirtHalImpl, MmioTransport, QS>::new(transport).map_err(as_dev_err)?;
-    log::debug!("[create_virt_net_dev] create inner");
     let rx_buffers = [NONE_BUF; QS];
     let tx_buffers = [NONE_BUF; QS];
-    log::debug!("[create_virt_net_dev] create rx/tx buffer");
     let buf_pool = NetBufPool::new(2 * QS, NET_BUF_LEN)?;
-    log::debug!("[create_virt_net_dev] create buf pool");
     let free_tx_bufs = Vec::with_capacity(QS);
 
     let mut dev = VirtIoNetDevImpl {
@@ -47,7 +43,6 @@ pub fn create_virt_net_dev(transport: MmioTransport) -> DevResult<Box<VirtIoNetD
     // 1. Fill all rx buffers.
     for (i, rx_buf_place) in dev.rx_buffers.iter_mut().enumerate() {
         let mut rx_buf = dev.buf_pool.alloc_boxed().ok_or(DevError::NoMemory)?;
-        // Safe because the buffer lives as long as the queue.
         let token = unsafe {
             dev.inner
                 .receive_begin(rx_buf.raw_buf_mut())
@@ -197,7 +192,7 @@ impl<T: Transport + 'static, const QS: usize> NetDevice for VirtIoNetDev<T, QS> 
             let mut rx_buf = self.rx_buffers[token as usize]
                 .take()
                 .ok_or(DevError::BadState)?;
-            // Safe because the buffer lives as long as the queue.
+
             let (hdr_len, pkt_len) = unsafe {
                 self.inner
                     .receive_complete(token, rx_buf.raw_buf_mut())

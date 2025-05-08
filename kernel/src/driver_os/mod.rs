@@ -248,7 +248,10 @@ fn probe_serial_console(stdout: &fdt::node::FdtNode) -> MmioSerialPort {
 }
 
 pub fn init_net(root: &Fdt) {
+    log::info!("[init_net] can't find qemu virtio-net.");
+
     let netmeta = probe_virtio_net(root);
+
     if let Some(net_meta) = netmeta {
         let transport = probe_mmio_device(
             PhysAddr::new(net_meta.mmio_base).to_va_kernel().to_usize() as *mut u8,
