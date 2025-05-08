@@ -1,11 +1,11 @@
 use hashbrown::HashMap;
 use id_allocator::{IdAllocator, VecIdAllocator};
-use mutex::SpinNoIrqLock;
+use mutex::{ShareMutex, SpinNoIrqLock};
 use spin::Lazy;
 
 use crate::SharedMemory;
 
-pub struct SharedMemoryManager(pub SpinNoIrqLock<HashMap<usize, SharedMemory>>);
+pub struct SharedMemoryManager(pub SpinNoIrqLock<HashMap<usize, ShareMutex<SharedMemory>>>);
 
 impl SharedMemoryManager {
     pub fn init() -> Self {
@@ -15,13 +15,13 @@ impl SharedMemoryManager {
     pub fn attach(&self, id: usize, lpid: usize) {
         let mut manager = self.0.lock();
         let shm = manager.get_mut(&id).unwrap();
-        shm.stat.attach(lpid);
+        shm.lock().stat.attach(lpid);
     }
 
     pub fn detach(&self, id: usize, lpid: usize) {
         let mut manager = self.0.lock();
         let shm = manager.get_mut(&id).unwrap();
-        if shm.stat.detach(lpid) {
+        if shm.lock().stat.detach(lpid) {
             manager.remove(&id);
             unsafe {
                 SHARED_MEMORY_KEY_ALLOCATOR.lock().dealloc(id);

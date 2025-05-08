@@ -1,11 +1,13 @@
-use alloc::{
-    sync::{Arc, Weak},
-    vec::Vec,
-};
-use mm::{address::VirtAddr, page_cache::page::Page};
+use alloc::sync::Arc;
+
+use config::mm::{MMAP_END, MMAP_START, PAGE_SIZE};
+use mm::address::VirtAddr;
+use mutex::ShareMutex;
+use shm::SharedMemory;
 use systype::{SysError, SysResult};
 
 use super::{addr_space::AddrSpace, mem_perm::MemPerm};
+use crate::vm::vm_area::{VmArea, VmaFlags};
 
 impl AddrSpace {
     /// Attach given `pages` to the AddrSpace. If pages is not given, it will
@@ -15,17 +17,66 @@ impl AddrSpace {
     ///
     /// `size` and `shmaddr` need to be page-aligned.
     pub fn attach_shm(
-        self: Arc<Self>,
-        size: usize,
-        shmaddr: VirtAddr,
-        map_perm: MemPerm,
-        pages: &mut Vec<Weak<Page>>,
+        &self,
+        mut addr: VirtAddr,
+        length: usize,
+        shm: ShareMutex<SharedMemory>,
+        prot: MemPerm,
     ) -> SysResult<VirtAddr> {
-        return Err(SysError::EBUSY);
+        if addr.to_usize() == 0 {
+            addr = self
+                .find_vacant_memory(
+                    addr,
+                    length,
+                    VirtAddr::new(MMAP_START),
+                    VirtAddr::new(MMAP_END),
+                )
+                .ok_or(SysError::ENOMEM)?;
+        }
+
+        log::info!(
+            "[attach_shm] addr: {:#x}, length: {}, prot: {:?}",
+            addr.to_usize(),
+            length,
+            prot
+        );
+
+        let length = (length + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
+        let va_start = addr;
+        let va_end = VirtAddr::new(addr.to_usize() + length);
+
+        let vma_flags = VmaFlags::PRIVATE;
+        log::debug!("[attach_shm] prot: {:?}", prot);
+
+        let area = VmArea::new_shared_memory(va_start, va_end, vma_flags, prot, shm);
+        self.add_area(area)?;
+
+        Ok(va_start)
     }
 
     /// `shmaddr` must be the return value of shmget (i.e. `shmaddr` is page
     /// aligned and in the beginning of the vm_area with type Shm). The
     /// check should be done at the caller who call `detach_shm`.
-    pub fn detach_shm(self: Arc<Self>, shmaddr: VirtAddr) {}
+    pub fn detach_shm(self: Arc<Self>, addr: VirtAddr) -> SysResult<()> {
+        let vm_areas_lock = self.vm_areas.lock();
+        let area = vm_areas_lock.get(&addr).ok_or_else(|| {
+            log::warn!(
+                "[detach_shm] addr: no area starting at {:#x}",
+                addr.to_usize()
+            );
+            SysError::EINVAL
+        })?;
+
+        if area.is_shared_memory() {
+            let length = area.length();
+            self.remove_mapping(addr, length);
+            Ok(())
+        } else {
+            log::warn!(
+                "[detach_shm] addr: no shared memory area starting at {:#x}",
+                addr.to_usize()
+            );
+            Err(SysError::EINVAL)
+        }
+    }
 }
