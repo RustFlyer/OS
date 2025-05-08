@@ -54,20 +54,12 @@ impl Task {
 
     /// Suspends the Task until it is waken or time out
     pub async fn suspend_timeout(&self, limit: Duration) -> Duration {
-        // let expire = limit;
         let expire = get_time_duration() + limit;
-        // log::error!(
-        //     "[sys_nanosleep] now: {:?}, limit {:?}, expire: {:?}",
-        //     get_time_duration(),
-        //     limit,
-        //     expire
-        // );
         let mut timer = Timer::new(expire);
         timer.set_waker_callback(self.get_waker().clone());
         TIMER_MANAGER.add_timer(timer);
         suspend_now().await;
         let now = get_time_duration();
-        // log::error!("[sys_nanosleep] now {:?}", now);
         if expire > now {
             expire - now
         } else {

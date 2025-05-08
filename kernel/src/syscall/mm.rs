@@ -159,7 +159,6 @@ pub fn sys_shmget(key: usize, size: usize, shmflg: i32) -> SyscallResult {
     let task = current_task();
     log::info!("[sys_shmget] {key} {size} {:?}", shmflg);
 
-    // Create a new shared memory. When it is specified, the shmflg is invalid
     const PAGE_MASK: usize = PAGE_SIZE - 1;
     const IPC_PRIVATE: usize = 0;
 
@@ -173,27 +172,24 @@ pub fn sys_shmget(key: usize, size: usize, shmflg: i32) -> SyscallResult {
     }
 
     let mut shm_manager = SHARED_MEMORY_MANAGER.0.lock();
+
     if let Some(shm) = shm_manager.get(&key) {
-        // IPC_CREAT and IPC_EXCL were specified in shmflg, but a shared memory segment
-        // already exists for key.
         if shmflg.contains(ShmGetFlags::IPC_CREAT | ShmGetFlags::IPC_EXCL) {
             return Err(SysError::EEXIST);
         }
-        // A segment for the given key exists, but size is greater than the size of that
-        // segment.
         if shm.size() < size {
             return Err(SysError::EINVAL);
         }
         return Ok(key);
     }
-    if shmflg.contains(ShmGetFlags::IPC_CREAT) {
-        let new_shm = SharedMemory::new(rounded_up_sz, task.pid());
-        shm_manager.insert(key, new_shm);
-        return Ok(key);
-    } else {
-        // No segment exists for the given key, and IPC_CREAT was not specified.
+
+    if !shmflg.contains(ShmGetFlags::IPC_CREAT) {
         return Err(SysError::ENOENT);
     }
+
+    let new_shm = SharedMemory::new(rounded_up_sz, task.pid());
+    shm_manager.insert(key, new_shm);
+    return Ok(key);
 }
 
 /// `shmat()` attaches the System V shared memory segment identified by `shmid` to the address space of the
@@ -207,6 +203,7 @@ pub fn sys_shmat(shmid: usize, shmaddr: VirtAddr, shmflg: i32) -> SyscallResult 
     let task = current_task();
     let addrspace = task.addr_space();
     let shmflg = ShmAtFlags::from_bits_truncate(shmflg as i32);
+
     log::info!("[sys_shmat] {shmid} {shmaddr:?} {:?}", shmflg);
 
     if shmaddr.page_offset() != 0 && !shmflg.contains(ShmAtFlags::SHM_RND) {
@@ -222,18 +219,18 @@ pub fn sys_shmat(shmid: usize, shmaddr: VirtAddr, shmflg: i32) -> SyscallResult 
         mem_perm.remove(MemPerm::W);
     }
 
-    let mut _ret = 0;
     if let Some(shm) = SHARED_MEMORY_MANAGER.0.lock().get_mut(&shmid) {
-        let ret_addr = addrspace.attach_shm(shm.size(), shmaddr_aligned, mem_perm, &mut shm.pages);
-        task.with_mut_shm_stats(|ids| {
-            ids.insert(ret_addr, shmid);
-        });
-        _ret = ret_addr.into();
+        let ret_addr =
+            addrspace.attach_shm(shm.size(), shmaddr_aligned, mem_perm, &mut shm.pages)?;
+
+        let mut shmids = task.shm_stats_mut().lock();
+        shmids.insert(ret_addr, shmid);
+
+        SHARED_MEMORY_MANAGER.attach(shmid, task.pid());
+        Ok(ret_addr.into())
     } else {
         return Err(SysError::EINVAL);
     }
-    SHARED_MEMORY_MANAGER.attach(shmid, task.pid());
-    return Ok(_ret);
 }
 
 /// `shmdt()` detaches the shared memory segment located at the address specified by `shmaddr`
@@ -249,11 +246,14 @@ pub fn sys_shmdt(shmaddr: VirtAddr) -> SyscallResult {
     log::info!("[sys_shmdt] {:?}", shmaddr);
     let task = current_task();
     let addrspace = task.addr_space();
+
     if shmaddr.page_offset() != 0 {
-        // shmaddr is not aligned on a page boundary
         return Err(SysError::EINVAL);
     }
-    let shm_id = task.with_mut_shm_stats(|ids| ids.remove(&shmaddr));
+
+    let mut shmids = task.shm_stats_mut().lock();
+    let shm_id = shmids.remove(&shmaddr);
+
     if let Some(shm_id) = shm_id {
         addrspace.detach_shm(shmaddr);
         SHARED_MEMORY_MANAGER.detach(shm_id, task.pid());
@@ -281,32 +281,25 @@ pub fn sys_shmdt(shmaddr: VirtAddr) -> SyscallResult {
 ///     ...
 /// };
 /// ```
+#[allow(non_snake_case)]
 pub fn sys_shmctl(shmid: usize, cmd: i32, buf: usize) -> SyscallResult {
     let task = current_task();
     let addrspace = task.addr_space();
-    const IPC_RMID: i32 = 0;
-    const IPC_SET: i32 = 1;
-    const IPC_STAT: i32 = 2;
 
     match cmd {
-        IPC_STAT => {
+        IPC_STAT if IPC_STAT == 2 => {
             let shm_manager = SHARED_MEMORY_MANAGER.0.lock();
             if let Some(shm) = shm_manager.get(&shmid) {
                 let mut buf = UserWritePtr::<ShmStat>::new(buf, &addrspace);
                 unsafe { buf.write(shm.stat) }?;
                 Ok(0)
             } else {
-                // shmid is not a valid identifier
                 Err(SysError::EINVAL)
             }
         }
-        IPC_RMID => {
-            log::warn!("[sys_shmctl] IPC_RMID, do nothing");
-            Ok(0)
-        }
+        IPC_RMID if IPC_RMID == 0 => Ok(0),
         cmd => {
             log::error!("[sys_shmctl] unimplemented cmd {cmd}");
-            // cmd is not a valid command
             Err(SysError::EINVAL)
         }
     }

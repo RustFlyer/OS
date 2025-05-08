@@ -352,6 +352,10 @@ impl Task {
         unsafe { &mut *self.sig_mask.get() }
     }
 
+    pub fn shm_stats_mut(&self) -> &ShareMutex<BTreeMap<VirtAddr, usize>> {
+        &self.shm_stats
+    }
+
     pub fn with_thread_group<T>(&self, f: impl FnOnce(&mut ThreadGroup) -> T) -> T {
         f(&mut self.threadgroup.lock())
     }
