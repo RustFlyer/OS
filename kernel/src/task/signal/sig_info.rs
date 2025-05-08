@@ -20,6 +20,10 @@ pub enum SigDetails {
         /// sender's pid
         pid: usize,
     },
+    Child {
+        /// child's pid
+        pid: usize,
+    }
 }
 
 impl SigInfo {

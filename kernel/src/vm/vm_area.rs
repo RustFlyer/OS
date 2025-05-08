@@ -418,6 +418,7 @@ impl VmArea {
             let pte = page_table.find_entry(vpn).unwrap();
             *pte = PageTableEntry::default();
         }
+        sfence_vma_all_except_global();
     }
 
     /// Changes the protection flags of the VMA, possibly updating page table entries.
@@ -971,7 +972,9 @@ impl AnonymousArea {
             unimplemented!("Handling a page fault in a shared anonymous VMA");
         }
 
+        // log::error!("info: {:#x}", info.fault_addr.to_usize());
         let page = Page::build()?;
+        // log::error!("ppn: {:#x}", page.ppn().to_usize());
         page_table.map_page_to(fault_addr.page_number(), page.ppn(), pte_flags)?;
         page.as_mut_slice().fill(0);
         pages.insert(fault_addr.page_number(), Arc::new(page));

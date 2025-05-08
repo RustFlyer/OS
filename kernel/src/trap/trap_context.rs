@@ -1,4 +1,4 @@
-use core::arch::asm;
+use core::{arch::asm, fmt::Debug};
 
 use arch::riscv64::{
     interrupt::disable_interrupt,
@@ -269,5 +269,16 @@ impl TrapContext {
 
     pub fn restore_last_user_a0(&mut self) {
         self.user_reg[10] = self.last_a0;
+    }
+
+    pub fn display(&self) {
+        log::info!("================TrapContext================");
+        log::info!("sepc    : {:#x}", self.sepc);
+        log::info!("stvec   : {:#x}", self.stvec);
+        log::info!("sstatus : {:#x}", self.sstatus.bits());
+        log::info!("sum     : {}", (self.sstatus.bits() & 1 << 8) > 0);
+        log::info!("stval   : {:#x}", self.stval);
+        log::info!("user_reg: {:#?}", self.user_reg);
+        log::info!("================    End    ================");
     }
 }

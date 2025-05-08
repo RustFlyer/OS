@@ -12,12 +12,12 @@ use super::sig_info::{Sig, SigInfo};
 
 global_asm!(include_str!("_sigreturn_trampoline.asm"));
 
-pub async fn sig_check(task: Arc<Task>, mut _intr: bool) {
+pub async fn sig_check(task: Arc<Task>, interrupted: &mut bool) {
     let old_mask = task.get_sig_mask();
 
     while let Some(si) = task.sig_manager_mut().dequeue_signal(&old_mask) {
         // if sig_exec turns to user handler, it will return true to break the loop and run user handler.
-        let ret = sig_exec(task.clone(), si).await;
+        let ret = sig_exec(task.clone(), si, interrupted).await;
 
         match ret {
             Ok(b) if b => break,
@@ -29,24 +29,27 @@ pub async fn sig_check(task: Arc<Task>, mut _intr: bool) {
     }
 }
 
-async fn sig_exec(task: Arc<Task>, si: SigInfo) -> SysResult<bool> {
+async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysResult<bool> {
     let action = task.sig_handlers_mut().lock().get(si.sig);
     let cx = task.trap_context_mut();
     let old_mask = task.get_sig_mask();
 
-    log::debug!(
-        "[sig_exec] task [{}] Handling signal: {:?} {:?}",
-        task.get_name(),
-        si,
-        action
-    );
+    // log::debug!(
+    //     "[sig_exec] task [{}] Handling signal: {:?} {:?}",
+    //     task.get_name(),
+    //     si,
+    //     action
+    // );
 
-    // log::debug!("trap context: {:?}", cx.user_reg);
-
-    if action.flags.contains(SigActionFlag::SA_RESTART) {
+    if *interrupted && action.flags.contains(SigActionFlag::SA_RESTART) {
         cx.sepc -= 4;
+        log::warn!(
+            "[sig_exec] restart interrupted syscall, orignal a0: {}, last_a0: {}",
+            cx.user_reg[10],
+            cx.last_a0
+        );
         cx.restore_last_user_a0();
-        log::info!("[sig_exec] restart syscall");
+        *interrupted = false;
     }
 
     match action.atype {
@@ -137,9 +140,7 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo) -> SysResult<bool> {
                 };
                 new_sp -= size_of::<LinuxSigInfo>();
                 let mut siginfo_ptr = UserWritePtr::<LinuxSigInfo>::new(new_sp, &addr_space);
-                unsafe {
-                    let _ = siginfo_ptr.write(siginfo_v);
-                }
+                unsafe { siginfo_ptr.write(siginfo_v)? };
                 cx.user_reg[11] = new_sp;
             }
 
@@ -157,6 +158,8 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo) -> SysResult<bool> {
             log::debug!("cx.user_reg[2]: {:#x}", cx.user_reg[2]);
             log::debug!("cx.user_reg[3]: {:#x}", cx.user_reg[3]);
             log::debug!("cx.user_reg[4]: {:#x}", cx.user_reg[4]);
+
+            log::debug!("sig: {:#x}", task.sig_manager_mut().bitmap.bits());
 
             Ok(true)
         }
@@ -183,8 +186,8 @@ fn stop(task: &Arc<Task>, sig: Sig) {
     log::warn!("[do_signal] task stopped!");
     task.with_thread_group(|tg| {
         for t in tg.iter() {
-            t.set_state(TaskState::Sleeping);
             t.set_wake_up_signal(SigSet::SIGCONT);
+            t.set_state(TaskState::Sleeping);
         }
     });
     task.notify_parent(SigInfo::CLD_STOPPED, sig);

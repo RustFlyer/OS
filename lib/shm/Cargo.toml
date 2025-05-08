@@ -12,3 +12,4 @@ mutex = { path = "../mutex" }
 
 hashbrown = { workspace = true }
 spin = { workspace = true }
+bitflags = { workspace = true }

@@ -8,10 +8,10 @@ use alloc::{
     string::String,
     sync::{Arc, Weak},
 };
-use mm::address::VirtAddr;
 use core::cell::SyncUnsafeCell;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use core::task::Waker;
+use mm::address::VirtAddr;
 use mutex::{ShareMutex, SpinNoIrqLock, new_share_mutex};
 use time::itime::ITimer;
 use vfs::{dentry::Dentry, file::File};
@@ -86,7 +86,7 @@ pub struct Task {
     // clone and then parent is set as it.
     parent: ShareMutex<Option<Weak<Task>>>,
 
-    // children controls all the task spawned by this task.
+    // children controls all the process spawned by this task.
     // Attention: the pointer to children task is Arc. It's
     // because parent task should recycle children and free
     // them in wait4 at last.
@@ -159,7 +159,7 @@ impl Task {
         let task = Task {
             tid,
             process: None,
-            is_process: false,
+            is_process: true,
             threadgroup: new_share_mutex(ThreadGroup::new()),
             trap_context: SyncUnsafeCell::new(TrapContext::new(entry, sp)),
             timer: SyncUnsafeCell::new(TaskTimeStat::new()),
@@ -368,8 +368,16 @@ impl Task {
         f(&mut self.sig_manager_mut())
     }
 
+    pub fn with_mut_sig_handler<T>(&self, f: impl FnOnce(&mut SigHandlers) -> T) -> T {
+        f(&mut self.sig_handlers_mut().lock())
+    }
+
     pub fn with_mut_itimers<T>(&self, f: impl FnOnce(&mut [ITimer; 3]) -> T) -> T {
         f(&mut self.itimers.lock())
+    }
+
+    pub fn with_mut_shm_maps<T>(&self, f: impl FnOnce(&mut BTreeMap<VirtAddr, usize>) -> T) -> T {
+        f(&mut self.shm_maps.lock())
     }
 
     pub fn cwd_mut(&self) -> Arc<dyn Dentry> {
@@ -407,6 +415,10 @@ impl Task {
             .upgrade()
             .unwrap()
             .get_pgid()
+    }
+
+    pub fn cwd(&self) -> ShareMutex<Arc<dyn Dentry>> {
+        self.cwd.clone()
     }
 
     pub fn get_sig_mask(&self) -> SigSet {
@@ -481,10 +493,12 @@ impl Task {
     }
     // ========== This Part You Can Change the Member of Task  ===========
     pub fn add_child(&self, child: Arc<Task>) {
+        log::debug!("addchild: tid {} -> tid {} ", child.tid(), self.tid());
         self.children.lock().insert(child.tid(), child);
     }
 
     pub fn remove_child(&self, child: Arc<Task>) {
+        log::debug!("child: tid [{}] will be removed", child.get_name());
         self.children.lock().remove(&child.tid());
     }
 }
@@ -505,9 +519,6 @@ impl Drop for Task {
             .values()
             .for_each(|c| log::debug!("children: tid [{}] name [{}]", c.tid(), c.get_name()));
 
-        // log::info!("{}", str);
-        // log::error!("{}", str);
-        // log::debug!("{}", str);
-        log::trace!("{}", str);
+        log::debug!("{}", str);
     }
 }

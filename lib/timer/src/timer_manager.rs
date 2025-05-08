@@ -19,6 +19,7 @@ impl TimerManager {
     }
 
     pub fn add_timer(&self, timer: Timer) {
+        log::warn!("[TimerManager] add a new timer {:?}", timer);
         self.timers.lock().push(Reverse(timer));
     }
 
@@ -29,6 +30,11 @@ impl TimerManager {
                 break;
             }
 
+            // log::error!(
+            //     "[TimerManager] wake: current: {:?}, expire: {:?}",
+            //     current,
+            //     timer.0.expire
+            // );
             let timer = timers.pop().unwrap().0;
             if let Some(event) = timer.clone().callback {
                 if event.callback() != TimerState::Cancelled && timer.is_periodic() {

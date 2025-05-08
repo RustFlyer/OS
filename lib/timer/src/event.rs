@@ -1,13 +1,14 @@
-use core::task::Waker;
+use core::{fmt::Debug, task::Waker};
 
 use alloc::sync::Arc;
 
 use crate::TimerState;
 
-pub trait IEvent: Send + Sync {
+pub trait IEvent: Send + Sync + Debug {
     fn callback(self: Arc<Self>) -> TimerState;
 }
 
+#[derive(Debug)]
 pub struct WakerEvent {
     pub(crate) waker: Waker,
 }

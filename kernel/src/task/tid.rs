@@ -32,6 +32,15 @@ pub fn tid_alloc() -> TidHandle {
     }
 }
 
+/// `tid_alloc_incr()` can look for an increment id from [`INIT_PROC_ID`]
+/// and allocate it for a new thread.
+pub fn tid_alloc_incr() -> TidHandle {
+    match TID_ALLOCATOR.lock().alloc_incr() {
+        Some(tid) => TidHandle(tid),
+        None => panic!("no more TIDs available"),
+    }
+}
+
 /// Tid address which may be set by `set_tid_address` syscall.
 pub struct TidAddress {
     /// When set, when spawning a new thread, the kernel sets the thread's tid

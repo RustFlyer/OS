@@ -12,7 +12,7 @@ pub enum TimerState {
     Cancelled,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Timer {
     pub(crate) expire: Duration,
     pub(crate) callback: Option<Arc<dyn IEvent>>,
@@ -44,7 +44,7 @@ impl PartialEq for Timer {
 impl Timer {
     pub fn new(duration: Duration) -> Self {
         Self {
-            expire: get_time_duration() + duration,
+            expire: duration,
             callback: None,
             state: TimerState::Active,
             periodic: false,

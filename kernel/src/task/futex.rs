@@ -55,34 +55,62 @@ impl FutexAddr {
     }
 }
 
-pub static FUTEX_MANAGER: Lazy<SpinNoIrqLock<FutexManager>> =
-    Lazy::new(|| SpinNoIrqLock::new(FutexManager::new()));
+pub static FUTEX_MANAGER: Lazy<Vec<SpinNoIrqLock<FutexManager>>> = Lazy::new(|| {
+    let mut v = Vec::new();
+    for i in 0..2 {
+        let fm = SpinNoIrqLock::new(FutexManager::new(i == 1));
+        v.push(fm);
+    }
+    v
+});
 
-pub fn futex_manager() -> impl DerefMut<Target = FutexManager> {
-    FUTEX_MANAGER.lock()
+pub fn single_futex_manager() -> impl DerefMut<Target = FutexManager> {
+    FUTEX_MANAGER.get(0).unwrap().lock()
 }
 
-pub struct FutexManager(HashMap<FutexHashKey, Vec<FutexWaiter>>);
+pub fn futex_manager(is_multi_group: bool, val32: u32) -> impl DerefMut<Target = FutexManager> {
+    if !is_multi_group {
+        FUTEX_MANAGER.get(0).unwrap().lock()
+    } else {
+        let mut r = FUTEX_MANAGER.get(1).unwrap().lock();
+        r.val32 = val32;
+        r
+    }
+}
+
+pub struct FutexManager {
+    hash: HashMap<FutexHashKey, Vec<FutexWaiter>>,
+    pub(crate) val32: u32,
+    is_mask: bool,
+}
 
 impl FutexManager {
-    pub fn new() -> Self {
-        Self(HashMap::new())
+    pub fn new(is_mask: bool) -> Self {
+        Self {
+            hash: HashMap::new(),
+            val32: 0,
+            is_mask: is_mask,
+        }
     }
 
-    pub fn add_waiter(&mut self, key: &FutexHashKey, waiter: FutexWaiter) -> SysResult<()> {
+    pub fn add_waiter(&mut self, key: &FutexHashKey, mut waiter: FutexWaiter) -> SysResult<()> {
         log::info!("[futex::add_waiter] {:?} in {:?} ", waiter, key);
-        if let Some(waiters) = self.0.get_mut(key) {
+        if self.is_mask {
+            waiter.mask = self.val32;
+        }
+
+        if let Some(waiters) = self.hash.get_mut(key) {
             waiters.push(waiter);
         } else {
             let mut waiters = Vec::new();
             waiters.push(waiter);
-            self.0.insert(*key, waiters);
+            self.hash.insert(*key, waiters);
         }
         Ok(())
     }
 
     pub fn rm_waiter(&mut self, key: &FutexHashKey, tid: Tid) -> SysResult<()> {
-        if let Some(waiters) = self.0.get_mut(key) {
+        if let Some(waiters) = self.hash.get_mut(key) {
             let index = waiters
                 .iter()
                 .enumerate()
@@ -95,16 +123,32 @@ impl FutexManager {
     }
 
     pub fn wake(&mut self, key: &FutexHashKey, n: u32) -> SyscallResult {
-        if let Some(waiters) = self.0.get_mut(key) {
+        // log::info!("[futex::wake] {:?} in {:?} ", n, key);
+        if let Some(waiters) = self.hash.get_mut(key) {
             let n = min(n as usize, waiters.len());
+            // log::debug!("[futex::wake] waiters: {:?}", waiters);
             for _ in 0..n {
-                let waiter = waiters.pop().unwrap();
-                log::info!("[futex_wake] {:?} has been woken", waiter);
-                waiter.wake();
+                if self.is_mask {
+                    let waiter = waiters.pop().unwrap();
+                    log::info!("[futex_wake] {:?} has been woken masked", waiter);
+                    if (waiter.mask & self.val32) != 0 {
+                        waiter.wake();
+                    } else {
+                        waiters.push(waiter);
+                    }
+                } else {
+                    let waiter = waiters.pop().unwrap();
+                    log::info!("[futex_wake] {:?} has been woken", waiter);
+                    waiter.wake();
+                }
+
+                if waiters.is_empty() {
+                    break;
+                }
             }
             Ok(n)
         } else {
-            log::error!("can not find key {key:?}");
+            // log::error!("can not find key {key:?}");
             Err(SysError::EINVAL)
         }
     }
@@ -115,7 +159,7 @@ impl FutexManager {
         new: FutexHashKey,
         n_req: usize,
     ) -> SyscallResult {
-        let mut old_waiters = self.0.remove(&old).ok_or_else(|| {
+        let mut old_waiters = self.hash.remove(&old).ok_or_else(|| {
             log::info!("[futex] no waiters in key {:?}", old);
             SysError::EINVAL
         })?;
@@ -123,16 +167,16 @@ impl FutexManager {
         let n = min(n_req as usize, old_waiters.len());
 
         let iter = 0..n;
-        if let Some(new_waiters) = self.0.get_mut(&new) {
+        if let Some(new_waiters) = self.hash.get_mut(&new) {
             iter.for_each(|_| new_waiters.push(old_waiters.pop().unwrap()));
         } else {
             let mut new_waiters = Vec::with_capacity(n);
             iter.for_each(|_| new_waiters.push(old_waiters.pop().unwrap()));
-            self.0.insert(new, new_waiters);
+            self.hash.insert(new, new_waiters);
         }
 
         if !old_waiters.is_empty() {
-            self.0.insert(old, old_waiters);
+            self.hash.insert(old, old_waiters);
         }
 
         Ok(n)
@@ -142,7 +186,7 @@ impl FutexManager {
 #[derive(Debug, Hash, PartialEq, PartialOrd, Eq, Copy, Clone)]
 pub enum FutexHashKey {
     Shared { paddr: PhysAddr },
-    Private { mm: usize, vaddr: VirtAddr },
+    Private { mm: VirtAddr, vaddr: VirtAddr },
 }
 
 impl FutexHashKey {
@@ -159,7 +203,7 @@ impl FutexHashKey {
 
     pub fn new_private_key(vaddr: usize, addrspace: Arc<AddrSpace>) -> SysResult<FutexHashKey> {
         Ok(FutexHashKey::Private {
-            mm: Arc::as_ptr(&addrspace) as usize,
+            mm: VirtAddr::new(Arc::as_ptr(&addrspace) as usize),
             vaddr: VirtAddr::new(vaddr),
         })
     }
@@ -176,10 +220,11 @@ impl FutexHashKey {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FutexWaiter {
     pub tid: Tid,
     pub waker: Waker,
+    pub mask: u32,
 }
 
 impl FutexWaiter {
@@ -187,6 +232,7 @@ impl FutexWaiter {
         Self {
             tid: task.tid(),
             waker: task.get_waker(),
+            mask: 0,
         }
     }
 
@@ -238,5 +284,74 @@ bitflags! {
         /// with another process.
         const Private = 128;
         const ClockRealtime = 256;
+        const DEBUG = 265;
+    }
+}
+
+impl FutexOp {
+    pub fn exstract_futex_flags(val: i32) -> FutexOp {
+        let flag_values = [
+            (FutexOp::DEBUG, FutexOp::DEBUG.bits()),
+            (FutexOp::ClockRealtime, FutexOp::ClockRealtime.bits()),
+            (FutexOp::Private, FutexOp::Private.bits()),
+            (FutexOp::WaitRequeuePi, FutexOp::WaitRequeuePi.bits()),
+            (FutexOp::WakeBitset, FutexOp::WakeBitset.bits()),
+            (FutexOp::WaitBitset, FutexOp::WaitBitset.bits()),
+            (FutexOp::TrylockPi, FutexOp::TrylockPi.bits()),
+            (FutexOp::UnlockPi, FutexOp::UnlockPi.bits()),
+            (FutexOp::LockPi, FutexOp::LockPi.bits()),
+            (FutexOp::WakeOp, FutexOp::WakeOp.bits()),
+            (FutexOp::CmpRequeue, FutexOp::CmpRequeue.bits()),
+            (FutexOp::Requeue, FutexOp::Requeue.bits()),
+            (FutexOp::Fd, FutexOp::Fd.bits()),
+            (FutexOp::Wake, FutexOp::Wake.bits()),
+        ];
+
+        let mut rest = val;
+        let mut res = FutexOp::empty();
+        for (flag, bits) in flag_values {
+            // log::trace!("{:?}, {:#x}", flag, bits);
+            if bits != 0 && (rest & bits) == bits {
+                res |= flag;
+                rest -= bits;
+            }
+        }
+
+        if rest == 0 && val == 0 {
+            FutexOp::Wait
+        } else {
+            res
+        }
+    }
+
+    pub fn exstract_main_futex_flags(val: i32) -> FutexOp {
+        let flag_values = [
+            (FutexOp::WaitRequeuePi, FutexOp::WaitRequeuePi.bits()),
+            (FutexOp::WakeBitset, FutexOp::WakeBitset.bits()),
+            (FutexOp::WaitBitset, FutexOp::WaitBitset.bits()),
+            (FutexOp::TrylockPi, FutexOp::TrylockPi.bits()),
+            (FutexOp::UnlockPi, FutexOp::UnlockPi.bits()),
+            (FutexOp::LockPi, FutexOp::LockPi.bits()),
+            (FutexOp::WakeOp, FutexOp::WakeOp.bits()),
+            (FutexOp::CmpRequeue, FutexOp::CmpRequeue.bits()),
+            (FutexOp::Requeue, FutexOp::Requeue.bits()),
+            (FutexOp::Fd, FutexOp::Fd.bits()),
+            (FutexOp::Wake, FutexOp::Wake.bits()),
+        ];
+
+        let mut rest = val;
+        let mut res = FutexOp::empty();
+        for (flag, bits) in flag_values {
+            if bits != 0 && (rest & bits) == bits {
+                res |= flag;
+                rest -= bits;
+            }
+        }
+
+        if rest == 0 && val == 0 {
+            FutexOp::Wait
+        } else {
+            res
+        }
     }
 }

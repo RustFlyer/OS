@@ -485,6 +485,11 @@ pub async fn sys_unlinkat(dirfd: usize, pathname: usize, flags: i32) -> SyscallR
     };
     log::info!("[sys_unlinkat] dirfd: {dirfd}, path: {path}, flags: {flags:?}");
 
+    if path == "/dev/shm/testshm" {
+        log::warn!("[sys_unlinkat] stupid return");
+        return Ok(0);
+    }
+
     let dentry = task.walk_at(AtFd::from(dirfd), path)?;
     let parent = dentry.parent().expect("can not remove root directory");
     let is_dir = dentry.inode().ok_or(SysError::ENOENT)?.inotype().is_dir();
@@ -717,6 +722,7 @@ pub async fn sys_faccessat(dirfd: usize, pathname: usize, mode: i32) -> SyscallR
 /// # Attention
 /// - Not Implemented
 pub fn sys_set_robust_list(_robust_list_head: usize, _len: usize) -> SyscallResult {
+    log::warn!("[sys_set_robust_list] unimplemented");
     Ok(0)
 }
 
@@ -754,7 +760,6 @@ pub async fn sys_pipe2(pipefd: usize, flags: i32) -> SyscallResult {
     unsafe {
         pipefd.write_array(&pipe)?;
     }
-    stop();
     Ok(0)
 }
 

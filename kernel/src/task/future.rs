@@ -1,6 +1,7 @@
 use alloc::sync::Arc;
-use arch::riscv64::time::{set_nx_timer_irq, set_timer_irq};
+use arch::riscv64::time::{get_time_duration, set_nx_timer_irq};
 use osfuture::{block_on_with_result, suspend_now, take_waker, yield_now};
+use timer::TIMER_MANAGER;
 
 use core::future::Future;
 use core::pin::Pin;
@@ -171,23 +172,32 @@ pub async fn task_executor_unit(task: Arc<Task>) {
         // be some instructions with risks between trap_return and trap_handle.
         trap::trap_handler(&task);
 
-        async_syscall(&task).await;
+        let mut interrupted = async_syscall(&task).await;
+
+        TIMER_MANAGER.check(get_time_duration());
+
+        if task.is_yield() {
+            yield_now().await;
+            task.set_is_yield(false);
+        }
 
         match task.get_state() {
             TaskState::Zombie => break,
             TaskState::Sleeping => {
+                task.set_state(TaskState::Interruptable);
                 suspend_now().await;
             }
             _ => {}
         }
 
         // param "intr" always false for now
-        sig_check(task.clone(), false).await;
+        sig_check(task.clone(), &mut interrupted).await;
 
         // threads may be killed or stopped in sig_check.
         match task.get_state() {
             TaskState::Zombie => break,
             TaskState::Sleeping => {
+                task.set_state(TaskState::Interruptable);
                 suspend_now().await;
             }
             _ => {}

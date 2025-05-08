@@ -1,14 +1,14 @@
 #![no_std]
 extern crate alloc;
 
-use id::ShmStat;
 use alloc::{sync::Weak, vec::Vec};
-use mm::page_cache::page::Page;
 use config::mm::PAGE_SIZE;
+use id::ShmStat;
+use mm::page_cache::page::Page;
 
+pub mod flags;
 pub mod id;
 pub mod manager;
-
 
 pub struct SharedMemory {
     pub stat: ShmStat,

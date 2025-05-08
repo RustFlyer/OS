@@ -1,7 +1,7 @@
 use core::time::Duration;
 
 use alloc::sync::Arc;
-use arch::riscv64::time::{get_time_duration, get_time_us};
+use arch::riscv64::time::{get_time_duration, get_time_ms, get_time_us};
 use osfuture::{Select2Futures, SelectOutput};
 use systype::{SysError, SyscallResult};
 use time::{TMS, TimeSpec, TimeVal, TimeValue, itime::ITimerVal};
@@ -98,6 +98,8 @@ pub async fn sys_times(tms: usize) -> SyscallResult {
 /// };
 /// ```
 pub async fn sys_nanosleep(req: usize, rem: usize) -> SyscallResult {
+    // log::error!("[sys_nanosleep] called {}", get_time_ms());
+
     let task = current_task();
     let req_time = {
         let addr_space = task.addr_space();
@@ -123,9 +125,11 @@ pub async fn sys_nanosleep(req: usize, rem: usize) -> SyscallResult {
     }?;
 
     if remain.is_zero() {
+        // log::debug!("[sys_nanosleep] sleep enough {}", get_time_ms());
         return Ok(0);
     }
 
+    // log::debug!("[sys_nanosleep] not sleep enough");
     let addr_space = task.addr_space();
     let mut rem_write = UserWritePtr::<TimeSpec>::new(rem, &addr_space);
     if !rem_write.is_null() {
@@ -307,7 +311,7 @@ pub fn sys_setitimer(which: usize, new_itimeval: usize, old_itimeval: usize) -> 
                     task: Arc::downgrade(&task),
                     id: timerid.0,
                 };
-                let mut timer = Timer::new(interval);
+                let mut timer = Timer::new(get_time_duration() + interval);
                 timer.set_callback(Arc::new(rtimer));
                 TIMER_MANAGER.add_timer(timer);
             }
