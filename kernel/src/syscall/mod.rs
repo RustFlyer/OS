@@ -129,6 +129,8 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         SHMGET => sys_shmget(args[0], args[1], args[2] as i32),
         TKILL => sys_tkill(args[0] as isize, args[1] as i32),
         SOCKET => sys_socket(args[0], args[1] as i32, args[2]),
+        BIND => sys_bind(args[0], args[1], args[2]),
+        GETSOCKNAME => sys_getsockname(args[0], args[1], args[2]),
         _ => {
             log::error!("Syscall not implemented: {}", syscall_no.as_str());
             unimplemented!()

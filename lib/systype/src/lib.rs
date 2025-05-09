@@ -113,6 +113,8 @@ pub enum SysError {
     ENOTEMPTY = 39,
     /// Inode is null
     ENINODE = 40,
+    /// Socket operation on non-socket
+    ENOTSOCK = 88,
     /// Unsupported
     EOPNOTSUPP = 95,
     /// Transport endpoint is not connected
@@ -170,6 +172,7 @@ impl SysError {
             ENOSYS => "Invalid system call number",
             ENOTEMPTY => "Directory not empty",
             ENINODE => "Inode is null",
+            ENOTSOCK => "Socket operation on non-socket",
             EOPNOTSUPP => "Unsupported",
             ENOTCONN => "Transport endpoint is not connected",
             ECONNREFUSED => "Connection refused",

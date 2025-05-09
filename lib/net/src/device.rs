@@ -52,7 +52,6 @@ impl Device for DeviceWrapper {
         }
 
         if !dev.can_transmit() {
-            // log::warn!("can not receive");
             return None;
         }
 
@@ -79,7 +78,6 @@ impl Device for DeviceWrapper {
         if dev.can_transmit() {
             Some(NetTxToken(&self.inner))
         } else {
-            // log::error!("can not transmit");
             None
         }
     }

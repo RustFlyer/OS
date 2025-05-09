@@ -22,6 +22,7 @@ impl SharedMemory {
             pages: Vec::with_capacity(sz / PAGE_SIZE + 1),
         }
     }
+
     pub fn size(&self) -> usize {
         self.stat.segsz
     }

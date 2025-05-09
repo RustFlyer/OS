@@ -3,10 +3,19 @@
 //!
 //! `IpEndpoint` is host byte order
 
-use core::net::{Ipv4Addr, Ipv6Addr};
+use core::{
+    mem,
+    net::{Ipv4Addr, Ipv6Addr},
+};
 
+use alloc::sync::Arc;
 use smoltcp::wire::{IpAddress, IpEndpoint, IpListenEndpoint};
-use systype::SysError;
+use systype::{SysError, SysResult};
+
+use crate::vm::{
+    addr_space::AddrSpace,
+    user_ptr::{SumGuard, UserReadPtr, UserWritePtr},
+};
 
 #[derive(Clone, Copy)]
 #[repr(C)]
@@ -206,4 +215,75 @@ impl From<SockAddrIn6> for IpListenEndpoint {
             port: u16::from_be_bytes(v6.port),
         }
     }
+}
+
+pub fn read_sockaddr(
+    addrspace: Arc<AddrSpace>,
+    addr: usize,
+    addrlen: usize,
+) -> SysResult<SockAddr> {
+    let _guard = SumGuard::new();
+
+    unsafe {
+        UserReadPtr::<u8>::new(addr, &addrspace).read_array(addrlen)?;
+    }
+
+    let family = SaFamily::try_from(unsafe { *(addr as *const u16) })?;
+    match family {
+        SaFamily::AF_INET => {
+            if addrlen < mem::size_of::<SockAddrIn>() {
+                log::error!("[audit_sockaddr] AF_INET addrlen error");
+                return Err(SysError::EINVAL);
+            }
+            Ok(SockAddr {
+                ipv4: unsafe { *(addr as *const _) },
+            })
+        }
+        SaFamily::AF_INET6 => {
+            if addrlen < mem::size_of::<SockAddrIn6>() {
+                log::error!("[audit_sockaddr] AF_INET6 addrlen error");
+                return Err(SysError::EINVAL);
+            }
+            Ok(SockAddr {
+                ipv6: unsafe { *(addr as *const _) },
+            })
+        }
+        SaFamily::AF_UNIX => {
+            if addrlen < mem::size_of::<SockAddrUn>() {
+                log::error!("[audit_sockaddr] AF_UNIX addrlen error");
+                return Err(SysError::EINVAL);
+            }
+            Ok(SockAddr {
+                ipv6: unsafe { *(addr as *const _) },
+            })
+        }
+    }
+}
+
+pub fn write_sockaddr(
+    addrspace: Arc<AddrSpace>,
+    addr: usize,
+    addrlen: usize,
+    sockaddr: SockAddr,
+) -> SysResult<()> {
+    unsafe {
+        match SaFamily::try_from(sockaddr.family).unwrap() {
+            SaFamily::AF_INET => {
+                UserWritePtr::<SockAddrIn>::new(addr, &addrspace).write(sockaddr.ipv4)?;
+                UserWritePtr::<u32>::new(addrlen, &addrspace)
+                    .write(mem::size_of::<SockAddrIn>() as u32)?;
+            }
+            SaFamily::AF_INET6 => {
+                UserWritePtr::<SockAddrIn6>::new(addr, &addrspace).write(sockaddr.ipv6)?;
+                UserWritePtr::<u32>::new(addrlen, &addrspace)
+                    .write(mem::size_of::<SockAddrIn6>() as u32)?;
+            }
+            SaFamily::AF_UNIX => {
+                UserWritePtr::<SockAddrUn>::new(addr, &addrspace).write(sockaddr.unix)?;
+                UserWritePtr::<u32>::new(addrlen, &addrspace)
+                    .write(mem::size_of::<SockAddrUn>() as u32)?;
+            }
+        }
+    }
+    Ok(())
 }
