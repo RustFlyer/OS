@@ -28,7 +28,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
     //     log::error!("[{}] args: {:?}", syscall_no.as_str(), args);
     // }
 
-    // log::info!(
+    // log::error!(
     //     "[{}] task {} call function",
     //     syscall_no.as_str(),
     //     current_task().tid()
@@ -135,6 +135,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         SHMAT => sys_shmat(args[0], args[1], args[2] as i32),
         SHMDT => sys_shmdt(args[0]),
         SHMCTL => sys_shmctl(args[0], args[1] as i32, args[2]),
+        PSELECT6 => sys_pselect6(args[0] as i32, args[1], args[2], args[3], args[4], args[5]).await,
         _ => {
             log::error!("Syscall not implemented: {}", syscall_no.as_str());
             unimplemented!()

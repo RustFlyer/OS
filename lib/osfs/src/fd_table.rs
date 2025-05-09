@@ -220,3 +220,41 @@ impl Debug for FdTable {
             })
     }
 }
+
+#[derive(Debug, Copy, Clone)]
+#[repr(C)]
+pub struct FdSet {
+    fds_bits: [u64; 16],
+}
+
+impl FdSet {
+    pub fn zero() -> Self {
+        Self { fds_bits: [0; 16] }
+    }
+
+    pub fn clear(&mut self) {
+        for i in 0..self.fds_bits.len() {
+            self.fds_bits[i] = 0;
+        }
+    }
+
+    /// Add the given file descriptor to the collection. Calculate the index and
+    /// corresponding bit of the file descriptor in the array, and set the bit
+    /// to 1
+    pub fn set(&mut self, fd: usize) {
+        let idx = fd / 64;
+        let bit = fd % 64;
+        let mask = 1 << bit;
+        self.fds_bits[idx] |= mask;
+    }
+
+    /// Check if the given file descriptor is in the collection. Calculate the
+    /// index and corresponding bit of the file descriptor in the array, and
+    /// check if the bit is 1
+    pub fn is_set(&self, fd: usize) -> bool {
+        let idx = fd / 64;
+        let bit = fd % 64;
+        let mask = 1 << bit;
+        self.fds_bits[idx] & mask != 0
+    }
+}

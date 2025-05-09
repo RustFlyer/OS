@@ -136,6 +136,7 @@ pub struct StatFs {
 
 bitflags! {
     // See in "bits/poll.h"
+    #[derive(Copy, Clone, Debug)]
     pub struct PollEvents: i16 {
         // Event types that can be polled for. These bits may be set in `events' to
         // indicate the interesting event types; they will appear in `revents' to

@@ -217,7 +217,7 @@ pub fn sys_shmat(shmid: usize, shmaddr: usize, shmflg: i32) -> SyscallResult {
     }
 
     let shmaddr_aligned = shmaddr.round_down();
-    let mut mem_perm = MemPerm::RW;
+    let mut mem_perm = MemPerm::RW | MemPerm::U;
     if shmflg.contains(ShmAtFlags::SHM_EXEC) {
         mem_perm.insert(MemPerm::X);
     }
@@ -225,18 +225,17 @@ pub fn sys_shmat(shmid: usize, shmaddr: usize, shmflg: i32) -> SyscallResult {
         mem_perm.remove(MemPerm::W);
     }
 
+    let ret_addr;
     if let Some(shm) = SHARED_MEMORY_MANAGER.0.lock().get(&shmid) {
-        let ret_addr =
+        ret_addr =
             addrspace.attach_shm(shmaddr_aligned, shm.lock().size(), shm.clone(), mem_perm)?;
 
-        let mut shmmaps = task.shm_maps_mut().lock();
-        shmmaps.insert(ret_addr, shmid);
-
-        SHARED_MEMORY_MANAGER.attach(shmid, task.pid());
-        Ok(ret_addr.into())
+        task.with_mut_shm_maps(|map| map.insert(ret_addr, shmid));
     } else {
-        Err(SysError::EINVAL)
+        return Err(SysError::EINVAL);
     }
+    SHARED_MEMORY_MANAGER.attach(shmid, task.pid());
+    return Ok(ret_addr.into());
 }
 
 /// `shmdt()` detaches the shared memory segment located at the address specified by `shmaddr`
@@ -262,7 +261,7 @@ pub fn sys_shmdt(shmaddr: usize) -> SyscallResult {
     let shm_id = shmmaps.remove(&shmaddr);
 
     if let Some(shm_id) = shm_id {
-        addrspace.detach_shm(shmaddr);
+        addrspace.detach_shm(shmaddr)?;
         SHARED_MEMORY_MANAGER.detach(shm_id, task.pid());
         Ok(0)
     } else {
