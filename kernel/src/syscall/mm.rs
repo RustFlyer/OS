@@ -204,10 +204,11 @@ pub fn sys_shmget(key: usize, size: usize, shmflg: i32) -> SyscallResult {
 /// - If `shmaddr` isn't NULL and SHM_RND is specified in `shmflg`, the attach occurs at the address equal to
 ///   `shmaddr` rounded down to the nearest multiple of SHMLBA.
 /// - Otherwise, `shmaddr` must be a page-aligned address at which the attach occurs.
-pub fn sys_shmat(shmid: usize, shmaddr: VirtAddr, shmflg: i32) -> SyscallResult {
+pub fn sys_shmat(shmid: usize, shmaddr: usize, shmflg: i32) -> SyscallResult {
     let task = current_task();
     let addrspace = task.addr_space();
     let shmflg = ShmAtFlags::from_bits_truncate(shmflg);
+    let shmaddr = VirtAddr::new(shmaddr);
 
     log::info!("[sys_shmat] {shmid} {shmaddr:?} {:?}", shmflg);
 
@@ -247,10 +248,11 @@ pub fn sys_shmat(shmid: usize, shmaddr: VirtAddr, shmflg: i32) -> SyscallResult 
 /// - `shm_dtime` is set to the current time.
 /// - `shm_lpid` is set to the process-ID of the calling process.
 /// - `shm_nattch` is decremented by one. If it becomes 0 and the segment is marked for deletion, the segment is deleted.
-pub fn sys_shmdt(shmaddr: VirtAddr) -> SyscallResult {
-    log::info!("[sys_shmdt] {:?}", shmaddr);
+pub fn sys_shmdt(shmaddr: usize) -> SyscallResult {
+    log::info!("[sys_shmdt] {:#x}", shmaddr);
     let task = current_task();
     let addrspace = task.addr_space();
+    let shmaddr = VirtAddr::new(shmaddr);
 
     if shmaddr.page_offset() != 0 {
         return Err(SysError::EINVAL);
