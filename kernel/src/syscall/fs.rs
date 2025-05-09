@@ -733,6 +733,21 @@ pub fn sys_set_robust_list(_robust_list_head: usize, _len: usize) -> SyscallResu
     Ok(0)
 }
 
+pub fn sys_get_robust_list(_pid: i32, _robust_list_head: usize, _len_ptr: usize) -> SyscallResult {
+    // let Some(task) = TASK_MANAGER.get(pid as usize) else {
+    //     return Err(SysError::ESRCH);
+    // };
+    // if !task.is_leader() {
+    //     return Err(SysError::ESRCH);
+    // }
+    // // UserReadPtr::<RobustListHead>::from(value)
+    // len_ptr.write(&task, mem::size_of::<RobustListHead>())?;
+    // robust_list_head.write(&task, unsafe {
+    //     *task.with_futexes(|futexes| futexes.robust_list.load(Ordering::SeqCst))
+    // })?;
+    Ok(0)
+}
+
 /// `pipe2()` creates a `pipe`, a unidirectional data channel that can be used for interprocess
 /// communication with OpenFlags `flags`.
 ///
@@ -909,10 +924,9 @@ pub struct IoVec {
     pub len: usize,
 }
 
-/// `sys_writev()` write data into file from multiple buffers
-pub async fn sys_writev(fd: usize, iov: usize, iovcnt: usize) -> SyscallResult {
-    // return Err(SysError::EBUSY);
-    log::info!("[sys_writev] fd: {fd}, iov: {iov:#x}, iovcnt: {iovcnt}");
+/// `sys_readv()` read data from file into multiple buffers
+pub async fn sys_readv(fd: usize, iov: usize, iovcnt: usize) -> SyscallResult {
+    // log::info!("[sys_readv] fd: {fd}, iov: {iov:#x}, iovcnt: {iovcnt}");
 
     let task = current_task();
     let addrspace = task.addr_space();
@@ -920,12 +934,39 @@ pub async fn sys_writev(fd: usize, iov: usize, iovcnt: usize) -> SyscallResult {
     let iovs = {
         let mut iovs_ptr = UserReadPtr::<IoVec>::new(iov, &addrspace);
         let pointers = unsafe { iovs_ptr.read_array(iovcnt)? };
-        // log::info!("[sys_writev] pointers: {:?}", pointers);
-        // log::info!("[sys_writev] iovcnt: {}", iovcnt);
         pointers
     };
 
-    log::info!("[sys_writev] iov: {:?}", iovs);
+    // log::info!("[sys_readv] iov: {:?}", iovs);
+
+    let mut read_bytes = 0;
+    let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
+    for iov in iovs {
+        if iov.len == 0 {
+            continue;
+        }
+        let mut ptr = UserWritePtr::<u8>::new(iov.base, &addrspace);
+        let slice = unsafe { ptr.try_into_mut_slice(iov.len)? };
+        read_bytes += file.read(slice).await?;
+    }
+
+    Ok(read_bytes)
+}
+
+/// `sys_writev()` write data into file from multiple buffers
+pub async fn sys_writev(fd: usize, iov: usize, iovcnt: usize) -> SyscallResult {
+    // log::info!("[sys_writev] fd: {fd}, iov: {iov:#x}, iovcnt: {iovcnt}");
+
+    let task = current_task();
+    let addrspace = task.addr_space();
+
+    let iovs = {
+        let mut iovs_ptr = UserReadPtr::<IoVec>::new(iov, &addrspace);
+        let pointers = unsafe { iovs_ptr.read_array(iovcnt)? };
+        pointers
+    };
+
+    // log::info!("[sys_writev] iov: {:?}", iovs);
 
     let mut write_bytes = 0;
     let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
@@ -938,7 +979,7 @@ pub async fn sys_writev(fd: usize, iov: usize, iovcnt: usize) -> SyscallResult {
         write_bytes += file.write(slice).await?;
     }
 
-    log::info!("[sys_writev] write bytes: {:?}", write_bytes);
+    // log::info!("[sys_writev] write bytes: {:?}", write_bytes);
     Ok(write_bytes)
 }
 
@@ -1448,15 +1489,15 @@ pub async fn sys_pselect6(
     let timeout = tconvert(timeout)?;
     let sigmask = sconvert(sigmask)?;
 
-    log::info!(
-        "[sys_pselect6] readfds: {readfds:?}, writefds: {writefds:?}, exceptfds: {exceptfds:?}"
-    );
+    // log::info!(
+    //     "[sys_pselect6] readfds: {readfds:?}, writefds: {writefds:?}, exceptfds: {exceptfds:?}"
+    // );
 
-    log::debug!(
-        "[sys_pselect6] task {} tid {} call",
-        task.get_name(),
-        task.tid()
-    );
+    // log::debug!(
+    //     "[sys_pselect6] task {} tid {} call",
+    //     task.get_name(),
+    //     task.tid()
+    // );
 
     let mut polls = Vec::<FilePollRet>::with_capacity(nfds as usize);
 
@@ -1502,7 +1543,7 @@ pub async fn sys_pselect6(
     };
 
     let ret_vec = if let Some(timeout) = timeout {
-        log::info!("timeout: {:?}", timeout);
+        // log::info!("timeout: {:?}", timeout);
         match Select2Futures::new(
             TimeoutFuture::new(timeout.into(), pselect_future),
             intr_future,
@@ -1512,7 +1553,7 @@ pub async fn sys_pselect6(
             SelectOutput::Output1(time_output) => match time_output {
                 TimedTaskResult::Completed(ret_vec) => ret_vec,
                 TimedTaskResult::Timeout => {
-                    log::debug!("[sys_pselect6]: timeout");
+                    // log::debug!("[sys_pselect6]: timeout");
                     sweep_and_cont();
                     return Ok(0);
                 }
