@@ -25,11 +25,13 @@ use mm::address::VirtAddr;
 use mutex::SpinLock;
 use systype::{SysError, SysResult};
 
+use crate::processor::current_task;
+
 use super::{
     mem_perm::MemPerm,
     page_table::{self, PageTable},
     pte::PteFlags,
-    vm_area::{PageFaultInfo, VmArea},
+    vm_area::{PageFaultInfo, VmArea, VmaFlags},
 };
 
 /// A virtual address space.
@@ -284,18 +286,20 @@ impl AddrSpace {
         let mut new_space = Self::build_user()?;
         let new_vm_areas = self.vm_areas.lock().clone();
 
-        for &vpn in new_vm_areas.values().flat_map(|vma| vma.pages().keys()) {
-            let old_pte = self.page_table.find_entry(vpn).unwrap();
-            let new_pte = new_space
-                .page_table
-                .find_entry_force(vpn, old_pte.flags())?
-                .0;
-            let mut pte = *old_pte;
-            if pte.flags().contains(PteFlags::W) {
-                pte.set_flags(pte.flags().difference(PteFlags::W));
-                *old_pte = pte;
+        for vma in new_vm_areas.values() {
+            for &vpn in vma.pages().keys() {
+                let old_pte = self.page_table.find_entry(vpn).unwrap();
+                let new_pte = new_space
+                    .page_table
+                    .find_entry_force(vpn, old_pte.flags())?
+                    .0;
+                let mut pte = *old_pte;
+                if vma.flags().contains(VmaFlags::PRIVATE) && pte.flags().contains(PteFlags::W) {
+                    pte.set_flags(pte.flags().difference(PteFlags::W));
+                    *old_pte = pte;
+                }
+                *new_pte = pte;
             }
-            *new_pte = pte;
         }
         new_space.vm_areas = SpinLock::new(new_vm_areas);
 
@@ -365,12 +369,17 @@ impl AddrSpace {
     pub fn handle_page_fault(&self, fault_addr: VirtAddr, access: MemPerm) -> SysResult<()> {
         let mut vm_areas_lock = self.vm_areas.lock();
 
-        if fault_addr.to_usize() == 0x68094 {
+        if fault_addr.to_usize() >= 0x3fffffa000 {
+            log::error!(
+                "[handle_page_fault] process {}: page fault at {:#x}",
+                current_task().pid(),
+                fault_addr.to_usize()
+            );
             vm_areas_lock.iter().for_each(|(_, vma)| {
-                log::debug!(
+                log::warn!(
                     "[{:?}][{:?}]: {:#x} ~ {:#x}",
                     vma.map_type,
-                    vma.flags(),
+                    vma.pte_flags(),
                     vma.start_va().to_usize(),
                     vma.end_va().to_usize()
                 )

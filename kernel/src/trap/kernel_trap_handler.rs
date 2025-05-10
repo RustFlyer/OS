@@ -1,3 +1,4 @@
+use mm::address::{PhysPageNum, VirtAddr};
 use riscv::{ExceptionNumber, InterruptNumber};
 use riscv::{
     interrupt::{Exception, Interrupt, Trap},
@@ -6,6 +7,8 @@ use riscv::{
 
 use arch::riscv64::time::{get_time_duration, set_nx_timer_irq};
 use timer::TIMER_MANAGER;
+
+use crate::vm::trace_page_table_lookup;
 
 /// Kernel trap handler
 #[unsafe(no_mangle)]
@@ -19,6 +22,13 @@ pub fn kernel_trap_handler() {
 }
 
 pub fn kernel_exception_handler(e: Exception, stval: usize) {
+    let root = satp::read().ppn();
+    log::error!("Page table entry at 0x3fffffd000:");
+    trace_page_table_lookup(PhysPageNum::new(root), VirtAddr::new(0x3fffffd000));
+    log::error!("Page table entry at 0x3fffffe000:");
+    trace_page_table_lookup(PhysPageNum::new(root), VirtAddr::new(0x3fffffe000));
+    log::error!("Page table entry at 0x3ffffff000:");
+    trace_page_table_lookup(PhysPageNum::new(root), VirtAddr::new(0x3ffffff000));
     log::error!(
         "[kernel] {:?} in kernel, bad addr = {:#x}, bad instruction = {:#x}, satp = {:#x}",
         e,

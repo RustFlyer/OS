@@ -10,12 +10,19 @@ use super::{addr_space::AddrSpace, mem_perm::MemPerm};
 use crate::vm::vm_area::{VmArea, VmaFlags};
 
 impl AddrSpace {
-    /// Attach given `pages` to the AddrSpace. If pages is not given, it will
-    /// create pages according to the `size` and map them to the AddrSpace.
-    /// if `shmaddr` is set to `0`, it will chooses a suitable page-aligned
-    /// address to attach.
+    /// Attach a shared memory area to the address space.
     ///
-    /// `size` and `shmaddr` need to be page-aligned.
+    /// `addr` is the starting address of the shared memory area. If `addr` is
+    /// 0, the kernel will find a suitable address for the shared memory area.
+    /// Otherwise, the kernel will try to use the specified address which must
+    /// be page aligned.
+    ///
+    /// `length` is the length of the shared memory area. If it is not page
+    /// aligned, it will be rounded up to a multiple of the page size.
+    ///
+    /// `shm` is the shared memory object to be attached.
+    ///
+    /// `prot` is the memory protection flags for the shared memory area.
     pub fn attach_shm(
         &self,
         mut addr: VirtAddr,
@@ -44,9 +51,7 @@ impl AddrSpace {
         let length = (length + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
         let va_start = addr;
         let va_end = VirtAddr::new(addr.to_usize() + length);
-
-        let vma_flags = VmaFlags::PRIVATE;
-        log::debug!("[attach_shm] prot: {:?}", prot);
+        let vma_flags = VmaFlags::SHARED;
 
         let area = VmArea::new_shared_memory(va_start, va_end, vma_flags, prot, shm);
         self.add_area(area)?;

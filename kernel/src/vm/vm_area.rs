@@ -574,8 +574,13 @@ impl VmArea {
         self.end.to_usize() - self.start.to_usize()
     }
 
+    /// Returns the flags of the VMA.
+    pub fn flags(&self) -> VmaFlags {
+        self.flags
+    }
+
     /// Returns the PTE flags of the VMA.
-    pub fn flags(&self) -> PteFlags {
+    pub fn pte_flags(&self) -> PteFlags {
         self.pte_flags
     }
 
@@ -903,15 +908,24 @@ impl SharedMemoryArea {
             ..
         } = info;
 
+        log::warn!(
+            "SharedMemoryArea::fault_handler: page fault at {:#x} in shared memory area",
+            fault_addr.to_usize()
+        );
+
         let area_offset = fault_addr.round_down().to_usize() - start_va.to_usize();
         let page_index = area_offset / PAGE_SIZE;
         let page_num = fault_addr.page_number();
 
         let pages = &mut shm.lock().pages;
         let page = match &pages[page_index] {
-            Some(page) => Arc::clone(page),
+            Some(page) => {
+                log::warn!("Found page at index {:#x}", page_index);
+                Arc::clone(page)
+            }
             None => {
                 // Allocate a new page and fill it with zeros.
+                log::warn!("Allocating new page at index {:#x}", page_index);
                 let page = Arc::new(Page::build()?);
                 page.as_mut_slice().fill(0);
                 pages[page_index] = Some(Arc::clone(&page));
