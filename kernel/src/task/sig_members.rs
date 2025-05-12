@@ -385,6 +385,12 @@ pub struct IntrBySignalFuture {
     pub mask: SigSet,
 }
 
+impl IntrBySignalFuture {
+    pub fn new(task: Arc<Task>, mask: SigSet) -> Self {
+        Self { task, mask }
+    }
+}
+
 impl Future for IntrBySignalFuture {
     type Output = ();
 

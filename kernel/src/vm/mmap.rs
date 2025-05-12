@@ -89,23 +89,6 @@ impl AddrSpace {
         offset: usize,
     ) -> SysResult<usize> {
         if addr.to_usize() == 0 {
-            // static mut base: usize = 0;
-            // unsafe { base = base + length };
-            // addr = self
-            //     .find_vacant_memory(
-            //         addr,
-            //         length,
-            //         VirtAddr::new(MMAP_START),
-            //         VirtAddr::new(MMAP_END),
-            //     )
-            //     .ok_or(SysError::ENOMEM)?;
-            // addr = VirtAddr::new(addr.to_usize() + unsafe { base });
-            // log::error!(
-            //     "[map_file] new addr is {:#x} ~ {:#x}",
-            //     addr.to_usize(),
-            //     addr.to_usize() + length
-            // );
-
             addr = self
                 .find_vacant_memory(
                     addr,

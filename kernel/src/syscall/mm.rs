@@ -1,6 +1,7 @@
 use config::mm::PAGE_SIZE;
 use id_allocator::IdAllocator;
 use mm::address::VirtAddr;
+use mutex::new_share_mutex;
 use shm::{
     SharedMemory,
     flags::{ShmAtFlags, ShmGetFlags},
@@ -167,7 +168,10 @@ pub fn sys_shmget(key: usize, size: usize, shmflg: i32) -> SyscallResult {
     if key == IPC_PRIVATE {
         let new_key = SHARED_MEMORY_KEY_ALLOCATOR.lock().alloc().unwrap();
         let new_shm = SharedMemory::new(rounded_up_sz, task.pid());
-        SHARED_MEMORY_MANAGER.0.lock().insert(new_key, new_shm);
+        SHARED_MEMORY_MANAGER
+            .0
+            .lock()
+            .insert(new_key, new_share_mutex(new_shm));
         return Ok(new_key);
     }
 
@@ -177,7 +181,7 @@ pub fn sys_shmget(key: usize, size: usize, shmflg: i32) -> SyscallResult {
         if shmflg.contains(ShmGetFlags::IPC_CREAT | ShmGetFlags::IPC_EXCL) {
             return Err(SysError::EEXIST);
         }
-        if shm.size() < size {
+        if shm.lock().size() < size {
             return Err(SysError::EINVAL);
         }
         return Ok(key);
@@ -188,8 +192,9 @@ pub fn sys_shmget(key: usize, size: usize, shmflg: i32) -> SyscallResult {
     }
 
     let new_shm = SharedMemory::new(rounded_up_sz, task.pid());
-    shm_manager.insert(key, new_shm);
-    return Ok(key);
+    shm_manager.insert(key, new_share_mutex(new_shm));
+
+    Ok(key)
 }
 
 /// `shmat()` attaches the System V shared memory segment identified by `shmid` to the address space of the
@@ -199,10 +204,11 @@ pub fn sys_shmget(key: usize, size: usize, shmflg: i32) -> SyscallResult {
 /// - If `shmaddr` isn't NULL and SHM_RND is specified in `shmflg`, the attach occurs at the address equal to
 ///   `shmaddr` rounded down to the nearest multiple of SHMLBA.
 /// - Otherwise, `shmaddr` must be a page-aligned address at which the attach occurs.
-pub fn sys_shmat(shmid: usize, shmaddr: VirtAddr, shmflg: i32) -> SyscallResult {
+pub fn sys_shmat(shmid: usize, shmaddr: usize, shmflg: i32) -> SyscallResult {
     let task = current_task();
     let addrspace = task.addr_space();
-    let shmflg = ShmAtFlags::from_bits_truncate(shmflg as i32);
+    let shmflg = ShmAtFlags::from_bits_truncate(shmflg);
+    let shmaddr = VirtAddr::new(shmaddr);
 
     log::info!("[sys_shmat] {shmid} {shmaddr:?} {:?}", shmflg);
 
@@ -211,7 +217,7 @@ pub fn sys_shmat(shmid: usize, shmaddr: VirtAddr, shmflg: i32) -> SyscallResult 
     }
 
     let shmaddr_aligned = shmaddr.round_down();
-    let mut mem_perm = MemPerm::RW;
+    let mut mem_perm = MemPerm::RW | MemPerm::U;
     if shmflg.contains(ShmAtFlags::SHM_EXEC) {
         mem_perm.insert(MemPerm::X);
     }
@@ -219,18 +225,17 @@ pub fn sys_shmat(shmid: usize, shmaddr: VirtAddr, shmflg: i32) -> SyscallResult 
         mem_perm.remove(MemPerm::W);
     }
 
-    if let Some(shm) = SHARED_MEMORY_MANAGER.0.lock().get_mut(&shmid) {
-        let ret_addr =
-            addrspace.attach_shm(shm.size(), shmaddr_aligned, mem_perm, &mut shm.pages)?;
+    let ret_addr;
+    if let Some(shm) = SHARED_MEMORY_MANAGER.0.lock().get(&shmid) {
+        ret_addr =
+            addrspace.attach_shm(shmaddr_aligned, shm.lock().size(), shm.clone(), mem_perm)?;
 
-        let mut shmmaps = task.shm_maps_mut().lock();
-        shmmaps.insert(ret_addr, shmid);
-
-        SHARED_MEMORY_MANAGER.attach(shmid, task.pid());
-        Ok(ret_addr.into())
+        task.with_mut_shm_maps(|map| map.insert(ret_addr, shmid));
     } else {
         return Err(SysError::EINVAL);
     }
+    SHARED_MEMORY_MANAGER.attach(shmid, task.pid());
+    return Ok(ret_addr.into());
 }
 
 /// `shmdt()` detaches the shared memory segment located at the address specified by `shmaddr`
@@ -242,10 +247,11 @@ pub fn sys_shmat(shmid: usize, shmaddr: VirtAddr, shmflg: i32) -> SyscallResult 
 /// - `shm_dtime` is set to the current time.
 /// - `shm_lpid` is set to the process-ID of the calling process.
 /// - `shm_nattch` is decremented by one. If it becomes 0 and the segment is marked for deletion, the segment is deleted.
-pub fn sys_shmdt(shmaddr: VirtAddr) -> SyscallResult {
-    log::info!("[sys_shmdt] {:?}", shmaddr);
+pub fn sys_shmdt(shmaddr: usize) -> SyscallResult {
+    log::info!("[sys_shmdt] {:#x}", shmaddr);
     let task = current_task();
     let addrspace = task.addr_space();
+    let shmaddr = VirtAddr::new(shmaddr);
 
     if shmaddr.page_offset() != 0 {
         return Err(SysError::EINVAL);
@@ -255,7 +261,7 @@ pub fn sys_shmdt(shmaddr: VirtAddr) -> SyscallResult {
     let shm_id = shmmaps.remove(&shmaddr);
 
     if let Some(shm_id) = shm_id {
-        addrspace.detach_shm(shmaddr);
+        addrspace.detach_shm(shmaddr)?;
         SHARED_MEMORY_MANAGER.detach(shm_id, task.pid());
         Ok(0)
     } else {
@@ -291,7 +297,7 @@ pub fn sys_shmctl(shmid: usize, cmd: i32, buf: usize) -> SyscallResult {
             let shm_manager = SHARED_MEMORY_MANAGER.0.lock();
             if let Some(shm) = shm_manager.get(&shmid) {
                 let mut buf = UserWritePtr::<ShmStat>::new(buf, &addrspace);
-                unsafe { buf.write(shm.stat) }?;
+                unsafe { buf.write(shm.lock().stat) }?;
                 Ok(0)
             } else {
                 Err(SysError::EINVAL)

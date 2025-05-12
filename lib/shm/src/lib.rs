@@ -1,25 +1,29 @@
 #![no_std]
-extern crate alloc;
 
-use alloc::{sync::Weak, vec::Vec};
+use alloc::{sync::Arc, vec::Vec};
+
 use config::mm::PAGE_SIZE;
 use id::ShmStat;
 use mm::page_cache::page::Page;
-
 pub mod flags;
 pub mod id;
 pub mod manager;
 
+#[macro_use]
+extern crate alloc;
+
+#[derive(Debug)]
 pub struct SharedMemory {
     pub stat: ShmStat,
-    pub pages: Vec<Weak<Page>>,
+    pub pages: Vec<Option<Arc<Page>>>,
 }
 
 impl SharedMemory {
-    pub fn new(sz: usize, pid: usize) -> Self {
+    pub fn new(size: usize, pid: usize) -> Self {
+        let size = (size + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
         Self {
-            stat: ShmStat::new(sz, pid),
-            pages: Vec::with_capacity(sz / PAGE_SIZE + 1),
+            stat: ShmStat::new(size, pid),
+            pages: vec![None; size / PAGE_SIZE],
         }
     }
 

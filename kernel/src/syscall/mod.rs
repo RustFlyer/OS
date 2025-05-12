@@ -24,7 +24,11 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         unimplemented!()
     };
 
-    // log::info!(
+    // if args.iter().find(|t| **t as i32 == 0x109).is_some() {
+    //     log::error!("[{}] args: {:?}", syscall_no.as_str(), args);
+    // }
+
+    // log::error!(
     //     "[{}] task {} call function",
     //     syscall_no.as_str(),
     //     current_task().tid()
@@ -75,6 +79,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         FACCESSAT => sys_faccessat(args[0], args[1], args[2] as i32).await,
         SET_TID_ADDRESS => sys_set_tid_address(args[0]),
         SET_ROBUST_LIST => sys_set_robust_list(args[0], args[1]),
+        GET_ROBUST_LIST => sys_get_robust_list(args[0] as i32, args[1], args[2]),
         UMOUNT2 => sys_umount2(args[0], args[1] as u32).await,
         MUNMAP => sys_munmap(args[0], args[1]).await,
         PIPE2 => sys_pipe2(args[0], args[1] as i32).await,
@@ -89,6 +94,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         RT_SIGACTION => sys_rt_sigaction(args[0] as i32, args[1], args[2], args[3]),
         FCNTL => sys_fcntl(args[0], args[1] as isize, args[2]),
         WRITEV => sys_writev(args[0], args[1], args[2]).await,
+        READV => sys_readv(args[0], args[1], args[2]).await,
         RT_SIGPROCMASK => sys_rt_sigmask(args[0], args[1], args[2], args[3]),
         RT_SIGRETURN => sys_sigreturn().await,
         TGKILL => sys_tgkill(args[0] as isize, args[1] as isize, args[2] as i32),
@@ -131,6 +137,12 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         SOCKET => sys_socket(args[0], args[1] as i32, args[2]),
         BIND => sys_bind(args[0], args[1], args[2]),
         GETSOCKNAME => sys_getsockname(args[0], args[1], args[2]),
+        SHMAT => sys_shmat(args[0], args[1], args[2] as i32),
+        SHMDT => sys_shmdt(args[0]),
+        SHMCTL => sys_shmctl(args[0], args[1] as i32, args[2]),
+        PSELECT6 => sys_pselect6(args[0] as i32, args[1], args[2], args[3], args[4], args[5]).await,
+        PREAD64 => sys_pread64(args[0], args[1], args[2], args[3]).await,
+        PWRITE64 => sys_pwrite64(args[0], args[1], args[2], args[3]).await,
         _ => {
             log::error!("Syscall not implemented: {}", syscall_no.as_str());
             unimplemented!()

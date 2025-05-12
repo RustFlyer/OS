@@ -1,16 +1,16 @@
 use alloc::{boxed::Box, ffi::CString, string::ToString, vec::Vec};
 use arch::riscv64::time::get_time_duration;
 use core::{
-    cmp,
+    cmp, mem,
     pin::Pin,
     task::{Context, Poll},
     time::Duration,
     usize,
 };
+use osfuture::{Select2Futures, SelectOutput};
 use time::TimeSpec;
 use timer::{TimedTaskResult, TimeoutFuture};
 
-use simdebug::stop;
 use strum::FromRepr;
 
 use config::{
@@ -28,9 +28,11 @@ use osfs::{
             ioctl::{Pid, Termios},
         },
     },
+    fd_table::FdSet,
     pipe::{inode::PIPE_BUF_LEN, new_pipe},
+    pselect::{FilePollRet, PSelectFuture},
 };
-use systype::{SysError, SyscallResult};
+use systype::{SysError, SysResult, SyscallResult};
 use vfs::{
     file::File,
     kstat::Kstat,
@@ -39,7 +41,11 @@ use vfs::{
 
 use crate::{
     processor::current_task,
-    vm::user_ptr::{UserReadPtr, UserWritePtr},
+    task::{TaskState, sig_members::IntrBySignalFuture, signal::sig_info::SigSet},
+    vm::{
+        addr_space::AddrSpace,
+        user_ptr::{UserPtr, UserReadPtr, UserReadWritePtr, UserWritePtr},
+    },
 };
 
 /// The `open`() system call opens the file specified by `pathname`.  If the specified file does not ex‐
@@ -726,6 +732,21 @@ pub fn sys_set_robust_list(_robust_list_head: usize, _len: usize) -> SyscallResu
     Ok(0)
 }
 
+pub fn sys_get_robust_list(_pid: i32, _robust_list_head: usize, _len_ptr: usize) -> SyscallResult {
+    // let Some(task) = TASK_MANAGER.get(pid as usize) else {
+    //     return Err(SysError::ESRCH);
+    // };
+    // if !task.is_leader() {
+    //     return Err(SysError::ESRCH);
+    // }
+    // // UserReadPtr::<RobustListHead>::from(value)
+    // len_ptr.write(&task, mem::size_of::<RobustListHead>())?;
+    // robust_list_head.write(&task, unsafe {
+    //     *task.with_futexes(|futexes| futexes.robust_list.load(Ordering::SeqCst))
+    // })?;
+    Ok(0)
+}
+
 /// `pipe2()` creates a `pipe`, a unidirectional data channel that can be used for interprocess
 /// communication with OpenFlags `flags`.
 ///
@@ -902,10 +923,9 @@ pub struct IoVec {
     pub len: usize,
 }
 
-/// `sys_writev()` write data into file from multiple buffers
-pub async fn sys_writev(fd: usize, iov: usize, iovcnt: usize) -> SyscallResult {
-    // return Err(SysError::EBUSY);
-    log::info!("[sys_writev] fd: {fd}, iov: {iov:#x}, iovcnt: {iovcnt}");
+/// `sys_readv()` read data from file into multiple buffers
+pub async fn sys_readv(fd: usize, iov: usize, iovcnt: usize) -> SyscallResult {
+    // log::info!("[sys_readv] fd: {fd}, iov: {iov:#x}, iovcnt: {iovcnt}");
 
     let task = current_task();
     let addrspace = task.addr_space();
@@ -913,12 +933,39 @@ pub async fn sys_writev(fd: usize, iov: usize, iovcnt: usize) -> SyscallResult {
     let iovs = {
         let mut iovs_ptr = UserReadPtr::<IoVec>::new(iov, &addrspace);
         let pointers = unsafe { iovs_ptr.read_array(iovcnt)? };
-        // log::info!("[sys_writev] pointers: {:?}", pointers);
-        // log::info!("[sys_writev] iovcnt: {}", iovcnt);
         pointers
     };
 
-    log::info!("[sys_writev] iov: {:?}", iovs);
+    // log::info!("[sys_readv] iov: {:?}", iovs);
+
+    let mut read_bytes = 0;
+    let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
+    for iov in iovs {
+        if iov.len == 0 {
+            continue;
+        }
+        let mut ptr = UserWritePtr::<u8>::new(iov.base, &addrspace);
+        let slice = unsafe { ptr.try_into_mut_slice(iov.len)? };
+        read_bytes += file.read(slice).await?;
+    }
+
+    Ok(read_bytes)
+}
+
+/// `sys_writev()` write data into file from multiple buffers
+pub async fn sys_writev(fd: usize, iov: usize, iovcnt: usize) -> SyscallResult {
+    // log::info!("[sys_writev] fd: {fd}, iov: {iov:#x}, iovcnt: {iovcnt}");
+
+    let task = current_task();
+    let addrspace = task.addr_space();
+
+    let iovs = {
+        let mut iovs_ptr = UserReadPtr::<IoVec>::new(iov, &addrspace);
+        let pointers = unsafe { iovs_ptr.read_array(iovcnt)? };
+        pointers
+    };
+
+    // log::info!("[sys_writev] iov: {:?}", iovs);
 
     let mut write_bytes = 0;
     let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
@@ -931,7 +978,7 @@ pub async fn sys_writev(fd: usize, iov: usize, iovcnt: usize) -> SyscallResult {
         write_bytes += file.write(slice).await?;
     }
 
-    log::info!("[sys_writev] write bytes: {:?}", write_bytes);
+    // log::info!("[sys_writev] write bytes: {:?}", write_bytes);
     Ok(write_bytes)
 }
 
@@ -1324,14 +1371,14 @@ pub fn sys_symlinkat(target: usize, newdirfd: usize, linkpath: usize) -> Syscall
 /// `sync()` causes all pending modifications to filesystem metadata and
 /// cached file data to be written to the underlying filesystems.
 pub fn sys_sync() -> SyscallResult {
-    log::error!("[sys_sync] not implemented.");
+    log::warn!("[sys_sync] not implemented.");
     Ok(0)
 }
 
 /// `fsync()` causes all pending modifications to filesystem metadata and
 /// cached file data to be written to the underlying filesystems.
 pub fn sys_fsync(_fd: usize) -> SyscallResult {
-    log::error!("[sys_fsync] not implemented.");
+    log::warn!("[sys_fsync] not implemented.");
     Ok(0)
 }
 
@@ -1369,4 +1416,205 @@ pub fn sys_ftruncate(fd: usize, length: usize) -> SyscallResult {
     inode.set_size(length);
 
     Ok(0)
+}
+
+pub async fn sys_pselect6(
+    nfds: i32,
+    readfds: usize,
+    writefds: usize,
+    exceptfds: usize,
+    timeout: usize,
+    sigmask: usize,
+) -> SyscallResult {
+    if nfds.is_negative() {
+        return Err(SysError::EINVAL);
+    }
+
+    let task = current_task();
+    let addrspace = task.addr_space();
+
+    // macro_rules! make_convert {
+    //     ($ty:ty) => {
+    //         |up: usize| -> SysResult<Option<$ty>> {
+    //             let mut ptr = UserReadWritePtr::<$ty>::new(up, &addrspace);
+    //             if ptr.is_null() {
+    //                 Ok(None)
+    //             } else {
+    //                 let r = unsafe { ptr.read() }?;
+    //                 Ok(Some(r))
+    //             }
+    //         }
+    //     };
+    // }
+
+    // let pconvert = make_convert!(FdSet);
+    // let tconvert = make_convert!(TimeSpec);
+    // let sconvert = make_convert!(SigSet);
+
+    let pconvert = |up: usize| -> SysResult<Option<FdSet>> {
+        let mut ptr = UserReadWritePtr::<FdSet>::new(up, &addrspace);
+        if ptr.is_null() {
+            Ok(None)
+        } else {
+            let r = unsafe { ptr.read() }?;
+            Ok(Some(r))
+        }
+    };
+
+    let tconvert = |up: usize| -> SysResult<Option<TimeSpec>> {
+        let mut ptr = UserReadWritePtr::<TimeSpec>::new(up, &addrspace);
+        if ptr.is_null() {
+            Ok(None)
+        } else {
+            let r = unsafe { ptr.read() }?;
+            Ok(Some(r))
+        }
+    };
+
+    let sconvert = |up: usize| -> SysResult<Option<SigSet>> {
+        let mut ptr = UserReadWritePtr::<SigSet>::new(up, &addrspace);
+        if ptr.is_null() {
+            Ok(None)
+        } else {
+            let r = unsafe { ptr.read() }?;
+            Ok(Some(r))
+        }
+    };
+
+    let nfds = nfds as usize;
+    let mut readfds = pconvert(readfds)?;
+    let mut writefds = pconvert(writefds)?;
+    let mut exceptfds = pconvert(exceptfds)?;
+    let timeout = tconvert(timeout)?;
+    let sigmask = sconvert(sigmask)?;
+
+    // log::info!(
+    //     "[sys_pselect6] readfds: {readfds:?}, writefds: {writefds:?}, exceptfds: {exceptfds:?}"
+    // );
+
+    // log::debug!(
+    //     "[sys_pselect6] task {} tid {} call",
+    //     task.get_name(),
+    //     task.tid()
+    // );
+
+    let mut polls = Vec::<FilePollRet>::with_capacity(nfds as usize);
+
+    for fd in 0..nfds as usize {
+        let mut events = PollEvents::empty();
+
+        readfds
+            .as_ref()
+            .map(|fds| fds.is_set(fd).then(|| events.insert(PollEvents::IN)));
+
+        writefds
+            .as_ref()
+            .map(|fds| fds.is_set(fd).then(|| events.insert(PollEvents::OUT)));
+
+        if !events.is_empty() {
+            let file = task.with_mut_fdtable(|f| f.get_file(fd))?;
+            log::debug!("fd:{fd}, file path:{}", file.dentry().path());
+            polls.push((fd, events, file));
+        }
+    }
+
+    let old_mask = if let Some(mask) = sigmask {
+        Some(mem::replace(task.sig_mask_mut(), mask))
+    } else {
+        None
+    };
+
+    task.set_state(TaskState::Interruptable);
+    task.set_wake_up_signal(!task.get_sig_mask());
+
+    let intr_future = IntrBySignalFuture::new(task.clone(), task.get_sig_mask());
+    let pselect_future = PSelectFuture::new(polls);
+
+    let mut sweep_and_cont = || {
+        readfds.as_mut().map(|fds| fds.clear());
+        writefds.as_mut().map(|fds| fds.clear());
+        exceptfds.as_mut().map(|fds| fds.clear());
+        task.set_state(TaskState::Running);
+
+        if let Some(mask) = old_mask {
+            *task.sig_mask_mut() = mask;
+        }
+    };
+
+    let ret_vec = if let Some(timeout) = timeout {
+        // log::info!("timeout: {:?}", timeout);
+        match Select2Futures::new(
+            TimeoutFuture::new(timeout.into(), pselect_future),
+            intr_future,
+        )
+        .await
+        {
+            SelectOutput::Output1(time_output) => match time_output {
+                TimedTaskResult::Completed(ret_vec) => ret_vec,
+                TimedTaskResult::Timeout => {
+                    // log::debug!("[sys_pselect6]: timeout");
+                    sweep_and_cont();
+                    return Ok(0);
+                }
+            },
+            SelectOutput::Output2(_) => return Err(SysError::EINTR),
+        }
+    } else {
+        match Select2Futures::new(pselect_future, intr_future).await {
+            SelectOutput::Output1(ret_vec) => ret_vec,
+            SelectOutput::Output2(_) => return Err(SysError::EINTR),
+        }
+    };
+    sweep_and_cont();
+
+    let mut ret = 0;
+    for (fd, events) in ret_vec {
+        if events.contains(PollEvents::IN) || events.contains(PollEvents::HUP) {
+            log::info!("read ready fd {fd}");
+            readfds.as_mut().map(|fds| fds.set(fd));
+            ret += 1;
+        }
+        if events.contains(PollEvents::OUT) {
+            log::info!("write ready fd {fd}");
+            writefds.as_mut().map(|fds| fds.set(fd));
+            ret += 1;
+        }
+    }
+
+    Ok(ret)
+}
+
+/// `pread()` reads up to `count` bytes from file descriptor `fd` at offset `offset`
+/// (from the start of the file) into the buffer starting at `buf`.
+///
+/// The file offset is not changed.
+pub async fn sys_pread64(fd: usize, buf: usize, count: usize, offset: usize) -> SyscallResult {
+    let task = current_task();
+    let addr_space = task.addr_space();
+    let mut buf = UserWritePtr::<u8>::new(buf, &addr_space);
+
+    let buf_ptr = unsafe { buf.try_into_mut_slice(count) }?;
+
+    let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
+    file.seek(SeekFrom::Start(offset as u64))?;
+
+    file.read(buf_ptr).await
+}
+
+/// `pwrite()` writes up to `count` bytes from the buffer starting at `buf` to the file descriptor
+/// `fd` at offset `offset`.
+///
+/// The file offset is not changed.
+
+pub async fn sys_pwrite64(fd: usize, buf: usize, count: usize, offset: usize) -> SyscallResult {
+    let task = current_task();
+    let addr_space = task.addr_space();
+    let mut data_ptr = UserReadPtr::<u8>::new(buf, &addr_space);
+
+    let buf = unsafe { data_ptr.try_into_slice(count) }?;
+
+    let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
+    file.seek(SeekFrom::Start(offset as u64))?;
+
+    file.write(buf).await
 }

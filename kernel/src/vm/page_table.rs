@@ -280,9 +280,9 @@ impl PageTable {
     /// Maps a leaf page by specifying VPN, PPN, and page table entry flags.
     ///
     /// This method does not allocate the frame for the leaf page. It only sets the
-    /// mapping in the page table. The caller should allocate a frame is allocated
-    /// and set the mapping by calling this method. Be careful that calling this
-    /// method with an already mapped `vpn` will overwrite the existing mapping.
+    /// mapping in the page table. The caller should allocate a frame and set the
+    /// mapping by calling this method. Be careful that calling this method with an
+    /// already mapped `vpn` will overwrite the existing mapping.
     ///
     /// Returns a [`SysResult`] indicating whether the operation is successful.
     /// Returns an [`ENOMEM`] error if the method needs to allocate a frame but fails

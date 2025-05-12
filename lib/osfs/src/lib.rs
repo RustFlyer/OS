@@ -18,6 +18,7 @@ pub mod dev;
 pub mod fd_table;
 pub mod pipe;
 pub mod proc;
+pub mod pselect;
 pub mod simple;
 pub mod tmp;
 

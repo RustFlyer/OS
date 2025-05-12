@@ -58,7 +58,7 @@ impl File for TtyFile {
         if termios.is_icrnl() {
             for i in 0..rlen {
                 if buf[i] == '\r' as u8 {
-                    // buf[i] = '\n' as u8;
+                    buf[i] = '\n' as u8;
                 }
             }
         }
