@@ -138,6 +138,8 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         SHMDT => sys_shmdt(args[0]),
         SHMCTL => sys_shmctl(args[0], args[1] as i32, args[2]),
         PSELECT6 => sys_pselect6(args[0] as i32, args[1], args[2], args[3], args[4], args[5]).await,
+        PREAD64 => sys_pread64(args[0], args[1], args[2], args[3]).await,
+        PWRITE64 => sys_pwrite64(args[0], args[1], args[2], args[3]).await,
         _ => {
             log::error!("Syscall not implemented: {}", syscall_no.as_str());
             unimplemented!()

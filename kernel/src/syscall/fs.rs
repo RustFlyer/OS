@@ -11,7 +11,6 @@ use osfuture::{Select2Futures, SelectOutput};
 use time::TimeSpec;
 use timer::{TimedTaskResult, TimeoutFuture};
 
-use simdebug::stop;
 use strum::FromRepr;
 
 use config::{
@@ -1372,14 +1371,14 @@ pub fn sys_symlinkat(target: usize, newdirfd: usize, linkpath: usize) -> Syscall
 /// `sync()` causes all pending modifications to filesystem metadata and
 /// cached file data to be written to the underlying filesystems.
 pub fn sys_sync() -> SyscallResult {
-    log::error!("[sys_sync] not implemented.");
+    log::warn!("[sys_sync] not implemented.");
     Ok(0)
 }
 
 /// `fsync()` causes all pending modifications to filesystem metadata and
 /// cached file data to be written to the underlying filesystems.
 pub fn sys_fsync(_fd: usize) -> SyscallResult {
-    log::error!("[sys_fsync] not implemented.");
+    log::warn!("[sys_fsync] not implemented.");
     Ok(0)
 }
 
@@ -1583,4 +1582,39 @@ pub async fn sys_pselect6(
     }
 
     Ok(ret)
+}
+
+/// `pread()` reads up to `count` bytes from file descriptor `fd` at offset `offset`
+/// (from the start of the file) into the buffer starting at `buf`.
+///
+/// The file offset is not changed.
+pub async fn sys_pread64(fd: usize, buf: usize, count: usize, offset: usize) -> SyscallResult {
+    let task = current_task();
+    let addr_space = task.addr_space();
+    let mut buf = UserWritePtr::<u8>::new(buf, &addr_space);
+
+    let buf_ptr = unsafe { buf.try_into_mut_slice(count) }?;
+
+    let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
+    file.seek(SeekFrom::Start(offset as u64))?;
+
+    file.read(buf_ptr).await
+}
+
+/// `pwrite()` writes up to `count` bytes from the buffer starting at `buf` to the file descriptor
+/// `fd` at offset `offset`.
+///
+/// The file offset is not changed.
+
+pub async fn sys_pwrite64(fd: usize, buf: usize, count: usize, offset: usize) -> SyscallResult {
+    let task = current_task();
+    let addr_space = task.addr_space();
+    let mut data_ptr = UserReadPtr::<u8>::new(buf, &addr_space);
+
+    let buf = unsafe { data_ptr.try_into_slice(count) }?;
+
+    let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
+    file.seek(SeekFrom::Start(offset as u64))?;
+
+    file.write(buf).await
 }
