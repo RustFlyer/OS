@@ -3,6 +3,8 @@ use core::{
     sync::atomic::{AtomicBool, AtomicU8},
 };
 
+use alloc::vec::Vec;
+use mutex::SpinNoIrqLock;
 use smoltcp::{iface::SocketHandle, wire::IpEndpoint};
 
 use crate::{SOCKET_SET, tcp::SHUT_RDWR};
@@ -37,6 +39,7 @@ pub struct TcpSocket {
     /// Indicates whether the socket is in non-blocking mode, using an atomic
     /// boolean for thread-safe access.
     pub(crate) nonblock: AtomicBool,
+    pub(crate) listen_handles: SpinNoIrqLock<Vec<SocketHandle>>,
 }
 
 unsafe impl Sync for TcpSocket {}

@@ -15,6 +15,7 @@ pub const PORT_NUM: usize = 65536;
 /// This struct holds the information related to a specific listening IP address
 /// and port. It also manages the SYN queue and the waker for handling incoming
 /// TCP connections.
+#[derive(Debug)]
 pub struct ListenTableEntry {
     /// The IP address and port being listened on.
     pub(crate) listen_endpoint: IpListenEndpoint,

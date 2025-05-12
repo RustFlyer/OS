@@ -909,6 +909,11 @@ pub fn sys_fcntl(fd: usize, op: isize, arg: usize) -> SyscallResult {
             let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
             Ok(file.flags().bits() as _)
         }
+        F_GETFD => task.with_mut_fdtable(|table| {
+            let fd_info = table.get(fd)?;
+            log::debug!("[sys_fcntl] {:?}", fd_info.flags());
+            Ok(fd_info.flags().bits() as usize)
+        }),
         _ => {
             log::error!("[sys_fcntl] not implemented {op:?}");
             Ok(0)

@@ -2,6 +2,7 @@ use core::{ops::DerefMut, task::Waker};
 
 use alloc::boxed::Box;
 use mutex::SpinNoIrqLock;
+use osfuture::yield_now;
 use smoltcp::{
     iface::{SocketHandle, SocketSet},
     socket::tcp,
@@ -44,15 +45,19 @@ impl ListenTable {
 
     pub fn listen(&self, listen_endpoint: IpListenEndpoint, waker: &Waker) -> SysResult<()> {
         let port = listen_endpoint.port;
+        log::debug!("[listen] port: {}", port);
         assert_ne!(port, 0);
         let mut entry = self.tcp[port as usize].lock();
         if entry.is_none() {
             *entry = Some(Box::new(ListenTableEntry::new(listen_endpoint, waker)));
-            Ok(())
         } else {
             log::warn!("socket listen() failed");
-            Err(SysError::EADDRINUSE)
+            return Err(SysError::EADDRINUSE);
         }
+
+        log::debug!("[listen] {:?}", *entry);
+
+        Ok(())
     }
 
     pub fn unlisten(&self, port: u16) {
@@ -76,8 +81,15 @@ impl ListenTable {
     /// checks SYN queue in port and find handles which built connection successfully, take them
     /// from the queue and return to caller.
     pub fn accept(&self, port: u16) -> SysResult<(SocketHandle, (IpEndpoint, IpEndpoint))> {
+        log::debug!("[accept] port: {}", port);
+
         if let Some(entry) = self.tcp[port as usize].lock().deref_mut() {
+            log::debug!("[accept] entry: {:?}", *entry);
             let syn_queue = &mut entry.syn_queue;
+            syn_queue.iter().for_each(|&tuple| {
+                log::debug!("[accept] {}, isconnect?{}", tuple, is_connected(tuple))
+            });
+
             let (idx, addr_tuple) = syn_queue
                 .iter()
                 .enumerate()
@@ -100,6 +112,7 @@ impl ListenTable {
                     syn_queue.len()
                 );
             }
+            log::debug!("[accept] success return resource");
             let handle = syn_queue.swap_remove_front(idx).unwrap();
             Ok((handle, addr_tuple))
         } else {

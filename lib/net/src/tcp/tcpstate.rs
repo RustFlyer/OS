@@ -4,14 +4,16 @@ use core::{
     task::Waker,
 };
 
+use alloc::vec::Vec;
 use mutex::SpinNoIrqLock;
 use osfuture::{suspend_now, yield_now};
 use smoltcp::{
     iface::SocketHandle,
-    socket::tcp::{self, ConnectError},
+    socket::tcp::{self, ConnectError, State},
     wire::{IpAddress, IpEndpoint, IpListenEndpoint},
 };
 use systype::{SysError, SysResult};
+use timer::sleep_ms;
 
 use crate::{
     ETH0, NetPollState, SOCKET_SET, SocketSetWrapper,
@@ -36,6 +38,7 @@ impl TcpSocket {
             local_addr: UnsafeCell::new(UNSPECIFIED_ENDPOINT_V4),
             peer_addr: UnsafeCell::new(UNSPECIFIED_ENDPOINT_V4),
             nonblock: AtomicBool::new(false),
+            listen_handles: SpinNoIrqLock::new(Vec::new()),
         }
     }
 
@@ -52,6 +55,7 @@ impl TcpSocket {
             local_addr: UnsafeCell::new(local_addr),
             peer_addr: UnsafeCell::new(peer_addr),
             nonblock: AtomicBool::new(false),
+            listen_handles: SpinNoIrqLock::new(Vec::new()),
         }
     }
 
@@ -219,11 +223,20 @@ impl TcpSocket {
     pub fn listen(&self, waker: &Waker) -> SysResult<()> {
         self.update_state(STATE_CLOSED, STATE_LISTENING, || {
             let bound_endpoint = self.bound_endpoint()?;
-            unsafe {
-                (*self.local_addr.get()).port = bound_endpoint.port;
+            // unsafe {
+            //     (*self.local_addr.get()).port = bound_endpoint.port;
+            // }
+
+            // LISTEN_TABLE.listen(bound_endpoint, waker)?;
+            // log::info!("[TcpSocket::listen] listening on {bound_endpoint:?}");
+            for _ in 0..32 {
+                let sock_handle = SOCKET_SET.add(SocketSetWrapper::new_tcp_socket());
+                SOCKET_SET.with_socket_mut::<tcp::Socket, _, _>(sock_handle, |sock| {
+                    sock.listen(bound_endpoint).unwrap();
+                });
+                self.listen_handles.lock().push(sock_handle);
             }
-            LISTEN_TABLE.listen(bound_endpoint, waker)?;
-            log::info!("[TcpSocket::listen] listening on {bound_endpoint:?}");
+
             Ok(())
         })
         .unwrap_or(Ok(())) // ignore simultaneous `listen`s.
@@ -245,9 +258,31 @@ impl TcpSocket {
         // SAFETY: `self.local_addr` should be initialized after `bind()`.
         let local_port = unsafe { self.local_addr.get().read().port };
         self.block_on(|| {
-            let (handle, (local_addr, peer_addr)) = LISTEN_TABLE.accept(local_port)?;
-            log::info!("TCP socket accepted a new connection {}", peer_addr);
-            Ok(TcpSocket::new_connected(handle, local_addr, peer_addr))
+            // log::info!("TCP socket try to accept a new connection");
+            // let (handle, (local_addr, peer_addr)) = LISTEN_TABLE.accept(local_port)?;
+            // log::info!("TCP socket accepted a new connection {}", peer_addr);
+            let mut listen_handles = self.listen_handles.lock();
+            for (i, &handle) in listen_handles.iter().enumerate() {
+                let established = SOCKET_SET.with_socket_mut::<tcp::Socket, _, _>(handle, |sock| {
+                    if sock.state() == State::Established {
+                        let peer_addr = sock.remote_endpoint().unwrap();
+                        let local_addr = sock.local_endpoint().unwrap();
+                        Some((handle, local_addr, peer_addr))
+                    } else {
+                        None
+                    }
+                });
+
+                log::debug!("has established? {:?}", established);
+                if let Some((hdl, local, peer)) = established {
+                    listen_handles.remove(i);
+                    // todo: 补充一个新的 listen socket
+                    return Ok(TcpSocket::new_connected(hdl, local, peer));
+                }
+            }
+
+            Err(SysError::EAGAIN)
+            // Ok(TcpSocket::new_connected(handle, local_addr, peer_addr))
         })
         .await
     }
@@ -396,6 +431,7 @@ impl TcpSocket {
         if self.is_nonblocking() {
             f()
         } else {
+            log::debug!("[block_on] socket is blocking");
             loop {
                 let timestamp = SOCKET_SET.poll_interfaces();
                 let ret = f();
@@ -403,7 +439,8 @@ impl TcpSocket {
                 match ret {
                     Ok(t) => return Ok(t),
                     Err(SysError::EAGAIN) => {
-                        suspend_now().await;
+                        // log::warn!("[block_on] this thread is suspended");
+                        sleep_ms(5).await;
                         if has_signal() {
                             log::warn!("[TcpSocket::block_on] has signal");
                             return Err(SysError::EINTR);

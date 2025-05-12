@@ -146,6 +146,10 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         SETSOCKOPT => sys_setsockopt(args[0], args[1], args[2], args[3], args[4]),
         SENDTO => sys_sendto(args[0], args[1], args[2], args[3], args[4], args[5]).await,
         RECVFROM => sys_recvfrom(args[0], args[1], args[2], args[3], args[4], args[5]).await,
+        LISTEN => sys_listen(args[0], args[1]),
+        CONNECT => sys_connect(args[0], args[1], args[2]).await,
+        ACCEPT => sys_accept(args[0], args[1], args[2]).await,
+        GETEGID => sys_getegid(),
         _ => {
             log::error!("Syscall not implemented: {}", syscall_no.as_str());
             unimplemented!()

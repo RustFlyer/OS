@@ -1,5 +1,5 @@
-use alloc::vec;
-use mutex::SpinNoIrqLock;
+use alloc::{sync::Arc, vec};
+use mutex::{SpinNoIrqLock, new_share_mutex};
 use smoltcp::{
     iface::{SocketHandle, SocketSet},
     socket::{self, AnySocket, tcp::SocketBuffer},
@@ -19,7 +19,7 @@ pub const LISTEN_QUEUE_SIZE: usize = 512;
 /// transmission and reception, etc.
 ///
 /// It is similar to `FdTable` and `SocketHandle` is similar to `fd`
-pub(crate) struct SocketSetWrapper<'a>(SpinNoIrqLock<SocketSet<'a>>);
+pub(crate) struct SocketSetWrapper(Arc<SpinNoIrqLock<SocketSet<'static>>>);
 
 /// Tcp Socket
 ///
@@ -58,22 +58,22 @@ type SmolUdpPacketMetadata = socket::udp::PacketMetadata;
 /// - A value less than 0 indicates a time before the starting point
 type SmolInstant = smoltcp::time::Instant;
 
-impl<'a> SocketSetWrapper<'a> {
+impl SocketSetWrapper {
     /// Creates a new `SocketSetWrapper`. In fact, this function is only called
     /// by `SOCKET_SET`.
     pub fn new() -> Self {
-        Self(SpinNoIrqLock::new(SocketSet::new(vec![])))
+        Self(new_share_mutex(SocketSet::new(vec![])))
     }
 
     /// Creates a new tcp socket consisting of `tcp_rx_buffer` and `tcp_tx_buffer`.
-    pub fn new_tcp_socket() -> SmolTcpSocket<'a> {
+    pub fn new_tcp_socket() -> SmolTcpSocket<'static> {
         let tcp_rx_buffer = SocketBuffer::new(vec![0; TCP_RX_BUF_LEN]);
         let tcp_tx_buffer = SocketBuffer::new(vec![0; TCP_TX_BUF_LEN]);
         SmolTcpSocket::new(tcp_rx_buffer, tcp_tx_buffer)
     }
 
     /// Creates a new udp socket consisting of `udp_rx_buffer` and `udp_tx_buffer`.
-    pub fn new_udp_socket() -> SmolUdpSocket<'a> {
+    pub fn new_udp_socket() -> SmolUdpSocket<'static> {
         let udp_rx_buffer = SmolUdpPacketBuffer::new(
             vec![SmolUdpPacketMetadata::EMPTY; 8],
             vec![0; UDP_RX_BUF_LEN],
@@ -88,7 +88,7 @@ impl<'a> SocketSetWrapper<'a> {
     /// Like `fdtable`, this function can receive a `socket` and add it into `Socket_Set`.
     /// A `SocketHandle` will be returned as `Fd` in `Fdtable` when the `socket` is added
     /// successfully.
-    pub fn add<T: AnySocket<'a>>(&self, socket: T) -> SocketHandle {
+    pub fn add<T: AnySocket<'static>>(&self, socket: T) -> SocketHandle {
         let handle = self.0.lock().add(socket);
         handle
     }
@@ -99,7 +99,7 @@ impl<'a> SocketSetWrapper<'a> {
         self.0.lock().remove(handle);
     }
 
-    pub fn with_socket_mut<T: AnySocket<'a>, R, F>(&self, handle: SocketHandle, f: F) -> R
+    pub fn with_socket_mut<T: AnySocket<'static>, R, F>(&self, handle: SocketHandle, f: F) -> R
     where
         F: FnOnce(&mut T) -> R,
     {
@@ -109,12 +109,12 @@ impl<'a> SocketSetWrapper<'a> {
     }
 
     pub fn poll_interfaces(&self) -> SmolInstant {
-        {
-            let lock = self.0.lock();
-            lock.iter()
-                .for_each(|s| log::debug!("[poll_interfaces] {}", s.0));
-        }
-        ETH0.get().unwrap().poll(&self.0)
+        // {
+        //     let lock = self.0.lock();
+        //     lock.iter()
+        //         .for_each(|s| log::debug!("[poll_interfaces] {}", s.0));
+        // }
+        ETH0.get().unwrap().poll(self.0.clone())
     }
 
     pub fn check_poll(&self, timestamp: SmolInstant) {

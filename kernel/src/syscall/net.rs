@@ -6,7 +6,8 @@ use systype::{SysError, SyscallResult};
 use crate::{
     net::{
         SocketType,
-        addr::{SaFamily, read_sockaddr, write_sockaddr},
+        addr::{SaFamily, SockAddr, read_sockaddr, write_sockaddr},
+        sock::Sock,
         socket::Socket,
         sockopt::{SocketLevel, SocketOpt},
     },
@@ -213,4 +214,67 @@ pub async fn sys_recvfrom(
     log::debug!("[sys_recvfrom] recv buf: {:?}", buf);
 
     Ok(bytes)
+}
+
+pub fn sys_listen(sockfd: usize, _backlog: usize) -> SyscallResult {
+    let task = current_task();
+
+    let socket: Arc<Socket> = task
+        .with_mut_fdtable(|table| table.get_file(sockfd))?
+        .downcast_arc::<Socket>()
+        .map_err(|_| SysError::ENOTSOCK)?;
+
+    socket.sk.listen()?;
+    Ok(0)
+}
+
+/// Connect the active socket referenced by the file descriptor `sockfd` to
+/// the listening socket specified by `addr` and `addrlen` at the address
+pub async fn sys_connect(sockfd: usize, addr: usize, addrlen: usize) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+    let remote_addr = read_sockaddr(addrspace.clone(), addr, addrlen)?;
+
+    let socket: Arc<Socket> = task
+        .with_mut_fdtable(|table| table.get_file(sockfd))?
+        .downcast_arc::<Socket>()
+        .map_err(|_| SysError::ENOTSOCK)?;
+
+    log::info!("[sys_connect] fd {sockfd} trys to connect");
+    socket.sk.connect(remote_addr).await?;
+    // TODO:
+    // yield_now().await;
+    Ok(0)
+}
+
+/// The accept() system call accepts an incoming connection on a listening
+/// stream socket referred to by the file descriptor `sockfd`. If there are
+/// no pending connections at the time of the accept() call, the call
+/// will block until a connection request arrives. Both `addr` and
+/// `addrlen` are pointers representing peer socket address. if the addrlen
+/// pointer is not zero, it will be assigned to the actual size of the
+/// peer address.
+///
+/// On success, the call returns the file descriptor of the newly connected
+/// socket.
+pub async fn sys_accept(sockfd: usize, addr: usize, addrlen: usize) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+
+    let socket: Arc<Socket> = task
+        .with_mut_fdtable(|table| table.get_file(sockfd))?
+        .downcast_arc::<Socket>()
+        .map_err(|_| SysError::ENOTSOCK)?;
+
+    task.set_state(TaskState::Interruptable);
+    task.set_wake_up_signal(!task.get_sig_mask());
+    let new_sk = socket.sk.accept().await?;
+    task.set_state(TaskState::Running);
+
+    let peer_addr = new_sk.peer_addr()?;
+    let peer_addr = SockAddr::from_endpoint(peer_addr);
+    write_sockaddr(addrspace, addr, addrlen, peer_addr)?;
+    let new_socket = Arc::new(Socket::from_another(&socket, Sock::Tcp(new_sk)));
+    let fd = task.with_mut_fdtable(|table| table.alloc(new_socket, OpenFlags::empty()))?;
+    Ok(fd)
 }

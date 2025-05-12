@@ -12,7 +12,7 @@ pub type Fd = usize;
 #[derive(Clone)]
 pub struct FdInfo {
     file: Arc<dyn File>,
-    flags: OpenFlags,
+    flags: FdFlags,
 }
 
 #[derive(Clone)]
@@ -22,7 +22,7 @@ pub struct FdTable {
 }
 
 impl FdInfo {
-    pub fn new(file: Arc<dyn File>, flags: OpenFlags) -> Self {
+    pub fn new(file: Arc<dyn File>, flags: FdFlags) -> Self {
         Self { file, flags }
     }
 
@@ -30,16 +30,16 @@ impl FdInfo {
         self.file.clone()
     }
 
-    pub fn flags(&self) -> OpenFlags {
+    pub fn flags(&self) -> FdFlags {
         self.flags
     }
 
-    pub fn set_flags(&mut self, flags: OpenFlags) {
+    pub fn set_flags(&mut self, flags: FdFlags) {
         self.flags = flags;
     }
 
     pub fn close(&mut self) {
-        self.flags = OpenFlags::O_CLOEXEC;
+        self.flags = FdFlags::CLOEXEC;
     }
 }
 
@@ -47,13 +47,13 @@ impl FdTable {
     pub fn new() -> Self {
         let mut table: Vec<Option<FdInfo>> = Vec::with_capacity(MAX_FDS);
 
-        let fdinfo = FdInfo::new(TTY.get().unwrap().clone(), OpenFlags::empty());
+        let fdinfo = FdInfo::new(TTY.get().unwrap().clone(), FdFlags::empty());
         table.push(Some(fdinfo));
 
-        let fdinfo = FdInfo::new(TTY.get().unwrap().clone(), OpenFlags::empty());
+        let fdinfo = FdInfo::new(TTY.get().unwrap().clone(), FdFlags::empty());
         table.push(Some(fdinfo));
 
-        let fdinfo = FdInfo::new(TTY.get().unwrap().clone(), OpenFlags::empty());
+        let fdinfo = FdInfo::new(TTY.get().unwrap().clone(), FdFlags::empty());
         table.push(Some(fdinfo));
 
         Self {
@@ -89,7 +89,7 @@ impl FdTable {
     }
 
     pub fn alloc(&mut self, file: Arc<dyn File>, flags: OpenFlags) -> SysResult<Fd> {
-        let fdinfo = FdInfo::new(file, flags);
+        let fdinfo = FdInfo::new(file, flags.into());
         if let Some(fd) = self.get_available_slot(0) {
             log::info!("alloc fd [{}]", fd);
             self.table[fd] = Some(fdinfo);
@@ -122,7 +122,7 @@ impl FdTable {
     pub fn close(&mut self) {
         for slot in self.table.iter_mut() {
             if let Some(fd_info) = slot {
-                if fd_info.flags().contains(OpenFlags::O_CLOEXEC) {
+                if fd_info.flags().contains(FdFlags::CLOEXEC) {
                     *slot = None;
                 }
             }
@@ -255,5 +255,23 @@ impl FdSet {
         let bit = fd % 64;
         let mask = 1 << bit;
         self.fds_bits[idx] & mask != 0
+    }
+}
+
+bitflags::bitflags! {
+    // Defined in <bits/fcntl-linux.h>.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct FdFlags: u8 {
+        const CLOEXEC = 1;
+    }
+}
+
+impl From<OpenFlags> for FdFlags {
+    fn from(value: OpenFlags) -> Self {
+        if value.contains(OpenFlags::O_CLOEXEC) {
+            FdFlags::CLOEXEC
+        } else {
+            FdFlags::empty()
+        }
     }
 }

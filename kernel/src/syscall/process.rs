@@ -122,12 +122,10 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
         match target {
             WaitFor::AnyChild => children
                 .values()
-                .find(|c| {
-                    c.is_in_state(TaskState::WaitForRecycle)
-                }),
+                .find(|c| c.is_in_state(TaskState::WaitForRecycle)),
             WaitFor::Pid(pid) => {
                 if let Some(child) = children.get(&pid) {
-                    if child.is_in_state(TaskState::WaitForRecycle){
+                    if child.is_in_state(TaskState::WaitForRecycle) {
                         Some(child)
                     } else {
                         None
@@ -143,7 +141,8 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
         .cloned()
     };
 
-    if let Some(child_for_recycle) = child_for_recycle {    // 1. if there is a child for recycle when `sys_wait4` is called
+    if let Some(child_for_recycle) = child_for_recycle {
+        // 1. if there is a child for recycle when `sys_wait4` is called
         let addr_space = task.addr_space();
         let mut status = UserWritePtr::<i32>::new(wstatus, &addr_space);
         let zombie_task = child_for_recycle;
@@ -171,9 +170,11 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
         TASK_MANAGER.remove_task(tid);
         PROCESS_GROUP_MANAGER.remove(&zombie_task);
         Ok(tid)
-    } else if option.contains(WaitOptions::WNOHANG) {   // 2. if WNOHANG option is set and there is no child for recycle, return immediately
+    } else if option.contains(WaitOptions::WNOHANG) {
+        // 2. if WNOHANG option is set and there is no child for recycle, return immediately
         Ok(0)
-    } else { // 3. if there is no child for recycle and WNOHANG option is not set, wait for SIGCHLD from target
+    } else {
+        // 3. if there is no child for recycle and WNOHANG option is not set, wait for SIGCHLD from target
         log::info!("[sys_wait4] task [{}] suspend for sigchld", task.get_name());
         let (child_tid, exit_code, child_utime, child_stime) = loop {
             task.set_state(TaskState::Interruptable);
@@ -185,7 +186,10 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
             // if it is SIGCHLD, then we can get the child for recycle
             // TODO: check if the matched child is identical to the SIGCHLD's info
             if let Some(info) = si {
-                log::info!("[sys_wait4] sigchld received, the child for recycle is announced by signal to be {:?}", info.details);
+                log::info!(
+                    "[sys_wait4] sigchld received, the child for recycle is announced by signal to be {:?}",
+                    info.details
+                );
                 let children = task.children_mut().lock();
 
                 let child = match target {
@@ -546,6 +550,12 @@ pub fn sys_setpgid(pid: usize, pgid: usize) -> SyscallResult {
 /// `geteuid()` returns the effective user ID of the calling process.
 pub fn sys_geteuid() -> SyscallResult {
     log::error!("[geteuid] unimplemented call");
+    Ok(0)
+}
+
+/// `getegid()` returns the effective user ID of the calling process.
+pub fn sys_getegid() -> SyscallResult {
+    log::error!("[getegid] unimplemented call");
     Ok(0)
 }
 

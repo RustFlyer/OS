@@ -1,5 +1,6 @@
 use crate_interface::call_interface;
 use listentable::ListenTable;
+use smoltcp::{iface::SocketSet, socket::icmp::Endpoint, wire::IpEndpoint};
 use spin::lazy::Lazy;
 
 pub mod core;
@@ -43,4 +44,35 @@ pub trait HasSignalIf: Send + Sync {
 
 pub(crate) fn has_signal() -> bool {
     call_interface!(HasSignalIf::has_signal())
+}
+
+pub fn snoop_tcp_packet(
+    buf: &[u8],
+    // sockets: &mut SocketSet<'_>,
+    is_ethernet: bool,
+) -> Result<Option<(IpEndpoint, IpEndpoint)>, smoltcp::wire::Error> {
+    use smoltcp::wire::{EthernetFrame, IpProtocol, Ipv4Packet, TcpPacket};
+
+    // let ether_frame = EthernetFrame::new_checked(buf)?;
+    // let ipv4_packet = Ipv4Packet::new_checked(ether_frame.payload())?;
+    let ipv4_packet = if is_ethernet {
+        let ether_frame = EthernetFrame::new_checked(buf)?;
+        Ipv4Packet::new_checked(ether_frame.payload())?
+    } else {
+        Ipv4Packet::new_checked(buf)?
+    };
+    if ipv4_packet.next_header() == IpProtocol::Tcp {
+        let tcp_packet = TcpPacket::new_checked(ipv4_packet.payload())?;
+        let src_addr = (ipv4_packet.src_addr(), tcp_packet.src_port()).into();
+        let dst_addr = (ipv4_packet.dst_addr(), tcp_packet.dst_port()).into();
+        let is_first = tcp_packet.syn() && !tcp_packet.ack();
+        if is_first {
+            // create a socket for the first incoming TCP packet, as the later accept()
+            // returns.
+            log::info!("[snoop_tcp_packet] receive TCP");
+            // LISTEN_TABLE.incoming_tcp_packet(src_addr, dst_addr, sockets);
+            return Ok(Some((src_addr, dst_addr)));
+        }
+    }
+    Ok(None)
 }

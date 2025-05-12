@@ -1,16 +1,17 @@
 use core::{ops::DerefMut, time::Duration};
 
-use alloc::{boxed::Box, vec::Vec};
+use alloc::{boxed::Box, sync::Arc, vec::Vec};
 use arch::riscv64::time::{get_time_duration, get_time_us};
 use driver::net::NetDevice;
-use mutex::SpinNoIrqLock;
+use mutex::{ShareMutex, SpinNoIrqLock, new_share_mutex};
 use smoltcp::{
     iface::{Config, Interface, SocketSet},
     phy::Medium,
     wire::{EthernetAddress, HardwareAddress, IpAddress, IpCidr},
 };
+use timer::{TIMER_MANAGER, Timer};
 
-use crate::device::DeviceWrapper;
+use crate::{PollTimer, device::DeviceWrapper, tcp::LISTEN_TABLE};
 
 type SmolInstant = smoltcp::time::Instant;
 type SmolDuration = smoltcp::time::Duration;
@@ -112,15 +113,16 @@ impl InterfaceWrapper {
     /// protocol stack status.
     ///
     /// return what time it should poll next
-    pub fn poll(&self, sockets: &SpinNoIrqLock<SocketSet>) -> SmolInstant {
+    pub fn poll(&self, sockets: ShareMutex<SocketSet>) -> SmolInstant {
         log::warn!("[net] poll");
         let mut dev = self.dev.lock();
+
         let mut iface = self.iface.lock();
         let mut sockets = sockets.lock();
         let timestamp = Self::current_time();
-        simdebug::stop();
         let res = iface.poll(timestamp, dev.deref_mut(), &mut sockets);
         log::debug!("[poll] res: {:?}", res);
+        // Self::check_device_tcpstate(dev.deref_mut(), &mut sockets);
         timestamp
     }
 
@@ -153,21 +155,29 @@ impl InterfaceWrapper {
                         &mut sockets,
                     );
                 } else {
-                    // Timer is not supported now.
-                    todo!();
-                    // let timer = Timer::new(next_poll, Box::new(PollTimer {}));
-                    // TIMER_MANAGER.add_timer(timer);
+                    let mut timer = Timer::new(next_poll);
+                    timer.set_callback(Arc::new(PollTimer {}));
+                    TIMER_MANAGER.add_timer(timer);
                 }
             }
             None => {
-                todo!();
-                // let timer = Timer::new(
-                //     get_time_duration() + Duration::from_millis(2),
-                //     Box::new(PollTimer {}),
-                // );
-                // TIMER_MANAGER.add_timer(timer);
+                let mut timer = Timer::new(get_time_duration() + Duration::from_millis(2));
+                timer.set_callback(Arc::new(PollTimer {}));
+                TIMER_MANAGER.add_timer(timer);
             }
         }
+        // Self::check_device_tcpstate(self.dev.lock().deref_mut(), &mut sockets);
+    }
+
+    pub(crate) fn check_device_tcpstate(dev: &mut DeviceWrapper, sockets: &mut SocketSet) {
+        let is_tcp_first = dev.state.is_recv_first;
+        if !is_tcp_first {
+            return;
+        }
+        let src_addr = dev.state.src_addr;
+        let dst_addr = dev.state.dst_addr;
+        LISTEN_TABLE.incoming_tcp_packet(src_addr, dst_addr, sockets);
+        dev.clear_state();
     }
 
     pub(crate) fn bench_test(&self) {

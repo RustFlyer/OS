@@ -3,12 +3,13 @@
 #![feature(ip)]
 #![feature(ip_as_octets)]
 
-use alloc::{boxed::Box, vec};
+use alloc::{boxed::Box, sync::Arc, vec};
 use driver::net::NetDevice;
 use interface::InterfaceWrapper;
 use smoltcp::wire::{EthernetAddress, IpCidr};
 use socketset::SocketSetWrapper;
 use spin::{lazy::Lazy, once::Once};
+use timer::{IEvent, Timer, TimerState};
 
 extern crate alloc;
 
@@ -81,4 +82,14 @@ pub fn poll_interfaces() -> smoltcp::time::Instant {
 
 pub fn net_bench() {
     ETH0.get().unwrap().bench_test();
+}
+
+#[derive(Debug)]
+struct PollTimer;
+
+impl IEvent for PollTimer {
+    fn callback(self: Arc<Self>) -> TimerState {
+        poll_interfaces();
+        TimerState::Cancelled
+    }
 }

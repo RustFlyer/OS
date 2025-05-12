@@ -2,21 +2,52 @@ use core::cell::RefCell;
 
 use alloc::boxed::Box;
 use driver::net::NetDevice;
-use smoltcp::phy;
+use mutex::{ShareMutex, SpinNoIrqLock, new_share_mutex};
+use smoltcp::{
+    iface::SocketSet,
+    phy::{self, Medium},
+    socket::icmp::Endpoint,
+    wire::IpEndpoint,
+};
 
-use crate::rttoken::{NetRxToken, NetTxToken};
+use crate::{
+    addr::UNSPECIFIED_ENDPOINT_V4,
+    rttoken::{NetRxToken, NetTxToken},
+    tcp::snoop_tcp_packet,
+};
+
+pub struct TcpState {
+    pub(crate) is_recv_first: bool,
+    pub(crate) src_addr: IpEndpoint,
+    pub(crate) dst_addr: IpEndpoint,
+}
+
+impl TcpState {
+    fn new() -> Self {
+        Self {
+            is_recv_first: false,
+            src_addr: UNSPECIFIED_ENDPOINT_V4,
+            dst_addr: UNSPECIFIED_ENDPOINT_V4,
+        }
+    }
+}
 
 /// `DeviceWrapper` is created for convenience to wrap dyn
 /// trait and modify inner member.
 pub(crate) struct DeviceWrapper {
     inner: RefCell<Box<dyn NetDevice>>,
+    pub state: TcpState,
 }
 
 impl DeviceWrapper {
     pub fn new(inner: Box<dyn NetDevice>) -> Self {
         Self {
             inner: RefCell::new(inner),
+            state: TcpState::new(),
         }
+    }
+    pub fn clear_state(&mut self) {
+        self.state.is_recv_first = false;
     }
 }
 
@@ -62,7 +93,28 @@ impl phy::Device for DeviceWrapper {
                 return None;
             }
         };
-        Some((NetRxToken(&self.inner, rx_buf), NetTxToken(&self.inner)))
+        let rxtoken = NetRxToken(&self.inner, rx_buf);
+        // let medium = dev.capabilities().medium;
+        // let is_ethernet = medium == Medium::Ethernet;
+        // let ret = snoop_tcp_packet(rxtoken.1.packet(), is_ethernet);
+
+        // match ret {
+        //     Ok(r) => match r {
+        //         Some((src, dest)) => {
+        //             self.state = TcpState {
+        //                 is_recv_first: true,
+        //                 src_addr: src,
+        //                 dst_addr: dest,
+        //             };
+        //         }
+        //         None => (),
+        //     },
+        //     Err(e) => {
+        //         log::warn!("{e:?}");
+        //     }
+        // }
+
+        Some((rxtoken, NetTxToken(&self.inner)))
     }
 
     /// Constructs a transmit token.

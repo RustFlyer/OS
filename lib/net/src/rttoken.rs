@@ -2,7 +2,10 @@ use core::cell::RefCell;
 
 use alloc::boxed::Box;
 use driver::net::{NetDevice, netbuf::NetBufPtrOps};
-use smoltcp::phy::{RxToken, TxToken};
+use smoltcp::{
+    phy::{Medium, RxToken, TxToken},
+    socket::tcp,
+};
 
 /// `NetRxToken` implement `RxToken` trait, which means that
 /// this token is the only chance that the kernel can process the packet

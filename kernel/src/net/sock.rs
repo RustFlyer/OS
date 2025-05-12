@@ -124,4 +124,14 @@ impl Sock {
             Sock::Udp(udp) => udp.shutdown(),
         }
     }
+
+    pub async fn accept(&self) -> SysResult<TcpSocket> {
+        match self {
+            Sock::Tcp(tcp) => {
+                let new_tcp = tcp.accept().await?;
+                Ok(new_tcp)
+            }
+            Sock::Udp(_udp) => Err(SysError::EOPNOTSUPP),
+        }
+    }
 }
