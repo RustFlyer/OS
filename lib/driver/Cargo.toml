@@ -6,14 +6,13 @@ edition = "2024"
 [dependencies]
 arch = { path = "../arch" }
 config = { path = "../config" }
-mutex = { path = "../mutex" }
 mm = { path = "../mm" }
+mutex = { path = "../mutex" }
 polyhal-macro = { path = "../polyhal/polyhal-macro" }
-
-spin = { workspace = true }
-virtio-drivers ={ workspace = true }
-uart_16550 = { workspace = true }
 log = { workspace = true }
+spin = { workspace = true }
+uart_16550 = { workspace = true }
+virtio-drivers ={ workspace = true }
 
 [target.'cfg(target_arch = "riscv64")'.dependencies]
 sbi-rt = { workspace = true, features = ["legacy"] }

@@ -3,5 +3,5 @@ name = "pps"
 version = "0.1.0"
 edition = "2024"
 
-[dependencies]
+[target.'cfg(target_arch = "riscv64")'.dependencies]
 riscv = { workspace = true }

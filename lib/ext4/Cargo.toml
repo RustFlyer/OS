@@ -4,15 +4,13 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-vfs = { path = "../vfs/" }
-driver = { path = "../driver/" }
 config = { path = "../config/" }
-systype = { path = "../systype/" }
+driver = { path = "../driver/" }
 mutex = { path = "../mutex/" }
 simdebug = { path = "../simdebug/" }
- 
-
-lwext4_rust = { workspace = true }
-log = { workspace = true }
+systype = { path = "../systype/" }
+vfs = { path = "../vfs/" }
 async-trait = { workspace = true }
 downcast-rs = { workspace = true }
+log = { workspace = true }
+lwext4_rust = { workspace = true }

@@ -6,6 +6,8 @@ edition = "2024"
 [dependencies]
 osfuture = { path = "../osfuture" }
 simdebug = { path = "../simdebug" }
-log = { workspace = true }
 bitflags = { workspace = true }
+log = { workspace = true }
+
+[target.'cfg(target_arch = "riscv64")'.dependencies]
 riscv = { workspace = true }
