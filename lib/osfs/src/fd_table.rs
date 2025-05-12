@@ -2,7 +2,6 @@ use alloc::{sync::Arc, vec::Vec};
 use core::fmt::Debug;
 
 use config::{fs::MAX_FDS, vfs::OpenFlags};
-use log::info;
 use systype::{RLimit, SysError, SysResult};
 use vfs::file::File;
 
@@ -92,7 +91,7 @@ impl FdTable {
     pub fn alloc(&mut self, file: Arc<dyn File>, flags: OpenFlags) -> SysResult<Fd> {
         let fdinfo = FdInfo::new(file, flags);
         if let Some(fd) = self.get_available_slot(0) {
-            info!("alloc fd [{}]", fd);
+            log::info!("alloc fd [{}]", fd);
             self.table[fd] = Some(fdinfo);
             Ok(fd)
         } else {

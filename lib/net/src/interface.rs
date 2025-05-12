@@ -36,7 +36,7 @@ pub(crate) struct InterfaceWrapper {
     name: &'static str,
     ether_addr: EthernetAddress,
     dev: SpinNoIrqLock<DeviceWrapper>,
-    iface: SpinNoIrqLock<Interface>,
+    pub(crate) iface: SpinNoIrqLock<Interface>,
 }
 
 impl InterfaceWrapper {
@@ -113,11 +113,14 @@ impl InterfaceWrapper {
     ///
     /// return what time it should poll next
     pub fn poll(&self, sockets: &SpinNoIrqLock<SocketSet>) -> SmolInstant {
+        log::warn!("[net] poll");
         let mut dev = self.dev.lock();
         let mut iface = self.iface.lock();
         let mut sockets = sockets.lock();
         let timestamp = Self::current_time();
-        let _result = iface.poll(timestamp, dev.deref_mut(), &mut sockets);
+        simdebug::stop();
+        let res = iface.poll(timestamp, dev.deref_mut(), &mut sockets);
+        log::debug!("[poll] res: {:?}", res);
         timestamp
     }
 

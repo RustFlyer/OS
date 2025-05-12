@@ -1,8 +1,8 @@
 use core::cell::RefCell;
 
 use alloc::boxed::Box;
-use driver::net::{DevError, NetDevice};
-use smoltcp::phy::Device;
+use driver::net::NetDevice;
+use smoltcp::phy;
 
 use crate::rttoken::{NetRxToken, NetTxToken};
 
@@ -20,7 +20,7 @@ impl DeviceWrapper {
     }
 }
 
-impl Device for DeviceWrapper {
+impl phy::Device for DeviceWrapper {
     #[rustfmt::skip]
     type RxToken<'a> = NetRxToken<'a> where Self: 'a;
 

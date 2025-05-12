@@ -117,10 +117,21 @@ pub enum SysError {
     ENOTSOCK = 88,
     /// Unsupported
     EOPNOTSUPP = 95,
+    /// Socket address is already in use
+    EADDRINUSE = 98,
+    /// Address not available
+    EADDRNOTAVAIL = 99,
+    /// Connection reset
+    ECONNRESET = 104,
+    /// Transport endpoint is already connected
+    EISCONN = 106,
     /// Transport endpoint is not connected
     ENOTCONN = 107,
     /// Connection refused
     ECONNREFUSED = 111,
+    /// The socket is nonblocking and the connection cannot be completed
+    /// immediately.(connect.2)
+    EINPROGRESS = 115,
     /// UTF-8 Convert Failed
     EUTFFAIL = 188,
     /// Trap in Infinite loop
@@ -174,8 +185,13 @@ impl SysError {
             ENINODE => "Inode is null",
             ENOTSOCK => "Socket operation on non-socket",
             EOPNOTSUPP => "Unsupported",
+            EADDRINUSE => "Address already in use",
+            EADDRNOTAVAIL => "Address not available",
+            EISCONN => "Transport endpoint is already connected",
             ENOTCONN => "Transport endpoint is not connected",
             ECONNREFUSED => "Connection refused",
+            ECONNRESET => "Connection reset",
+            EINPROGRESS => "Operation now in progress",
             EUTFFAIL => "UTF-8 Convert Failed",
             ELOOP => "Trap in Infinite loop",
         }

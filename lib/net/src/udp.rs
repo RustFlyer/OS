@@ -119,6 +119,8 @@ impl UdpSocket {
 
         *local_addr = Some(bound_addr);
 
+        log::debug!("[udp::bind] bind {:?}", bound_addr);
+
         Ok(())
     }
 
@@ -170,7 +172,7 @@ impl UdpSocket {
                 Err(SysError::EAGAIN)
             }
         })?;
-        log::info!("[UdpSocket::send_impl] send {bytes}bytes to {remote_addr:?}");
+        log::info!("[UdpSocket::send_impl] send {bytes} bytes to {remote_addr:?}");
         yield_now().await;
 
         Ok(bytes)

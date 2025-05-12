@@ -596,10 +596,12 @@ name = "net"
 version = "0.1.0"
 dependencies = [
  "arch",
+ "crate_interface",
  "driver",
  "log",
  "mutex",
  "osfuture",
+ "simdebug",
  "smoltcp",
  "spin",
  "systype",
@@ -1065,6 +1067,7 @@ dependencies = [
  "cfg-if",
  "log",
  "mutex",
+ "osfuture",
  "simdebug",
  "spin",
 ]

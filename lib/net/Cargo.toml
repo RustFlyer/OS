@@ -10,12 +10,15 @@ arch = { path = "../arch" }
 timer = { path = "../timer" }
 systype = { path = "../systype" }
 osfuture = { path = "../osfuture" }
+simdebug = { path = "../simdebug" }
+
 
 smoltcp = { workspace = true }
 spin = { workspace = true }
 log = { workspace = true }
-
+crate_interface = { workspace = true }
 
 [features]
 smoltcp = []
 default = ["smoltcp"]
+log = []

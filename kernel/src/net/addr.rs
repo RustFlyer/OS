@@ -17,7 +17,7 @@ use crate::vm::{
     user_ptr::{SumGuard, UserReadPtr, UserWritePtr},
 };
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 #[repr(C)]
 /// IPv4 address
 pub struct SockAddrIn {
@@ -30,7 +30,7 @@ pub struct SockAddrIn {
     pub zero: [u8; 8],
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 #[repr(C)]
 /// IPv6 address
 pub struct SockAddrIn6 {
@@ -42,7 +42,7 @@ pub struct SockAddrIn6 {
     pub scope: u32,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 #[repr(C)]
 /// Unix domain socket address
 pub struct SockAddrUn {

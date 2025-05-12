@@ -1,5 +1,7 @@
 #![no_std]
 #![no_main]
+#![feature(ip)]
+#![feature(ip_as_octets)]
 
 use alloc::{boxed::Box, vec};
 use driver::net::NetDevice;
@@ -17,6 +19,7 @@ pub mod interface;
 pub mod portmap;
 pub mod rttoken;
 pub mod socketset;
+pub mod tcp;
 pub mod udp;
 
 /// Some meaningless parameters. They will be parsed as bytes

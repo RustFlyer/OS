@@ -4,7 +4,7 @@ use alloc::{boxed::Box, sync::Arc};
 
 use super::netpool::NetBufPool;
 
-pub trait NetBufPtrOps: Any {
+pub trait NetBufPtrOps: Any + Debug {
     fn packet(&self) -> &[u8];
     fn packet_mut(&mut self) -> &mut [u8];
     fn packet_len(&self) -> usize;
@@ -122,6 +122,7 @@ impl Drop for NetBuf {
 }
 
 /// A raw buffer struct for network device.
+#[derive(Debug)]
 pub struct NetBufPtr {
     // The raw pointer of the original object.
     pub raw_ptr: NonNull<u8>,

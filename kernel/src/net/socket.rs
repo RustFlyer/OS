@@ -1,7 +1,7 @@
 use alloc::boxed::Box;
 use async_trait::async_trait;
 use config::vfs::{OpenFlags, PollEvents};
-use net::{poll_interfaces, udp::UdpSocket};
+use net::{poll_interfaces, tcp::core::TcpSocket, udp::UdpSocket};
 use systype::SysResult;
 use vfs::{
     file::{File, FileMeta},
@@ -28,7 +28,7 @@ impl Socket {
         let sk = match domain {
             SaFamily::AF_UNIX => unimplemented!(),
             SaFamily::AF_INET | SaFamily::AF_INET6 => match types {
-                SocketType::STREAM => unimplemented!(),
+                SocketType::STREAM => Sock::Tcp(TcpSocket::new_v4()),
                 SocketType::DGRAM => Sock::Udp(UdpSocket::new()),
                 _ => unimplemented!(),
             },

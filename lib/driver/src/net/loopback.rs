@@ -7,6 +7,7 @@ use super::{DevError, DevResult, EthernetAddress, NetDevice, netbuf::NetBufPtrOp
 /// directly at the IP level. Consequently, packets sent to 127.0.0.1 do not
 /// include Ethernet headers because they never actually touch the physical
 /// network hardware, which is necessary for Ethernet frame encapsulation
+#[derive(Debug)]
 pub struct LoopbackDev {
     queue: VecDeque<Vec<u8>>,
 }
@@ -83,6 +84,7 @@ impl NetDevice for LoopbackDev {
     }
 }
 
+#[derive(Debug)]
 struct SimpleNetBuf(Vec<u8>);
 
 impl NetBufPtrOps for SimpleNetBuf {

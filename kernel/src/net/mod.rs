@@ -3,6 +3,7 @@ use strum::FromRepr;
 pub mod addr;
 pub mod sock;
 pub mod socket;
+pub mod sockopt;
 
 #[derive(FromRepr, Debug, PartialEq, Eq, Clone, Copy)]
 pub enum SocketType {

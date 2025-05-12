@@ -109,6 +109,11 @@ impl<'a> SocketSetWrapper<'a> {
     }
 
     pub fn poll_interfaces(&self) -> SmolInstant {
+        {
+            let lock = self.0.lock();
+            lock.iter()
+                .for_each(|s| log::debug!("[poll_interfaces] {}", s.0));
+        }
         ETH0.get().unwrap().poll(&self.0)
     }
 
