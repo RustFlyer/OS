@@ -6,7 +6,6 @@
 use alloc::vec::Vec;
 
 use lazy_static::lazy_static;
-use riscv::register::satp::{self, Satp};
 
 use config::mm::{
     KERNEL_MAP_OFFSET, MMIO_END, MMIO_PHYS_RANGES, MMIO_START, PTE_PER_TABLE, VIRT_END, bss_end,
@@ -22,7 +21,7 @@ use simdebug::when_debug;
 use systype::SysResult;
 
 #[cfg(target_arch = "riscv64")]
-use arch::mm::{fence, sfence_vma_addr, sfence_vma_all_except_global, tlb_shootdown};
+use arch::mm::{fence, tlb_flush_addr, tlb_flush_all_except_global, tlb_shootdown};
 
 use super::{
     mapping_flags::MappingFlags,
@@ -256,9 +255,9 @@ impl PageTable {
         let page = Page::build()?;
         *entry = PageTableEntry::new(page.ppn(), flags);
         if non_leaf_created {
-            sfence_vma_all_except_global();
+            tlb_flush_all_except_global();
         } else {
-            sfence_vma_addr(vpn.address().to_usize());
+            tlb_flush_addr(vpn.address().to_usize());
         }
         Ok(Ok(page))
     }
@@ -288,9 +287,9 @@ impl PageTable {
         let (entry, non_leaf_created) = self.find_entry_force(vpn, flags)?;
         *entry = PageTableEntry::new(ppn, flags);
         if non_leaf_created {
-            sfence_vma_all_except_global();
+            tlb_flush_all_except_global();
         } else {
-            sfence_vma_addr(vpn.address().to_usize());
+            tlb_flush_addr(vpn.address().to_usize());
         }
         Ok(())
     }
@@ -349,7 +348,7 @@ impl PageTable {
             *entry = PageTableEntry::new(ppn, flags);
         }
         // Simply flush all TLB entries, as the range is likely to be large.
-        sfence_vma_all_except_global();
+        tlb_flush_all_except_global();
         Ok(())
     }
 
@@ -476,18 +475,11 @@ pub unsafe fn switch_to_kernel_page_table() {
 /// This function must be called before the current page table is dropped,
 /// or the kernel may lose its memory mappings.
 pub unsafe fn switch_page_table(page_table: &PageTable) {
-    let mut satp = Satp::from_bits(0);
-    satp.set_mode(satp::Mode::Sv39);
-    satp.set_ppn(page_table.root().to_usize());
-    unsafe {
-        satp::write(satp);
-    }
-    sfence_vma_all_except_global();
+    arch::mm::switch_pagetable(page_table.root().to_usize());
     when_debug!({
         log::trace!(
-            "Switched to page table at {:#x}, satp: {:#x}",
+            "Switched to page table at {:#x}",
             page_table.root().to_usize(),
-            satp::read().bits()
         );
     });
 }

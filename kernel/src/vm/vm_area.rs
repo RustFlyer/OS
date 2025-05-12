@@ -38,7 +38,7 @@ use systype::{SysError, SysResult};
 use vfs::file::File;
 
 #[cfg(target_arch = "riscv64")]
-use arch::mm::{sfence_vma_addr, sfence_vma_all_except_global};
+use arch::mm::{tlb_flush_addr, tlb_flush_all_except_global};
 
 use super::{
     mapping_flags::MappingFlags,
@@ -457,7 +457,7 @@ impl VmArea {
         }
         // Flush the TLB if any kind of permission is downgraded.
         if !new_prot.contains(old_prot) {
-            sfence_vma_all_except_global();
+            tlb_flush_all_except_global();
         }
     }
 
@@ -491,7 +491,7 @@ impl VmArea {
             let (pte, flush_all) =
                 page_table.find_entry_force(fault_addr.page_number(), pte_flags)?;
             if flush_all {
-                sfence_vma_all_except_global();
+                tlb_flush_all_except_global();
             }
             pte
         };
@@ -503,7 +503,7 @@ impl VmArea {
                 self.handle_cow_fault(fault_addr, pte)?;
             } else {
                 // The page is already mapped by another thread, so just flush the TLB.
-                sfence_vma_addr(fault_addr.to_usize());
+                tlb_flush_addr(fault_addr.to_usize());
             }
         } else {
             self.handler.unwrap()(self, info)?;
@@ -543,7 +543,7 @@ impl VmArea {
             new_pte.set_flags(new_flags);
             *pte = new_pte;
         }
-        sfence_vma_addr(fault_addr.to_usize());
+        tlb_flush_addr(fault_addr.to_usize());
         Ok(())
     }
 
