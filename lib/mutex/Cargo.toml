@@ -11,3 +11,6 @@ log = { workspace = true }
 
 [target.'cfg(target_arch = "riscv64")'.dependencies]
 riscv = { workspace = true }
+
+[target.'cfg(target_arch = "loongarch64")'.dependencies]
+loongArch64 = { workspace = true }
