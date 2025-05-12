@@ -1,7 +1,6 @@
 use core::arch::global_asm;
 
-use arch::trap::set_trap_handler;
-use riscv::register::stvec::TrapMode;
+use arch::trap::{set_trap_handler, TrapMode};
 
 #[cfg(target_arch = "riscv64")]
 global_asm!(include_str!("rv_trap.s"));
@@ -25,7 +24,7 @@ pub fn set_user_stvec() {
 /// Set the trap vector as such:
 /// 1. the handler of interrupts is the same as normal condition, but
 /// 2. the handler of exceptions is changed into `__user_rw_exception_entry`, which
-///    will “returns” 1 to indicate that an exceptions is caused in supervisor mode,
+///    will “returns” 1 to indicate that an exception occurred in supervisor mode,
 ///    which is used to check the permission of the user memory access.
 ///
 /// # Safety

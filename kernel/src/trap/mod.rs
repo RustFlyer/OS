@@ -19,10 +19,3 @@ pub unsafe fn load_trap_handler() {
     trap_env::set_kernel_stvec();
     enable_interrupt();
 }
-
-pub fn init() {
-    unsafe {
-        riscv::register::sie::set_stimer();
-        riscv::register::sstatus::set_sie();
-    }
-}
