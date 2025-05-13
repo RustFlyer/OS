@@ -209,6 +209,14 @@ pub trait Dentry: Send + Sync {
             .insert(child.name().to_string(), child);
     }
 
+    /// Removes a child dentry to this dentry.
+    fn remove_child(&self, child: &dyn Dentry) -> Option<Arc<dyn Dentry + 'static>> {
+        self.get_meta()
+            .children
+            .lock()
+            .remove(&child.name().to_string())
+    }
+
     /// Returns the path of this dentry as a string.
     ///
     /// The path is in the format of `/path/to/dentry`, always with no trailing `/`.
@@ -281,6 +289,7 @@ impl dyn Dentry {
         match self.get_child(name) {
             Some(dentry) => Ok(dentry),
             None => {
+                // log::debug!("lookup: neg child {}", name);
                 let dentry = self.new_neg_child(name);
                 match self.base_lookup(dentry.as_ref()) {
                     Ok(_) | Err(SysError::ENOENT) => Ok(dentry),

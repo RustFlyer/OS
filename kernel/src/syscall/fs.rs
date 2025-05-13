@@ -100,8 +100,11 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
     log::info!("[sys_openat] dirfd: {dirfd:#x}, path: {path}, flags: {flags:?}, mode: {_mode:?}");
 
     let mut dentry = task.walk_at(AtFd::from(dirfd), path)?;
+
+    log::info!("[sys_openat] dentry path: {}", dentry.path());
     // Handle symlinks early here to simplify the logic.
     if !dentry.is_negative() && dentry.inode().unwrap().inotype().is_symlink() {
+        log::info!("[sys_openat] non-null dentry is_symlink");
         if flags.contains(OpenFlags::O_NOFOLLOW) {
             return Err(SysError::ELOOP);
         }
@@ -111,6 +114,7 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
     // Create a regular file when `O_CREAT` is specified if the file does not exist.
     if dentry.is_negative() {
         if flags.contains(OpenFlags::O_CREAT) {
+            log::debug!("[sys_openat] create a new file");
             let parent = dentry.parent().unwrap();
             parent.create(dentry.as_ref(), InodeMode::REG)?
         } else {
@@ -129,7 +133,7 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
     let file = <dyn File>::open(dentry)?;
     file.set_flags(flags);
 
-    log::debug!("[sys_openat] opened {:?}", name);
+    log::debug!("[sys_openat] opened {:?} is_dir: {:?}", name, inode_type);
 
     task.with_mut_fdtable(|ft| ft.alloc(file, flags))
 }

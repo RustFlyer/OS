@@ -195,6 +195,14 @@ impl FdTable {
         debug_assert!(new_fd >= lower_bound);
         Ok(new_fd)
     }
+
+    pub fn set_rlimit(&mut self, rlimit: RLimit) {
+        self.rlimit = rlimit;
+    }
+
+    pub fn get_rlimit(&self) -> RLimit {
+        self.rlimit
+    }
 }
 
 impl Debug for FdInfo {

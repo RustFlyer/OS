@@ -9,6 +9,7 @@ mod time;
 mod user;
 
 use consts::SyscallNo::{self, *};
+use driver::println;
 use fs::*;
 use misc::{sys_getrandom, sys_sysinfo, sys_syslog, sys_uname};
 use mm::*;
@@ -151,7 +152,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         ACCEPT => sys_accept(args[0], args[1], args[2]).await,
         GETEGID => sys_getegid(),
         _ => {
-            log::error!("Syscall not implemented: {}", syscall_no.as_str());
+            println!("Syscall not implemented: {}", syscall_no.as_str());
             unimplemented!()
         }
     };

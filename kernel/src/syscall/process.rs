@@ -645,22 +645,28 @@ pub fn sys_prlimit64(
     log::debug!("[prlimit64] pid: {pid}, resource: {resource:?}");
 
     if !olimit.is_null() {
-        match resource {
+        let limit = match resource {
             Resource::STACK => {
                 let rstack = RLimit::one(USER_STACK_SIZE, USER_STACK_SIZE);
-                unsafe { olimit.write(rstack)? };
+                rstack
             }
+            Resource::NOFILE => task.with_mut_fdtable(|table| table.get_rlimit()),
             r => {
                 log::error!("[sys_prlimit64] old limit {:?} not implemented", r);
+                RLimit::one(0, 0)
             }
-        }
+        };
+        unsafe { olimit.write(limit)? };
     }
 
     if !nlimit.is_null() {
+        let rlimit = unsafe { nlimit.read()? };
         match resource {
             Resource::STACK => {
-                let rstack = unsafe { nlimit.read()? };
-                log::debug!("[sys_prlimit64] new limit STACK: {:?}", rstack);
+                log::debug!("[sys_prlimit64] new limit STACK: {:?}", rlimit);
+            }
+            Resource::NOFILE => {
+                task.with_mut_fdtable(|table| table.set_rlimit(rlimit));
             }
             r => {
                 log::error!("[sys_prlimit64] new limit {:?} not implemented", r);

@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
 use config::{
-    inode::InodeMode,
+    inode::{InodeMode, InodeType},
     vfs::{MountFlags, StatFs},
 };
 use driver::BlockDevice;
@@ -40,14 +40,14 @@ impl FileSystemType for TmpFsType {
     ) -> SysResult<Arc<dyn Dentry>> {
         let sb = TmpSuperBlock::new(dev, self.clone());
         let mount_inode = SimpleInode::new(sb.clone());
-        {
-            mount_inode.get_meta().inner.lock().mode = InodeMode::DIR;
-        }
+        mount_inode.set_inotype(InodeType::from(InodeMode::DIR));
+
         let parentv = if let Some(p) = parent.clone() {
             Some(Arc::downgrade(&p))
         } else {
             None
         };
+
         let mount_dentry = SimpleDentry::new(name, Some(mount_inode), parentv);
         if let Some(parent) = parent {
             parent.add_child(mount_dentry.clone());

@@ -14,6 +14,7 @@ use vfs::{
 
 use crate::simple::{dentry::SimpleDentry, inode::SimpleInode};
 
+pub mod null;
 pub mod rtc;
 pub mod stdio;
 pub mod tty;
