@@ -369,7 +369,7 @@ impl AddrSpace {
     pub fn handle_page_fault(&self, fault_addr: VirtAddr, access: MemPerm) -> SysResult<()> {
         let mut vm_areas_lock = self.vm_areas.lock();
 
-        if fault_addr.to_usize() >= 0x3fffffa000 && false {
+        if fault_addr.to_usize() >= 0x3fffffa000 {
             log::error!(
                 "[handle_page_fault] process {}: page fault at {:#x}",
                 current_task().pid(),

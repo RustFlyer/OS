@@ -34,11 +34,11 @@
 use core::{cmp, fmt::Debug, marker::PhantomData, ops::ControlFlow, slice};
 
 use alloc::{ffi::CString, vec::Vec};
+use bitflags::bitflags;
 use config::mm::{PAGE_SIZE, USER_END};
 use mm::address::VirtAddr;
 use riscv::{interrupt::supervisor, register::scause};
 use systype::{SysError, SysResult};
-use bitflags::bitflags;
 
 use super::{addr_space::AddrSpace, mem_perm::MemPerm};
 use crate::{
@@ -588,7 +588,7 @@ where
     } else {
         try_read
     };
-
+    // log::error!("start");
     while addr < end_addr {
         if unsafe { !checker(addr) } {
             // If the access failed, manually call the original page fault handler
@@ -605,6 +605,8 @@ where
             match f(item) {
                 ControlFlow::Continue(()) => {}
                 ControlFlow::Break(()) => {
+                    // log::error!("end");
+
                     set_kernel_stvec();
                     return Ok(());
                 }
@@ -612,6 +614,7 @@ where
         }
         addr = end_in_page;
     }
+    // log::error!("end");
 
     set_kernel_stvec();
     Ok(())

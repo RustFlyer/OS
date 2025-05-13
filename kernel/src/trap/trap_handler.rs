@@ -58,9 +58,11 @@ pub fn user_exception_handler(task: &Task, e: Exception, stval: usize) {
             let fault_addr = VirtAddr::new(stval);
             let addr_space = task.addr_space();
             // log::debug!("pass sleep lock {:?}", addrspace.change_heap_size(0, 0));
+            // log::error!("addr_space: {:?}", addr_space.page_table.root());
             if let Err(e) = addr_space.handle_page_fault(fault_addr, access) {
                 // Should send a `SIGSEGV` signal to the task
 
+                log::error!("addr_space: {:?}", addr_space.page_table.root());
                 log::error!(
                     "[user_exception_handler] task [{}] {} unsolved page fault at {:#x}, access: {:?}, error: {:?}",
                     task.tid(),

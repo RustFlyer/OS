@@ -1,3 +1,4 @@
+use alloc::sync::Arc;
 use mm::address::{PhysPageNum, VirtAddr};
 use riscv::{ExceptionNumber, InterruptNumber};
 use riscv::{
@@ -8,6 +9,7 @@ use riscv::{
 use arch::riscv64::time::{get_time_duration, set_nx_timer_irq};
 use timer::TIMER_MANAGER;
 
+use crate::processor::current_task;
 use crate::vm::trace_page_table_lookup;
 
 /// Kernel trap handler
@@ -36,6 +38,15 @@ pub fn kernel_exception_handler(e: Exception, stval: usize) {
         sepc::read(),
         satp::read().bits(),
     );
+
+    log::error!(
+        "current task address: {:?}, pid: {}",
+        Arc::as_ptr(&current_task()) as *const usize,
+        current_task().tid()
+    );
+
+    simdebug::stop();
+
     kernel_panic();
 }
 

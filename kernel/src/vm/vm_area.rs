@@ -40,6 +40,8 @@ use shm::SharedMemory;
 use systype::{SysError, SysResult};
 use vfs::file::File;
 
+use crate::processor::current_task;
+
 use super::{
     mem_perm::MemPerm,
     page_table::PageTable,
@@ -465,7 +467,7 @@ impl VmArea {
 
         // Check the protection bits.
         if !prot.contains(access) {
-            log::warn!(
+            log::error!(
                 "VmArea::handle_page_fault: access {:?} at {:#x} not allowed, with protection {:?}",
                 access,
                 fault_addr.to_usize(),
@@ -482,6 +484,13 @@ impl VmArea {
             }
             pte
         };
+
+        // log::error!(
+        //     "current task address: {:?}, pid: {}",
+        //     Arc::as_ptr(&current_task()) as *const usize,
+        //     current_task().tid()
+        // );
+        // log::error!("handle_page_fault {:?}", info.fault_addr);
         if pte.is_valid() {
             if access == MemPerm::W && !pte.flags().contains(PteFlags::W) {
                 // Copy-on-write page fault.
@@ -491,6 +500,7 @@ impl VmArea {
                 sfence_vma_addr(fault_addr.to_usize());
             }
         } else {
+            log::warn!("handle_fault: pte not valid");
             self.handler.unwrap()(self, info)?;
         }
 
@@ -508,6 +518,7 @@ impl VmArea {
         fault_addr: VirtAddr,
         pte: &mut PageTableEntry,
     ) -> SysResult<()> {
+        // log::error!("[handle_cow_fault] fault_addr: {:?}", fault_addr);
         let fault_vpn = fault_addr.page_number();
         let fault_page = self.pages.get(&fault_vpn).unwrap();
         // Note: The if-else branch does not work as expected because the reference
@@ -534,6 +545,7 @@ impl VmArea {
             *pte = new_pte;
             sfence_vma_addr(fault_addr.to_usize());
         }
+        // log::error!("[handle_cow_fault] success");
         Ok(())
     }
 
@@ -814,6 +826,7 @@ impl FileBackedArea {
             page_table,
             access,
         } = info;
+        // log::error!("[FileBackedArea] fault_addr: {:?}", fault_addr);
 
         // Offset from the start of the VMA to the faulting page.
         let area_offset = fault_addr.round_down().to_usize() - start_va.to_usize();
@@ -961,6 +974,7 @@ impl AnonymousArea {
             page_table,
             ..
         } = info;
+        // log::error!("[AnonymousArea] fault_addr: {:?}", fault_addr);
 
         if flags.contains(VmaFlags::SHARED) {
             unimplemented!("Handling a page fault in a shared anonymous VMA");
@@ -970,7 +984,7 @@ impl AnonymousArea {
         page_table.map_page_to(fault_addr.page_number(), page.ppn(), pte_flags)?;
         page.as_mut_slice().fill(0);
         pages.insert(fault_addr.page_number(), Arc::new(page));
-
+        // log::error!("[AnonymousArea] fault_handler pass");
         Ok(())
     }
 }

@@ -67,6 +67,8 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
             Ok(false)
         }
         ActionType::User { entry } => {
+            log::error!("write before");
+
             // The signal being delivered is also added to the signal mask, unless
             // SA_NODEFER was specified when registering the handler.
             if !action.flags.contains(SigActionFlag::SA_NODEFER) {
@@ -93,6 +95,8 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
             };
             // extend the sig_stack
             // 在栈上压入一个sig_cx，存储trap frame里的寄存器信息
+            log::error!("[sig context] sp: {:#x}", sp);
+
             let mut new_sp = sp - size_of::<SigContext>();
             let addr_space = task.addr_space();
             let mut sig_cx_ptr = UserWritePtr::<SigContext>::new(new_sp, &addr_space);
@@ -107,9 +111,12 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
                 fpstate: [0; 66],
             };
             sig_cx.user_reg[0] = cx.sepc;
-            // log::trace!("[save_context_into_sigstack] sig_cx_ptr: {sig_cx_ptr:?}");
+            log::error!("[sig context] sig_cx_ptr: {sig_cx_ptr:?}");
+            log::error!("[sig context] SigContext: {:#x}", size_of::<SigContext>());
+
             unsafe { sig_cx_ptr.write(sig_cx)? };
 
+            log::error!("write after");
             task.set_sig_cx_ptr(new_sp);
             // user defined void (*sa_handler)(int);
             cx.user_reg[10] = si.sig.raw();
