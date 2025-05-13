@@ -523,7 +523,7 @@ fn check_user_access(
                 return Err(e);
             }
         }
-        addr += PAGE_SIZE;
+        addr = (addr + PAGE_SIZE) & !(PAGE_SIZE - 1);
     }
 
     set_kernel_stvec();
