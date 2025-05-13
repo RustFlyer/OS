@@ -414,7 +414,7 @@ impl Task {
             .expect("Call ppid Without parent")
             .upgrade()
             .unwrap()
-            .get_pgid()
+            .pid()
     }
 
     pub fn cwd(&self) -> ShareMutex<Arc<dyn Dentry>> {

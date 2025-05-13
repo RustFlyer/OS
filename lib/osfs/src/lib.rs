@@ -92,6 +92,8 @@ pub fn init() {
     dev::tty::init().expect("dev-tty init fails");
     dev::rtc::init().expect("dev-rtc init fails");
     dev::null::init().expect("dev-null init fails");
+    dev::shm::init().expect("dev-shm init fails");
+    dev::zero::init().expect("dev-zero init fails");
 
     <dyn File>::open(sys_root_dentry())
         .unwrap()

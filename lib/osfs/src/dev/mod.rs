@@ -16,8 +16,10 @@ use crate::simple::{dentry::SimpleDentry, inode::SimpleInode};
 
 pub mod null;
 pub mod rtc;
+pub mod shm;
 pub mod stdio;
 pub mod tty;
+pub mod zero;
 
 pub struct DevFsType {
     meta: FileSystemTypeMeta,

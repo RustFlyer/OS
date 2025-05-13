@@ -91,7 +91,7 @@ impl FdTable {
     pub fn alloc(&mut self, file: Arc<dyn File>, flags: OpenFlags) -> SysResult<Fd> {
         let fdinfo = FdInfo::new(file, flags.into());
         if let Some(fd) = self.get_available_slot(0) {
-            log::info!("alloc fd [{}]", fd);
+            // log::info!("alloc fd [{}]", fd);
             self.table[fd] = Some(fdinfo);
             Ok(fd)
         } else {

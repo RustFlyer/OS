@@ -317,6 +317,7 @@ pub fn sys_clone(
         new_task.trap_context_mut().set_user_tp(tls_ptr);
     }
 
+    log::info!("[sys_clone] who is your parent? {}", new_task.ppid());
     spawn_user_task(new_task);
     log::info!("[sys_clone] clone success",);
 

@@ -381,7 +381,7 @@ pub fn sys_close(fd: usize) -> SyscallResult {
 /// # Tips
 /// - The OpenFlag is the same between old and new fd.
 pub fn sys_dup(fd: usize) -> SyscallResult {
-    log::info!("[sys_dup] fd: {fd}");
+    // log::info!("[sys_dup] fd: {fd}");
     let task = current_task();
     task.with_mut_fdtable(|table| table.dup(fd))
 }
