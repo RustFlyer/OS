@@ -26,6 +26,11 @@ pub fn easy_cmd(s: String) -> String {
             let arg = args.get(1).unwrap();
             format!("runtest.exe -w entry-static.exe {}", arg).to_string()
         }
+        sf if sf.starts_with("rd") => {
+            let args: Vec<&str> = sf.split(" ").collect();
+            let arg = args.get(1).unwrap();
+            format!("runtest.exe -w entry-dynamic.exe {}", arg).to_string()
+        }
         _ => s,
     }
 }

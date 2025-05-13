@@ -310,3 +310,18 @@ pub fn sys_shmctl(shmid: usize, cmd: i32, buf: usize) -> SyscallResult {
         }
     }
 }
+
+/// The membarrier() system call helps reducing the overhead of the memory barrier instructions
+/// required to order memory accesses on multi-core systems. However, this system call is heavier
+/// than a memory barrier, so using it effectively is not as simple as replacing memory barriers
+/// with this system call, but requires understanding of the details below.
+///
+/// Use of memory barriers needs to be done taking into account that a memory barrier always
+/// needs to be either matched with its memory barrier counterparts, or that the architecture's
+/// memory model doesn't require the matching barriers.
+///
+/// Tips: Unimplement now.
+pub fn sys_membarrier(_cmd: usize, _flags: usize, _cpu_id: usize) -> SyscallResult {
+    log::error!("[sys_membarrier] not implemented");
+    Ok(0)
+}

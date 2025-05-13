@@ -151,6 +151,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         CONNECT => sys_connect(args[0], args[1], args[2]).await,
         ACCEPT => sys_accept(args[0], args[1], args[2]).await,
         GETEGID => sys_getegid(),
+        MEMBARRIER => sys_membarrier(args[0], args[1], args[2]),
         _ => {
             println!("Syscall not implemented: {}", syscall_no.as_str());
             unimplemented!()
