@@ -21,6 +21,7 @@ pub fn easy_cmd(s: String) -> String {
         "d" | "iozone" => "busybox sh iozone_testcode.sh".to_string(),
         "e" | "libctest" => "busybox sh libctest_testcode.sh".to_string(),
         "f" | "unixbench" => "busybox sh unixbench_testcode.sh".to_string(),
+        "g" | "iperf" => "busybox sh iperf_testcode.sh".to_string(),
         sf if sf.starts_with("r7") => {
             let args: Vec<&str> = sf.split(" ").collect();
             let arg = args.get(1).unwrap();

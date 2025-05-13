@@ -158,6 +158,7 @@ fs-img: user
 	@sudo cp -r testcase/UnixBench/* emnt/
 	@sudo cp -r testcase/libc-test/* emnt/
 	@sudo cp -r testcase/iozone/* emnt/
+	@sudo cp -r testcase/iperf/* emnt/
 	@sudo cp -r img-data/* emnt/
 	@sudo chmod -R 755 emnt/
 	@sudo umount emnt
