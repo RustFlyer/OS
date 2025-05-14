@@ -20,6 +20,7 @@ __trap_from_user:
     # swap sp and kernel stack pointer in KSAVE_CTX, as sstratch in RV
     csrwr   $sp, 0x31
     # Save general-purpose registers
+    # Note: sp is r3 in LoongArch, which is different from RV's sp
     st.d    $ra, $sp,  1*8
     st.d    $tp, $sp,  2*8
     st.d    $a0, $sp,  4*8

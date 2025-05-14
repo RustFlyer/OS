@@ -43,7 +43,7 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo) -> SysResult<bool> {
 
     if action.flags.contains(SigActionFlag::SA_RESTART) {
         cx.sepc -= 4;
-        cx.restore_last_user_a0();
+        cx.restore_last_user_ret_val();
         log::info!("[sig_exec] restart syscall");
     }
 
