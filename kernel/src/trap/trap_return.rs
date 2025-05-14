@@ -14,7 +14,7 @@ unsafe extern "C" {
 #[unsafe(no_mangle)]
 pub fn trap_return(task: &Arc<Task>) {
     disable_interrupt();
-    trap_env::set_user_stvec();
+    trap_env::set_user_trap_entry();
 
     // restore registers situations:
     // 1. current task yields after last trap.

@@ -13,11 +13,11 @@ unsafe extern "C" {
     fn __user_rw_trap_vector();
 }
 
-pub fn set_kernel_stvec() {
+pub fn set_kernel_trap_entry() {
     set_trap_handler(__trap_from_kernel as usize, TrapMode::Direct);
 }
 
-pub fn set_user_stvec() {
+pub fn set_user_trap_entry() {
     set_trap_handler(__trap_from_user as usize, TrapMode::Direct);
 }
 
@@ -32,6 +32,6 @@ pub fn set_user_stvec() {
 /// should be only enabled in the context of user memory access permission checking.
 /// After the check is done, the trap vector should be restored to the normal one
 /// before any other operations.
-pub fn set_kernel_stvec_user_rw() {
+pub fn set_user_rw_trap_entry() {
     set_trap_handler(__user_rw_trap_vector as usize, TrapMode::Vectored);
 }

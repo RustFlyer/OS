@@ -16,6 +16,6 @@ pub use trap_return::trap_return;
     2. enables interrupt in case of it is a interrupt type trap
 */
 pub unsafe fn load_trap_handler() {
-    trap_env::set_kernel_stvec();
+    trap_env::set_kernel_trap_entry();
     enable_interrupt();
 }

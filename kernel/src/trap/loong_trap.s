@@ -175,6 +175,6 @@ __user_rw_exception_entry:
 __user_rw_trap_vector:
     jail 0, __user_rw_exception_entry, 0
     .rept 16
-    .align 2
+    .align 3
     jail 0 __trap_from_kernel, 0
     .endr
