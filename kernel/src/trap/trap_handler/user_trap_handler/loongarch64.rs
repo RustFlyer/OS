@@ -1,11 +1,13 @@
 use loongArch64::register::estat::{self, Exception, Trap};
 use loongArch64::register::{badv, ecfg, eentry, prmd, ticlr};
 
-use arch::time::{get_time_duration, set_nx_timer_irq};
+use arch::{
+    time::{get_time_duration, set_nx_timer_irq},
+    trap::TIMER_IRQ,
+};
 use mm::address::VirtAddr;
 use timer::TIMER_MANAGER;
 
-use crate::irq::TIMER_IRQ;
 use crate::processor::current_hart;
 use crate::task::{Task, TaskState};
 use crate::trap::load_trap_handler;
@@ -68,7 +70,7 @@ pub fn user_exception_handler(task: &Task, e: Exception, badv_val: usize) {
                 task.set_state(TaskState::Zombie);
             }
         }
-        Exception::IllegalInstruction => {
+        Exception::InstructionNotExist => {
             log::warn!("[trap_handler] illegal instruction at {:#x}", badv_val);
             // TODO: Send SIGILL signal to the task; don't just kill the task
             task.set_state(TaskState::Zombie);

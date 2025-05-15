@@ -1,11 +1,13 @@
 use loongArch64::register::estat::{self, Exception, Trap};
 use loongArch64::register::{badv, ecfg, eentry, era, prmd, ticlr};
 
-use arch::time::{get_time_duration, set_nx_timer_irq};
+use arch::{
+    time::{get_time_duration, set_nx_timer_irq},
+    trap::TIMER_IRQ,
+};
 use mm::address::VirtAddr;
 use timer::TIMER_MANAGER;
 
-use crate::irq::TIMER_IRQ;
 use crate::vm::mapping_flags::MappingFlags;
 
 #[unsafe(no_mangle)]
@@ -42,12 +44,12 @@ pub fn kernel_interrupt_handler(irq_num: usize, _badv_val: usize) {
 }
 
 pub fn kernel_panic() -> ! {
-    log = format!(
+    let msg = format!(
         "[kernel] {:?} in kernel, bad addr = {:#x}, bad instruction = {:#x}, kernel panicked!!",
         estat::read().cause(),
         badv::read().vaddr(),
-        era::read()
+        era::read().raw(),
     );
-    log::error!("{}", log);
-    panic!("{}", log);
+    log::error!("{}", msg);
+    panic!("{}", msg);
 }
