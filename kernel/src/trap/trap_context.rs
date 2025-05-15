@@ -15,7 +15,7 @@ pub struct TrapContext {
     // Note: It's for both RISCV and LoongArch, but only use RISCV's register name for convenience
     pub user_reg: [usize; 32], // 0-31, general register
 
-    pub sstatus: Sstatus, // 32, controls previlege level. its SIE part enables interrupt
+    pub sstatus: Sstatus, // 32, controls previlege level. seen as PRMD in LoongArch
 
     pub sepc: usize, // 33, the instruction that occurs trap (or the next instruction when trap returns)
 

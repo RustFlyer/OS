@@ -660,14 +660,16 @@ struct SumGuard;
 
 impl SumGuard {
     pub fn new() -> Self {
-        current_hart().get_mut_pps().inc_sum_cnt();
+        #[cfg(target_arch = "riscv64")]
+            current_hart().get_mut_pps().inc_sum_cnt();
         Self
     }
 }
 
 impl Drop for SumGuard {
     fn drop(&mut self) {
-        current_hart().get_mut_pps().dec_sum_cnt();
+        #[cfg(target_arch = "riscv64")]
+            current_hart().get_mut_pps().dec_sum_cnt();
     }
 }
 

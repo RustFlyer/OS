@@ -625,6 +625,7 @@ dependencies = [
 name = "pps"
 version = "0.1.0"
 dependencies = [
+ "loongArch64",
  "riscv 0.13.0",
 ]
 
