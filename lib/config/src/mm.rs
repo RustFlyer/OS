@@ -8,7 +8,13 @@ pub const RAM_SIZE: usize = 128 * 1024 * 1024;
 pub const RAM_END: usize = RAM_START + RAM_SIZE;
 
 /// Start of kernel address space
+#[cfg(target_arch = "riscv64")]
 pub const VIRT_START: usize = 0xffff_ffc0_8000_0000;
+#[cfg(target_arch = "loongarch64")]
+pub const VIRT_START: usize = 0x9000_0000_0000_0000;
+#[cfg(not(any(target_arch = "riscv64", target_arch = "loongarch64")))]
+// Fallback for unsupported architectures
+pub const VIRT_START: usize = 0x8000_0000_0000_0000;
 /// End of kernel address space
 pub const VIRT_END: usize = VIRT_START + RAM_SIZE;
 /// Offset of kernel from `RAM_START`

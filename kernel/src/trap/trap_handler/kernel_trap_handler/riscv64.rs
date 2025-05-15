@@ -4,7 +4,7 @@ use riscv::{
     register::{satp, scause, sepc, stval},
 };
 
-use arch::riscv64::time::{get_time_duration, set_nx_timer_irq};
+use arch::time::{get_time_duration, set_nx_timer_irq};
 use timer::TIMER_MANAGER;
 
 #[unsafe(no_mangle)]

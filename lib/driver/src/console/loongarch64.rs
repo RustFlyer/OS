@@ -1,7 +1,7 @@
 use spin::Mutex;
 
 #[cfg(not(board = "2k1000"))]
-const UART_ADDR: usize = 0x01FE001E0 | crate::components::consts::VIRT_ADDR_START;
+const UART_ADDR: usize = 0x01FE001E0 | config::mm::VIRT_START;
 #[cfg(board = "2k1000")]
 const UART_ADDR: usize = 0x800000001fe20000;
 // 0x800000001fe20000ULL
