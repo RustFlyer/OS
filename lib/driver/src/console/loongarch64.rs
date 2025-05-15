@@ -11,6 +11,7 @@ struct Uart {
     base_address: usize,
 }
 
+// TODO: How does `putchar` and `getchar` work?
 impl Uart {
     const fn new(base_address: usize) -> Self {
         Uart { base_address }
@@ -44,13 +45,14 @@ impl Uart {
     }
 }
 
-pub fn console_putchar(c: usize) -> usize {
-    if ch == b'\n' {
+pub fn console_putchar(c: u8) {
+    if c == b'\n' {
         COM1.lock().putchar(b'\r');
     }
-    COM1.lock().putchar(ch)
+    COM1.lock().putchar(c)
 }
 
 pub fn console_getchar() -> u8 {
-    COM1.lock().getchar()
+    // TODO: Handle the case when no data is available (?)
+    COM1.lock().getchar().unwrap_or(0)
 }
