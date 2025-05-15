@@ -10,9 +10,8 @@ use riscv::register::{
 
 #[cfg(target_arch = "loongarch64")]
 use loongArch64::register::{
-    pgdl::{self, Pgdl},
-    era::*,
-    prmd::*,
+    era, pgdl,
+    prmd::{self, Prmd},
 };
 
 /// `ProcessorPrivilegeState` records processor privilege state of a task.
@@ -101,11 +100,11 @@ impl ProcessorPrivilegeState {
         self.sepc = sepc::read();
         self.satp = satp::read().bits();
     }
-    
+
     #[cfg(target_arch = "loongarch64")]
     pub fn record(&mut self) {
-        self.sstatus = prmd::read().bits();
-        self.sepc = era::read();
+        self.sstatus = prmd::read().raw();
+        self.sepc = era::read().raw();
         self.satp = pgdl::read().base();
     }
 
@@ -117,11 +116,11 @@ impl ProcessorPrivilegeState {
             satp::write(Satp::from_bits(self.satp));
         }
     }
-    
+
     #[cfg(target_arch = "loongarch64")]
     pub fn restore(&mut self) {
         unsafe {
-            prmd::write(Prmd::from_bits(self.prmd));
+            prmd::set_bits(Prmd::from_bits(self.prmd));
             era::write(self.era);
             pgdl::set_base(self.pgdl);
         }
