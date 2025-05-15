@@ -17,5 +17,5 @@ pub async fn async_syscall(task: &Task) {
     cx.sepc_forward();
     let sys_ret = syscall(syscall_no, cx.syscall_args()).await;
     cx = task.trap_context_mut();
-    cx.set_user_a0(sys_ret);
+    cx.set_user_ret_val(sys_ret);
 }

@@ -268,7 +268,7 @@ pub async fn sys_clone(
     log::info!("[sys_clone] flags {flags:?}");
 
     let new_task = task.fork(flags).await;
-    new_task.trap_context_mut().set_user_a0(0);
+    new_task.trap_context_mut().set_user_ret_val(0);
     let new_tid = new_task.tid();
     log::info!("[sys_clone] clone a new thread, tid {new_tid}, clone flags {flags:?}",);
 

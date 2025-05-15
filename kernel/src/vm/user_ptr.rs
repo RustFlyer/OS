@@ -41,7 +41,7 @@ use systype::{SysError, SysResult};
 use super::{addr_space::AddrSpace, mapping_flags::MappingFlags};
 use crate::{
     processor::current_hart,
-    trap::trap_env::{set_kernel_stvec, set_kernel_stvec_user_rw},
+    trap::trap_env::{set_kernel_trap_entry, set_user_rw_trap_entry},
 };
 
 /// Smart pointer that can be used to read memory in user address space.
@@ -503,7 +503,7 @@ fn check_user_access(
         return Err(SysError::EFAULT);
     }
 
-    set_kernel_stvec_user_rw();
+    set_user_rw_trap_entry();
 
     let checker = if perm.contains(MappingFlags::W) {
         try_write
@@ -517,14 +517,14 @@ fn check_user_access(
             // to try mapping the page. If this also fails, then we know the access
             // is not allowed.
             if let Err(e) = addr_space.handle_page_fault(VirtAddr::new(addr), perm) {
-                set_kernel_stvec();
+                set_kernel_trap_entry();
                 return Err(e);
             }
         }
         addr += PAGE_SIZE;
     }
 
-    set_kernel_stvec();
+    set_kernel_trap_entry();
     Ok(())
 }
 
@@ -579,7 +579,7 @@ where
         return Err(SysError::EFAULT);
     }
 
-    set_kernel_stvec_user_rw();
+    set_user_rw_trap_entry();
 
     let checker = if perm.contains(MappingFlags::W) {
         try_write
@@ -593,7 +593,7 @@ where
             // to try mapping the page. If this also fails, then we know the access
             // is not allowed.
             if let Err(e) = addr_space.handle_page_fault(VirtAddr::new(addr), perm) {
-                set_kernel_stvec();
+                set_kernel_trap_entry();
                 return Err(e);
             }
         }
@@ -603,7 +603,7 @@ where
             match f(item) {
                 ControlFlow::Continue(()) => {}
                 ControlFlow::Break(()) => {
-                    set_kernel_stvec();
+                    set_kernel_trap_entry();
                     return Ok(());
                 }
             }
@@ -611,7 +611,7 @@ where
         addr = end_in_page;
     }
 
-    set_kernel_stvec();
+    set_kernel_trap_entry();
     Ok(())
 }
 
@@ -622,7 +622,7 @@ where
 /// is not mapped in the page table.
 ///
 /// # Safety
-/// This function must be called after calling `set_kernel_stvec_user_rw` to
+/// This function must be called after calling `set_user_rw_trap_entry` to
 /// enable kernel memory access to user space.
 unsafe fn try_read(va: usize) -> bool {
     unsafe extern "C" {
@@ -642,7 +642,7 @@ unsafe fn try_read(va: usize) -> bool {
 /// is not mapped in the page table.
 ///
 /// # Safety
-/// This function must be called after calling `set_kernel_stvec_user_rw` to
+/// This function must be called after calling `set_user_rw_trap_entry` to
 /// enable kernel memory access to user space.
 unsafe fn try_write(va: usize) -> bool {
     unsafe extern "C" {
@@ -660,14 +660,16 @@ struct SumGuard;
 
 impl SumGuard {
     pub fn new() -> Self {
-        current_hart().get_mut_pps().inc_sum_cnt();
+        #[cfg(target_arch = "riscv64")]
+            current_hart().get_mut_pps().inc_sum_cnt();
         Self
     }
 }
 
 impl Drop for SumGuard {
     fn drop(&mut self) {
-        current_hart().get_mut_pps().dec_sum_cnt();
+        #[cfg(target_arch = "riscv64")]
+            current_hart().get_mut_pps().dec_sum_cnt();
     }
 }
 

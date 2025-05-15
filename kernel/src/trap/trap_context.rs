@@ -12,9 +12,10 @@ use riscv::register::sstatus::SPP;
 #[repr(C)]
 pub struct TrapContext {
     // integer registers and CSR to be saved when trap from user to kernel
+    // Note: It's for both RISCV and LoongArch, but only use RISCV's register name for convenience
     pub user_reg: [usize; 32], // 0-31, general register
 
-    pub sstatus: Sstatus, // 32, controls previlege level. its SIE part enables interrupt
+    pub sstatus: Sstatus, // 32, controls previlege level. seen as PRMD in LoongArch
 
     pub sepc: usize, // 33, the instruction that occurs trap (or the next instruction when trap returns)
 
@@ -94,45 +95,109 @@ impl TrapContext {
         argv: usize,
         envp: usize,
     ) {
-        self.user_reg[2] = user_sp;
-        self.user_reg[10] = argc;
-        self.user_reg[11] = argv;
-        self.user_reg[12] = envp;
-        self.sepc = sepc;
+        #[cfg(target_arch = "riscv64")]
+        {
+            self.user_reg[2] = user_sp;
+            self.user_reg[10] = argc;
+            self.user_reg[11] = argv;
+            self.user_reg[12] = envp;
+            self.sepc = sepc;
+        }
+        
+        #[cfg(target_arch = "loongarch64")]
+        {
+            self.user_reg[3] = user_sp; // sp在loongArch中存放在3*8
+            self.user_reg[4] = argc;    // a0存放在4*8
+            self.user_reg[6] = argv;    // a2存放在6*8
+            self.user_reg[7] = envp;    // a3存放在7*8
+            self.sepc = sepc;
+        }
     }
+    
     /// this function can be called to get syscall number
     /// when trapped
     pub fn syscall_no(&self) -> usize {
-        // a7 == x17
-        self.user_reg[17]
+        #[cfg(target_arch = "riscv64")]
+        {
+            // a7 == x17
+            self.user_reg[17]
+        }
+        
+        #[cfg(target_arch = "loongarch64")]
+        {
+            // 在loongArch中，syscall_no存放在a7 (register 11)
+            self.user_reg[11]
+        }
     }
 
     /// this function can be called to get syscall args
     /// when trapped
     pub fn syscall_args(&self) -> [usize; 6] {
-        [
-            self.user_reg[10],
-            self.user_reg[11],
-            self.user_reg[12],
-            self.user_reg[13],
-            self.user_reg[14],
-            self.user_reg[15],
-        ]
+        #[cfg(target_arch = "riscv64")]
+        {
+            [
+                self.user_reg[10], // a0
+                self.user_reg[11], // a1
+                self.user_reg[12], // a2
+                self.user_reg[13], // a3
+                self.user_reg[14], // a4
+                self.user_reg[15], // a5
+            ]
+        }
+        
+        #[cfg(target_arch = "loongarch64")]
+        {
+            [
+                self.user_reg[4],  // a0
+                self.user_reg[6],  // a1
+                self.user_reg[7],  // a2
+                self.user_reg[8],  // a3
+                self.user_reg[9],  // a4
+                self.user_reg[10], // a5
+            ]
+        }
     }
 
     pub fn set_user_sp(&mut self, sp: usize) {
-        // sp == x2
-        self.user_reg[2] = sp;
+        #[cfg(target_arch = "riscv64")]
+        {
+            // sp == x2
+            self.user_reg[2] = sp;
+        }
+        
+        #[cfg(target_arch = "loongarch64")]
+        {
+            // sp在loongArch中存放在3*8
+            self.user_reg[3] = sp;
+        }
     }
 
-    pub fn set_user_a0(&mut self, val: usize) {
-        // a0 == x10
-        self.user_reg[10] = val;
+    pub fn set_user_ret_val(&mut self, val: usize) {
+        #[cfg(target_arch = "riscv64")]
+        {
+            // a0 == x10
+            self.user_reg[10] = val;
+        }
+        
+        #[cfg(target_arch = "loongarch64")]
+        {
+            // a1存放在5*8
+            self.user_reg[5] = val;
+        }
     }
 
     pub fn set_user_tp(&mut self, val: usize) {
-        // tp == x4
-        self.user_reg[4] = val;
+        #[cfg(target_arch = "riscv64")]
+        {
+            // tp == x4
+            self.user_reg[4] = val;
+        }
+        
+        #[cfg(target_arch = "loongarch64")]
+        {
+            // tp存放在2*8
+            self.user_reg[2] = val;
+        }
     }
 
     /// set entry to user space.
@@ -147,11 +212,29 @@ impl TrapContext {
         self.sepc += 4;
     }
 
-    pub fn save_last_user_a0(&mut self) {
-        self.last_a0 = self.user_reg[10];
+    pub fn save_last_user_ret_val(&mut self) {
+        #[cfg(target_arch = "riscv64")]
+        {
+            self.last_a0 = self.user_reg[10];
+        }
+        
+        #[cfg(target_arch = "loongarch64")]
+        {
+            // a1存放在5*8
+            self.last_a0 = self.user_reg[5];
+        }
     }
 
-    pub fn restore_last_user_a0(&mut self) {
-        self.user_reg[10] = self.last_a0;
+    pub fn restore_last_user_ret_val(&mut self) {
+        #[cfg(target_arch = "riscv64")]
+        {
+            self.user_reg[10] = self.last_a0;
+        }
+        
+        #[cfg(target_arch = "loongarch64")]
+        {
+            // a1存放在5*8
+            self.user_reg[5] = self.last_a0;
+        }
     }
 }
