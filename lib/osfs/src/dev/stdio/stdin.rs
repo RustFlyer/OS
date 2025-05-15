@@ -2,7 +2,7 @@ use alloc::boxed::Box;
 use alloc::sync::{Arc, Weak};
 use async_trait::async_trait;
 use config::inode::InodeType;
-use driver::console::getchar;
+use driver::console::console_getchar;
 use systype::SysResult;
 use vfs::stat::Stat;
 use vfs::{
@@ -113,7 +113,7 @@ impl File for StdInFile {
         }
         let mut cnt = 0;
         while cnt < buf.len() {
-            let c = getchar();
+            let c = console_getchar();
             buf[cnt] = c;
             cnt += 1;
             // yield_now().await;

@@ -1,13 +1,15 @@
 #![no_std]
 
-use alloc::sync::Arc;
-use core::task::Waker;
+use alloc::{string::ToString, sync::Arc};
+use console::console_putchar;
+use core::{fmt, task::Waker};
+use mutex::SpinNoIrqLock;
 
 use qemu::{UartDevice, VirtBlkDevice};
 use spin::Once;
 
-pub mod qemu;
 pub mod console;
+pub mod qemu;
 
 extern crate alloc;
 
@@ -47,6 +49,14 @@ fn init_char_device() {
     CHAR_DEVICE.call_once(|| Arc::new(UartDevice::new()));
 }
 
+pub fn console_print(args: fmt::Arguments<'_>) {
+    static PRINT_MUTEX: SpinNoIrqLock<()> = SpinNoIrqLock::new(());
+    let _lock = PRINT_MUTEX.lock();
+    for s in args.to_string().as_bytes() {
+        console_putchar(*s);
+    }
+}
+
 pub fn block_device_test() {
     let block_device = BLOCK_DEVICE.get().unwrap();
     let mut write_buffer = [0u8; 512];
@@ -65,7 +75,7 @@ pub fn block_device_test() {
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => {{
-        $crate::console::console_print(format_args!($($arg)*));
+        $crate::console_print(format_args!($($arg)*));
     }};
 }
 
