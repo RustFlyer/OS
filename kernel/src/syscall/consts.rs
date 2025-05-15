@@ -2,7 +2,7 @@
 //!
 //! Syscall numbers from <asm-generic/unistd.h>.
 
-#![allow(unused)]
+#![allow(clippy::upper_case_acronyms)]
 
 use strum::FromRepr;
 
@@ -246,7 +246,6 @@ impl SyscallNo {
             GETRANDOM => "getrandom",
             MEMBARRIER => "membarrier",
             COPY_FILE_RANGE => "copy_file_range",
-            _ => "this syscall name is not set",
         }
     }
 }

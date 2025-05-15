@@ -7,6 +7,6 @@ struct KernelProcIfImpl;
 #[crate_interface::impl_interface]
 impl KernelProcIf for KernelProcIfImpl {
     fn exe() -> alloc::string::String {
-        current_task().elf_mut().dentry().path()
+        unsafe { current_task().elf().dentry().path() }
     }
 }

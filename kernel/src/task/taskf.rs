@@ -130,7 +130,7 @@ impl Task {
             .init_user(sp, entry_point.to_usize(), argc, argv, envp);
 
         *self.timer_mut() = TaskTimeStat::new();
-        *self.elf_mut() = elf_file;
+        unsafe { self.set_elf(elf_file) };
         *self.name_mut() = name;
         self.with_mut_fdtable(|table| table.close());
 
@@ -189,7 +189,7 @@ impl Task {
 
         let cwd = new_share_mutex(self.cwd_mut());
 
-        let elf = SyncUnsafeCell::new((*self.elf_mut()).clone());
+        let elf = SyncUnsafeCell::new(unsafe { self.elf() });
 
         let mut name = self.get_name() + "(fork)";
 

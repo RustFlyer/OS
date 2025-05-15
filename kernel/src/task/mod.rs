@@ -40,7 +40,7 @@ pub fn timer_init() {
     spawn_kernel_task(async {
         let mut ticks: usize = 0;
         loop {
-            ticks = ticks + 1;
+            ticks += 1;
             if ticks % 1000 == 0 {
                 let current = get_time_duration();
                 TIMER_MANAGER.check(current);

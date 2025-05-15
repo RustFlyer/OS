@@ -13,7 +13,8 @@ use systype::{SysError, SyscallResult};
 /// - if pid > 0, send a SigInfo built on sig_code to the process with pid
 /// - If pid = -1, then sig is sent to every process for which the calling
 ///   process has permission to send signals, except for process 1 (init)
-/// to do: broadcast(to process group) when pid <= 0; permission check when sig_code == 0; i32 or u32
+///
+/// TODO: broadcast(to process group) when pid <= 0; permission check when sig_code == 0; i32 or u32
 pub fn sys_kill(pid: isize, sig_code: i32) -> SyscallResult {
     // log::error!("[sys_kill] try to send sig_code {} to pid {}", sig_code, pid);
     // TASK_MANAGER.for_each(|task| {
@@ -47,7 +48,7 @@ pub fn sys_kill(pid: isize, sig_code: i32) -> SyscallResult {
 
         -1 => {
             TASK_MANAGER.for_each(|task| {
-                Ok(if task.pid() != INIT_PROC_ID && task.is_process() && sig.raw() != 0 {
+                if task.pid() != INIT_PROC_ID && task.is_process() && sig.raw() != 0 {
                     task.receive_siginfo(
                         SigInfo {
                             sig,
@@ -55,7 +56,8 @@ pub fn sys_kill(pid: isize, sig_code: i32) -> SyscallResult {
                             details: SigDetails::Kill { pid: task.pid() },
                         }
                     );
-                })
+                };
+                Ok(())
             })?;
         }
 
@@ -92,7 +94,7 @@ pub fn sys_sigaction(sig_code: i32, new_sa: usize, prev_sa: usize) -> SyscallRes
     if !prev_sa.is_null() {
         let prev = handlers.get(sig);
         unsafe {
-            prev_sa.write(prev.into())?;
+            prev_sa.write(prev)?;
         }
     }
 
@@ -284,7 +286,7 @@ pub fn sys_rt_sigmask(
 
     if !prev_mask.is_null() {
         unsafe {
-            let _ = prev_mask.write(*mask)?;
+            prev_mask.write(*mask)?;
         }
     }
 
@@ -340,6 +342,6 @@ pub fn sys_tgkill(tgid: isize, tid: isize, signum: i32) -> SyscallResult {
                 return Ok(0);
             }
         }
-        return Err(SysError::ESRCH);
+        Err(SysError::ESRCH)
     })
 }

@@ -65,7 +65,7 @@ impl Hart {
     }
 
     pub fn set_pps(&mut self, pps: &ProcessorPrivilegeState) {
-        self.pps = pps.clone();
+        self.pps = *pps;
     }
 
     pub fn get_pps(&self) -> &ProcessorPrivilegeState {

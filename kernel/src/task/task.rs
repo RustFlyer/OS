@@ -266,7 +266,7 @@ impl Task {
     }
 
     pub fn get_state(&self) -> TaskState {
-        self.state.lock().clone()
+        *self.state.lock()
     }
 
     #[allow(clippy::mut_from_ref)]
@@ -303,8 +303,20 @@ impl Task {
         unsafe { Arc::clone(&*self.addr_space.get()) }
     }
 
-    pub fn elf_mut(&self) -> &mut Arc<dyn File> {
-        unsafe { &mut *self.elf.get() }
+    /// # Safety
+    /// The caller must ensure that no other hart is accessing the elf
+    /// file at the same time.
+    pub unsafe fn elf(&self) -> Arc<dyn File> {
+        unsafe { Arc::clone(&*self.elf.get()) }
+    }
+
+    /// # Safety
+    /// The caller must ensure that no other hart is accessing the elf
+    /// file at the same time.
+    pub unsafe fn set_elf(&self, elf: Arc<dyn File>) {
+        unsafe {
+            *self.elf.get() = elf;
+        }
     }
 
     #[allow(clippy::mut_from_ref)]
@@ -342,7 +354,7 @@ impl Task {
     }
 
     pub fn with_mut_sig_manager<T>(&self, f: impl FnOnce(&mut SigManager) -> T) -> T {
-        f(&mut self.sig_manager_mut())
+        f(self.sig_manager_mut())
     }
 
     pub fn cwd_mut(&self) -> Arc<dyn Dentry> {
@@ -362,11 +374,11 @@ impl Task {
     }
 
     pub fn get_exit_code(&self) -> i32 {
-        self.exit_code.lock().clone()
+        *self.exit_code.lock()
     }
 
     pub fn get_pgid(&self) -> PGid {
-        self.pgid.lock().clone()
+        *self.pgid.lock()
     }
 
     pub fn get_name(&self) -> String {

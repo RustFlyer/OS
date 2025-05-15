@@ -5,7 +5,6 @@ use core::{
     pin::Pin,
     task::{Context, Poll},
     time::Duration,
-    usize,
 };
 use time::TimeSpec;
 use timer::{TimedTaskResult, TimeoutFuture};
@@ -27,7 +26,7 @@ use osfs::{
     },
     pipe::{inode::PIPE_BUF_LEN, new_pipe},
 };
-use systype::{SysError, SysResult, SyscallResult};
+use systype::{SysError, SyscallResult};
 use vfs::{
     file::File,
     kstat::Kstat,
@@ -1046,7 +1045,7 @@ pub async fn sys_ppoll(fds: usize, nfds: usize, tmo_p: usize, sigmask: usize) ->
 
     let ret = ret_vec.len();
     for (i, result) in ret_vec {
-        poll_fds[i].revents |= result.bits() as i16;
+        poll_fds[i].revents |= result.bits();
     }
 
     unsafe { UserWritePtr::<PollFd>::new(fds, &addrspace).write_array(&poll_fds)? };
@@ -1093,7 +1092,7 @@ pub fn sys_statfs(path: usize, buf: usize) -> SyscallResult {
     log::info!("[sys_statfs] path: {path}");
 
     let stfs = StatFs {
-        f_type: 0x20259527 as i64,
+        f_type: 0x20259527,
         f_bsize: BLOCK_SIZE as i64,
         f_blocks: 1 << 27,
         f_bfree: 1 << 26,
@@ -1103,7 +1102,7 @@ pub fn sys_statfs(path: usize, buf: usize) -> SyscallResult {
         f_fsid: [0; 2],
         f_namelen: 1 << 8,
         f_frsize: 1 << 9,
-        f_flags: 1 << 1 as i64,
+        f_flags: 1 << 1,
         f_spare: [0; 4],
     };
 

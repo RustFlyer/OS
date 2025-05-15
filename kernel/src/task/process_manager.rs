@@ -33,8 +33,7 @@ impl ProcessGroupManager {
     pub fn add_group(&self, group_leader: &Arc<Task>) {
         let pgid = group_leader.tid();
         group_leader.set_pgid(pgid);
-        let mut group = Vec::new();
-        group.push(Arc::downgrade(group_leader));
+        let group = vec![Arc::downgrade(group_leader)];
         self.0.lock().insert(pgid, group);
     }
 
@@ -63,6 +62,10 @@ impl ProcessGroupManager {
             .lock()
             .get_mut(&process.get_pgid())
             .unwrap()
-            .retain(|task| task.upgrade().map_or(false, |t| !Arc::ptr_eq(process, &t)))
+            .retain(|task| {
+                task.upgrade()
+                    .filter(|t| !Arc::ptr_eq(process, t))
+                    .is_some()
+            })
     }
 }

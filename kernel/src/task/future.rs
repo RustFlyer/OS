@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
-use arch::time::{set_nx_timer_irq, init_timer};
-use osfuture::{block_on_with_result, suspend_now, take_waker, yield_now};
+use arch::time::{set_nx_timer_irq};
+use osfuture::{block_on_with_result, suspend_now, take_waker};
 
 use core::future::Future;
 use core::pin::Pin;

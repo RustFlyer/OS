@@ -56,7 +56,7 @@ pub fn sys_syslog(log_type: usize, bufp: usize, len: usize) -> SyscallResult {
     let mut bufp = UserWritePtr::<u8>::new(bufp, &addrspace);
     log::warn!("[sys_log] unimplemeted call log_type: {log_type}");
     match log_type {
-        2 | 3 | 4 => {
+        2..=4 => {
             // For type equal to 2, 3, or 4, a successful call to syslog() returns the
             // number of bytes read.
             unsafe {

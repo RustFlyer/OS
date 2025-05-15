@@ -236,7 +236,7 @@ pub async fn sys_clock_nanosleep(
         }
         _ => {
             log::error!("[sys_clock_nanosleep] unsupported clockid {}", clockid);
-            return Err(SysError::EINVAL);
+            Err(SysError::EINVAL)
         }
     }
 }
