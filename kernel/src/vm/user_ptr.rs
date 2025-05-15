@@ -39,10 +39,10 @@ use mm::address::VirtAddr;
 use systype::{SysError, SysResult};
 
 use super::{addr_space::AddrSpace, mapping_flags::MappingFlags};
-use crate::{
-    processor::current_hart,
-    trap::trap_env::{set_kernel_trap_entry, set_user_rw_trap_entry},
-};
+use crate::trap::trap_env::{set_kernel_trap_entry, set_user_rw_trap_entry};
+
+#[cfg(target_arch = "riscv64")]
+use crate::processor::current_hart;
 
 /// Smart pointer that can be used to read memory in user address space.
 pub type UserReadPtr<'a, T> = UserPtr<'a, T, ReadMarker>;
@@ -661,7 +661,7 @@ struct SumGuard;
 impl SumGuard {
     pub fn new() -> Self {
         #[cfg(target_arch = "riscv64")]
-            current_hart().get_mut_pps().inc_sum_cnt();
+        current_hart().get_mut_pps().inc_sum_cnt();
         Self
     }
 }
@@ -669,7 +669,7 @@ impl SumGuard {
 impl Drop for SumGuard {
     fn drop(&mut self) {
         #[cfg(target_arch = "riscv64")]
-            current_hart().get_mut_pps().dec_sum_cnt();
+        current_hart().get_mut_pps().dec_sum_cnt();
     }
 }
 

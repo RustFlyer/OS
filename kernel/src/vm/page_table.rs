@@ -21,9 +21,6 @@ use mutex::SpinLock;
 use simdebug::when_debug;
 use systype::SysResult;
 
-#[cfg(target_arch = "riscv64")]
-use arch::mm::{fence, tlb_flush_addr, tlb_flush_all_except_global, tlb_shootdown};
-
 use super::{
     mapping_flags::MappingFlags,
     pte::{PageTableEntry, PteFlags},
