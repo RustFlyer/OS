@@ -1,4 +1,3 @@
-pub mod kernel_trap_handler;
 pub mod trap_context;
 pub mod trap_env;
 pub mod trap_handler;

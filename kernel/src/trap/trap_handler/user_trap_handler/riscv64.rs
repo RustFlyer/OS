@@ -19,13 +19,11 @@ use crate::vm::user_ptr::UserReadPtr;
 /// the middle of trap_return(), and then return to
 /// task_executor_unit(), which calls this trap_handler() function.
 #[unsafe(no_mangle)]
-pub fn trap_handler(task: &Task) -> bool {
+pub fn trap_handler(task: &Task) {
     let stval = register::stval::read();
     let cause = register::scause::read().cause();
 
     unsafe { load_trap_handler() };
-
-    // log::info!("[trap_handler] enter");
 
     // Here task updates global timer manager and checks if there
     // are any expired timer. If there is, the task will wake up
@@ -41,7 +39,6 @@ pub fn trap_handler(task: &Task) -> bool {
         }
         Trap::Interrupt(i) => user_interrupt_handler(task, Interrupt::from_number(i).unwrap()),
     }
-    true
 }
 
 pub fn user_exception_handler(task: &Task, e: Exception, stval: usize) {
@@ -58,40 +55,24 @@ pub fn user_exception_handler(task: &Task, e: Exception, stval: usize) {
             };
             let fault_addr = VirtAddr::new(stval);
             let addr_space = task.addr_space();
-            // log::debug!("pass sleep lock {:?}", addrspace.change_heap_size(0, 0));
             if let Err(e) = addr_space.handle_page_fault(fault_addr, access) {
-                if fault_addr.to_usize() == 0x68094 {
-                    simdebug::stop();
-                }
-                // Should send a `SIGSEGV` signal to the task
+                // TODO: Send SIGSEGV to the task
                 log::error!(
                     "[user_exception_handler] unsolved page fault at {:#x}, access: {:?}, error: {:?}",
                     fault_addr.to_usize(),
                     access,
                     e.as_str()
                 );
-                unimplemented!();
+                task.set_state(TaskState::Zombie);
             }
         }
         Exception::IllegalInstruction => {
             log::warn!("[trap_handler] illegal instruction at {:#x}", stval);
-            let addr_space = task.addr_space();
-            let mut user_ptr = UserReadPtr::<u32>::new(stval, &addr_space);
-
-            let old_sstatus = register::sstatus::read();
-            unsafe {
-                register::sstatus::set_mxr();
-            }
-            // SAFETY: the instruction must reside in a `X` page since it's an instruction fetch,
-            // and we have set `MXR` bit in `sstatus` register.
-            let inst = unsafe { user_ptr.read().unwrap() };
-            unsafe { register::sstatus::write(old_sstatus) };
-
-            log::warn!("The illegal instruction is {:#x}", inst);
+            // TODO: Send SIGILL signal to the task; don't just kill the task
             task.set_state(TaskState::Zombie);
         }
         e => {
-            log::warn!("Unknown user exception: {:?}", e);
+            log::error!("Unknown user exception: {:?}", e);
         }
     }
 }
