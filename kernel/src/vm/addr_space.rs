@@ -20,12 +20,10 @@
 use alloc::{collections::btree_map::BTreeMap, vec::Vec};
 use core::{cmp, ops::Bound};
 
+use arch::mm::{fence, tlb_shootdown_all};
 use mm::address::VirtAddr;
 use mutex::SpinLock;
 use systype::{SysError, SysResult};
-
-#[cfg(target_arch = "riscv64")]
-use arch::mm::{fence, tlb_shootdown_all};
 
 use super::{
     mapping_flags::MappingFlags,

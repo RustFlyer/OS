@@ -10,7 +10,6 @@ pub fn start_harts(hart_id: usize) {
         if i == hart_id {
             continue;
         }
-        let status: isize = hart_start(i, HART_START_ADDR) as _;
-        log::info!("[kernel] start to wake up hart {}... status {}", i, status);
+        hart_start(i, HART_START_ADDR);
     }
 }

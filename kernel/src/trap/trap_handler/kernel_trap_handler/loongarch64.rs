@@ -1,7 +1,7 @@
 use loongArch64::register::estat::{self, Exception, Trap};
 use loongArch64::register::{badv, ecfg, eentry, era, prmd, ticlr};
 
-use arch::loongarch64::time::{get_time_duration, set_nx_timer_irq};
+use arch::time::{get_time_duration, set_nx_timer_irq};
 use mm::address::VirtAddr;
 use timer::TIMER_MANAGER;
 

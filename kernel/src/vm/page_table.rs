@@ -7,6 +7,7 @@ use alloc::vec::Vec;
 
 use lazy_static::lazy_static;
 
+use arch::mm::{fence, tlb_flush_addr, tlb_flush_all_except_global, tlb_shootdown};
 use config::mm::{
     KERNEL_MAP_OFFSET, MMIO_END, MMIO_PHYS_RANGES, MMIO_START, PTE_PER_TABLE, VIRT_END, bss_end,
     bss_start, data_end, data_start, kernel_end, kernel_start, rodata_end, rodata_start, text_end,
@@ -178,6 +179,8 @@ impl PageTable {
             #[cfg(target_arch = "loongarch64")]
             {
                 // Flags in non-leaf entries are not specified in LoongArch architecture.
+                // TODO: Check if this is correct.
+                inner_flags;
                 PteFlags::empty()
             }
         };

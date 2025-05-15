@@ -39,3 +39,13 @@ pub fn tlb_flush_addr(addr: usize) {
         );
     }
 }
+
+/// TLB shootdown for the specified address range.
+pub fn tlb_shootdown(_addr: usize, _length: usize) {
+    // TODO: Implement TLB shootdown mechanism for LoongArch64.
+}
+
+/// TLB shootdown for the whole user address space.
+pub fn tlb_shootdown_all() {
+    // TODO: Implement TLB shootdown mechanism for LoongArch64.
+}

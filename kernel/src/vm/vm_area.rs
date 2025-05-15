@@ -28,6 +28,7 @@ use core::{cmp, fmt::Debug, mem};
 
 use bitflags::bitflags;
 
+use arch::mm::{tlb_flush_addr, tlb_flush_all_except_global};
 use config::mm::{KERNEL_MAP_OFFSET, PAGE_SIZE};
 use mm::{
     address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum},
@@ -36,9 +37,6 @@ use mm::{
 use osfuture::block_on;
 use systype::{SysError, SysResult};
 use vfs::file::File;
-
-#[cfg(target_arch = "riscv64")]
-use arch::mm::{tlb_flush_addr, tlb_flush_all_except_global};
 
 use super::{
     mapping_flags::MappingFlags,
@@ -304,7 +302,17 @@ impl VmArea {
             start: start_va,
             end: end_va,
             flags: VmaFlags::PRIVATE,
-            pte_flags: PteFlags::V | PteFlags::R | PteFlags::W | PteFlags::U | PteFlags::A | PteFlags::D,
+            pte_flags: {
+                let prot = MappingFlags::V | MappingFlags::R | MappingFlags::W | MappingFlags::U;
+                #[cfg(target_arch = "riscv64")]
+                {
+                    PteFlags::from(prot) | PteFlags::A | PteFlags::D
+                }
+                #[cfg(target_arch = "loongarch64")]
+                {
+                    PteFlags::from(prot)
+                }
+            },
             prot: MappingFlags::R | MappingFlags::W | MappingFlags::U,
             pages: BTreeMap::new(),
             map_type: TypedArea::Anonymous(AnonymousArea),
@@ -322,7 +330,17 @@ impl VmArea {
             start: start_va,
             end: end_va,
             flags: VmaFlags::PRIVATE,
-            pte_flags: PteFlags::V | PteFlags::R | PteFlags::W | PteFlags::U | PteFlags::A | PteFlags::D,
+            pte_flags: {
+                let prot = MappingFlags::V | MappingFlags::R | MappingFlags::W | MappingFlags::U;
+                #[cfg(target_arch = "riscv64")]
+                {
+                    PteFlags::from(prot) | PteFlags::A | PteFlags::D
+                }
+                #[cfg(target_arch = "loongarch64")]
+                {
+                    PteFlags::from(prot)
+                }
+            },
             prot: MappingFlags::R | MappingFlags::W | MappingFlags::U,
             pages: BTreeMap::new(),
             map_type: TypedArea::Heap(AnonymousArea),

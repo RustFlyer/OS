@@ -21,7 +21,7 @@ mod vm;
 
 use core::ptr;
 
-use arch::hart::hart_shutdown;
+use arch::mm::fence;
 use config::mm::{DTB_END, DTB_START};
 use mm::{self, frame, heap};
 use processor::hart;
@@ -50,7 +50,7 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
             log::info!("hart {}: initialized frame allocator", hart_id);
             vm::switch_to_kernel_page_table();
             log::info!("hart {}: switched to kernel page table", hart_id);
-            riscv::asm::fence();
+            fence();
             ptr::write_volatile(&raw mut INITIALIZED, true);
         }
 
