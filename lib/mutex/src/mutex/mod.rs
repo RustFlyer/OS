@@ -13,10 +13,10 @@ use sleep_mutex::SleepMutex;
 use spin_mutex::SpinMutex;
 use spin_then_sleep_mutex::SleepMutexCas;
 
-#[cfg(target_arch = "riscv")]
-use riscv::register::sstatus;
 #[cfg(target_arch = "loongarch64")]
 use loongArch64::register::crmd;
+#[cfg(target_arch = "riscv64")]
+use riscv::register::sstatus;
 
 pub mod optimistic_mutex;
 pub mod share_mutex;
@@ -66,7 +66,9 @@ impl SieGuard {
             #[cfg(target_arch = "riscv64")]
             {
                 let sie = sstatus::read().sie();
-                sstatus::clear_sie();
+                unsafe {
+                    sstatus::clear_sie();
+                }
                 sie
             }
             #[cfg(target_arch = "loongarch64")]
