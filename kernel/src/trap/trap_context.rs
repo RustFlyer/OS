@@ -1,8 +1,7 @@
 use arch::{
-    sstatus::{self, Sstatus},
     trap::disable_interrupt,
 };
-use riscv::register::sstatus::SPP;
+use riscv::register::sstatus::{self, Sstatus, SPP};
 
 /// when sp points to user stack of a task/process,
 /// sscratch(in RISCV) points to the start
@@ -15,7 +14,11 @@ pub struct TrapContext {
     // Note: It's for both RISCV and LoongArch, but only use RISCV's register name for convenience
     pub user_reg: [usize; 32], // 0-31, general register
 
+    #[cfg(target_arch = "riscv64")]
     pub sstatus: Sstatus, // 32, controls previlege level. seen as PRMD in LoongArch
+
+    #[cfg(target_arch = "loongarch64")]
+    pub sstatus: Prmd,
 
     pub sepc: usize, // 33, the instruction that occurs trap (or the next instruction when trap returns)
 
@@ -54,15 +57,28 @@ impl TrapContext {
     pub fn new(entry: usize, sp: usize) -> Self {
         disable_interrupt();
         // disable Interrupt until trap handling
-        let mut sstatus = sstatus::read();
-        sstatus.set_sie(false);
-        sstatus.set_spie(false);
-        // switch to User priviledge after handling
-        sstatus.set_spp(SPP::User);
+        
+        #[cfg(target_arch = "riscv64")]
+        let mut status = sstatus::read();
+        #[cfg(target_arch = "riscv64")]
+        {
+            status.set_sie(false);
+            status.set_spie(false);
+            // switch to User priviledge after handling
+            status.set_spp(SPP::User);
+        }
+        
+        #[cfg(target_arch = "loongarch64")]
+        let mut status = prmd::read();
+        #[cfg(target_arch = "loongarch64")]
+        {
+            status.set_pie(false);
+            status.set_ppl(PPL::U);
+        }
 
         let mut context = Self {
             user_reg: [0; 32],
-            sstatus,
+            sstatus: status,
             sepc: entry,
             stvec: 0,
             stval: 0,

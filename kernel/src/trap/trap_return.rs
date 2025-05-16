@@ -4,7 +4,6 @@ use crate::trap::trap_env;
 use alloc::sync::Arc;
 
 use arch::trap::disable_interrupt;
-use riscv::register::sstatus::FS;
 
 unsafe extern "C" {
     fn __return_to_user(cx: *mut TrapContext);
@@ -20,7 +19,7 @@ pub fn trap_return(task: &Arc<Task>) {
     // 1. current task yields after last trap.
     // 2. current task gets into sig-handler.
     let trap_cx = task.trap_context_mut();
-    trap_cx.sstatus.set_fs(FS::Clean);
+    // trap_cx.sstatus.set_fs(FS::Clean);
 
     // assert that interrupt will be disabled when trap returns
     assert!(!(trap_cx.sstatus.sie()));
