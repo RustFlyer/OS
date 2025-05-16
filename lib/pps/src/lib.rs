@@ -11,7 +11,7 @@ use riscv::register::{
 #[cfg(target_arch = "loongarch64")]
 use loongArch64::register::{
     era, pgdl,
-    prmd::{self, Prmd},
+    crmd::{self, Crmd},
 };
 
 /// `ProcessorPrivilegeState` records processor privilege state of a task.
@@ -24,7 +24,7 @@ use loongArch64::register::{
 ///   `auto_sum()` is called, the state of sum will changed really.
 ///   sum is a bit in sstatus, which decides whether kernel can access
 ///   user space.
-/// - sstatus(seen as PRMD in loongArch): it stores current state in S mode.
+/// - sstatus(seen as CRMD in loongArch): it stores current state in S mode.
 /// - sepc(seen as ERA in loongArch): when kernel finish handling trap or interrupt, application
 ///   can return `sepc` address in user space.
 /// - satp(seen as PGDL in loongArch): a pagetable for mapping virtual address.
@@ -103,7 +103,7 @@ impl ProcessorPrivilegeState {
 
     #[cfg(target_arch = "loongarch64")]
     pub fn record(&mut self) {
-        self.sstatus = prmd::read().raw();
+        self.sstatus = crmd::read().raw();
         self.sepc = era::read().raw();
         self.satp = pgdl::read().base();
     }
@@ -119,10 +119,13 @@ impl ProcessorPrivilegeState {
 
     #[cfg(target_arch = "loongarch64")]
     pub fn restore(&mut self) {
+        // TODO: change loongarch64 crate to change CSR from bits
+        let crmd = self.sstatus;
+        let era = self.sepc;
         unsafe {
-            prmd::set_bits(Prmd::from_bits(self.prmd));
-            era::write(self.era);
-            pgdl::set_base(self.pgdl);
+            core::arch::asm!("csrwr {}, 0x1", in(reg) crmd);
+            core::arch::asm!("csrwr {}, 0x6", in(reg) era);
+            pgdl::set_base(self.satp);
         }
     }
 }
