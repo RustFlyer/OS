@@ -12,3 +12,4 @@ pub mod sstatus;
 
 #[cfg(target_arch = "loongarch64")]
 pub mod prmd;
+pub mod crmd;

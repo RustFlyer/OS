@@ -22,6 +22,7 @@ pub fn trap_return(task: &Arc<Task>) {
     let trap_cx = task.trap_context_mut();
     trap_cx.sstatus.set_fs(FS::Clean);
 
+    // assert that interrupt will be disabled when trap returns
     assert!(!(trap_cx.sstatus.sie()));
     assert!(!(task.is_in_state(TaskState::Zombie) || task.is_in_state(TaskState::Sleeping)));
 

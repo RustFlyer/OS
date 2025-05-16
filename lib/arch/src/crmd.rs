@@ -1,9 +1,9 @@
 #[derive(Debug, Copy, Clone)]
 #[repr(C)]
-pub struct Prmd {
+pub struct Crmd {
     bits: usize,
 }
 
-impl Prmd {
+impl Crmd {
     
 }
