@@ -26,6 +26,7 @@ impl TcpSocket {
     /// Returning `true` indicates that the socket has entered a stable
     /// state(connected or failed) and can proceed to the next step
     pub(crate) async fn poll_connect(&self) -> NetPollState {
+        log::debug!("[poll_connect] {:?}", unsafe { self.handle.get().read() });
         // SAFETY: `self.handle` should be initialized above.
         let handle = unsafe { self.handle.get().read().unwrap() };
         let waker = take_waker().await;
@@ -56,6 +57,15 @@ impl TcpSocket {
                 }
             }
         });
+
+        // if writable {
+        //     log::debug!("[poll_connect] incoming_tcp_packet");
+        //     let local = unsafe { *self.local_addr.get() };
+        //     let peer = unsafe { *self.peer_addr.get() };
+        //     let mut sockets = SOCKET_SET.0.lock();
+        //     LISTEN_TABLE.incoming_tcp_packet(local, peer, &mut sockets);
+        // }
+
         NetPollState {
             readable: false,
             writable,
@@ -64,6 +74,7 @@ impl TcpSocket {
     }
 
     pub(crate) async fn poll_stream(&self) -> NetPollState {
+        log::debug!("[poll_stream] {:?}", unsafe { self.handle.get().read() });
         // SAFETY: `self.handle` should be initialized in a connected socket.
         let handle = unsafe { self.handle.get().read().unwrap() };
         let waker = take_waker().await;
@@ -89,9 +100,19 @@ impl TcpSocket {
     }
 
     pub(crate) fn poll_listener(&self) -> NetPollState {
+        log::debug!("[poll_listener] {:?}", unsafe { self.handle.get().read() });
         // SAFETY: `self.local_addr` should be initialized in a listening socket.
+
         let local_addr = unsafe { self.local_addr.get().read() };
         let readable = LISTEN_TABLE.can_accept(local_addr.port);
+
+        // let listen_handles = self.listen_handles.lock();
+        // let readable = listen_handles.iter().any(|&handle| {
+        //     SOCKET_SET.with_socket_mut::<tcp::Socket, _, _>(handle, |sock| {
+        //         sock.state() == tcp::State::Established
+        //     })
+        // });
+
         NetPollState {
             readable,
             writable: false,
@@ -100,6 +121,7 @@ impl TcpSocket {
     }
 
     pub(crate) fn poll_closed(&self) -> NetPollState {
+        log::debug!("[poll_closed]");
         use tcp::State::*;
         let handle = unsafe { self.handle.get().read() };
         if let Some(handle) = handle {
@@ -110,7 +132,7 @@ impl TcpSocket {
                 );
                 let hangup = matches!(socket.state(), CloseWait | FinWait2 | TimeWait);
                 NetPollState {
-                    readable: false,
+                    readable: true,
                     writable: false,
                     hangup,
                 }

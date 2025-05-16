@@ -353,7 +353,6 @@ pub async fn sys_sigreturn() -> SyscallResult {
     }
     log::debug!("[sys_sigreturn] trap context: {:?}", trap_cx.user_reg);
     // log::debug!("sig: {:#x}", task.sig_manager_mut().bitmap.bits());
-
     // its return value is the a0 before signal interrupt, so that it won't be changed in async_syscall
     // trap_cx.display();
     Ok(trap_cx.user_reg[10])

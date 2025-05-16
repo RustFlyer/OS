@@ -2,6 +2,7 @@ use alloc::boxed::Box;
 use async_trait::async_trait;
 use config::vfs::{OpenFlags, PollEvents};
 use net::{poll_interfaces, tcp::core::TcpSocket, udp::UdpSocket};
+use osfuture::take_waker;
 use systype::SysResult;
 use vfs::{
     file::{File, FileMeta},
@@ -90,12 +91,19 @@ impl File for Socket {
         let mut res = PollEvents::empty();
         poll_interfaces();
         let netstate = self.sk.poll().await;
+
         if events.contains(PollEvents::IN) && netstate.readable {
             res |= PollEvents::IN;
+        } else if events.contains(PollEvents::IN) {
+            // self.sk.register_recv_waker(take_waker().await);
         }
+
         if events.contains(PollEvents::OUT) && netstate.writable {
             res |= PollEvents::OUT;
+        } else if events.contains(PollEvents::OUT) {
+            // self.sk.register_send_waker(take_waker().await);
         }
+
         if netstate.hangup {
             log::warn!("[Socket::bask_poll] PollEvents is hangup");
             res |= PollEvents::HUP;

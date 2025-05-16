@@ -262,7 +262,11 @@ impl FdSet {
         let idx = fd / 64;
         let bit = fd % 64;
         let mask = 1 << bit;
-        self.fds_bits[idx] & mask != 0
+        let ret = self.fds_bits[idx] & mask != 0;
+
+        ret.then(|| log::warn!("[FdSet::is_set] fd {} set", fd));
+
+        ret
     }
 }
 

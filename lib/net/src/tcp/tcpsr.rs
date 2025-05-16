@@ -16,6 +16,7 @@ impl TcpSocket {
             log::warn!("[TcpSocket::recv] shutdown closed read, recv return 0");
             return Ok(0);
         }
+
         if self.is_connecting() {
             return Err(SysError::EAGAIN);
         } else if !self.is_connected() && shutdown == 0 {
@@ -34,6 +35,7 @@ impl TcpSocket {
                     log::warn!("[TcpSocket::recv] socket recv() failed because handle{handle} is not active");
                     Err(SysError::ECONNREFUSED)
                 } else if !socket.may_recv() {
+                    log::error!("[TcpSocket::recv] connection closed");
                     // connection closed
                     Ok(0)
                 } else if socket.recv_queue() > 0 {

@@ -19,7 +19,7 @@ pub const LISTEN_QUEUE_SIZE: usize = 512;
 /// transmission and reception, etc.
 ///
 /// It is similar to `FdTable` and `SocketHandle` is similar to `fd`
-pub(crate) struct SocketSetWrapper(Arc<SpinNoIrqLock<SocketSet<'static>>>);
+pub(crate) struct SocketSetWrapper(pub(crate) Arc<SpinNoIrqLock<SocketSet<'static>>>);
 
 /// Tcp Socket
 ///
@@ -99,6 +99,8 @@ impl SocketSetWrapper {
         self.0.lock().remove(handle);
     }
 
+    /// This function exposes its socket to caller as a closure. Just ensure the socket lock
+    /// in a certain range.
     pub fn with_socket_mut<T: AnySocket<'static>, R, F>(&self, handle: SocketHandle, f: F) -> R
     where
         F: FnOnce(&mut T) -> R,
@@ -108,6 +110,7 @@ impl SocketSetWrapper {
         f(socket)
     }
 
+    /// The core function of net module. Poll and process data packets in waiting list.
     pub fn poll_interfaces(&self) -> SmolInstant {
         // {
         //     let lock = self.0.lock();
@@ -117,6 +120,7 @@ impl SocketSetWrapper {
         ETH0.get().unwrap().poll(self.0.clone())
     }
 
+    /// Different from `poll_interfaces`, it checks time and decides whether to poll.
     pub fn check_poll(&self, timestamp: SmolInstant) {
         ETH0.get().unwrap().check_poll(timestamp, &self.0)
     }

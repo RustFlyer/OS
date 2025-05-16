@@ -519,6 +519,7 @@ fn check_user_access(
             // to try mapping the page. If this also fails, then we know the access
             // is not allowed.
             if let Err(e) = addr_space.handle_page_fault(VirtAddr::new(addr), perm) {
+                log::error!("fail to handle_page_fault in userptr");
                 set_kernel_stvec();
                 return Err(e);
             }

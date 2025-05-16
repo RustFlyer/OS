@@ -7,6 +7,8 @@ use smoltcp::{
     socket::tcp,
 };
 
+use crate::tcp::LISTEN_TABLE;
+
 /// `NetRxToken` implement `RxToken` trait, which means that
 /// this token is the only chance that the kernel can process the packet
 /// when kernel receive the packet.
@@ -31,6 +33,10 @@ impl RxToken for NetRxToken<'_> {
     where
         F: FnOnce(&[u8]) -> R,
     {
+        let medium = self.0.borrow().capabilities().medium;
+        let is_ethernet = medium == Medium::Ethernet;
+        crate::tcp::snoop_tcp_packet(self.1.packet(), is_ethernet).ok();
+
         let mut rx_buf = self.1;
         let result = f(rx_buf.packet_mut());
         self.0.borrow_mut().recycle_rx_buffer(rx_buf).unwrap();

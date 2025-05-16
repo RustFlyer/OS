@@ -11,7 +11,7 @@ use smoltcp::{
 };
 use timer::{TIMER_MANAGER, Timer};
 
-use crate::{PollTimer, device::DeviceWrapper, tcp::LISTEN_TABLE};
+use crate::{PollTimer, SOCKET_SET, device::DeviceWrapper, tcp::LISTEN_TABLE};
 
 type SmolInstant = smoltcp::time::Instant;
 type SmolDuration = smoltcp::time::Duration;
@@ -114,14 +114,15 @@ impl InterfaceWrapper {
     ///
     /// return what time it should poll next
     pub fn poll(&self, sockets: ShareMutex<SocketSet>) -> SmolInstant {
-        log::warn!("[net] poll");
+        // log::warn!("[net] poll");
         let mut dev = self.dev.lock();
 
         let mut iface = self.iface.lock();
         let mut sockets = sockets.lock();
         let timestamp = Self::current_time();
-        let res = iface.poll(timestamp, dev.deref_mut(), &mut sockets);
-        log::debug!("[poll] res: {:?}", res);
+        let _res = iface.poll(timestamp, dev.deref_mut(), &mut sockets);
+        LISTEN_TABLE.check_after_poll(&mut sockets);
+        // log::debug!("[poll] res: {:?}", res);
         // Self::check_device_tcpstate(dev.deref_mut(), &mut sockets);
         timestamp
     }
@@ -144,6 +145,7 @@ impl InterfaceWrapper {
                     self.dev.lock().deref_mut(),
                     &mut sockets,
                 );
+                LISTEN_TABLE.check_after_poll(&mut sockets);
             }
             Some(delay) => {
                 let next_poll = delay + Self::ins_to_duration(timestamp);
@@ -154,6 +156,7 @@ impl InterfaceWrapper {
                         self.dev.lock().deref_mut(),
                         &mut sockets,
                     );
+                    LISTEN_TABLE.check_after_poll(&mut sockets);
                 } else {
                     let mut timer = Timer::new(next_poll);
                     timer.set_callback(Arc::new(PollTimer {}));
@@ -176,7 +179,7 @@ impl InterfaceWrapper {
         }
         let src_addr = dev.state.src_addr;
         let dst_addr = dev.state.dst_addr;
-        LISTEN_TABLE.incoming_tcp_packet(src_addr, dst_addr, sockets);
+        LISTEN_TABLE.incoming_tcp_packet(src_addr, dst_addr);
         dev.clear_state();
     }
 

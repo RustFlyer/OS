@@ -1,10 +1,11 @@
 use core::{
     ops::Deref,
     sync::atomic::{AtomicBool, Ordering},
+    task::Waker,
 };
 
 use mutex::SpinNoIrqLock;
-use osfuture::{take_waker, yield_now};
+use osfuture::{suspend_now, take_waker, yield_now};
 use smoltcp::{
     iface::SocketHandle,
     socket::{
@@ -20,6 +21,7 @@ use crate::{
     NetPollState, SOCKET_SET, SocketSetWrapper,
     addr::{UNSPECIFIED_LISTEN_ENDPOINT, is_unspecified, to_endpoint},
     portmap::PORT_MAP,
+    tcp::has_signal,
 };
 
 const PORT_START: u16 = 0xc000;
@@ -116,7 +118,6 @@ impl UdpSocket {
                 BindError::Unaddressable => SysError::EINVAL,
             })
         })?;
-
         *local_addr = Some(bound_addr);
 
         log::debug!("[udp::bind] bind {:?}", bound_addr);
@@ -149,29 +150,33 @@ impl UdpSocket {
         }
 
         let waker = take_waker().await;
-        let bytes = SOCKET_SET.with_socket_mut::<udp::Socket, _, _>(self.handle, |socket| {
-            if socket.can_send() {
-                socket.send_slice(buf, remote_addr).map_err(|e| match e {
-                    SendError::BufferFull => {
-                        log::warn!("socket send() failed, {e:?}");
+        let bytes = self
+            .block_on(|| {
+                SOCKET_SET.with_socket_mut::<udp::Socket, _, _>(self.handle, |socket| {
+                    if socket.can_send() {
+                        socket.send_slice(buf, remote_addr).map_err(|e| match e {
+                            SendError::BufferFull => {
+                                log::warn!("socket send() failed, {e:?}");
+                                socket.register_send_waker(&waker);
+                                SysError::EAGAIN
+                            }
+                            SendError::Unaddressable => {
+                                log::warn!("socket send() failed, {e:?}");
+                                SysError::ECONNREFUSED
+                            }
+                        })?;
+                        Ok(buf.len())
+                    } else {
+                        log::info!(
+                            "[UdpSocket::send_impl] handle{} can't send now, tx buffer is full",
+                            self.handle
+                        );
                         socket.register_send_waker(&waker);
-                        SysError::EAGAIN
+                        Err(SysError::EAGAIN)
                     }
-                    SendError::Unaddressable => {
-                        log::warn!("socket send() failed, {e:?}");
-                        SysError::ECONNREFUSED
-                    }
-                })?;
-                Ok(buf.len())
-            } else {
-                log::info!(
-                    "[UdpSocket::send_impl] handle{} can't send now, tx buffer is full",
-                    self.handle
-                );
-                socket.register_send_waker(&waker);
-                Err(SysError::EAGAIN)
-            }
-        })?;
+                })
+            })
+            .await?;
         log::info!("[UdpSocket::send_impl] send {bytes} bytes to {remote_addr:?}");
         yield_now().await;
 
@@ -214,21 +219,26 @@ impl UdpSocket {
             return Err(SysError::ENOTCONN);
         }
         let waker = take_waker().await;
-        let ret = SOCKET_SET.with_socket_mut::<udp::Socket, _, _>(self.handle, |socket| {
-            if socket.can_recv() {
-                // data available
-                op(socket)
-            } else if !socket.is_open() {
-                log::warn!("UDP socket {}: recv() failed: not connected", self.handle);
-                Err(SysError::ENOTCONN)
-            } else {
-                // no more data
-                log::info!("[recv_impl] no more data, register waker and suspend now");
-                socket.register_recv_waker(&waker);
-                Err(SysError::EAGAIN)
-            }
-        });
+        let ret = self
+            .block_on(|| {
+                SOCKET_SET.with_socket_mut::<udp::Socket, _, _>(self.handle, |socket| {
+                    if socket.can_recv() {
+                        // data available
+                        op(socket)
+                    } else if !socket.is_open() {
+                        log::warn!("UDP socket {}: recv() failed: not connected", self.handle);
+                        Err(SysError::ENOTCONN)
+                    } else {
+                        // no more data
+                        log::info!("[recv_impl] no more data, register waker and suspend now");
+                        socket.register_recv_waker(&waker);
+                        Err(SysError::EAGAIN)
+                    }
+                })
+            })
+            .await;
         yield_now().await;
+
         ret
     }
 
@@ -374,6 +384,46 @@ impl UdpSocket {
                 hangup: false,
             }
         })
+    }
+
+    async fn block_on<F, T>(&self, mut f: F) -> SysResult<T>
+    where
+        F: FnMut() -> SysResult<T>,
+    {
+        if self.is_nonblocking() {
+            f()
+        } else {
+            loop {
+                let timestamp = SOCKET_SET.poll_interfaces();
+                let ret = f();
+                SOCKET_SET.check_poll(timestamp);
+                match ret {
+                    Ok(t) => return Ok(t),
+                    Err(SysError::EAGAIN) => {
+                        suspend_now().await;
+                        if has_signal() {
+                            log::warn!("[UdpSocket::block_on] has signal");
+                            return Err(SysError::EINTR);
+                        }
+                    }
+                    Err(e) => return Err(e),
+                }
+            }
+        }
+    }
+
+    pub fn register_recv_waker(&self, waker: &Waker) {
+        let handle = self.handle;
+        SOCKET_SET.with_socket_mut::<udp::Socket, _, _>(handle, |socket| {
+            socket.register_recv_waker(waker);
+        });
+    }
+
+    pub fn register_send_waker(&self, waker: &Waker) {
+        let handle = self.handle;
+        SOCKET_SET.with_socket_mut::<udp::Socket, _, _>(handle, |socket| {
+            socket.register_send_waker(waker);
+        });
     }
 
     pub fn get_ephemeral_port() -> u16 {

@@ -46,11 +46,18 @@ pub fn sys_socket(domain: usize, types: i32, protocal: usize) -> SyscallResult {
 }
 
 pub fn sys_bind(sockfd: usize, addr: usize, addrlen: usize) -> SyscallResult {
-    log::debug!("[sys_bind] sockfd: {}, addr: {:#x}", sockfd, addr);
     let task = current_task();
     let addrspace = task.addr_space();
     let local_addr = read_sockaddr(addrspace, addr, addrlen)?;
 
+    log::debug!(
+        "[sys_bind] thread: {}, sockfd: {}, addr: {:#x}",
+        task.tid(),
+        sockfd,
+        addr
+    );
+
+    log::debug!("[sys_bind] local_addr: {:?}", local_addr.into_endpoint());
     let socket: Arc<Socket> = task
         .with_mut_fdtable(|table| table.get_file(sockfd))?
         .downcast_arc::<Socket>()
@@ -132,6 +139,15 @@ pub fn sys_getsockopt(
     Ok(0)
 }
 
+/// used to transmit a message to another socket.
+///
+/// The argument sockfd is the file descriptor of the sending socket.
+///
+/// If sendto() is used on a connection-mode (SOCK_STREAM, SOCK_SEQPACKET) socket, the arguments
+/// dest_addr and addrlen are ignored (and the error EISCONN may be returned when they are not NULL
+/// and 0), and the error ENOTCONN is returned when the socket was not actually connected.
+///
+/// Otherwise, the address of the target is given by dest_addr with addrlen specifying its size.
 pub async fn sys_sendto(
     sockfd: usize,
     buf: usize,
@@ -141,9 +157,13 @@ pub async fn sys_sendto(
     addrlen: usize,
 ) -> SyscallResult {
     debug_assert!(flags == 0, "unsupported flags");
-    log::debug!("[sys_sendto] socket fd: {sockfd:#x}, dest_addr: {dest_addr:#x}");
 
     let task = current_task();
+    log::debug!(
+        "[sys_sendto] thread: {}, sockfd: {sockfd:#x}, dest_addr: {dest_addr:#x}",
+        task.tid()
+    );
+
     let addrspace = task.addr_space();
     let mut read_ptr = UserReadPtr::<u8>::new(buf, &addrspace);
     let buf = unsafe { read_ptr.try_into_slice(len) }?;
@@ -189,8 +209,9 @@ pub async fn sys_recvfrom(
 ) -> SyscallResult {
     debug_assert!(flags == 0, "unsupported flags");
     log::debug!("[sys_recvfrom] socket fd: {sockfd:#x}, src_addr: {src_addr:#x}");
+    log::debug!("[sys_recvfrom] buf: {buf:#x}, len: {len:#x}");
 
-    poll_interfaces();
+    // poll_interfaces();
 
     let task = current_task();
     let addrspace = task.addr_space();
@@ -211,7 +232,7 @@ pub async fn sys_recvfrom(
 
     buf[..bytes].copy_from_slice(&temp[..bytes]);
     write_sockaddr(addrspace.clone(), src_addr, addrlen, remote_addr)?;
-    log::debug!("[sys_recvfrom] recv buf: {:?}", buf);
+    // log::debug!("[sys_recvfrom] recv buf: {:?}", buf);
 
     Ok(bytes)
 }
@@ -233,6 +254,8 @@ pub fn sys_listen(sockfd: usize, _backlog: usize) -> SyscallResult {
 pub async fn sys_connect(sockfd: usize, addr: usize, addrlen: usize) -> SyscallResult {
     let task = current_task();
     let addrspace = task.addr_space();
+
+    log::info!("[sys_connect] thread: {}, addr: {:#x}", task.tid(), addr);
     let remote_addr = read_sockaddr(addrspace.clone(), addr, addrlen)?;
 
     let socket: Arc<Socket> = task
@@ -240,10 +263,12 @@ pub async fn sys_connect(sockfd: usize, addr: usize, addrlen: usize) -> SyscallR
         .downcast_arc::<Socket>()
         .map_err(|_| SysError::ENOTSOCK)?;
 
-    log::info!("[sys_connect] fd {sockfd} trys to connect");
+    log::info!(
+        "[sys_connect] sockfd {} trys to connect {}",
+        sockfd,
+        remote_addr.into_endpoint()
+    );
     socket.sk.connect(remote_addr).await?;
-    // TODO:
-    // yield_now().await;
     Ok(0)
 }
 
@@ -260,6 +285,12 @@ pub async fn sys_connect(sockfd: usize, addr: usize, addrlen: usize) -> SyscallR
 pub async fn sys_accept(sockfd: usize, addr: usize, addrlen: usize) -> SyscallResult {
     let task = current_task();
     let addrspace = task.addr_space();
+    log::debug!(
+        "[sys_accept]tid: {} sockfd: {} addr: {:#x}",
+        task.tid(),
+        sockfd,
+        addr
+    );
 
     let socket: Arc<Socket> = task
         .with_mut_fdtable(|table| table.get_file(sockfd))?
@@ -277,4 +308,29 @@ pub async fn sys_accept(sockfd: usize, addr: usize, addrlen: usize) -> SyscallRe
     let new_socket = Arc::new(Socket::from_another(&socket, Sock::Tcp(new_sk)));
     let fd = task.with_mut_fdtable(|table| table.alloc(new_socket, OpenFlags::empty()))?;
     Ok(fd)
+}
+
+/// Unlike the `close` system call, `shutdown` allows for finer grained
+/// control over the closing behavior of connections. `shutdown` can only
+/// close the sending and receiving directions of the socket, or both at the
+/// same time
+pub fn sys_shutdown(sockfd: usize, how: usize) -> SyscallResult {
+    let task = current_task();
+    let socket: Arc<Socket> = task
+        .with_mut_fdtable(|table| table.get_file(sockfd))?
+        .downcast_arc::<Socket>()
+        .map_err(|_| SysError::ENOTSOCK)?;
+
+    log::info!(
+        "[sys_shutdown] sockfd:{sockfd} shutdown {}",
+        match how {
+            0 => "READ",
+            1 => "WRITE",
+            2 => "READ AND WRITE",
+            _ => "Invalid argument",
+        }
+    );
+
+    socket.sk.shutdown(how as u8)?;
+    Ok(0)
 }

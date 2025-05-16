@@ -235,18 +235,22 @@ pub fn read_sockaddr(
                 log::error!("[audit_sockaddr] AF_INET addrlen error");
                 return Err(SysError::EINVAL);
             }
-            Ok(SockAddr {
+            let sockaddr = SockAddr {
                 ipv4: unsafe { *(addr as *const _) },
-            })
+            };
+            log::debug!("[read_sockaddr] AF_INET: {:?}", sockaddr.into_endpoint());
+            Ok(sockaddr)
         }
         SaFamily::AF_INET6 => {
             if addrlen < mem::size_of::<SockAddrIn6>() {
                 log::error!("[audit_sockaddr] AF_INET6 addrlen error");
                 return Err(SysError::EINVAL);
             }
-            Ok(SockAddr {
+            let sockaddr = SockAddr {
                 ipv6: unsafe { *(addr as *const _) },
-            })
+            };
+            log::debug!("[read_sockaddr] AF_INET6: {:?}", sockaddr.into_endpoint());
+            Ok(sockaddr)
         }
         SaFamily::AF_UNIX => {
             if addrlen < mem::size_of::<SockAddrUn>() {
@@ -269,9 +273,15 @@ pub fn write_sockaddr(
     unsafe {
         match SaFamily::try_from(sockaddr.family).unwrap() {
             SaFamily::AF_INET => {
-                UserWritePtr::<SockAddrIn>::new(addr, &addrspace).write(sockaddr.ipv4)?;
-                UserWritePtr::<u32>::new(addrlen, &addrspace)
-                    .write(mem::size_of::<SockAddrIn>() as u32)?;
+                log::debug!("write af_inet {addr:#x} {addrlen:#x}");
+                if addr != 0 {
+                    UserWritePtr::<SockAddrIn>::new(addr, &addrspace).write(sockaddr.ipv4)?;
+                }
+                if addrlen != 0 {
+                    UserWritePtr::<u32>::new(addrlen, &addrspace)
+                        .write(mem::size_of::<SockAddrIn>() as u32)?;
+                }
+                log::debug!("write af_inet success");
             }
             SaFamily::AF_INET6 => {
                 UserWritePtr::<SockAddrIn6>::new(addr, &addrspace).write(sockaddr.ipv6)?;

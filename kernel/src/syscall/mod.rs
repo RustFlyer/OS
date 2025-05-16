@@ -19,6 +19,8 @@ use signal::*;
 use time::*;
 use user::{sys_getgid, sys_getuid};
 
+use crate::processor::current_task;
+
 pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
     let Some(syscall_no) = SyscallNo::from_repr(syscall_no) else {
         log::error!("Syscall number not included: {syscall_no}");
@@ -29,11 +31,11 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
     //     log::error!("[{}] args: {:?}", syscall_no.as_str(), args);
     // }
 
-    // log::error!(
-    //     "[{}] task {} call function",
-    //     syscall_no.as_str(),
-    //     current_task().tid()
-    // );
+    log::warn!(
+        "task {} call [{}]",
+        current_task().tid(),
+        syscall_no.as_str(),
+    );
 
     let result = match syscall_no {
         GETTIMEOFDAY => sys_gettimeofday(args[0], args[1]).await,
@@ -145,6 +147,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         PREAD64 => sys_pread64(args[0], args[1], args[2], args[3]).await,
         PWRITE64 => sys_pwrite64(args[0], args[1], args[2], args[3]).await,
         SETSOCKOPT => sys_setsockopt(args[0], args[1], args[2], args[3], args[4]),
+        GETSOCKOPT => sys_getsockopt(args[0], args[1], args[2], args[3], args[4]),
         SENDTO => sys_sendto(args[0], args[1], args[2], args[3], args[4], args[5]).await,
         RECVFROM => sys_recvfrom(args[0], args[1], args[2], args[3], args[4], args[5]).await,
         LISTEN => sys_listen(args[0], args[1]),
@@ -152,6 +155,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         ACCEPT => sys_accept(args[0], args[1], args[2]).await,
         GETEGID => sys_getegid(),
         MEMBARRIER => sys_membarrier(args[0], args[1], args[2]),
+        SHUTDOWN => sys_shutdown(args[0], args[1]),
         _ => {
             println!("Syscall not implemented: {}", syscall_no.as_str());
             unimplemented!()

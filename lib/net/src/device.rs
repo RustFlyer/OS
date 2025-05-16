@@ -89,30 +89,11 @@ impl phy::Device for DeviceWrapper {
         let rx_buf = match dev.receive() {
             Ok(buf) => buf,
             Err(err) => {
-                log::error!("err: {err:?}");
+                // log::error!("err: {err:?}");
                 return None;
             }
         };
         let rxtoken = NetRxToken(&self.inner, rx_buf);
-        // let medium = dev.capabilities().medium;
-        // let is_ethernet = medium == Medium::Ethernet;
-        // let ret = snoop_tcp_packet(rxtoken.1.packet(), is_ethernet);
-
-        // match ret {
-        //     Ok(r) => match r {
-        //         Some((src, dest)) => {
-        //             self.state = TcpState {
-        //                 is_recv_first: true,
-        //                 src_addr: src,
-        //                 dst_addr: dest,
-        //             };
-        //         }
-        //         None => (),
-        //     },
-        //     Err(e) => {
-        //         log::warn!("{e:?}");
-        //     }
-        // }
 
         Some((rxtoken, NetTxToken(&self.inner)))
     }

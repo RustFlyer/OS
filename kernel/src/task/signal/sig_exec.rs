@@ -160,6 +160,8 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
             cx.user_reg[3] = sig_cx.user_reg[3];
             cx.user_reg[4] = sig_cx.user_reg[4];
 
+            (cx.sepc == 0x68094).then(|| simdebug::stop());
+
             log::debug!("cx.sepc: {:#x}", cx.sepc);
             log::debug!("cx.user_reg[1]: {:#x}", cx.user_reg[1]);
             log::debug!("cx.user_reg[2]: {:#x}", cx.user_reg[2]);

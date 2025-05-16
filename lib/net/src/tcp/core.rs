@@ -4,10 +4,15 @@ use core::{
 };
 
 use alloc::vec::Vec;
-use mutex::SpinNoIrqLock;
-use smoltcp::{iface::SocketHandle, wire::IpEndpoint};
+use mutex::{ShareMutex, SpinNoIrqLock};
+use smoltcp::{
+    iface::SocketHandle,
+    socket::tcp::{self, State},
+    wire::IpEndpoint,
+};
+use timer::sleep_ms;
 
-use crate::{SOCKET_SET, tcp::SHUT_RDWR};
+use crate::{SOCKET_SET, poll_interfaces, tcp::SHUT_RDWR};
 
 /// A TCP socket that provides POSIX-like APIs.
 ///
@@ -19,6 +24,7 @@ use crate::{SOCKET_SET, tcp::SHUT_RDWR};
 /// [`bind`]: TcpSocket::bind
 /// [`listen`]: TcpSocket::listen
 /// [`accept`]: TcpSocket::accept
+#[derive(Debug)]
 pub struct TcpSocket {
     /// Manages the state of the socket using an atomic u8 for lock-free
     /// management.
@@ -39,7 +45,7 @@ pub struct TcpSocket {
     /// Indicates whether the socket is in non-blocking mode, using an atomic
     /// boolean for thread-safe access.
     pub(crate) nonblock: AtomicBool,
-    pub(crate) listen_handles: SpinNoIrqLock<Vec<SocketHandle>>,
+    pub(crate) listen_handles: ShareMutex<Vec<SocketHandle>>,
 }
 
 unsafe impl Sync for TcpSocket {}
@@ -50,6 +56,15 @@ impl Drop for TcpSocket {
         self.shutdown(SHUT_RDWR).ok();
         // Safe because we have mut reference to `self`.
         if let Some(handle) = unsafe { self.handle.get().read() } {
+            loop {
+                let is_close = SOCKET_SET.with_socket_mut::<tcp::Socket, _, _>(handle, |sock| {
+                    sock.state() == State::Closed
+                });
+                if is_close {
+                    break;
+                }
+                poll_interfaces();
+            }
             SOCKET_SET.remove(handle);
         }
     }

@@ -49,6 +49,7 @@ impl Future for PSelectFuture {
         if ret_vec.len() > 0 {
             Poll::Ready(ret_vec)
         } else {
+            log::debug!("[PSelectFuture] waiting..");
             Poll::Pending
         }
     }

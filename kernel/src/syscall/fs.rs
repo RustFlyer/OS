@@ -1497,15 +1497,11 @@ pub async fn sys_pselect6(
     let timeout = tconvert(timeout)?;
     let sigmask = sconvert(sigmask)?;
 
-    // log::info!(
-    //     "[sys_pselect6] readfds: {readfds:?}, writefds: {writefds:?}, exceptfds: {exceptfds:?}"
-    // );
-
-    // log::debug!(
-    //     "[sys_pselect6] task {} tid {} call",
-    //     task.get_name(),
-    //     task.tid()
-    // );
+    log::info!(
+        "[sys_pselect6] readfds: {readfds:?}, writefds: {writefds:?}, exceptfds: {exceptfds:?}"
+    );
+    log::debug!("[sys_pselect6] thread: {} call", task.tid());
+    log::info!("[sys_pselect6] timeout: {:?}", timeout);
 
     let mut polls = Vec::<FilePollRet>::with_capacity(nfds as usize);
 
@@ -1522,7 +1518,7 @@ pub async fn sys_pselect6(
 
         if !events.is_empty() {
             let file = task.with_mut_fdtable(|f| f.get_file(fd))?;
-            log::debug!("fd:{fd}, file path:{}", file.dentry().path());
+            log::debug!("[sys_pselect6] fd:{fd}, file path:{}", file.dentry().path());
             polls.push((fd, events, file));
         }
     }
@@ -1551,7 +1547,6 @@ pub async fn sys_pselect6(
     };
 
     let ret_vec = if let Some(timeout) = timeout {
-        // log::info!("timeout: {:?}", timeout);
         match Select2Futures::new(
             TimeoutFuture::new(timeout.into(), pselect_future),
             intr_future,

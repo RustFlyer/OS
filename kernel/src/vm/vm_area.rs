@@ -500,7 +500,7 @@ impl VmArea {
                 sfence_vma_addr(fault_addr.to_usize());
             }
         } else {
-            log::warn!("handle_fault: pte not valid");
+            // log::warn!("handle_fault: pte not valid");
             self.handler.unwrap()(self, info)?;
         }
 

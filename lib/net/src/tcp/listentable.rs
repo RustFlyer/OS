@@ -1,18 +1,21 @@
-use core::{ops::DerefMut, task::Waker};
+use core::{ops::DerefMut, sync::atomic::Ordering, task::Waker};
 
-use alloc::boxed::Box;
-use mutex::SpinNoIrqLock;
+use alloc::{boxed::Box, vec::Vec};
+use mutex::{ShareMutex, SpinNoIrqLock};
 use osfuture::yield_now;
 use smoltcp::{
     iface::{SocketHandle, SocketSet},
-    socket::tcp,
+    socket::tcp::{self, State},
     wire::{IpEndpoint, IpListenEndpoint},
 };
 use systype::{SysError, SysResult};
 
 use crate::{SOCKET_SET, SocketSetWrapper, socketset::LISTEN_QUEUE_SIZE};
 
-use super::listenentry::{ListenTableEntry, PORT_NUM};
+use super::{
+    core::TcpSocket,
+    listenentry::{ListenTableEntry, PORT_NUM},
+};
 
 /// A table for managing TCP listen ports.
 /// Each index corresponds to a specific port number.
@@ -25,6 +28,9 @@ pub struct ListenTable {
     /// An array of Mutexes, each protecting an optional ListenTableEntry for a
     /// specific port.
     tcp: Box<[SpinNoIrqLock<Option<Box<ListenTableEntry>>>]>,
+    /// An array of ports, used to store ports in incoming_tcp_packet for future
+    /// check after poll.
+    waiting_ports: SpinNoIrqLock<Vec<usize>>,
 }
 
 impl ListenTable {
@@ -36,20 +42,30 @@ impl ListenTable {
             }
             buf.assume_init()
         };
-        Self { tcp }
+        let waiting_ports = SpinNoIrqLock::new(Vec::new());
+        Self { tcp, waiting_ports }
     }
 
     pub fn can_listen(&self, port: u16) -> bool {
         self.tcp[port as usize].lock().is_none()
     }
 
-    pub fn listen(&self, listen_endpoint: IpListenEndpoint, waker: &Waker) -> SysResult<()> {
+    pub fn listen(
+        &self,
+        listen_endpoint: IpListenEndpoint,
+        waker: &Waker,
+        handles: ShareMutex<Vec<SocketHandle>>,
+    ) -> SysResult<()> {
         let port = listen_endpoint.port;
         log::debug!("[listen] port: {}", port);
         assert_ne!(port, 0);
         let mut entry = self.tcp[port as usize].lock();
         if entry.is_none() {
-            *entry = Some(Box::new(ListenTableEntry::new(listen_endpoint, waker)));
+            *entry = Some(Box::new(ListenTableEntry::new(
+                listen_endpoint,
+                waker,
+                handles,
+            )));
         } else {
             log::warn!("socket listen() failed");
             return Err(SysError::EADDRINUSE);
@@ -69,7 +85,9 @@ impl ListenTable {
 
     pub fn can_accept(&self, port: u16) -> bool {
         if let Some(entry) = self.tcp[port as usize].lock().deref_mut() {
+            log::debug!("[can_accept] entry.syn_queue: {:?}", entry.syn_queue);
             entry.syn_queue.iter().any(|&handle| is_connected(handle))
+            // true
         } else {
             // 因为在listen函数调用时已经将port设为监听状态了，这里应该不会查不到？？
             log::error!("socket accept() failed: not listen. I think this wouldn't happen !!!");
@@ -121,12 +139,7 @@ impl ListenTable {
         }
     }
 
-    pub fn incoming_tcp_packet(
-        &self,
-        src: IpEndpoint,
-        dst: IpEndpoint,
-        sockets: &mut SocketSet<'_>,
-    ) {
+    pub fn incoming_tcp_packet(&self, src: IpEndpoint, dst: IpEndpoint) {
         if let Some(entry) = self.tcp[dst.port as usize].lock().deref_mut() {
             if !entry.can_accept(dst.addr) {
                 // not listening on this address
@@ -146,23 +159,88 @@ impl ListenTable {
                 "[ListenTable::incoming_tcp_packet] wake the socket who listens port {}",
                 dst.port
             );
-            let mut socket = SocketSetWrapper::new_tcp_socket();
-            if socket.listen(entry.listen_endpoint).is_ok() {
-                let handle = sockets.add(socket);
-                log::info!(
-                    "TCP socket {}: prepare for connection {} -> {}",
-                    handle,
-                    src,
-                    entry.listen_endpoint
-                );
-                entry.syn_queue.push_back(handle);
+
+            self.waiting_ports.lock().push(dst.port as usize);
+
+            // let mut socket = SocketSetWrapper::new_tcp_socket();
+            // if socket.listen(entry.listen_endpoint).is_ok() {
+            //     let handle = sockets.add(socket);
+            //     log::info!(
+            //         "TCP socket {}: prepare for connection {} -> {}",
+            //         handle,
+            //         src,
+            //         entry.listen_endpoint
+            //     );
+            //     entry.syn_queue.push_back(handle);
+            // }
+        }
+    }
+
+    pub fn check_after_poll(&self, sockets: &mut SocketSet<'_>) {
+        // log::debug!("[check_after_poll] poll");
+        let mut list = self.waiting_ports.lock();
+        // log::debug!("[check_after_poll] get list lock");
+        while !list.is_empty() {
+            let port = list.pop().unwrap();
+            if let Some(entry) = self.tcp[port as usize].lock().deref_mut() {
+                // log::debug!("[check_after_poll] ");
+                let mut listen_handles = entry.handles.lock();
+                let mut ret = None;
+                for (i, &handle) in listen_handles.iter().enumerate() {
+                    let sock: &mut tcp::Socket<'_> = sockets.get_mut(handle);
+                    // SOCKET_SET.with_socket_mut::<tcp::Socket, _, _>(handle, |sock| {
+                    log::debug!("[check_after_poll] sock.state()? {}", sock.state());
+                    if sock.state() == State::SynReceived {
+                        log::debug!("[check_after_poll] success get handle!");
+                        entry.syn_queue.push_back(handle);
+                        entry.syn_recv_sleep.store(true, Ordering::Relaxed);
+                        let local_addr = sock.local_endpoint().unwrap();
+                        ret = Some((handle, local_addr, i));
+                    }
+                    // });
+
+                    if ret.is_some() {
+                        break;
+                    }
+                }
+
+                // if let Some((handle, local_addr, index)) = ret {
+                // listen_handles.remove(index);
+                // let new_handle = SOCKET_SET.add(SocketSetWrapper::new_tcp_socket());
+                // SOCKET_SET.with_socket_mut::<tcp::Socket, _, _>(new_handle, |sock| {
+                //     sock.listen(local_addr).unwrap();
+                // });
+                // listen_handles.push(new_handle);
+                // }
             }
+        }
+    }
+
+    pub fn syn_wake(&self, dst: IpEndpoint, ack: bool) {
+        if let Some(entry) = self.tcp[dst.port as usize].lock().deref_mut() {
+            // let is_syn = entry.syn_recv_sleep.load(Ordering::Relaxed);
+            // if is_syn {
+            //     entry
+            //         .syn_queue
+            //         .iter()
+            //         .any(|&handle| is_connected(handle))
+            //         .then(|| {
+            //             log::debug!("[syn_wake] is connected");
+            //             entry.syn_recv_sleep.store(false, Ordering::Relaxed);
+            //             log::debug!("[syn_wake] wake process");
+            //             entry.waker.wake_by_ref();
+            //         });
+            // }
+            ack.then(|| {
+                entry.waker.wake_by_ref();
+            });
         }
     }
 }
 
 fn is_connected(handle: SocketHandle) -> bool {
     SOCKET_SET.with_socket_mut::<tcp::Socket, _, _>(handle, |socket| {
+        log::debug!("socket.state(): {}", socket.state());
         !matches!(socket.state(), tcp::State::Listen | tcp::State::SynReceived)
     })
 }

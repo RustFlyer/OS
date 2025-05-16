@@ -1,12 +1,15 @@
-use core::task::Waker;
+use core::{sync::atomic::AtomicBool, task::Waker};
 
-use alloc::collections::vec_deque::VecDeque;
+use alloc::{boxed::Box, collections::vec_deque::VecDeque, vec::Vec};
+use mutex::ShareMutex;
 use smoltcp::{
     iface::SocketHandle,
     wire::{IpAddress, IpListenEndpoint, IpVersion},
 };
 
 use crate::{SOCKET_SET, socketset::LISTEN_QUEUE_SIZE};
+
+use super::core::TcpSocket;
 
 pub const PORT_NUM: usize = 65536;
 
@@ -24,14 +27,22 @@ pub struct ListenTableEntry {
     /// The waker used to wake up the listening socket when a new connection
     /// arrives.
     pub(crate) waker: Waker,
+    pub(crate) handles: ShareMutex<Vec<SocketHandle>>,
+    pub(crate) syn_recv_sleep: AtomicBool,
 }
 
 impl ListenTableEntry {
-    pub fn new(listen_endpoint: IpListenEndpoint, waker: &Waker) -> Self {
+    pub fn new(
+        listen_endpoint: IpListenEndpoint,
+        waker: &Waker,
+        handles: ShareMutex<Vec<SocketHandle>>,
+    ) -> Self {
         Self {
             listen_endpoint,
             syn_queue: VecDeque::with_capacity(LISTEN_QUEUE_SIZE),
             waker: waker.clone(),
+            handles,
+            syn_recv_sleep: AtomicBool::new(false),
         }
     }
 

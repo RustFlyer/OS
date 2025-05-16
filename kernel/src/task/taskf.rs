@@ -355,19 +355,20 @@ impl Task {
                 self.tid(),
                 address
             );
-            unsafe {
-                UserWritePtr::<i32>::new(address, &self.addr_space())
+
+            if unsafe {
+                UserWritePtr::<usize>::new(address, &self.addr_space())
                     .write(0)
-                    .expect("fail to write in clear_child_tid")
-            };
+                    .is_ok()
+            } {
+                let key = FutexHashKey::new_share_key(address, &self.addr_space()).unwrap();
+                let _ = futex_manager(false, 0xffffffff).wake(&key, 1);
+                let _ = futex_manager(true, 0xffffffff).wake(&key, 1);
 
-            let key = FutexHashKey::new_share_key(address, &self.addr_space()).unwrap();
-            let _ = futex_manager(false, 0xffffffff).wake(&key, 1);
-            let _ = futex_manager(true, 0xffffffff).wake(&key, 1);
-
-            let key = FutexHashKey::new_private_key(address, self.addr_space()).unwrap();
-            let _ = futex_manager(false, 0xffffffff).wake(&key, 1);
-            let _ = futex_manager(true, 0xffffffff).wake(&key, 1);
+                let key = FutexHashKey::new_private_key(address, self.addr_space()).unwrap();
+                let _ = futex_manager(false, 0xffffffff).wake(&key, 1);
+                let _ = futex_manager(true, 0xffffffff).wake(&key, 1);
+            }
         }
 
         let tg_lock = self.thread_group_mut();

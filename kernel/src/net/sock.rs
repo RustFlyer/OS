@@ -1,3 +1,5 @@
+use core::task::Waker;
+
 use net::{NetPollState, addr::UNSPECIFIED_IPV4, tcp::core::TcpSocket, udp::UdpSocket};
 use smoltcp::wire::IpEndpoint;
 use systype::{SysError, SysResult};
@@ -111,6 +113,7 @@ impl Sock {
             }
         }
     }
+
     pub async fn poll(&self) -> NetPollState {
         match self {
             Sock::Tcp(tcp) => tcp.poll().await,
@@ -132,6 +135,20 @@ impl Sock {
                 Ok(new_tcp)
             }
             Sock::Udp(_udp) => Err(SysError::EOPNOTSUPP),
+        }
+    }
+
+    pub fn register_recv_waker(&self, waker: Waker) {
+        match self {
+            Sock::Tcp(tcp) => tcp.register_recv_waker(&waker),
+            Sock::Udp(udp) => udp.register_recv_waker(&waker),
+        }
+    }
+
+    pub fn register_send_waker(&self, waker: Waker) {
+        match self {
+            Sock::Tcp(tcp) => tcp.register_send_waker(&waker),
+            Sock::Udp(udp) => udp.register_send_waker(&waker),
         }
     }
 }

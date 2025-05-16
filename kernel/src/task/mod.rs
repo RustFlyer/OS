@@ -14,11 +14,12 @@ pub mod timeid;
 
 use arch::riscv64::time::get_time_duration;
 use future::spawn_kernel_task;
+use net::poll_interfaces;
 use osfuture::yield_now;
 pub use task::{Task, TaskState};
 
 use osfs::sys_root_dentry;
-use timer::TIMER_MANAGER;
+use timer::{TIMER_MANAGER, sleep_ms};
 use vfs::file::File;
 
 pub fn init() {
@@ -30,6 +31,7 @@ pub fn init() {
 
     Task::spawn_from_elf(init_proc, "init_proc");
     // timer_init();
+    net_poll_init();
     // elf_test();
 }
 
@@ -49,6 +51,16 @@ pub fn timer_init() {
                 ticks = 0;
             }
             yield_now().await;
+        }
+    });
+}
+
+pub fn net_poll_init() {
+    spawn_kernel_task(async {
+        loop {
+            sleep_ms(10).await;
+            poll_interfaces();
+            // log::debug!("net poll again");
         }
     });
 }
