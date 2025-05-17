@@ -130,7 +130,10 @@ impl FdTable {
     }
 
     pub fn remove(&mut self, fd: Fd) -> SysResult<()> {
-        assert!(fd < self.table.len());
+        // assert!(fd < self.table.len());
+        if fd >= self.table.len() {
+            return Err(SysError::EBADF);
+        }
         if self.table[fd].is_none() {
             return Err(SysError::EBADF);
         }

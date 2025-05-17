@@ -56,14 +56,17 @@ impl Drop for TcpSocket {
         self.shutdown(SHUT_RDWR).ok();
         // Safe because we have mut reference to `self`.
         if let Some(handle) = unsafe { self.handle.get().read() } {
+            let mut cnt = 0;
             loop {
                 let is_close = SOCKET_SET.with_socket_mut::<tcp::Socket, _, _>(handle, |sock| {
                     sock.state() == State::Closed
                 });
-                if is_close {
+                if is_close || cnt > 1000 {
+                    log::error!("[shutdown] poll cnt is {}", cnt);
                     break;
                 }
                 poll_interfaces();
+                cnt += 1;
             }
             SOCKET_SET.remove(handle);
         }

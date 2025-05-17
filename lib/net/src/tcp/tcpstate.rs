@@ -251,40 +251,48 @@ impl TcpSocket {
             return Err(SysError::EINVAL);
         }
 
-        let waker = take_waker().await;
+        // let waker = take_waker().await;
         // SAFETY: `self.local_addr` should be initialized after `bind()`.
+
+        // self.block_on(|| {
+        //     let mut listen_handles = self.listen_handles.lock();
+        //     for (i, &handle) in listen_handles.iter().enumerate() {
+        //         let established = SOCKET_SET.with_socket_mut::<tcp::Socket, _, _>(handle, |sock| {
+        //             log::debug!("has established? {:?}", sock.state());
+        //             if sock.state() == State::Established {
+        //                 let peer_addr = sock.remote_endpoint().unwrap();
+        //                 let local_addr = sock.local_endpoint().unwrap();
+
+        //                 Some((handle, local_addr, peer_addr))
+        //             } else {
+        //                 // sock.register_recv_waker(&waker);
+        //                 None
+        //             }
+        //         });
+
+        //         if let Some((hdl, local, peer)) = established {
+        //             let handle = listen_handles.remove(i);
+        //             let new_handle = SOCKET_SET.add(SocketSetWrapper::new_tcp_socket());
+        //             SOCKET_SET.with_socket_mut::<tcp::Socket, _, _>(new_handle, |sock| {
+        //                 sock.listen(local).unwrap();
+        //             });
+        //             listen_handles.push(new_handle);
+        //             unsafe {
+        //                 self.handle.get().write(Some(handle));
+        //             }
+
+        //             return Ok(TcpSocket::new_connected(hdl, local, peer));
+        //         }
+        //     }
+
+        //     Err(SysError::EAGAIN)
+        // })
+        // .await
+        let local_port = unsafe { self.local_addr.get().read().port };
         self.block_on(|| {
-            let mut listen_handles = self.listen_handles.lock();
-            for (i, &handle) in listen_handles.iter().enumerate() {
-                let established = SOCKET_SET.with_socket_mut::<tcp::Socket, _, _>(handle, |sock| {
-                    log::debug!("has established? {:?}", sock.state());
-                    if sock.state() == State::Established {
-                        let peer_addr = sock.remote_endpoint().unwrap();
-                        let local_addr = sock.local_endpoint().unwrap();
-
-                        Some((handle, local_addr, peer_addr))
-                    } else {
-                        // sock.register_recv_waker(&waker);
-                        None
-                    }
-                });
-
-                if let Some((hdl, local, peer)) = established {
-                    let handle = listen_handles.remove(i);
-                    let new_handle = SOCKET_SET.add(SocketSetWrapper::new_tcp_socket());
-                    SOCKET_SET.with_socket_mut::<tcp::Socket, _, _>(new_handle, |sock| {
-                        sock.listen(local).unwrap();
-                    });
-                    listen_handles.push(new_handle);
-                    unsafe {
-                        self.handle.get().write(Some(handle));
-                    }
-
-                    return Ok(TcpSocket::new_connected(hdl, local, peer));
-                }
-            }
-
-            Err(SysError::EAGAIN)
+            let (handle, (local_addr, peer_addr)) = LISTEN_TABLE.accept(local_port)?;
+            log::info!("TCP socket accepted a new connection {}", peer_addr);
+            Ok(TcpSocket::new_connected(handle, local_addr, peer_addr))
         })
         .await
     }

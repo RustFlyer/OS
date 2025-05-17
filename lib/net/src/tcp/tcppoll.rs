@@ -7,6 +7,7 @@ use super::{STATE_CLOSED, STATE_CONNECTED, STATE_CONNECTING, STATE_LISTENING, co
 impl TcpSocket {
     /// Whether the socket is readable or writable.
     pub async fn poll(&self) -> NetPollState {
+        // log::debug!("poll");
         match self.get_state() {
             STATE_CONNECTING => self.poll_connect().await,
             STATE_CONNECTED => self.poll_stream().await,
