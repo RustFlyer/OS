@@ -123,7 +123,7 @@ impl ProcessorPrivilegeState {
         let crmd = self.sstatus;
         let era = self.sepc;
         unsafe {
-            core::arch::asm!("csrwr {}, 0x1", in(reg) crmd);
+            core::arch::asm!("csrwr {}, 0x0", in(reg) crmd);
             core::arch::asm!("csrwr {}, 0x6", in(reg) era);
             pgdl::set_base(self.satp);
         }

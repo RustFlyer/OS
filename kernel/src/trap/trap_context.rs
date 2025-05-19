@@ -21,6 +21,7 @@ pub struct TrapContext {
     pub sstatus: Prmd,
 
     pub sepc: usize, // 33, the instruction that occurs trap (or the next instruction when trap returns)
+    // aka. era(0x6) in LoongArch
 
     pub stvec: usize, // address of __trap_from_user in trampoline
 
@@ -124,8 +125,8 @@ impl TrapContext {
         {
             self.user_reg[3] = user_sp; // sp在loongArch中存放在3*8
             self.user_reg[4] = argc;    // a0存放在4*8
-            self.user_reg[6] = argv;    // a2存放在6*8
-            self.user_reg[7] = envp;    // a3存放在7*8
+            self.user_reg[5] = argv;    // a1存放在5*8
+            self.user_reg[6] = envp;    // a2存放在6*8
             self.sepc = sepc;
         }
     }
@@ -165,11 +166,11 @@ impl TrapContext {
         {
             [
                 self.user_reg[4],  // a0
-                self.user_reg[6],  // a1
-                self.user_reg[7],  // a2
-                self.user_reg[8],  // a3
-                self.user_reg[9],  // a4
-                self.user_reg[10], // a5
+                self.user_reg[5],  // a1
+                self.user_reg[6],  // a2
+                self.user_reg[7],  // a3
+                self.user_reg[8],  // a4
+                self.user_reg[9],  // a5
             ]
         }
     }
@@ -197,8 +198,7 @@ impl TrapContext {
         
         #[cfg(target_arch = "loongarch64")]
         {
-            // a1存放在5*8
-            self.user_reg[5] = val;
+            self.user_reg[4] = val;
         }
     }
 
@@ -236,8 +236,7 @@ impl TrapContext {
         
         #[cfg(target_arch = "loongarch64")]
         {
-            // a1存放在5*8
-            self.last_a0 = self.user_reg[5];
+            self.last_a0 = self.user_reg[4];
         }
     }
 
@@ -249,8 +248,7 @@ impl TrapContext {
         
         #[cfg(target_arch = "loongarch64")]
         {
-            // a1存放在5*8
-            self.user_reg[5] = self.last_a0;
+            self.user_reg[4] = self.last_a0;
         }
     }
 }
