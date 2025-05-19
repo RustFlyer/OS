@@ -20,10 +20,6 @@ pub struct TrapContext {
 
     pub sepc: usize, // 33, the instruction that occurs trap (or the next instruction when trap returns)
 
-    pub stvec: usize, // address of __trap_from_user in trampoline
-
-    pub stval: usize, // appended trap information
-
     // callee-saved registers and constant addresses that guide trap into kernel space,
     // seted when kernel return to user
     pub k_sp: usize, // 34, kernel stack top of this process
@@ -84,8 +80,6 @@ impl TrapContext {
             user_reg: [0; 32],
             sstatus,
             sepc: entry,
-            stvec: 0,
-            stval: 0,
             k_sp: 0,
             k_ra: 0,
             k_s: [0; 12],
@@ -274,10 +268,8 @@ impl TrapContext {
     pub fn display(&self) {
         log::info!("================TrapContext================");
         log::info!("sepc    : {:#x}", self.sepc);
-        log::info!("stvec   : {:#x}", self.stvec);
         log::info!("sstatus : {:#x}", self.sstatus.bits());
         log::info!("sum     : {}", (self.sstatus.bits() & 1 << 8) > 0);
-        log::info!("stval   : {:#x}", self.stval);
         log::info!("user_reg: {:#?}", self.user_reg);
         log::info!("================    End    ================");
     }
