@@ -8,7 +8,7 @@ use riscv::register::satp::{self, Satp};
 pub fn switch_pagetable(root: usize) {
     let mut satp = Satp::from_bits(0);
     satp.set_mode(riscv::register::satp::Mode::Sv39);
-    satp.set_ppn(root >> 12);
+    satp.set_ppn(root);
     unsafe {
         satp::write(satp);
     }
