@@ -1,13 +1,19 @@
 use arch::{
     trap::disable_interrupt,
 };
+
+use loongArch64::register::prmd;
+#[cfg(target_arch = "riscv64")]
 use riscv::register::sstatus::{self, Sstatus, SPP};
+
+#[cfg(target_arch = "loongarch64")]
+use loongArch64::register::prmd::Prmd;
 
 /// when sp points to user stack of a task/process,
 /// sscratch(in RISCV) points to the start
 /// of the TrapContext of this task/process in user address space,
 /// until they switch when __trap_from_user, and the context begin to be saved
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 pub struct TrapContext {
     // integer registers and CSR to be saved when trap from user to kernel

@@ -78,13 +78,11 @@ pub fn user_exception_handler(task: &Task, e: Exception, stval: usize) {
 }
 
 pub fn user_interrupt_handler(task: &Task, i: Interrupt) {
-    // log::error!("[trap_handler] user_interrupt_handler");
     match i {
         Interrupt::SupervisorTimer => {
-            // log::trace!("[trap_handler] timer interrupt");
             set_nx_timer_irq();
 
-            // if executor does not have other tasks, it is no need to yield.
+            // If the executor does not have other tasks, no need to yield.
             if task.timer_mut().schedule_time_out()
                 && executor::has_waiting_task_alone(current_hart().id)
             {

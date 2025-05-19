@@ -1,4 +1,4 @@
-use loongArch64::register::estat::{self, Exception, Trap};
+use loongArch64::register::estat::{self, Exception, Interrupt, Trap};
 use loongArch64::register::{badv, ecfg, eentry, prmd, ticlr};
 
 use arch::{
@@ -16,9 +16,7 @@ use crate::vm::user_ptr::UserReadPtr;
 
 #[unsafe(no_mangle)]
 pub fn trap_handler(task: &Task) {
-    let badv_val = badv::read().vaddr();
-    let estat_val = estat::read();
-    let cause = estat_val.cause();
+    let estat = estat::read();
 
     unsafe { load_trap_handler() };
 
@@ -26,13 +24,9 @@ pub fn trap_handler(task: &Task) {
     let current = get_time_duration();
     TIMER_MANAGER.check(current);
 
-    match cause {
-        Trap::Exception(e) => user_exception_handler(task, e, badv_val),
-        Trap::Interrupt(_) => {
-            // Get the IRQ number from estat register
-            let irq_num: usize = estat_val.is().trailing_zeros() as usize;
-            user_interrupt_handler(task, irq_num)
-        }
+    match estat.cause() {
+        Trap::Exception(e) => user_exception_handler(task, e),
+        Trap::Interrupt(i) => user_interrupt_handler(task, i),
         _ => {
             log::error!("Unknown trap cause");
         }
@@ -40,7 +34,7 @@ pub fn trap_handler(task: &Task) {
 }
 
 /// Handler for user exceptions
-pub fn user_exception_handler(task: &Task, e: Exception, badv_val: usize) {
+pub fn user_exception_handler(task: &Task, e: Exception) {
     match e {
         Exception::Syscall => {
             task.set_is_syscall(true);
@@ -57,7 +51,8 @@ pub fn user_exception_handler(task: &Task, e: Exception, badv_val: usize) {
                 Exception::StorePageFault | Exception::PageModifyFault => MappingFlags::W,
                 _ => unreachable!(),
             };
-            let fault_addr = VirtAddr::new(badv_val);
+            let fault_addr = badv::read().vaddr();
+            let fault_addr = VirtAddr::new(fault_addr);
             let addr_space = task.addr_space();
             if let Err(e) = addr_space.handle_page_fault(fault_addr, access) {
                 // TODO: Send SIGSEGV to the task
@@ -71,7 +66,8 @@ pub fn user_exception_handler(task: &Task, e: Exception, badv_val: usize) {
             }
         }
         Exception::InstructionNotExist => {
-            log::warn!("[trap_handler] illegal instruction at {:#x}", badv_val);
+            let fault_addr = badv::read().vaddr();
+            log::warn!("[trap_handler] illegal instruction at {:#x}", fault_addr);
             // TODO: Send SIGILL signal to the task; don't just kill the task
             task.set_state(TaskState::Zombie);
         }
@@ -82,23 +78,18 @@ pub fn user_exception_handler(task: &Task, e: Exception, badv_val: usize) {
 }
 
 /// Handler for user interrupts
-pub fn user_interrupt_handler(task: &Task, irq_num: usize) {
-    match irq_num {
-        TIMER_IRQ => {
+pub fn user_interrupt_handler(task: &Task, i: Interrupt) {
+    match i {
+        Interrupt::Timer => {
             ticlr::clear_timer_interrupt();
-            set_nx_timer_irq();
 
-            // If executor doesn't have other tasks, no need to yield
+            // If the executor does not have other tasks, no need to yield
             if task.timer_mut().schedule_time_out()
                 && executor::has_waiting_task_alone(current_hart().id)
             {
                 task.set_is_yield(true);
             }
         }
-        _ => {
-            log::info!("[trap_handler] Received external interrupt: {}", irq_num);
-            // TODO: Implement proper device IRQ handling
-            // driver::get_device_manager_mut().handle_irq();
-        }
+        _ => panic!("Unknown user interrupt: {:?}", i),
     }
 }
