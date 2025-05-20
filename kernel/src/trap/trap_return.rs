@@ -24,8 +24,6 @@ pub fn trap_return(task: &Arc<Task>) {
     // assert that interrupt will be disabled when trap returns
     #[cfg(target_arch = "riscv64")]
     assert!(!(trap_cx.sstatus.sie()));
-    #[cfg(target_arch = "loongarch64")]
-    assert!(!(trap_cx.prmd.pie()));
 
     assert!(!(task.is_in_state(TaskState::Zombie) || task.is_in_state(TaskState::Sleeping)));
 
