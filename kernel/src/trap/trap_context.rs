@@ -1,7 +1,10 @@
 use arch::{
     trap::disable_interrupt,
 };
+#[cfg(target_arch = "riscv64")]
 use riscv::register::sstatus::{self, Sstatus, SPP};
+#[cfg(target_arch = "loongarch64")]
+use loongArch64::register::{prmd, CpuMode};
 
 /// when sp points to user stack of a task/process,
 /// sscratch(in RISCV) points to the start
@@ -18,7 +21,7 @@ pub struct TrapContext {
     pub sstatus: Sstatus, // 32, controls previlege level. seen as PRMD in LoongArch
 
     #[cfg(target_arch = "loongarch64")]
-    pub sstatus: Prmd,
+    pub sstatus: usize, // Prmd structure doesn't impl debug trait, use usize instead
 
     pub sepc: usize, // 33, the instruction that occurs trap (or the next instruction when trap returns)
     // aka. era(0x6) in LoongArch
@@ -66,11 +69,13 @@ impl TrapContext {
         }
         
         #[cfg(target_arch = "loongarch64")]
-        let mut status = prmd::read();
+        let mut status = prmd::read().raw(); // Prmd
         #[cfg(target_arch = "loongarch64")]
         {
-            status.set_pie(false);
-            status.set_ppl(PPL::U);
+            // prmd.set_pie(false);
+            // TODO: set pplv to ring3, but it seems useless and dangerous and unimplemented
+            // status.set_pplv(CpuMode::Ring3);
+            
         }
 
         let mut context = Self {

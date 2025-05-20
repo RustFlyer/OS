@@ -7,7 +7,9 @@ use alloc::sync::Arc;
 use pps::ProcessorPrivilegeState;
 
 use core::arch::asm;
+#[cfg(target_arch = "riscv64")]
 use riscv::register::sstatus;
+#[cfg(target_arch = "riscv64")]
 use riscv::register::sstatus::FS;
 
 use arch::trap::{disable_interrupt, enable_interrupt};
@@ -164,6 +166,7 @@ pub fn get_current_hart() -> &'static mut Hart {
 pub fn init(id: usize) {
     unsafe {
         set_current_hart(id);
+        #[cfg(target_arch = "riscv64")]
         sstatus::set_fs(FS::Initial);
     }
 }
