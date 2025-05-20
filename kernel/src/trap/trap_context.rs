@@ -1,13 +1,10 @@
-use arch::{
-    trap::disable_interrupt,
-};
+use arch::trap::disable_interrupt;
 
-use loongArch64::register::prmd;
 #[cfg(target_arch = "riscv64")]
-use riscv::register::sstatus::{self, Sstatus, SPP};
+use riscv::register::sstatus::{self, SPP, Sstatus};
 
 #[cfg(target_arch = "loongarch64")]
-use loongArch64::register::prmd::Prmd;
+use loongArch64::register::prmd::{self, Prmd};
 
 /// when sp points to user stack of a task/process,
 /// sscratch(in RISCV) points to the start
@@ -24,7 +21,7 @@ pub struct TrapContext {
     pub sstatus: Sstatus, // 32, controls previlege level. seen as PRMD in LoongArch
 
     #[cfg(target_arch = "loongarch64")]
-    pub sstatus: Prmd,
+    pub prmd: Prmd,
 
     pub sepc: usize, // 33, the instruction that occurs trap (or the next instruction when trap returns)
     // aka. era(0x6) in LoongArch
@@ -64,7 +61,7 @@ impl TrapContext {
     pub fn new(entry: usize, sp: usize) -> Self {
         disable_interrupt();
         // disable Interrupt until trap handling
-        
+
         #[cfg(target_arch = "riscv64")]
         let mut status = sstatus::read();
         #[cfg(target_arch = "riscv64")]
@@ -74,7 +71,7 @@ impl TrapContext {
             // switch to User priviledge after handling
             status.set_spp(SPP::User);
         }
-        
+
         #[cfg(target_arch = "loongarch64")]
         let mut status = prmd::read();
         #[cfg(target_arch = "loongarch64")]
@@ -85,7 +82,7 @@ impl TrapContext {
 
         let mut context = Self {
             user_reg: [0; 32],
-            sstatus: status,
+            prmd: status,
             sepc: entry,
             stvec: 0,
             stval: 0,
@@ -113,7 +110,7 @@ impl TrapContext {
     pub fn init_user(
         &mut self,
         user_sp: usize,
-        sepc: usize,
+        entry: usize,
         argc: usize,
         argv: usize,
         envp: usize,
@@ -124,19 +121,19 @@ impl TrapContext {
             self.user_reg[10] = argc;
             self.user_reg[11] = argv;
             self.user_reg[12] = envp;
-            self.sepc = sepc;
+            self.sepc = entry;
         }
-        
+
         #[cfg(target_arch = "loongarch64")]
         {
             self.user_reg[3] = user_sp; // sp在loongArch中存放在3*8
-            self.user_reg[4] = argc;    // a0存放在4*8
-            self.user_reg[5] = argv;    // a1存放在5*8
-            self.user_reg[6] = envp;    // a2存放在6*8
-            self.sepc = sepc;
+            self.user_reg[4] = argc; // a0存放在4*8
+            self.user_reg[5] = argv; // a1存放在5*8
+            self.user_reg[6] = envp; // a2存放在6*8
+            self.sepc = entry;
         }
     }
-    
+
     /// this function can be called to get syscall number
     /// when trapped
     pub fn syscall_no(&self) -> usize {
@@ -145,7 +142,7 @@ impl TrapContext {
             // a7 == x17
             self.user_reg[17]
         }
-        
+
         #[cfg(target_arch = "loongarch64")]
         {
             // 在loongArch中，syscall_no存放在a7 (register 11)
@@ -167,16 +164,16 @@ impl TrapContext {
                 self.user_reg[15], // a5
             ]
         }
-        
+
         #[cfg(target_arch = "loongarch64")]
         {
             [
-                self.user_reg[4],  // a0
-                self.user_reg[5],  // a1
-                self.user_reg[6],  // a2
-                self.user_reg[7],  // a3
-                self.user_reg[8],  // a4
-                self.user_reg[9],  // a5
+                self.user_reg[4], // a0
+                self.user_reg[5], // a1
+                self.user_reg[6], // a2
+                self.user_reg[7], // a3
+                self.user_reg[8], // a4
+                self.user_reg[9], // a5
             ]
         }
     }
@@ -187,7 +184,7 @@ impl TrapContext {
             // sp == x2
             self.user_reg[2] = sp;
         }
-        
+
         #[cfg(target_arch = "loongarch64")]
         {
             // sp在loongArch中存放在3*8
@@ -201,7 +198,7 @@ impl TrapContext {
             // a0 == x10
             self.user_reg[10] = val;
         }
-        
+
         #[cfg(target_arch = "loongarch64")]
         {
             self.user_reg[4] = val;
@@ -214,7 +211,7 @@ impl TrapContext {
             // tp == x4
             self.user_reg[4] = val;
         }
-        
+
         #[cfg(target_arch = "loongarch64")]
         {
             // tp存放在2*8
@@ -239,7 +236,7 @@ impl TrapContext {
         {
             self.last_a0 = self.user_reg[10];
         }
-        
+
         #[cfg(target_arch = "loongarch64")]
         {
             self.last_a0 = self.user_reg[4];
@@ -251,7 +248,7 @@ impl TrapContext {
         {
             self.user_reg[10] = self.last_a0;
         }
-        
+
         #[cfg(target_arch = "loongarch64")]
         {
             self.user_reg[4] = self.last_a0;

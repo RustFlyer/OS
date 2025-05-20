@@ -1,7 +1,7 @@
 use riscv::{ExceptionNumber, InterruptNumber};
 use riscv::{
     interrupt::{Exception, Interrupt, Trap},
-    register::{satp, scause, sepc},
+    register::{satp, scause, sepc, stval},
 };
 
 use arch::time::{get_time_duration, set_nx_timer_irq};
