@@ -124,7 +124,7 @@ pub fn open(dirfd: i32, pathname: &str, flags: OpenFlags, mode: InodeMode) -> is
     let pathname = CString::new(pathname).unwrap();
     sys_openat(
         dirfd as usize,
-        pathname.as_ptr(),
+        pathname.as_ptr() as _,
         flags.bits() as usize,
         mode.bits() as usize,
     )
