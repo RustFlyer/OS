@@ -102,6 +102,9 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
 
         arch::trap::init();
 
+        #[cfg(target_arch = "loongarch64")]
+        trap::trap_handler::tlb_init();
+
         task::init();
     } else {
         log::info!("hart {}: enabling page table", hart_id);

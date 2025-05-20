@@ -139,7 +139,10 @@ pub fn current_hart() -> &'static mut Hart {
     let ret;
     unsafe {
         let tp: usize;
+        #[cfg(target_arch = "riscv64")]
         asm!("mv {}, tp", out(reg) tp);
+        #[cfg(target_arch = "loongarch64")]
+        asm!("move {}, $tp", out(reg) tp);
         ret = &mut *(tp as *mut Hart);
     }
 
@@ -151,22 +154,28 @@ pub fn set_current_hart(id: usize) {
     hart.set_hart_id(id);
     let hart_addr = hart as *const _ as usize;
     unsafe {
+        #[cfg(target_arch = "riscv64")]
         asm!("mv tp, {}", in(reg) hart_addr);
+        #[cfg(target_arch = "loongarch64")]
+        asm!("move $tp, {}", in(reg) hart_addr);
     }
 }
 
 pub fn get_current_hart() -> &'static mut Hart {
     let hart_ptr: *mut Hart;
     unsafe {
+        #[cfg(target_arch = "riscv64")]
         asm!("mv {}, tp", out(reg) hart_ptr);
+        #[cfg(target_arch = "loongarch64")]
+        asm!("move {}, $tp", out(reg) hart_ptr);
         &mut *hart_ptr
     }
 }
 
 pub fn init(id: usize) {
+    set_current_hart(id);
+    #[cfg(target_arch = "riscv64")]
     unsafe {
-        set_current_hart(id);
-        #[cfg(target_arch = "riscv64")]
         sstatus::set_fs(FS::Initial);
     }
 }
