@@ -70,11 +70,11 @@ impl TrapContext {
     pub fn new(entry: usize, sp: usize) -> Self {
         disable_interrupt();
         // disable Interrupt until trap handling
-        let mut sstatus = sstatus::read();
-        sstatus.set_sie(false);
-        sstatus.set_spie(false);
-        // switch to User priviledge after handling
-        sstatus.set_spp(SPP::User);
+        let sstatus = sstatus::read();
+        // sstatus.set_sie(false);
+        // sstatus.set_spie(false);
+        // // switch to User priviledge after handling
+        // sstatus.set_spp(SPP::User);
 
         let mut context = Self {
             user_reg: [0; 32],
