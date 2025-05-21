@@ -10,10 +10,10 @@ use super::BOOT_STACK;
 unsafe extern "C" fn _start() -> ! {
     unsafe {
         naked_asm!("
-            ori         $t0, $zero, 0x1     # Set CSR.DMW0.PLV0 = 1
+            li.w        $t0, 0x1            # Set CSR.DMW0.PLV0 = 1
             lu52i.d     $t0, $t0, -2048     # Set CSR.DMW0.VSEC = 8
             csrwr       $t0, 0x180          # Write CSR.DMW0 = 0x8000_0000_0000_0001
-            ori         $t0, $zero, 0x11    # Set CSR.DMW1.MAT = 1, CSR.DMW1.PLV0 = 1
+            li.w        $t0, 0x11           # Set CSR.DMW1.MAT = 1, CSR.DMW1.PLV0 = 1
             lu52i.d     $t0, $t0, -1792     # Set CSR.DMW1.VSEC = 9
             csrwr       $t0, 0x181          # Write CSR.DMW1 = 0x9000_0000_0000_0001
 
@@ -22,7 +22,7 @@ unsafe extern "C" fn _start() -> ! {
             csrwr       $t0, 0x0            # Write CSR.CRMD
             li.w        $t0, 0x0            # Clear PRMD.PPLV (seems not necessary)
             csrwr       $t0, 0x1            # Write CSR.PRMD
-            li.w        $t0, 0x00           # Set FPE = 0, SXE = 0, ASXE = 0, BTE = 0
+            li.w        $t0, 0x0            # Set FPE = 0, SXE = 0, ASXE = 0, BTE = 0
             csrwr       $t0, 0x2            # Write CSR.EUEN
 
             # Set up the stack pointer

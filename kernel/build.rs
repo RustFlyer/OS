@@ -22,7 +22,7 @@ fn main() {
             0xffff_ffc0_8000_0000
         }
         "loongarch64" => {
-            0x9000_0000_0000_0000
+            0x9000_0000_8000_0000
         }
         _ => panic!("Unsupported target architecture"),
     };
