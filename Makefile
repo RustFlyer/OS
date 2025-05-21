@@ -4,17 +4,25 @@
 # Build Configuration Variables
 # ======================
 
+# Target architecture
+# export ARCH = riscv64
+export ARCH = loongarch64
+
 # Docker image name for development environment
 # Kernel package/output name
 # Bootloader selection (default BIOS for QEMU)
-# Target architecture specification
+# Target archeitecture full name
 DOCKER_NAME = os
 PACKAGE_NAME = kernel
 BOOTLOADER = default
-# TARGET = riscv64gc-unknown-none-elf
-TARGET = loongarch64-unknown-none
 
-export ARCH = loongarch64
+ifeq ($(ARCH),riscv64)
+	TARGET = riscv64gc-unknown-none-elf
+else ifeq ($(ARCH),loongarch64)
+	TARGET = loongarch64-unknown-none
+else
+	$(error "Unsupported architecture: $(ARCH).")
+endif
 
 # Number of CPU cores
 # Target board (QEMU emulator)
@@ -57,14 +65,14 @@ ifeq ($(ARCH),riscv64)
 	QEMU_ARGS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
 	QEMU_ARGS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
 
-	GDB = riscv64-unknown-elf-gdb  
-	GDB_ARGS = riscv:rv64  
+	GDB = riscv64-unknown-elf-gdb
+	GDB_ARGS = riscv:rv64
 endif
 
 ifeq ($(ARCH),loongarch64)
 	QEMU_ARGS := -m 1G
 	QEMU_ARGS += -nographic
-	QEMU_ARGS += -bios $(BOOTLOADER)
+	# QEMU_ARGS += -bios $(BOOTLOADER)
 	QEMU_ARGS += -kernel $(KERNEL_ELF)
 	QEMU_ARGS += -smp $(SMP)
 	QEMU_ARGS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
@@ -73,10 +81,10 @@ ifeq ($(ARCH),loongarch64)
 	QEMU_ARGS += -device virtio-net-pci,netdev=net0
 	QEMU_ARGS += -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555
 	QEMU_ARGS += -rtc base=utc
-	QEMU_ARGS += -no-reboot	
+	QEMU_ARGS += -no-reboot
 
-	GDB = loongarch64-linux-gnu-gdb
-	GDB_ARGS = loongarch64 
+	GDB = loongarch64-unknown-linux-gnu-gdb
+	GDB_ARGS = loongarch64
 endif
 
 
