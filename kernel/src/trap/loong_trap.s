@@ -172,7 +172,10 @@ __trap_from_kernel:
     st.d  $a5, $sp, 16*8
     st.d  $a6, $sp, 17*8
     st.d  $a7, $sp, 18*8
-    bl kernel_trap_handler
+
+    la.abs  $t0, kernel_trap_handler
+    jirl $r0, $t0, 0
+
     ld.d  $ra, $sp, 1*8
     ld.d  $t0, $sp, 2*8
     ld.d  $t1, $sp, 3*8
@@ -218,10 +221,13 @@ __user_rw_exception_entry:
 
     .align 8
 __user_rw_trap_vector:
-    la.global $t0, __user_rw_exception_entry
-    jirl $zero, $t0, 0
-    // .rept 16
-    // .align 3
-    // la.global $t0, __trap_from_kernel
-    // jirl $zero, $t0, 0
-    // .endr
+    .rept 64
+    .align 3
+    la.abs  $t0, __user_rw_exception_entry
+    jirl $r0, $t0, 0
+    .endr
+    .rept 13
+    .align 3
+    la.abs  $t0, __trap_from_kernel
+    jirl $r0, $t0, 0
+    .endr
