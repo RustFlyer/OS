@@ -15,7 +15,7 @@ unsafe extern "C" fn _start() -> ! {
             csrwr       $t0, 0x180          # Write CSR.DMW0 = 0x8000_0000_0000_0001
             li.w        $t0, 0x11           # Set CSR.DMW1.MAT = 1, CSR.DMW1.PLV0 = 1
             lu52i.d     $t0, $t0, -1792     # Set CSR.DMW1.VSEC = 9
-            csrwr       $t0, 0x181          # Write CSR.DMW1 = 0x9000_0000_0000_0001
+            csrwr       $t0, 0x181          # Write CSR.DMW1 = 0x9000_0000_0000_0011
 
             # Enable mapped address translation mode
             li.w        $t0, 0xb0           # Set CRMD.PLV = 0, CRMD.IE = 0, CRMD.PG = 1
