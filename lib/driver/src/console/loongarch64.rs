@@ -1,10 +1,24 @@
 use spin::Mutex;
 
+/// UART address of stdout device for Qemu `virt` machine.
+///
+/// This is `serial@1fe001e0` in the device tree.
+///
+/// See https://github.com/LoongsonLab/oscomp-documents/blob/main/platforms.md
+///
+/// # Note
+/// I don't know why the address is in the `0x9xxx_...` range, which has MAT = 1.
 #[cfg(not(board = "2k1000"))]
-const UART_ADDR: usize = 0x01FE001E0 | config::mm::VIRT_START;
+const UART_ADDR: usize = 0x9000_0000_1fe0_01e0;
+
+/// UART address of stdout device for Loongson 2K1000 machine.
+///
+/// This is `serial@0x1fe20000` in the device tree.
+///
+/// See https://github.com/LoongsonLab/oscomp-documents/blob/main/platforms.md
 #[cfg(board = "2k1000")]
-const UART_ADDR: usize = 0x800000001fe20000;
-// 0x800000001fe20000ULL
+const UART_ADDR: usize = 0x8000_0000_1fe2_0000;
+
 static COM1: Mutex<Uart> = Mutex::new(Uart::new(UART_ADDR));
 
 struct Uart {
