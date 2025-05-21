@@ -1,8 +1,7 @@
 use core::panic::PanicInfo;
 
 use arch::hart::hart_shutdown;
-
-use crate::println;
+use driver::println;
 
 #[panic_handler]
 fn panic_handler(info: &PanicInfo) -> ! {

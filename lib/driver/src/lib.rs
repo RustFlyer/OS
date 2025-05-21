@@ -1,10 +1,12 @@
 #![no_std]
 
-use alloc::{string::ToString, sync::Arc};
-use console::console_putchar;
-use core::{fmt, task::Waker};
-use mutex::SpinNoIrqLock;
+use alloc::sync::Arc;
+use core::{
+    fmt::{self, Write},
+    task::Waker,
+};
 
+use console::console_putchar;
 use qemu::{UartDevice, VirtBlkDevice};
 use spin::Once;
 
@@ -49,12 +51,22 @@ fn init_char_device() {
     CHAR_DEVICE.call_once(|| Arc::new(UartDevice::new()));
 }
 
-pub fn console_print(args: fmt::Arguments<'_>) {
-    static PRINT_MUTEX: SpinNoIrqLock<()> = SpinNoIrqLock::new(());
-    let _lock = PRINT_MUTEX.lock();
-    for s in args.to_string().as_bytes() {
-        console_putchar(*s);
+struct Console;
+
+impl Write for Console {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        for c in s.as_bytes() {
+            console_putchar(*c);
+        }
+        Ok(())
     }
+}
+
+pub fn console_print(args: fmt::Arguments<'_>) {
+    // Note: Is the lock necessary?
+    // static PRINT_MUTEX: SpinNoIrqLock<()> = SpinNoIrqLock::new(());
+    // let _lock = PRINT_MUTEX.lock();
+    Console.write_fmt(args).unwrap();
 }
 
 pub fn block_device_test() {
@@ -74,18 +86,14 @@ pub fn block_device_test() {
 
 #[macro_export]
 macro_rules! print {
-    ($($arg:tt)*) => {{
-        $crate::console_print(format_args!($($arg)*));
-    }};
+    ($fmt: literal $(, $($arg: tt)+)?) => {
+        $crate::console_print(format_args!($fmt $(, $($arg)+)?))
+    }
 }
 
 #[macro_export]
 macro_rules! println {
-    () => {
-        $crate::print!("\n")
-    };
-    ($($arg:tt)*) => {{
-        $crate::print!($($arg)*);
-        $crate::print!("\n")
-    }};
+    ($fmt: literal $(, $($arg: tt)+)?) => {
+        $crate::console_print(format_args!(concat!($fmt, "\n") $(, $($arg)+)?))
+    }
 }

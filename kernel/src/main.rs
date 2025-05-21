@@ -7,7 +7,6 @@
 #![allow(dead_code)]
 
 mod boot;
-mod console;
 mod entry;
 mod lang_item;
 mod link_app;
