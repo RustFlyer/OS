@@ -10,7 +10,11 @@ use systype::SysResult;
 
 use super::sig_info::{Sig, SigInfo};
 
-global_asm!(include_str!("_sigreturn_trampoline.asm"));
+#[cfg(target_arch = "loongarch64")]
+global_asm!(include_str!("_sigret_loong.asm"));
+
+#[cfg(target_arch = "riscv64")]
+global_asm!(include_str!("_sigret_riscv.asm"));
 
 pub async fn sig_check(task: Arc<Task>, mut _intr: bool) {
     let old_mask = task.get_sig_mask();

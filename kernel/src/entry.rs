@@ -42,13 +42,13 @@ static mut BOOT_PAGE_TABLE: BootPageTable = {
     BootPageTable(arr)
 };
 
-#[naked]
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".text.entry")]
-unsafe extern "C" fn _start(hart_id: usize) -> ! {
+unsafe extern "C" fn _start(hart_id: usize) {
     // Note: The `hart_id` parameter is passed in `a0` register on boot.
+    #[cfg(target_arch = "riscv64")]
     unsafe {
-        core::arch::naked_asm!(
+        core::arch::asm!(
             // Enable Sv39 page table
             // satp = (8 << 60) | ppn
             "
@@ -80,6 +80,46 @@ unsafe extern "C" fn _start(hart_id: usize) -> ! {
             page_table_pa = sym BOOT_PAGE_TABLE,
             boot_stack_pa = sym BOOT_STACK,
             kernel_map_offset = const KERNEL_MAP_OFFSET,
+        )
+    }
+    #[cfg(target_arch = "loongarch64")]
+    unsafe {
+        core::arch::asm!(
+            // turn off page mechanism, set PLV0
+            "li.w   $t0, 0x0",
+            "csrwr  $t0, 0x0",         // CRMD
+
+
+            // set page base address
+            "la.global $t0, {page_table_pa}",
+            "csrwr  $t0, 0x1b",        // PGD
+
+            // set ASID as zero
+            "li.w   $t0, 0x0",
+            "csrwr  $t0, 0x18",        // ASID
+
+            "addi.d $t1, $a0, 1",
+            "slli.d $t1, $t1, 16",     // t1 = KERNEL_STACK_SIZE
+            "la.global $sp, {boot_stack_pa}",
+            "add.d  $sp, $sp, $t1",
+
+            // set DMWIN config
+            "ori     $t0, $zero, 0x11",
+            "lu52i.d $t0, $t0, -1792",
+            "csrwr   $t0, 0x181",
+
+            // turn on page mechanism
+            "csrrd  $t0, 0x0",
+            "ori    $t0, $t0, 0x4",    // PG=1
+            "csrwr  $t0, 0x0",
+
+            // Jump to the virtual address of `rust_main`
+            "la.global $t0, rust_main",
+            "jirl   $zero, $t0, 0",
+
+            page_table_pa = sym BOOT_PAGE_TABLE,
+            boot_stack_pa = sym BOOT_STACK,
+            options(noreturn)
         )
     }
 }

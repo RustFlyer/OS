@@ -83,7 +83,7 @@ __trap_from_user:
 
     // jump to ra(fn trap_return) without offset, drop current pc+4 to r0
     // Sugar: jr $ra
-    jirl r0, ra, 0
+    jirl $r0, $ra, 0
 
 __return_to_user:
     // Save kernel callee-saved registers
@@ -153,45 +153,45 @@ __return_to_user:
 # kernel -> kernel
 __trap_from_kernel:
     # only need to save caller-saved regs
-    addi.d sp, sp, -19*8
-    st.d  ra, $sp, 1*8
-    st.d  t0, $sp, 2*8
-    st.d  t1, $sp, 3*8
-    st.d  t2, $sp, 4*8
-    st.d  t3, $sp, 5*8
-    st.d  t4, $sp, 6*8
-    st.d  t5, $sp, 7*8
-    st.d  t6, $sp, 8*8
-    st.d  t7, $sp, 9*8
-    st.d  t8, $sp, 10*8
-    st.d  a0, $sp, 11*8
-    st.d  a1, $sp, 12*8
-    st.d  a2, $sp, 13*8
-    st.d  a3, $sp, 14*8
-    st.d  a4, $sp, 15*8
-    st.d  a5, $sp, 16*8
-    st.d  a6, $sp, 17*8
-    st.d  a7, $sp, 18*8
-    call kernel_trap_handler
-    ld.d  ra, $sp, 1*8
-    ld.d  t0, $sp, 2*8
-    ld.d  t1, $sp, 3*8
-    ld.d  t2, $sp, 4*8
-    ld.d  t3, $sp, 5*8
-    ld.d  t4, $sp, 6*8
-    ld.d  t5, $sp, 7*8
-    ld.d  t6, $sp, 8*8
-    ld.d  t7, $sp, 9*8
-    ld.d  t8, $sp, 10*8
-    ld.d  a0, $sp, 11*8
-    ld.d  a1, $sp, 12*8
-    ld.d  a2, $sp, 13*8
-    ld.d  a3, $sp, 14*8
-    ld.d  a4, $sp, 15*8
-    ld.d  a5, $sp, 16*8
-    ld.d  a6, $sp, 17*8
-    ld.d  a7, $sp, 18*8
-    addi.d sp, sp, 19*8
+    addi.d $sp, $sp, -19*8
+    st.d  $ra, $sp, 1*8
+    st.d  $t0, $sp, 2*8
+    st.d  $t1, $sp, 3*8
+    st.d  $t2, $sp, 4*8
+    st.d  $t3, $sp, 5*8
+    st.d  $t4, $sp, 6*8
+    st.d  $t5, $sp, 7*8
+    st.d  $t6, $sp, 8*8
+    st.d  $t7, $sp, 9*8
+    st.d  $t8, $sp, 10*8
+    st.d  $a0, $sp, 11*8
+    st.d  $a1, $sp, 12*8
+    st.d  $a2, $sp, 13*8
+    st.d  $a3, $sp, 14*8
+    st.d  $a4, $sp, 15*8
+    st.d  $a5, $sp, 16*8
+    st.d  $a6, $sp, 17*8
+    st.d  $a7, $sp, 18*8
+    bl kernel_trap_handler
+    ld.d  $ra, $sp, 1*8
+    ld.d  $t0, $sp, 2*8
+    ld.d  $t1, $sp, 3*8
+    ld.d  $t2, $sp, 4*8
+    ld.d  $t3, $sp, 5*8
+    ld.d  $t4, $sp, 6*8
+    ld.d  $t5, $sp, 7*8
+    ld.d  $t6, $sp, 8*8
+    ld.d  $t7, $sp, 9*8
+    ld.d  $t8, $sp, 10*8
+    ld.d  $a0, $sp, 11*8
+    ld.d  $a1, $sp, 12*8
+    ld.d  $a2, $sp, 13*8
+    ld.d  $a3, $sp, 14*8
+    ld.d  $a4, $sp, 15*8
+    ld.d  $a5, $sp, 16*8
+    ld.d  $a6, $sp, 17*8
+    ld.d  $a7, $sp, 18*8
+    addi.d $sp, $sp, 19*8
     ertn
 
 __try_read_user:
@@ -218,8 +218,10 @@ __user_rw_exception_entry:
 
     .align 8
 __user_rw_trap_vector:
-    jail 0, __user_rw_exception_entry, 0
-    .rept 16
-    .align 3
-    jail 0 __trap_from_kernel, 0
-    .endr
+    la.global $t0, __user_rw_exception_entry
+    jirl $zero, $t0, 0
+    // .rept 16
+    // .align 3
+    // la.global $t0, __trap_from_kernel
+    // jirl $zero, $t0, 0
+    // .endr
