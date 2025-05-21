@@ -25,6 +25,10 @@ unsafe extern "C" fn _start() -> ! {
             li.w        $t0, 0x0            # Set FPE = 0, SXE = 0, ASXE = 0, BTE = 0
             csrwr       $t0, 0x2            # Write CSR.EUEN
 
+            # Enable floating-point instructions and vector expansion instructions
+            li.w        $t0, 0x7            # Set EUEN.FPE = 1, EUEN.SXE = 1, EUEN.ASXE = 1
+            csrwr       $t0, 0x2            # Write CSR.EUEN
+
             # Set up the stack pointer
             la.global   $sp, {boot_stack}
             addi.d      $t0, $t0, 1
