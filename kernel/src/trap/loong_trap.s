@@ -83,7 +83,7 @@ __trap_from_user:
 
     // jump to ra(fn trap_return) without offset, drop current pc+4 to r0
     // Sugar: jr $ra
-    jirl r0, ra, 0
+    jirl $r0, $ra, 0
 
 __return_to_user:
     // Save kernel callee-saved registers
@@ -153,7 +153,7 @@ __return_to_user:
 # kernel -> kernel
 __trap_from_kernel:
     # only need to save caller-saved regs
-    addi.d sp, sp, -19*8
+    addi.d $sp, $sp, -19*8
     st.d  $ra, $sp, 1*8
     st.d  $t0, $sp, 2*8
     st.d  $t1, $sp, 3*8
@@ -172,7 +172,8 @@ __trap_from_kernel:
     st.d  $a5, $sp, 16*8
     st.d  $a6, $sp, 17*8
     st.d  $a7, $sp, 18*8
-    call kernel_trap_handler
+    la.abs  $t0, kernel_trap_handler
+    jirl $r0, $t0, 0
     ld.d  $ra, $sp, 1*8
     ld.d  $t0, $sp, 2*8
     ld.d  $t1, $sp, 3*8
@@ -191,7 +192,7 @@ __trap_from_kernel:
     ld.d  $a5, $sp, 16*8
     ld.d  $a6, $sp, 17*8
     ld.d  $a7, $sp, 18*8
-    addi.d sp, sp, 19*8
+    addi.d $sp, $sp, 19*8
     ertn
 
 __try_read_user:
@@ -218,8 +219,10 @@ __user_rw_exception_entry:
 
     .align 8
 __user_rw_trap_vector:
-    jirl 0, __user_rw_exception_entry, 0
+    la.abs  $t0, __user_rw_exception_entry
+    jirl $r0, $t0, 0
     .rept 16
     .align 3
-    jirl 0, __trap_from_kernel, 0
+    la.abs  $t0, __trap_from_kernel
+    jirl $r0, $t0, 0
     .endr
