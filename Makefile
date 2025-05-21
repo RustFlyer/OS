@@ -28,7 +28,6 @@ export LOG = trace
 export DEBUG = off
 
 QEMU = qemu-system-$(ARCH)
-GDB = riscv64-unknown-elf-gdb  
 OBJDUMP = rust-objdump --arch-name=$(ARCH)
 OBJCOPY = rust-objcopy --binary-architecture=$(ARCH)
 PAGER = less
@@ -57,6 +56,9 @@ ifeq ($(ARCH),riscv64)
 	QEMU_ARGS += -smp $(SMP)
 	QEMU_ARGS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
 	QEMU_ARGS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+
+	GDB = riscv64-unknown-elf-gdb  
+	GDB_ARGS = riscv:rv64  
 endif
 
 ifeq ($(ARCH),loongarch64)
@@ -72,6 +74,9 @@ ifeq ($(ARCH),loongarch64)
 	QEMU_ARGS += -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555
 	QEMU_ARGS += -rtc base=utc
 	QEMU_ARGS += -no-reboot	
+
+	GDB = loongarch64-linux-gnu-gdb
+	GDB_ARGS = loongarch64 
 endif
 
 
@@ -132,7 +137,7 @@ gdbserver: all
 PHONY += gdbclient
 gdbclient: all
 	@$(GDB) -ex 'file $(KERNEL_ELF)' \
-			-ex 'set arch riscv:rv64' \
+			-ex 'set arch $(GDB_ARGS)' \
 			-ex 'target remote localhost:1234'
 
 
