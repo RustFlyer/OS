@@ -23,7 +23,7 @@ sbi-rt = { version = "0.0.3", features = ["legacy"] }
 spin = { version = "0.9.8", features = ["lazy", "mutex"] }
 strum = { version = "0.27", default-features = false, features = ["derive"] }
 uart_16550 = "0.3"
-virtio-drivers = { version = "0.7" }
+virtio-drivers = { version = "0.10.0" }
 
 fatfs = { default-features = false, git = "https://github.com/EchudeT/rust-fatfs.git", rev = "e656", features = [
     "alloc",

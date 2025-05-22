@@ -1,4 +1,4 @@
-mod hal;
+pub mod hal;
 mod uart;
 mod virtblk;
 

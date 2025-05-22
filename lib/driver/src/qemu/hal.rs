@@ -73,6 +73,7 @@ unsafe impl virtio_drivers::Hal for VirtHalImpl {
         let va = pa.to_va_kernel();
         let va_ptr = va.to_usize() as *mut u8;
 
+        log::debug!("[mmio_phys_to_virt] {:?} -> {:?}", pa, va);
         unsafe { NonNull::new_unchecked(va_ptr) }
     }
 

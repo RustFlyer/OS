@@ -1,5 +1,5 @@
 use super::hal::VirtHalImpl;
-use crate::BlockDevice;
+use crate::{BlockDevice, DevTransport};
 use config::device::{BLOCK_SIZE, DEV_SIZE, VIRTIO0};
 use mutex::SpinNoIrqLock;
 use virtio_drivers::{
@@ -7,7 +7,7 @@ use virtio_drivers::{
     transport::mmio::{MmioTransport, VirtIOHeader},
 };
 
-pub struct VirtBlkDevice(SpinNoIrqLock<VirtIOBlk<VirtHalImpl, MmioTransport>>);
+pub struct VirtBlkDevice(SpinNoIrqLock<VirtIOBlk<VirtHalImpl, DevTransport>>);
 
 unsafe impl Sync for VirtBlkDevice {}
 unsafe impl Send for VirtBlkDevice {}
@@ -58,18 +58,23 @@ impl BlockDevice for VirtBlkDevice {
 }
 
 impl VirtBlkDevice {
-    pub fn new() -> Self {
-        unsafe {
-            let header = &mut *(VIRTIO0 as *mut VirtIOHeader);
-            let blk = VirtIOBlk::<VirtHalImpl, MmioTransport>::new(
-                MmioTransport::new(header.into()).unwrap(),
-            );
-            Self(SpinNoIrqLock::new(blk.unwrap()))
-        }
-    }
+    // pub fn new() -> Self {
+    //     unsafe {
+    //         let header = &mut *(VIRTIO0 as *mut VirtIOHeader);
+    //         let blk = VirtIOBlk::<VirtHalImpl, DevTransport>::new(
+    //             DevTransport::new(header.into()).unwrap(),
+    //         );
+    //         Self(SpinNoIrqLock::new(blk.unwrap()))
+    //     }
+    // }
 
-    pub fn new_from(transport: MmioTransport) -> Self {
-        let blk = VirtIOBlk::<VirtHalImpl, MmioTransport>::new(transport);
+    pub fn new_from(transport: DevTransport) -> Self {
+        let blk = VirtIOBlk::<VirtHalImpl, DevTransport>::new(transport);
+
+        if let Err(e) = blk {
+            log::error!("blk: {:?}", e);
+        }
+
         Self(SpinNoIrqLock::new(blk.unwrap()))
     }
 }

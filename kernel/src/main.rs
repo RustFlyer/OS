@@ -42,10 +42,10 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         log::info!("hart {}: initializing kernel", hart_id);
         log::info!("dtb_addr: {:#x}", dtb_addr);
 
-        // unsafe {
-        //     config::mm::DTB_ADDR = dtb_addr;
-        //     osdriver::probe_tree();
-        // }
+        unsafe {
+            config::mm::DTB_ADDR = dtb_addr;
+            osdriver::probe_tree();
+        }
 
         /* Initialize heap allocator and page table */
         unsafe {

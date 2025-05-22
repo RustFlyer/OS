@@ -5,6 +5,7 @@ use core::{
     fmt::{self, Write},
     task::Waker,
 };
+use virtio_drivers::transport::{mmio::MmioTransport, pci::PciTransport};
 
 use console::console_putchar;
 use qemu::{UartDevice, VirtBlkDevice};
@@ -16,6 +17,11 @@ pub mod console;
 pub mod qemu;
 
 extern crate alloc;
+
+#[cfg(target_arch = "riscv64")]
+pub type DevTransport = MmioTransport;
+#[cfg(target_arch = "loongarch64")]
+pub type DevTransport = PciTransport;
 
 pub static BLOCK_DEVICE: Once<Arc<dyn BlockDevice>> = Once::new();
 pub static CHAR_DEVICE: Once<Arc<dyn CharDevice>> = Once::new();
@@ -41,12 +47,15 @@ pub trait CharDevice: Send + Sync {
 }
 
 pub fn init() {
-    // init_block_device();
     // init_char_device();
+
+    // init_block_device();
 }
 
 fn init_block_device() {
-    BLOCK_DEVICE.call_once(|| Arc::new(VirtBlkDevice::new()));
+    log::debug!("block in");
+    // BLOCK_DEVICE.call_once(|| Arc::new(VirtBlkDevice::new()));
+    log::debug!("block out");
 }
 
 fn init_char_device() {
