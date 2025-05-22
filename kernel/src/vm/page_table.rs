@@ -462,12 +462,24 @@ impl PageTableMem {
 ///
 /// # Safety
 /// This function must be called after the kernel page table is set up.
+#[cfg(target_arch = "riscv64")]
 pub unsafe fn switch_to_kernel_page_table() {
     // SAFETY: the boot page table never gets dropped.
     unsafe {
         switch_page_table(&KERNEL_PAGE_TABLE);
     }
 }
+
+/// Switch to the kernel page table.
+///
+/// # Note for LoongArch
+/// In our LoongArch implementation, we do not have a separate kernel page table.
+/// The mapping for the kernel space is done in a direct mapping configuration window,
+/// with all virtual addresses be its corresponding physical addresses ORed with
+/// `0x9000_0000_0000_0000` (which is also the value of [`KERNEL_MAP_OFFSET`]).
+/// Therefore, this function is a no-op.
+#[cfg(target_arch = "loongarch64")]
+pub unsafe fn switch_to_kernel_page_table() {}
 
 /// Switches to the specified page table.
 ///
