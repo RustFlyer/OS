@@ -7,8 +7,7 @@
 use core::fmt::{self, Debug, Formatter};
 
 use config::mm::{
-    KERNEL_MAP_OFFSET, PA_WIDTH_SV39, PAGE_SIZE, PPN_WIDTH, USER_END, VA_WIDTH_SV39,
-    VPN_WIDTH,
+    KERNEL_MAP_OFFSET, PA_WIDTH_SV39, PAGE_SIZE, PPN_WIDTH, USER_END, VA_WIDTH_SV39, VPN_WIDTH,
 };
 
 /// An address in physical memory defined in Sv39.
@@ -41,9 +40,13 @@ impl PhysAddr {
     }
 
     /// Checks the validity of the address.
+    ///
+    /// # Note
+    /// MMIO addresses may be outside the RAM range, but they are still valid. This
+    /// function is only a sanity check and does not guarantee the address is valid.
     pub fn check_validity(addr: usize) -> bool {
-        let tmp = addr as isize >> PA_WIDTH_SV39;
-        tmp == 0 || tmp == -1
+        let extended_bits = addr as isize >> PA_WIDTH_SV39;
+        extended_bits == 0
     }
 
     /// Gets the inner `usize` address.
@@ -115,9 +118,26 @@ impl VirtAddr {
         VirtAddr { addr }
     }
 
+    /// Checks the validity of the address.
+    ///
+    /// # TODO
+    /// Is this check right?
+    #[cfg(target_arch = "riscv64")]
     pub fn check_validity(addr: usize) -> bool {
-        let tmp = addr as isize >> VA_WIDTH_SV39;
-        tmp == 0 || tmp == -1
+        let extended_bits = addr as isize >> VA_WIDTH_SV39;
+        extended_bits == 0 || extended_bits == -1
+    }
+
+    /// Checks the validity of the address.
+    ///
+    /// # Note for LoongArch64
+    /// LoongArch64 has multiple kinds of virtual addresses. This check is only a sanity
+    /// check and does not guarantee the address is valid.
+    #[cfg(target_arch = "loongarch64")]
+    pub fn check_validity(addr: usize) -> bool {
+        // Check the most significant 16 bits.
+        let upper_16_bits = addr >> 48;
+        matches!(upper_16_bits, 0x0000 | 0xffff | 0x8000 | 0x9000)
     }
 
     pub fn in_user_space(self) -> bool {
@@ -260,8 +280,7 @@ impl VirtPageNum {
 
     /// Gets the starting address of the page.
     pub fn address(self) -> VirtAddr {
-        let addr =
-            ((self.page_num as isize) << (64 - VPN_WIDTH) >> (64 - VA_WIDTH_SV39)) as usize;
+        let addr = ((self.page_num as isize) << (64 - VPN_WIDTH) >> (64 - VA_WIDTH_SV39)) as usize;
         VirtAddr::new(addr)
     }
 
