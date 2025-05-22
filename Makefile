@@ -86,8 +86,8 @@ ifeq ($(ARCH),loongarch64)
 	QEMU_ARGS += -rtc base=utc
 	QEMU_ARGS += -no-reboot
 
-	GDB = loongarch64-linux-gnu-gdb
-	GDB_ARGS = loongarch64
+	GDB = loongarch64-unknown-linux-gnu-gdb
+	GDB_ARGS = Loongarch64
 endif
 
 
