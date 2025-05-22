@@ -84,7 +84,7 @@ ifeq ($(ARCH),loongarch64)
 	QEMU_ARGS += -no-reboot
 
 	GDB = loongarch64-unknown-linux-gnu-gdb
-	GDB_ARGS = loongarch64
+	GDB_ARGS = Loongarch64
 endif
 
 
