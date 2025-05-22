@@ -476,12 +476,10 @@ pub unsafe fn switch_to_kernel_page_table() {
 /// or the kernel may lose its memory mappings.
 pub unsafe fn switch_page_table(page_table: &PageTable) {
     arch::mm::switch_pagetable(page_table.root().to_usize());
-    when_debug!({
-        log::trace!(
-            "Switched to page table at {:#x}",
-            page_table.root().to_usize(),
-        );
-    });
+    log::trace!(
+        "Switched to page table at {:#x}",
+        page_table.root().to_usize(),
+    );
 }
 
 /// Prints the lookup process of a virtual address in the specific page table.

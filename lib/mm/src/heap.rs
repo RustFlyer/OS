@@ -8,7 +8,7 @@ use buddy_system_allocator as buddy;
 
 use config::mm::KERNEL_HEAP_SIZE;
 
-use crate::address::PhysAddr;
+use crate::address::{PhysAddr, VirtAddr};
 
 static mut KERNEL_HEAP: [u8; KERNEL_HEAP_SIZE] = [0; KERNEL_HEAP_SIZE];
 
@@ -30,7 +30,7 @@ pub unsafe fn init_heap_allocator() {
     unsafe {
         // SAFETY: we are the only one using the heap
         #[allow(static_mut_refs)]
-        let start_addr = PhysAddr::new(KERNEL_HEAP.as_ptr() as usize).to_usize();
+        let start_addr = VirtAddr::new(KERNEL_HEAP.as_ptr() as usize).to_usize();
 
         HEAP_ALLOCATOR.lock().init(start_addr, KERNEL_HEAP_SIZE);
 
