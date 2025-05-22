@@ -67,4 +67,9 @@ impl VirtBlkDevice {
             Self(SpinNoIrqLock::new(blk.unwrap()))
         }
     }
+
+    pub fn new_from(transport: MmioTransport) -> Self {
+        let blk = VirtIOBlk::<VirtHalImpl, MmioTransport>::new(transport);
+        Self(SpinNoIrqLock::new(blk.unwrap()))
+    }
 }

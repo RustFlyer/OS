@@ -10,6 +10,8 @@ use console::console_putchar;
 use qemu::{UartDevice, VirtBlkDevice};
 use spin::Once;
 
+pub use uart_16550::MmioSerialPort;
+
 pub mod console;
 pub mod qemu;
 
@@ -39,8 +41,8 @@ pub trait CharDevice: Send + Sync {
 }
 
 pub fn init() {
-    init_block_device();
-    init_char_device();
+    // init_block_device();
+    // init_char_device();
 }
 
 fn init_block_device() {

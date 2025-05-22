@@ -76,10 +76,10 @@ ifeq ($(ARCH),loongarch64)
 	QEMU_ARGS += -kernel $(KERNEL_ELF)
 	QEMU_ARGS += -smp $(SMP)
 	QEMU_ARGS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
-	# QEMU_ARGS += -device virtio-blk-pci,drive=x0,bus=virtio-mmio-bus.0 
-	# QEMU_ARGS += -device virtio-blk-pci,drive=x1,bus=virtio-mmio-bus.1
-	QEMU_ARGS += -device virtio-net-pci,netdev=net0
-	QEMU_ARGS += -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555
+	QEMU_ARGS += -device virtio-blk-pci,drive=x0
+	# QEMU_ARGS += -device virtio-blk-pci,drive=x1
+	# QEMU_ARGS += -device virtio-net-pci,netdev=net0
+	# QEMU_ARGS += -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555
 	QEMU_ARGS += -rtc base=utc
 	QEMU_ARGS += -no-reboot
 

@@ -23,6 +23,7 @@ time = { path = "../lib/time/" }
 timer = { path = "../lib/timer/" }
 vfs = { path = "../lib/vfs/" }
 
+fdt = { workspace = true }
 bitflags = { workspace = true }
 cfg-if = { workspace = true }
 crate_interface = { workspace = true }
@@ -30,6 +31,7 @@ elf = { workspace = true }
 lazy_static = { workspace = true }
 log = { workspace = true }
 strum = { workspace = true }
+virtio-drivers = { workspace = true }
 
 [target.'cfg(target_arch = "riscv64")'.dependencies]
 riscv = { workspace = true }

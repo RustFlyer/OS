@@ -12,6 +12,7 @@ mod lang_item;
 mod link_app;
 mod loader;
 mod logging;
+mod osdriver;
 mod processor;
 mod syscall;
 mod task;
@@ -39,10 +40,15 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         /* Initialize logger */
         logger::init();
         log::info!("hart {}: initializing kernel", hart_id);
+        log::info!("dtb_addr: {:#x}", dtb_addr);
+
+        // unsafe {
+        //     config::mm::DTB_ADDR = dtb_addr;
+        //     osdriver::probe_tree();
+        // }
 
         /* Initialize heap allocator and page table */
         unsafe {
-            config::mm::DTB_ADDR = dtb_addr;
             heap::init_heap_allocator();
             log::info!("hart {}: initialized heap allocator", hart_id);
             frame::init_frame_allocator();

@@ -378,6 +378,7 @@ dependencies = [
  "driver",
  "elf",
  "executor",
+ "fdt",
  "id_allocator",
  "lazy_static",
  "log",
@@ -398,6 +399,7 @@ dependencies = [
  "time",
  "timer",
  "vfs",
+ "virtio-drivers",
 ]
 
 [[package]]
