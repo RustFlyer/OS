@@ -74,7 +74,7 @@ impl PageTable {
         }
         Ok(PageTable {
             root: root_frame.ppn(),
-            frames: SpinLock::new(vec![root_frame]),
+            frames: SpinLock::new(alloc::vec![root_frame]),
         })
     }
 

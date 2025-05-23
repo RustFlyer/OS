@@ -72,19 +72,23 @@ endif
 ifeq ($(ARCH),loongarch64)
 	QEMU_ARGS := -m 1G
 	QEMU_ARGS += -nographic
-	# QEMU_ARGS += -machine virt,accel=tcg 
-	# QEMU_ARGS += -machine virt,dumpdtb=loongarch.dtb
-	# QEMU_ARGS += -D qemu.log -d guest_errors,unimp,in_asm
-	# QEMU_ARGS += -bios default
 	QEMU_ARGS += -kernel $(KERNEL_ELF)
 	QEMU_ARGS += -smp $(SMP)
 	QEMU_ARGS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
 	QEMU_ARGS += -device virtio-blk-pci,drive=x0
- 	# QEMU_ARGS += -device virtio-blk-pci,drive=x1 
-	# QEMU_ARGS += -device virtio-net-pci,netdev=net0 
-	# QEMU_ARGS += -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555
-	QEMU_ARGS += -rtc base=utc
 	QEMU_ARGS += -no-reboot
+	QEMU_ARGS += -device virtio-net-pci,netdev=net0 
+	QEMU_ARGS += -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555
+	QEMU_ARGS += -rtc base=utc
+# QEMU_ARGS += -drive file=disk-la.img,if=none,format=raw,id=x1
+# QEMU_ARGS += -device virtio-blk-pci,drive=x1 
+
+	QEMU_ARGS += -dtb loongarch.dtb
+# QEMU_ARGS += -bios uefi_bios.bin
+# QEMU_ARGS += -vga none
+# QEMU_ARGS += -D qemu.log -d guest_errors,unimp,in_asm
+# QEMU_ARGS += -machine virt,dumpdtb=loongarch.dtb
+# QEMU_ARGS += -machine virt,accel=tcg
 
 	GDB = loongarch64-unknown-linux-gnu-gdb
 	GDB_ARGS = Loongarch64

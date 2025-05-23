@@ -53,7 +53,7 @@ unsafe impl virtio_drivers::Hal for VirtHalImpl {
         let ppn_ed = PhysPageNum::new(ppn_st.to_usize() + pages);
         for _ppn in ppn_st.to_usize()..ppn_ed.to_usize() {
             // Here frame which owns the ppn should be dealloc
-            todo!()
+            // todo!()
         }
         0
     }

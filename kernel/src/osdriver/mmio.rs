@@ -6,7 +6,7 @@ use driver::{
     BLOCK_DEVICE, BlockDevice, CHAR_DEVICE, MmioSerialPort, println,
     qemu::{UartDevice, VirtBlkDevice},
 };
-use fdt::Fdt;
+use flat_device_tree::Fdt;
 use mm::address::PhysAddr;
 use virtio_drivers::transport::{self, DeviceType, Transport, mmio::MmioTransport};
 
@@ -16,7 +16,7 @@ pub fn probe_virtio_blk(root: &Fdt) -> Option<Arc<VirtBlkDevice>> {
     let device_tree = root;
     let mut dev = None;
     for node in device_tree.find_all_nodes("/soc/virtio_mmio") {
-        for reg in node.reg()? {
+        for reg in node.reg() {
             let mmio_base_paddr = PhysAddr::new(reg.starting_address as usize);
             let mmio_size = reg.size?;
             let irq_no = node.property("interrupts").and_then(|i| i.as_usize());
@@ -32,7 +32,7 @@ pub fn probe_virtio_blk(root: &Fdt) -> Option<Arc<VirtBlkDevice>> {
                 mmio_size,
                 Some(DeviceType::Block),
             ) {
-                dev = Some(Arc::new(VirtBlkDevice::new_from(transport)));
+                dev = Some(Arc::new(VirtBlkDevice::new_from_mmio(transport)));
                 log::info!(
                     "[probe_virtio_blk] created a new block device: {:?}",
                     dev.clone().unwrap().block_size()
@@ -55,14 +55,14 @@ pub fn probe_virtio_blk(root: &Fdt) -> Option<Arc<VirtBlkDevice>> {
 
 pub fn probe_mmio_device(
     reg_base: *mut u8,
-    _reg_size: usize,
+    reg_size: usize,
     type_match: Option<DeviceType>,
-) -> Option<MmioTransport> {
+) -> Option<MmioTransport<'static>> {
     use transport::mmio::VirtIOHeader;
 
     let header = NonNull::new(reg_base as *mut VirtIOHeader).unwrap();
 
-    if let Ok(transport) = unsafe { MmioTransport::new(header) } {
+    if let Ok(transport) = unsafe { MmioTransport::new(header, reg_size) } {
         log::info!("[probe_mmio_device] transport: {:?}", transport);
         log::info!(
             "[probe_mmio_device] transport device: {:?}",
@@ -87,9 +87,9 @@ pub fn probe_mmio_device(
 
 pub fn probe_char_device(root: &Fdt) -> Option<MmioSerialPort> {
     log::debug!("[probe_char_device] start");
-    let chosen = root.chosen();
+    let chosen = root.chosen().unwrap();
     // Serial
-    let mut stdout = chosen.stdout();
+    let mut stdout = chosen.stdout().and_then(|n| Some(n.node()));
     if stdout.is_none() {
         log::debug!("Non-standard stdout device, trying to workaround");
         let chosen = root.find_node("/chosen").expect("No chosen node");
@@ -131,14 +131,14 @@ pub fn probe_char_device(root: &Fdt) -> Option<MmioSerialPort> {
 
 /// This guarantees to return a Serial device
 /// The device is not initialized yet
-fn probe_serial_console(stdout: &fdt::node::FdtNode) -> MmioSerialPort {
-    let reg = stdout.reg().unwrap().next().unwrap();
+fn probe_serial_console(stdout: &flat_device_tree::node::FdtNode) -> MmioSerialPort {
+    let reg = stdout.reg().next().unwrap();
     let base_paddr = reg.starting_address as usize;
     let size = reg.size.unwrap();
     let base_vaddr = base_paddr + KERNEL_MAP_OFFSET;
     let irq_number = stdout.property("interrupts").unwrap().as_usize().unwrap();
     log::info!("IRQ number: {}", irq_number);
-    let first_compatible = stdout.compatible().unwrap().first();
+    let first_compatible = stdout.compatible().unwrap().first().unwrap();
     match first_compatible {
         "ns16550a" | "snps,dw-apb-uart" => {
             // VisionFive 2 (FU740)

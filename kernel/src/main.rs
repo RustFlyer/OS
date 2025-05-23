@@ -42,11 +42,6 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         log::info!("hart {}: initializing kernel", hart_id);
         log::info!("dtb_addr: {:#x}", dtb_addr);
 
-        unsafe {
-            config::mm::DTB_ADDR = dtb_addr;
-            osdriver::probe_tree();
-        }
-
         /* Initialize heap allocator and page table */
         unsafe {
             heap::init_heap_allocator();
@@ -93,17 +88,22 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         log::info!("device tree blob PA start: {:#x}", dtb_addr);
         log::info!("====== kernel memory layout end ======");
 
+        unsafe {
+            config::mm::DTB_ADDR = dtb_addr;
+            osdriver::probe_tree();
+        }
+
         driver::init();
         log::info!("hart {}: initialized driver", hart_id);
 
         // block_device_test();
 
         osfs::init();
-        log::info!("hart {}: initialized FS", hart_id);
+        log::info!("hart {}: initialized FS success", hart_id);
 
         // boot::start_harts(hart_id);
 
-        loader::init();
+        // loader::init();
 
         arch::trap::init();
 

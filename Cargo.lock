@@ -317,10 +317,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "fdt"
-version = "0.1.5"
+name = "flat_device_tree"
+version = "3.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "784a4df722dc6267a04af36895398f59d21d07dce47232adf31ec0ff2fa45e67"
+checksum = "4d29ba76ecf314f211601c5641d6fc4393d8f56a3b7764b3c8544639aad965a9"
 
 [[package]]
 name = "glob"
@@ -378,7 +378,7 @@ dependencies = [
  "driver",
  "elf",
  "executor",
- "fdt",
+ "flat_device_tree",
  "id_allocator",
  "lazy_static",
  "log",
@@ -584,7 +584,7 @@ dependencies = [
  "bitflags 2.9.0",
  "buddy_system_allocator",
  "cfg-if",
- "fdt",
+ "flat_device_tree",
  "log",
  "loongArch64",
  "multiboot",
@@ -1002,9 +1002,9 @@ dependencies = [
 
 [[package]]
 name = "virtio-drivers"
-version = "0.10.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b5db5f7aaf57cf1e9e12a348be8c32ce6cd9ca0e1880f908867948cf0525e95"
+checksum = "7fe3f779fd88436e27b51540d9563c7454c8c814893a1e6f9bb6138bcac60627"
 dependencies = [
  "bitflags 2.9.0",
  "embedded-io",

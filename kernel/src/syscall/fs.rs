@@ -1,4 +1,9 @@
-use alloc::{boxed::Box, ffi::CString, string::ToString, vec::Vec};
+use alloc::{
+    boxed::Box,
+    ffi::CString,
+    string::{String, ToString},
+    vec::Vec,
+};
 use arch::time::get_time_duration;
 use core::{
     cmp,
@@ -17,7 +22,7 @@ use config::{
     inode::InodeMode,
     vfs::{AccessFlags, AtFd, AtFlags, MountFlags, OpenFlags, PollEvents, RenameFlags, SeekFrom},
 };
-use driver::BLOCK_DEVICE;
+use driver::{BLOCK_DEVICE, println};
 use osfs::{
     FS_MANAGER,
     dev::tty::{
@@ -146,6 +151,12 @@ pub async fn sys_write(fd: usize, addr: usize, len: usize) -> SyscallResult {
 
     let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
     let buf = unsafe { data_ptr.try_into_slice(len) }?;
+
+    if fd <= 2 {
+        let string = String::from_utf8_lossy(buf);
+        println!("{}", string);
+    }
+
     file.write(buf).await
 }
 

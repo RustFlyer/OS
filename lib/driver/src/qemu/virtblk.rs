@@ -4,10 +4,14 @@ use config::device::{BLOCK_SIZE, DEV_SIZE, VIRTIO0};
 use mutex::SpinNoIrqLock;
 use virtio_drivers::{
     device::blk::VirtIOBlk,
-    transport::mmio::{MmioTransport, VirtIOHeader},
+    transport::{
+        Transport,
+        mmio::{MmioTransport, VirtIOHeader},
+        pci::PciTransport,
+    },
 };
 
-pub struct VirtBlkDevice(SpinNoIrqLock<VirtIOBlk<VirtHalImpl, DevTransport>>);
+pub struct VirtBlkDevice(SpinNoIrqLock<VirtIOBlk<VirtHalImpl, PciTransport>>);
 
 unsafe impl Sync for VirtBlkDevice {}
 unsafe impl Send for VirtBlkDevice {}
@@ -58,23 +62,28 @@ impl BlockDevice for VirtBlkDevice {
 }
 
 impl VirtBlkDevice {
-    // pub fn new() -> Self {
-    //     unsafe {
-    //         let header = &mut *(VIRTIO0 as *mut VirtIOHeader);
-    //         let blk = VirtIOBlk::<VirtHalImpl, DevTransport>::new(
-    //             DevTransport::new(header.into()).unwrap(),
-    //         );
-    //         Self(SpinNoIrqLock::new(blk.unwrap()))
-    //     }
+    // pub fn new(transport: impl Transport) -> Self {
+    //     let blk = VirtIOBlk::<VirtHalImpl, _>::new(transport);
+    //     Self(SpinNoIrqLock::new(blk.unwrap()))
     // }
 
-    pub fn new_from(transport: DevTransport) -> Self {
-        let blk = VirtIOBlk::<VirtHalImpl, DevTransport>::new(transport);
+    pub fn new_from_pci(transport: PciTransport) -> Self {
+        let blk = VirtIOBlk::<VirtHalImpl, PciTransport>::new(transport);
+
+        if let Err(e) = blk {
+            log::error!("blk: {:?}", e);
+        }
+        Self(SpinNoIrqLock::new(blk.unwrap()))
+    }
+
+    pub fn new_from_mmio(transport: MmioTransport) -> Self {
+        let blk = VirtIOBlk::<VirtHalImpl, MmioTransport>::new(transport);
 
         if let Err(e) = blk {
             log::error!("blk: {:?}", e);
         }
 
-        Self(SpinNoIrqLock::new(blk.unwrap()))
+        todo!()
+        // Self(SpinNoIrqLock::new(blk.unwrap()))
     }
 }
