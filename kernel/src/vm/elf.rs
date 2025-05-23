@@ -97,7 +97,7 @@ impl AddrSpace {
             let interp_name = {
                 let offset = interp.p_offset as usize;
                 let len = interp.p_filesz as usize;
-                let mut buf = vec![0u8; len];
+                let mut buf = alloc::vec![0u8; len];
                 elf_file.seek(SeekFrom::Start(offset as u64))?;
                 block_on(async { elf_file.read(&mut buf).await })?;
                 CString::from_vec_with_nul(buf)

@@ -23,7 +23,7 @@ time = { path = "../lib/time/" }
 timer = { path = "../lib/timer/" }
 vfs = { path = "../lib/vfs/" }
 
-fdt = { workspace = true }
+flat_device_tree = { workspace = true }
 bitflags = { workspace = true }
 cfg-if = { workspace = true }
 crate_interface = { workspace = true }

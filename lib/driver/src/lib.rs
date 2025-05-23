@@ -19,7 +19,7 @@ pub mod qemu;
 extern crate alloc;
 
 #[cfg(target_arch = "riscv64")]
-pub type DevTransport = MmioTransport;
+pub type DevTransport = MmioTransport<'static>;
 #[cfg(target_arch = "loongarch64")]
 pub type DevTransport = PciTransport;
 
