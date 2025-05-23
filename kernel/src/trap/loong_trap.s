@@ -15,7 +15,7 @@
     .globl __try_write_user
 
 
-.align 4    #why 8*2^4=128 bits align ?
+    .align 12
 __trap_from_user:
     # swap sp and kernel stack pointer in KSAVE_CTX, as sstratch in RV
     csrwr   $sp, 0x31
@@ -151,6 +151,7 @@ __return_to_user:
     ertn
 
 # kernel -> kernel
+    .align 12
 __trap_from_kernel:
     # only need to save caller-saved regs
     addi.d $sp, $sp, -19*8
@@ -219,7 +220,7 @@ __user_rw_exception_entry:
     csrrd $a1, 0x5
     ertn
 
-    .align 8
+    .align 12
 __user_rw_trap_vector:
     .rept 64
     .align 3

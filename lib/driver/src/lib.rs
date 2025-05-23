@@ -47,9 +47,8 @@ pub trait CharDevice: Send + Sync {
 }
 
 pub fn init() {
-    // init_char_device();
-
-    // init_block_device();
+    init_char_device();
+    init_block_device();
 }
 
 fn init_block_device() {

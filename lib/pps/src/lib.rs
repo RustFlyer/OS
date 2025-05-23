@@ -1,6 +1,9 @@
 #![no_std]
 #![no_main]
 
+#[cfg(target_arch = "loongarch64")]
+use core::arch::asm;
+
 #[cfg(target_arch = "riscv64")]
 use riscv::register::{
     satp::{self, Satp},
@@ -9,10 +12,7 @@ use riscv::register::{
 };
 
 #[cfg(target_arch = "loongarch64")]
-use loongArch64::register::{
-    era, pgdl,
-    crmd::{self, Crmd},
-};
+use loongArch64::register::{crmd, era, pgdl};
 
 /// `ProcessorPrivilegeState` records processor privilege state of a task.
 /// when a task is scheduled(poll in or poll out), the hart will switch pps and
@@ -119,13 +119,19 @@ impl ProcessorPrivilegeState {
 
     #[cfg(target_arch = "loongarch64")]
     pub fn restore(&mut self) {
-        // TODO: change loongarch64 crate to change CSR from bits
         let crmd = self.sstatus;
         let era = self.sepc;
+        let pgdl = self.satp;
         unsafe {
-            core::arch::asm!("csrwr {}, 0x0", in(reg) crmd);
-            core::arch::asm!("csrwr {}, 0x6", in(reg) era);
-            pgdl::set_base(self.satp);
+            asm!("csrwr {}, 0x0", in(reg) crmd);
+            asm!("csrwr {}, 0x6", in(reg) era);
+            asm!("csrwr {}, 0x19", in(reg) pgdl);
         }
+    }
+}
+
+impl Default for ProcessorPrivilegeState {
+    fn default() -> Self {
+        Self::new()
     }
 }
