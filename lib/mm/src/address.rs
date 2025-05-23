@@ -7,13 +7,11 @@
 use core::fmt::{self, Debug, Formatter};
 
 use config::mm::{
-    KERNEL_MAP_OFFSET, PA_WIDTH_SV39, PAGE_SIZE, PPN_WIDTH, USER_END, VA_WIDTH_SV39, VPN_WIDTH,
+    KERNEL_MAP_OFFSET, PA_WIDTH_SV39, PAGE_OFFSET_WIDTH, PAGE_SIZE, PPN_WIDTH, USER_END,
+    VA_WIDTH_SV39, VPN_WIDTH,
 };
 
-/// An address in physical memory defined in Sv39.
-///
-/// A physical address is a 56-bit integer representing a location in physical
-/// memory. The upper 8 bits of the address must be the same as bit 55.
+/// Physical address.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PhysAddr {
     addr: usize,
@@ -22,14 +20,8 @@ pub struct PhysAddr {
 impl PhysAddr {
     /// Creates a new `PhysAddr` from the given address.
     ///
-    /// According to the RISC-V Sv39 specification, only the lower 56 bits of
-    /// a physical address are used, and the upper 8 bits must be the same as
-    /// bit 55.
-    ///
-    /// # Panics
-    ///
-    /// This function panics if the upper 8 bits of the address are not the same
-    /// as bit 55.
+    /// # Note
+    /// We only support physical addresses in the lower half of the address space.
     pub fn new(addr: usize) -> Self {
         debug_assert!(
             Self::check_validity(addr),
@@ -45,8 +37,8 @@ impl PhysAddr {
     /// MMIO addresses may be outside the RAM range, but they are still valid. This
     /// function is only a sanity check and does not guarantee the address is valid.
     pub fn check_validity(addr: usize) -> bool {
-        let extended_bits = addr as isize >> PA_WIDTH_SV39;
-        extended_bits == 0
+        let high_bits = addr as isize >> PA_WIDTH_SV39;
+        high_bits == 0
     }
 
     /// Gets the inner `usize` address.
@@ -61,9 +53,7 @@ impl PhysAddr {
 
     /// Gets the page number where the address resides.
     pub fn page_number(self) -> PhysPageNum {
-        let ppn_mask = (1 << PPN_WIDTH) - 1;
-        let page_num = (self.addr / PAGE_SIZE) & ppn_mask;
-        PhysPageNum::new(page_num)
+        PhysPageNum::new(self.addr / PAGE_SIZE)
     }
 
     /// Rounds the address down to the nearest page boundary.
@@ -78,8 +68,7 @@ impl PhysAddr {
 
     /// Translates a physical address into a virtual address in the kernel space.
     pub fn to_va_kernel(self) -> VirtAddr {
-        let va = self.addr + KERNEL_MAP_OFFSET;
-        VirtAddr::new(va)
+        VirtAddr::new(self.addr + KERNEL_MAP_OFFSET)
     }
 }
 
@@ -89,10 +78,7 @@ impl Debug for PhysAddr {
     }
 }
 
-/// An address in virtual memory defined in Sv39.
-///
-/// A virtual address is a 39-bit integer representing a location in virtual
-/// memory. The upper 25 bits of the address must be the same as bit 38.
+/// Virtual address.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct VirtAddr {
     addr: usize,
@@ -101,14 +87,17 @@ pub struct VirtAddr {
 impl VirtAddr {
     /// Creates a new `VirtAddr` from the given address.
     ///
+    /// # Note for RISC-V
     /// According to the RISC-V Sv39 specification, only the lower 39 bits of
     /// a virtual address are used, and the upper 25 bits must be the same as
     /// bit 38.
     ///
-    /// # Panics
-    ///
-    /// This function panics if the upper 25 bits of the address are not the same
-    /// as bit 38.
+    /// # Note for LoongArch64
+    /// LoongArch64 has multiple kinds of virtual addresses: addresses in a
+    /// direct mapping configuration window and addresses that are not. The
+    /// former kind of addresses may has `0x9` or `0x8` being the upper 4 bits
+    /// (in our current implementation), and the latter kind of addresses
+    /// is similar to RISC-V.
     pub fn new(addr: usize) -> Self {
         debug_assert!(
             Self::check_validity(addr),
@@ -119,25 +108,21 @@ impl VirtAddr {
     }
 
     /// Checks the validity of the address.
-    ///
-    /// # TODO
-    /// Is this check right?
     #[cfg(target_arch = "riscv64")]
     pub fn check_validity(addr: usize) -> bool {
-        let extended_bits = addr as isize >> VA_WIDTH_SV39;
-        extended_bits == 0 || extended_bits == -1
+        let high_bits = addr as isize >> (VA_WIDTH_SV39 - 1);
+        high_bits == 0 || high_bits == -1
     }
 
     /// Checks the validity of the address.
     ///
     /// # Note for LoongArch64
-    /// LoongArch64 has multiple kinds of virtual addresses. This check is only a sanity
-    /// check and does not guarantee the address is valid.
+    /// LoongArch64 has multiple kinds of virtual addresses. This check is only
+    /// a sanity check and does not guarantee the address is valid.
     #[cfg(target_arch = "loongarch64")]
     pub fn check_validity(addr: usize) -> bool {
-        // Check the most significant 16 bits.
-        let upper_16_bits = addr >> 48;
-        matches!(upper_16_bits, 0x0000 | 0xffff | 0x8000 | 0x9000)
+        let dmw_bits = addr >> 60;
+        matches!(dmw_bits, 0x0 | 0xf | 0x8 | 0x9)
     }
 
     pub fn in_user_space(self) -> bool {
@@ -156,9 +141,7 @@ impl VirtAddr {
 
     /// Gets the page number where the address resides.
     pub fn page_number(self) -> VirtPageNum {
-        let vpn_mask = (1 << VPN_WIDTH) - 1;
-        let page_num = (self.addr / PAGE_SIZE) & vpn_mask;
-        VirtPageNum::new(page_num)
+        VirtPageNum::new(self.addr / PAGE_SIZE)
     }
 
     /// Rounds the address down to the nearest page boundary.
@@ -174,10 +157,7 @@ impl VirtAddr {
     /// Translates a virtual address into a physical address, if the VA is in the
     /// kernel space.
     pub fn to_pa_kernel(self) -> PhysAddr {
-        // stop();
-        // info!("{:#x} - {:#x}", self.addr, KERNEL_MAP_OFFSET);
-        let pa = self.addr - KERNEL_MAP_OFFSET;
-        PhysAddr::new(pa)
+        PhysAddr::new(self.addr - KERNEL_MAP_OFFSET)
     }
 }
 
@@ -187,11 +167,10 @@ impl Debug for VirtAddr {
     }
 }
 
-/// A physical page number defined in Sv39.
+/// Physical page number.
 ///
-/// A physical page number is a 44-bit unsigned integer representing the page
-/// number of a physical address. The upper 20 bits of the page number must be
-/// zero.
+/// A physical page number is defined as the physical address divided by the
+/// page size.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PhysPageNum {
     page_num: usize,
@@ -199,11 +178,6 @@ pub struct PhysPageNum {
 
 impl PhysPageNum {
     /// Creates a new `PhysPageNum` from the given page number.
-    ///
-    /// # Panics
-    ///
-    /// This function panics if the upper 20 bits of the page number
-    /// are not zero.
     pub fn new(page_num: usize) -> Self {
         debug_assert!(
             Self::check_validity(page_num),
@@ -215,8 +189,8 @@ impl PhysPageNum {
 
     /// Checks the validity of the page number.
     pub fn check_validity(page_num: usize) -> bool {
-        let tmp = page_num >> PPN_WIDTH;
-        tmp == 0
+        let high_bits = page_num >> PPN_WIDTH;
+        high_bits == 0
     }
 
     /// Gets the inner `usize` page number.
@@ -226,8 +200,7 @@ impl PhysPageNum {
 
     /// Gets the starting address of the page.
     pub fn address(self) -> PhysAddr {
-        let addr = self.page_num << (64 - PPN_WIDTH) >> (64 - PA_WIDTH_SV39);
-        PhysAddr::new(addr)
+        PhysAddr::new(self.page_num << PAGE_OFFSET_WIDTH)
     }
 
     /// Translates a physical page number into a virtual page number in the kernel space.
@@ -242,10 +215,10 @@ impl Debug for PhysPageNum {
     }
 }
 
-/// A virtual page number defined in Sv39.
+/// Virtual page number defined in Sv39.
 ///
-/// A virtual page number is a 39-bit unsized integer representing the page
-/// number of a virtual address. The upper 25 bits of the page number is zero.
+/// A virtual page number is defined as the virtual address divided by the
+/// page size.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct VirtPageNum {
     page_num: usize,
@@ -253,11 +226,6 @@ pub struct VirtPageNum {
 
 impl VirtPageNum {
     /// Creates a new `VirtPageNum` from the given page number.
-    ///
-    /// # Panics
-    ///
-    /// This function panics if the upper 25 bits of the page number
-    /// are not zero.
     pub fn new(page_num: usize) -> Self {
         debug_assert!(
             Self::check_validity(page_num),
@@ -268,9 +236,17 @@ impl VirtPageNum {
     }
 
     /// Checks the validity of the page number.
+    #[cfg(target_arch = "riscv64")]
     pub fn check_validity(page_num: usize) -> bool {
-        let tmp = page_num >> VPN_WIDTH;
-        tmp == 0
+        let extended_bits = page_num >> VPN_WIDTH;
+        extended_bits == 0
+    }
+
+    /// Checks the validity of the page number.
+    #[cfg(target_arch = "loongarch64")]
+    pub fn check_validity(page_num: usize) -> bool {
+        let dmw_bits = page_num >> (VPN_WIDTH - 4);
+        matches!(dmw_bits, 0x0 | 0xf | 0x8 | 0x9)
     }
 
     /// Gets the inner `usize` page number.
@@ -280,8 +256,13 @@ impl VirtPageNum {
 
     /// Gets the starting address of the page.
     pub fn address(self) -> VirtAddr {
-        let addr = ((self.page_num as isize) << (64 - VPN_WIDTH) >> (64 - VA_WIDTH_SV39)) as usize;
-        VirtAddr::new(addr)
+        VirtAddr::new(self.page_num << PAGE_OFFSET_WIDTH)
+    }
+
+    /// Translates a virtual page number into a physical page number, if the VPN is in the
+    /// kernel space.
+    pub fn to_ppn_kernel(self) -> PhysPageNum {
+        self.address().to_pa_kernel().page_number()
     }
 
     /// Gets a slice pointing to the page.
@@ -302,12 +283,6 @@ impl VirtPageNum {
     pub unsafe fn as_slice_mut(self) -> &'static mut [u8; PAGE_SIZE] {
         let ptr = self.address().to_usize() as *mut [u8; PAGE_SIZE];
         unsafe { &mut *ptr }
-    }
-
-    /// Translates a virtual page number into a physical page number, if the VPN is in the
-    /// kernel space.
-    pub fn to_ppn_kernel(self) -> PhysPageNum {
-        self.address().to_pa_kernel().page_number()
     }
 
     /// Returns 9-bit indices of the VPN.

@@ -1,13 +1,17 @@
 use config::mm::{DTB_ADDR, KERNEL_MAP_OFFSET};
 
+#[cfg(target_arch = "riscv64")]
 pub mod mmio;
+#[cfg(target_arch = "loongarch64")]
 pub mod pci;
+
+#[cfg(target_arch = "riscv64")]
+use mmio::*;
+#[cfg(target_arch = "loongarch64")]
+use pci::*;
 
 use driver::BLOCK_DEVICE;
 use flat_device_tree::Fdt;
-
-// use mmio::*;
-use pci::*;
 
 pub fn probe_tree() {
     unsafe { DTB_ADDR = 0x00100000 };
