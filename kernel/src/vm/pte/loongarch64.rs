@@ -13,7 +13,7 @@ bitflags! {
     /// The flags are defined in the LoongArch64 specification as follows:
     ///
     /// - `V`: Valid. When set, the PTE is valid.
-    /// - `D`: Dirty. If set, the page pointed at by the PTE has been written to.
+    /// - `D`: Dirty. If set, there are dirty data on the page pointed at by the PTE.
     /// - `PLV`: Privilege Level. The privilege level of the page pointed at by the PTE.
     /// - `MAT`: Memory Access Type. There are 3 kind of memory access types:
     ///   - 0: Strongly-ordered UnCached (SUC)

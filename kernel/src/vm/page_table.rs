@@ -5,30 +5,34 @@
 
 use alloc::vec::Vec;
 
-use lazy_static::lazy_static;
+#[cfg(target_arch = "loongarch64")]
+use loongArch64::register::pgdl;
 
-use arch::mm::{fence, tlb_flush_addr, tlb_flush_all_except_global, tlb_shootdown};
-use config::mm::{
-    DTB_ADDR, DTB_END, DTB_START, KERNEL_MAP_OFFSET, MMIO_END, MMIO_PHYS_RANGES, MMIO_START,
-    PAGE_SIZE, PTE_PER_TABLE, VIRT_END, bss_end, bss_start, data_end, data_start, kernel_end,
-    kernel_start, rodata_end, rodata_start, text_end, text_start, trampoline_end, trampoline_start,
-};
+use arch::mm::{fence, switch_pagetable, tlb_shootdown};
+use config::mm::{KERNEL_MAP_OFFSET, PAGE_SIZE, PTE_PER_TABLE};
 use mm::{
     address::{PhysPageNum, VirtAddr, VirtPageNum},
     page_cache::page::Page,
 };
 use mutex::SpinLock;
-use simdebug::when_debug;
-use systype::SysResult;
+use systype::{SysError, SysResult};
 
-use super::{
-    mapping_flags::MappingFlags,
-    pte::{PageTableEntry, PteFlags},
+#[cfg(target_arch = "riscv64")]
+use arch::mm::tlb_flush_all_except_global;
+#[cfg(target_arch = "riscv64")]
+use config::mm::{
+    MMIO_END, MMIO_PHYS_RANGES, MMIO_START, VIRT_END, bss_end, bss_start, data_end, data_start,
+    kernel_end, kernel_start, rodata_end, rodata_start, text_end, text_start, trampoline_end,
+    trampoline_start,
 };
-use crate::{
-    frame::FrameTracker,
-    vm::vm_area::{OffsetArea, VmArea, VmaFlags},
-};
+
+use super::pte::{PageTableEntry, PteFlags};
+use crate::frame::FrameTracker;
+
+#[cfg(target_arch = "riscv64")]
+use super::mapping_flags::MappingFlags;
+#[cfg(target_arch = "riscv64")]
+use crate::vm::vm_area::{OffsetArea, VmArea};
 
 /// A data structure for manipulating page tables and manage memory mappings.
 ///
@@ -51,6 +55,7 @@ pub struct PageTable {
     frames: SpinLock<Vec<FrameTracker>>,
 }
 
+#[cfg(target_arch = "riscv64")]
 lazy_static! {
     /// The kernel page table.
     pub static ref KERNEL_PAGE_TABLE: PageTable = unsafe { PageTable::build_kernel_page_table() };
@@ -84,6 +89,7 @@ impl PageTable {
     /// # Panics
     /// Panics if the kernel page table cannot be constructed due to lack of free
     /// frames, which should not happen in practice.
+    #[cfg(target_arch = "riscv64")]
     unsafe fn build_kernel_page_table() -> Self {
         let mut page_table = Self::build().expect("out of memory");
 
@@ -192,10 +198,8 @@ impl PageTable {
             }
             #[cfg(target_arch = "loongarch64")]
             {
-                // Flags in non-leaf entries are not specified in LoongArch architecture.
-                // TODO: Check if this is correct.
-                inner_flags;
-                PteFlags::empty()
+                // TODO: Check the required bits for LoongArch
+                (inner_flags & PteFlags::G) | PteFlags::V
             }
         };
         let mut inner_created = false;
@@ -265,17 +269,19 @@ impl PageTable {
         vpn: VirtPageNum,
         flags: PteFlags,
     ) -> SysResult<Result<Page, &mut PageTableEntry>> {
+        #[allow(unused)]
         let (entry, non_leaf_created) = self.find_entry_force(vpn, flags)?;
         if entry.is_valid() {
             return Ok(Err(entry));
         }
         let page = Page::build()?;
         *entry = PageTableEntry::new(page.ppn(), flags);
+
+        #[cfg(target_arch = "riscv64")]
         if non_leaf_created {
             tlb_flush_all_except_global();
-        } else {
-            tlb_flush_addr(vpn.address().to_usize());
         }
+
         Ok(Ok(page))
     }
 
@@ -283,12 +289,15 @@ impl PageTable {
     ///
     /// This method does not allocate the frame for the leaf page. It only sets the
     /// mapping in the page table. The caller should allocate a frame is allocated
-    /// and set the mapping by calling this method. Be careful that calling this
-    /// method with an already mapped `vpn` will overwrite the existing mapping.
+    /// and set the mapping by calling this method.
     ///
     /// Returns a [`SysResult`] indicating whether the operation is successful.
     /// Returns an [`ENOMEM`] error if the method needs to allocate a frame but fails
     /// to do so.
+    ///
+    /// # Errors
+    /// Returns an [`EINVAL`] error if the page is already mapped. Returns an [`ENOMEM`]
+    /// errors if the method needs to allocate a frame but fails to do so.
     ///
     /// # Note
     /// This function takes `flags` as the flags for the leaf page table entry, and
@@ -301,13 +310,18 @@ impl PageTable {
         ppn: PhysPageNum,
         flags: PteFlags,
     ) -> SysResult<()> {
+        #[allow(unused)]
         let (entry, non_leaf_created) = self.find_entry_force(vpn, flags)?;
+        if entry.is_valid() {
+            return Err(SysError::EINVAL);
+        }
         *entry = PageTableEntry::new(ppn, flags);
+
+        #[cfg(target_arch = "riscv64")]
         if non_leaf_created {
             tlb_flush_all_except_global();
-        } else {
-            tlb_flush_addr(vpn.address().to_usize());
         }
+
         Ok(())
     }
 
@@ -364,8 +378,11 @@ impl PageTable {
             };
             *entry = PageTableEntry::new(ppn, flags);
         }
+
         // Simply flush all TLB entries, as the range is likely to be large.
+        #[cfg(target_arch = "riscv64")]
         tlb_flush_all_except_global();
+
         Ok(())
     }
 
@@ -382,9 +399,9 @@ impl PageTable {
             let vpn = VirtPageNum::new(start_vpn.to_usize() + i);
             self.unmap_page(vpn);
         }
-        // Flush all TLB entries for all harts.
-        // Later, we can optimize this by only flushing the TLB for harts that
-        // execute the current process.
+        // Perfrom a TLB shootdown for the range.
+        // TODO: Optimize this by only flushing the TLB for harts that execute the current
+        // process.
         fence();
         tlb_shootdown(start_vpn.address().to_usize(), count);
     }
@@ -393,6 +410,7 @@ impl PageTable {
     ///
     /// This method is used to map the kernel space into a new page table for a user process.
     /// This method does not allocate any frame or make this page table own any frame.
+    #[cfg(target_arch = "riscv64")]
     pub fn map_kernel(&self) {
         // Map the kernel areas.
         let kernel_vpn_start = VirtAddr::new(kernel_start()).page_number();
@@ -426,9 +444,9 @@ impl PageTable {
     }
 
     /// Map the physical addresses of I/O memory resources to core virtual
-    /// addresses
+    /// addresses.
     ///
-    /// Linux also has this function
+    /// Linux also has this function.
     pub fn ioremap(&self, paddr: usize, size: usize) -> SysResult<()> {
         let flags = PteFlags::V | PteFlags::W | PteFlags::D;
         let mut vpn = VirtAddr::new(paddr + KERNEL_MAP_OFFSET)
@@ -521,12 +539,13 @@ pub unsafe fn switch_to_kernel_page_table() {
 ///
 /// # Note for LoongArch
 /// In our LoongArch implementation, we do not have a separate kernel page table.
-/// The mapping for the kernel space is done in a direct mapping configuration window,
-/// with all virtual addresses be its corresponding physical addresses ORed with
-/// `0x9000_0000_0000_0000` (which is also the value of [`KERNEL_MAP_OFFSET`]).
-/// Therefore, this function is a no-op.
+/// The mapping for the kernel space is done in a direct mapping configuration window.
+/// Therefore, this function just disables the current user page table, leaving only
+/// the kernel space mapped.
 #[cfg(target_arch = "loongarch64")]
-pub unsafe fn switch_to_kernel_page_table() {}
+pub unsafe fn switch_to_kernel_page_table() {
+    pgdl::set_base(0);
+}
 
 /// Switches to the specified page table.
 ///
@@ -534,7 +553,7 @@ pub unsafe fn switch_to_kernel_page_table() {}
 /// This function must be called before the current page table is dropped,
 /// or the kernel may lose its memory mappings.
 pub unsafe fn switch_page_table(page_table: &PageTable) {
-    arch::mm::switch_pagetable(page_table.root().to_usize());
+    switch_pagetable(page_table.root().to_usize());
     log::trace!(
         "Switched to page table at {:#x}",
         page_table.root().to_usize(),
@@ -567,6 +586,7 @@ pub fn trace_page_table_lookup(root: PhysPageNum, va: VirtAddr) {
 /// Prints the lookup process of a virtual address in the kernel page table.
 ///
 /// For debugging purposes.
+#[cfg(target_arch = "riscv64")]
 pub fn trace_kernel_page_table_lookup(va: VirtAddr) {
     trace_page_table_lookup(KERNEL_PAGE_TABLE.root(), va);
 }

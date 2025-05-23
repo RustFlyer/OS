@@ -28,7 +28,7 @@ use core::{cmp, fmt::Debug, mem};
 
 use bitflags::bitflags;
 
-use arch::mm::{tlb_flush_addr, tlb_flush_all_except_global};
+use arch::mm::{tlb_flush_addr, tlb_flush_all_except_global, tlb_shootdown};
 use config::mm::{KERNEL_MAP_OFFSET, PAGE_SIZE};
 use mm::{
     address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum},
@@ -451,11 +451,12 @@ impl VmArea {
     /// This function invalidates all valid page table entries in the VMA, and drops
     /// the `VmArea` itself. This is the proper way to drop a `VmArea` which is
     /// associated with a [`AddrSpace`].
-    pub fn unmap_area(self, page_table: &PageTable) {
-        for (vpn, _) in self.pages {
+    pub fn unmap_area(mut self, page_table: &PageTable) {
+        for (vpn, _) in mem::take(&mut self.pages) {
             let pte = page_table.find_entry(vpn).unwrap();
             *pte = PageTableEntry::default();
         }
+        tlb_shootdown(self.start_va().to_usize(), self.length());
     }
 
     /// Changes the protection flags of a user space VMA, possibly updating page table
@@ -475,7 +476,7 @@ impl VmArea {
         }
         // Flush the TLB if any kind of permission is downgraded.
         if !new_prot.contains(old_prot) {
-            tlb_flush_all_except_global();
+            tlb_shootdown(self.start_va().to_usize(), self.length());
         }
     }
 
@@ -597,9 +598,19 @@ impl VmArea {
         self.end = end_va;
     }
 
+    /// Returns the length of the VMA in bytes.
+    pub fn length(&self) -> usize {
+        self.end.to_usize() - self.start.to_usize()
+    }
+
     /// Returns the PTE flags of the VMA.
     pub fn flags(&self) -> PteFlags {
         self.pte_flags
+    }
+
+    /// Returns the protection flags of the VMA.
+    pub fn prot(&self) -> MappingFlags {
+        self.prot
     }
 
     /// Returns the mapping from virtual page numbers to `Arc<Page>`s mapped in this VMA.

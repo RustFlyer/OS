@@ -59,14 +59,14 @@ impl AddrSpace {
         })
     }
 
-    /// Creates an empty address space with the kernel part mapped for a user process.
-    ///
-    /// This should be the base of the address space for any user process.
+    /// Creates an empty user address space. Any user address space should be created
+    /// via this function.
     ///
     /// # Errors
     /// Returns [`ENOMEM`] if memory allocation needed for the address space fails.
     pub fn build_user() -> SysResult<Self> {
         let addr_space = Self::build()?;
+        #[cfg(target_arch = "riscv64")]
         addr_space.page_table.map_kernel();
         Ok(addr_space)
     }
@@ -365,30 +365,18 @@ impl AddrSpace {
     pub fn handle_page_fault(&self, fault_addr: VirtAddr, access: MappingFlags) -> SysResult<()> {
         let mut vm_areas_lock = self.vm_areas.lock();
 
-        if fault_addr.to_usize() == 0x68094 {
-            vm_areas_lock.iter().for_each(|(_, vma)| {
-                log::debug!(
-                    "[{:?}][{:?}]: {:#x} ~ {:#x}",
-                    vma.map_type,
-                    vma.flags(),
-                    vma.start_va().to_usize(),
-                    vma.end_va().to_usize()
-                )
-            });
-        }
-
         let vma = vm_areas_lock
             .range_mut(..=fault_addr)
             .next_back()
             .filter(|(_, vma)| vma.contains(fault_addr))
             .map(|(_, vma)| vma)
             .ok_or(SysError::EFAULT)?;
-
         let page_fault_info = PageFaultInfo {
             fault_addr,
             page_table: &self.page_table,
             access,
         };
+
         vma.handle_page_fault(page_fault_info)
     }
 }

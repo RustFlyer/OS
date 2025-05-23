@@ -141,8 +141,6 @@ pub fn tlb_init() {
     pwch::set_dir3_width(DIR3_WIDTH);
 
     tlbrentry::set_tlbrentry(tlb_refill as usize);
-    // pgdl::set_base(kernel_pgd_base);
-    // pgdh::set_base(kernel_pgd_base);
 }
 
 /// The TLB refill exception handler.

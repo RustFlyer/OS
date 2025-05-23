@@ -41,11 +41,22 @@ pub fn tlb_flush_addr(addr: usize) {
 }
 
 /// TLB shootdown for the specified address range.
+///
+/// # TODO
+/// This function currently only flushes the TLB for the current hart.
+/// In the future, it should be extended to support real TLB shootdown
+/// mechanism for LoongArch64.
 pub fn tlb_shootdown(_addr: usize, _length: usize) {
+    tlb_flush_all_except_global();
     // TODO: Implement TLB shootdown mechanism for LoongArch64.
 }
 
 /// TLB shootdown for the whole user address space.
+///
+/// # TODO
+/// This function currently only flushes the TLB for the current hart.
+/// In the future, it should be extended to support real TLB shootdown
 pub fn tlb_shootdown_all() {
+    tlb_flush_all_except_global();
     // TODO: Implement TLB shootdown mechanism for LoongArch64.
 }
