@@ -171,7 +171,6 @@ __try_read_user:
 __try_write_user:
     mv a2, a0
     mv a0, zero
-    lb a1, 0(a2)
     sb a1, 0(a2)
     ret
 
@@ -180,7 +179,6 @@ __user_rw_exception_entry:
     addi a0, a0, 4
     csrw sepc, a0
     li   a0, 1
-    csrr a1, scause
     sret
 
     .align 8
