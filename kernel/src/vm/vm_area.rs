@@ -558,7 +558,12 @@ impl VmArea {
             new_page.copy_from_page(fault_page);
 
             let mut new_pte = *pte;
-            let new_flags = (new_pte.flags() & !PteFlags::RWX_MASK) | PteFlags::from(self.prot);
+
+            #[cfg(target_arch = "riscv64")]
+            let new_flags = new_pte.flags().difference(PteFlags::W);
+            #[cfg(target_arch = "loongarch64")]
+            let new_flags = new_pte.flags().difference(PteFlags::W | PteFlags::D);
+
             new_pte.set_flags(new_flags);
             new_pte.set_ppn(new_page.ppn());
             *pte = new_pte;
@@ -566,7 +571,12 @@ impl VmArea {
         } else {
             // Just set the write bit if the page is not shared.
             let mut new_pte = *pte;
-            let new_flags = (new_pte.flags() & !PteFlags::RWX_MASK) | PteFlags::from(self.prot);
+
+            #[cfg(target_arch = "riscv64")]
+            let new_flags = new_pte.flags().union(PteFlags::W);
+            #[cfg(target_arch = "loongarch64")]
+            let new_flags = new_pte.flags().union(PteFlags::W | PteFlags::D);
+
             new_pte.set_flags(new_flags);
             *pte = new_pte;
         }

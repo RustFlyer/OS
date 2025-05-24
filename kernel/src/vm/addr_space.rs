@@ -290,8 +290,11 @@ impl AddrSpace {
                 .0;
             let mut pte = *old_pte;
             if MappingFlags::from(pte.flags()).contains(MappingFlags::W) {
-                let new_prot = MappingFlags::from(pte.flags()).difference(MappingFlags::W);
-                let new_flags = (pte.flags() & !PteFlags::RWX_MASK) | PteFlags::from(new_prot);
+                #[cfg(target_arch = "riscv64")]
+                let new_flags = pte.flags().difference(PteFlags::W);
+                #[cfg(target_arch = "loongarch64")]
+                let new_flags = pte.flags().difference(PteFlags::W | PteFlags::D);
+
                 pte.set_flags(new_flags);
                 *old_pte = pte;
             }
