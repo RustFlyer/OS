@@ -47,8 +47,12 @@ pub trait CharDevice: Send + Sync {
 }
 
 pub fn init() {
+    // init_block_device();
     init_char_device();
-    init_block_device();
+
+    log::debug!("test");
+    let buf = "hello char dev";
+    CHAR_DEVICE.get().unwrap().write(buf.as_bytes());
 }
 
 fn init_block_device() {
