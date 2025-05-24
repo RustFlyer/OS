@@ -28,7 +28,7 @@ use core::{cmp, fmt::Debug, mem};
 
 use bitflags::bitflags;
 
-use arch::mm::{tlb_flush_addr, tlb_flush_all_except_global, tlb_shootdown};
+use arch::mm::{tlb_flush_addr, tlb_shootdown};
 use config::mm::{KERNEL_MAP_OFFSET, PAGE_SIZE};
 use mm::{
     address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum},
@@ -37,6 +37,9 @@ use mm::{
 use osfuture::block_on;
 use systype::{SysError, SysResult};
 use vfs::file::File;
+
+#[cfg(target_arch = "riscv64")]
+use arch::mm::tlb_flush_all_except_global;
 
 use super::{
     mapping_flags::MappingFlags,
@@ -99,6 +102,9 @@ pub enum TypedArea {
 /// The handler is responsible for handling a “normal” page fault, which is not a CoW page fault
 /// or a page fault due to TLB not being flushed. The handler is called when the permission is
 /// allowed, the fault is not a CoW fault, and the page is not already mapped by another thread.
+///
+/// “Handling a page fault” here means allocating a new page and mapping it to the faulting
+/// virtual address by updating the page table. It does not do anything to the TLB.
 type PageFaultHandler = fn(&mut VmArea, PageFaultInfo) -> SysResult<()>;
 
 /// Data passed to a page fault handler.
@@ -507,8 +513,10 @@ impl VmArea {
         }
 
         let pte = {
+            #[allow(unused_variables)]
             let (pte, flush_all) =
                 page_table.find_entry_force(fault_addr.page_number(), pte_flags)?;
+            #[cfg(target_arch = "riscv64")]
             if flush_all {
                 tlb_flush_all_except_global();
             }
@@ -522,11 +530,11 @@ impl VmArea {
                 self.handle_cow_fault(fault_addr, pte)?;
             } else {
                 // The page is already mapped by another thread, so just flush the TLB.
-                tlb_flush_addr(fault_addr.to_usize());
             }
         } else {
             self.handler.unwrap()(self, info)?;
         }
+        tlb_flush_addr(fault_addr.to_usize());
 
         Ok(())
     }
@@ -562,7 +570,6 @@ impl VmArea {
             new_pte.set_flags(new_flags);
             *pte = new_pte;
         }
-        tlb_flush_addr(fault_addr.to_usize());
         Ok(())
     }
 
@@ -880,7 +887,7 @@ impl FileBackedArea {
             // Other conditions: Just use the cached page.
             if flags.contains(VmaFlags::PRIVATE) {
                 // Read from or execute a private VMA: Mark the page as read-only, which
-                // posiibly means copy-on-write.
+                // possibly means copy-on-write.
                 pte_flags = pte_flags.difference(PteFlags::W);
             }
             cached_page

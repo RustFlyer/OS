@@ -3,7 +3,7 @@ use core::arch::asm;
 use loongArch64::register::pgdl;
 
 /// Switches the current page table being used by the MMU to the one
-/// at the given virtual page number `root`.
+/// at the given physical page number `root`.
 pub fn switch_pagetable(root: usize) {
     pgdl::set_base(root << 12);
     tlb_flush_all_except_global();

@@ -274,7 +274,7 @@ impl AddrSpace {
     /// address space. Specifically, the new address space maps virtual memory areas to
     /// data identical to the original address space when the function is called.
     ///
-    /// This function uses the copy-on-write (COW) mechanism to share the same physical
+    /// This function uses the copy-on-write (CoW) mechanism to share the same physical
     /// memory pages between the original address space and the new address space. When
     /// one of them writes to a shared page, the page is copied and the writer gets a
     /// new physical page elsewhere.

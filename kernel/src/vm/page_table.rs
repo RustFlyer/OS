@@ -199,7 +199,8 @@ impl PageTable {
             #[cfg(target_arch = "loongarch64")]
             {
                 // TODO: Check the required bits for LoongArch
-                (inner_flags & PteFlags::G) | PteFlags::V
+                let _ = inner_flags;
+                PteFlags::empty()
             }
         };
         let mut inner_created = false;
