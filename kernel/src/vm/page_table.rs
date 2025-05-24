@@ -210,7 +210,19 @@ impl PageTable {
             if i == 0 {
                 return Ok((entry, inner_created));
             }
-            if !entry.is_valid() {
+            // Note: We used to check if the non-leaf entry points to a sub page table
+            // via `PageTableEntry::is_valid()` here, but it is not so suitable for both
+            // RISC-V and LoongArch. RISC-V considers a non-leaf entry to point to a sub
+            // page table if it has the `V` bit set, while LoongArch does not specify
+            // such a rule. To simplify the implementation of the TLB refill exception
+            // handler, we only store the physical page number of the sub page table in
+            // a non-leaf entry, so such entry does not have any flags set, including the
+            // `V` bit. Therefore, we cannot use `is_valid()` to check if the entry points
+            // to a sub page table. To deal with this, we decide to make sure that a non-
+            // leaf entry, which does not points to a sub page table, is not only invalid
+            // (no `V` bit set), but also make sure that it is zeroed in both RISC-V and
+            // LoongArch, and we check this simply by seeing if the entry is zeroed.
+            if *entry == PageTableEntry::default() {
                 let frame = FrameTracker::build()?;
                 unsafe {
                     PageTableMem::new(frame.ppn()).clear();
@@ -237,7 +249,9 @@ impl PageTable {
             if i == 0 {
                 return Some(entry);
             }
-            if !entry.is_valid() {
+            // Note: See the note in `find_entry_force` for the reason why we check if
+            // the entry is zeroed instead of checking if it is valid.
+            if *entry == PageTableEntry::default() {
                 return None;
             }
             ppn = entry.ppn();
@@ -317,6 +331,13 @@ impl PageTable {
             return Err(SysError::EINVAL);
         }
         *entry = PageTableEntry::new(ppn, flags);
+
+        log::debug!(
+            "Mapped VPN {:#x} to PPN {:#x} with flags {:?}",
+            vpn.address().to_usize(),
+            ppn.address().to_usize(),
+            flags,
+        );
 
         #[cfg(target_arch = "riscv64")]
         if non_leaf_created {

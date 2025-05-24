@@ -12,7 +12,7 @@ use polyhal_macro::define_arch_mods;
 define_arch_mods!();
 
 /// A page table entry.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 #[repr(C)]
 pub struct PageTableEntry {
     bits: u64,
@@ -52,7 +52,7 @@ impl PageTableEntry {
 }
 
 impl Default for PageTableEntry {
-    /// Returns a default page table entry which is zeroed.
+    /// Returns a zeroed page table entry.
     fn default() -> Self {
         PageTableEntry { bits: 0 }
     }
