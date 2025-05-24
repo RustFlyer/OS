@@ -71,6 +71,12 @@ impl From<MappingFlags> for PteFlags {
         }
         if perm.contains(MappingFlags::W) {
             flags |= Self::W;
+            // Note: LoongArch64 requires the `D` bit to be set in the TLB to allow
+            // writing to the page. Since we don't track the dirty state of pages
+            // currently, we always set the `D` bit if the page is writable, so the
+            // TLB refill exception handler can automatically set the `D` bit in the
+            // TLB entry.
+            flags |= Self::D;
         }
         if !perm.contains(MappingFlags::X) {
             flags |= Self::NX;
