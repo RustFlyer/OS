@@ -103,12 +103,9 @@ __return_to_user:
     st.d $s8, $a0, 47*8
     st.d $fp, $a0, 48*8
     st.d $tp, $a0, 49*8
-    
-    //XXX: rCoreloongArch use the macro "move", which represents add.d,
-    //but 0x31 is a CSR, so I got no idea but replaced it with csrwr
+
+    move $sp, $a0
     csrwr $a0, 0x31
-    csrwr $sp, 0x30   // SAVE kernel_sp to SAVEn(0)
-    move  $sp, $a0
 
     ld.d $t0, $sp, 32*8
     ld.d $t1, $sp, 33*8

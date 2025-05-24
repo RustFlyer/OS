@@ -2,7 +2,7 @@ use core::arch::naked_asm;
 
 use loongArch64::register::estat::{self, Exception, Interrupt, Trap};
 use loongArch64::register::{
-    badv, ecfg, eentry, prmd, pwch, pwcl, stlbps, ticlr, tlbidx, tlbrehi, tlbrentry,
+    badv, ecfg, era, prmd, pwch, pwcl, stlbps, ticlr, tlbidx, tlbrehi, tlbrentry
 };
 
 use arch::{
@@ -69,8 +69,8 @@ pub fn user_exception_handler(task: &Task, e: Exception) {
             }
         }
         Exception::InstructionNotExist => {
-            let fault_addr = badv::read().vaddr();
-            log::warn!("[trap_handler] illegal instruction at {:#x}", fault_addr);
+            let inst_addr = era::read().pc();
+            log::warn!("[trap_handler] illegal instruction at {:#x}", inst_addr);
             // TODO: Send SIGILL signal to the task; don't just kill the task
             task.set_state(TaskState::Zombie);
         }
@@ -148,8 +148,8 @@ pub fn tlb_init() {
 /// The control flow goes here when a TLB refill exception occurs.
 ///
 /// This function walks the current page table to find the page table entries
-/// corresponding to the faulting virtual address, and fills the TLB with
-/// the entries.
+/// corresponding to the faulting virtual address, and fills the TLB with the
+/// entries.
 #[naked]
 pub unsafe extern "C" fn tlb_refill() {
     unsafe {

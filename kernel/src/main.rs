@@ -31,7 +31,6 @@ extern crate alloc;
 
 static mut INITIALIZED: bool = false;
 
-#[unsafe(no_mangle)]
 pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
     executor::init(hart_id);
 
@@ -105,11 +104,6 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
 
         // loader::init();
 
-        arch::trap::init();
-
-        #[cfg(target_arch = "loongarch64")]
-        trap::trap_handler::tlb_init();
-
         task::init();
     } else {
         log::info!("hart {}: enabling page table", hart_id);
@@ -119,6 +113,11 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
             vm::switch_to_kernel_page_table();
         }
     }
+
+    arch::trap::init();
+
+    #[cfg(target_arch = "loongarch64")]
+    trap::trap_handler::tlb_init();
 
     hart::init(hart_id);
 

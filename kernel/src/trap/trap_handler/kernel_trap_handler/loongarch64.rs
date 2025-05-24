@@ -1,5 +1,5 @@
 use loongArch64::register::estat::{self, Exception, Interrupt, Trap};
-use loongArch64::register::{badv, ecfg, eentry, era, pgdh, pgdl, prmd, ticlr};
+use loongArch64::register::{badv, ecfg, era, pgdh, pgdl, prmd, ticlr};
 
 use arch::{
     time::{get_time_duration, set_nx_timer_irq},

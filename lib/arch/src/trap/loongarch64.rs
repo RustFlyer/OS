@@ -6,8 +6,7 @@ use super::TrapMode;
 pub const TIMER_IRQ: usize = 11;
 
 pub fn init() {
-    // Enable interrupt
-    crmd::set_ie(true);
+    enable_interrupt();
 }
 
 pub fn enable_interrupt() {
@@ -30,10 +29,10 @@ pub fn disable_interrupt() {
 /// register. In our implementation, we should have `interval` equal to the size of an jump
 /// instruction, and each handler should be just a jump instruction to the real handler.
 pub fn set_trap_handler(handler_addr: usize, mode: TrapMode) {
-    let inerval = match mode {
+    let vs = match mode {
         TrapMode::Direct => 0,
         TrapMode::Vectored => 1,
     };
-    ecfg::set_vs(inerval);
+    ecfg::set_vs(vs);
     eentry::set_eentry(handler_addr);
 }
