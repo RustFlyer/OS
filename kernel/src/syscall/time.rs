@@ -1,7 +1,7 @@
 use core::time::Duration;
 
 use alloc::sync::Arc;
-use arch::riscv64::time::{get_time_duration, get_time_ms, get_time_us};
+use arch::time::{get_time_duration, get_time_us,get_time_ms};
 use osfuture::{Select2Futures, SelectOutput};
 use systype::{SysError, SyscallResult};
 use time::{TMS, TimeSpec, TimeVal, TimeValue, itime::ITimerVal};
@@ -240,7 +240,7 @@ pub async fn sys_clock_nanosleep(
         }
         _ => {
             log::error!("[sys_clock_nanosleep] unsupported clockid {}", clockid);
-            return Err(SysError::EINVAL);
+            Err(SysError::EINVAL)
         }
     }
 }

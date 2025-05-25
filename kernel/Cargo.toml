@@ -4,43 +4,49 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+arch = { path = "../lib/arch/" }
 config = { path = "../lib/config/" }
-logger = { path = "../lib/logger/" }
-simdebug = { path = "../lib/simdebug/" }
+driver = { path = "../lib/driver/" }
 id_allocator = { path = "../lib/id_allocator/" }
+logger = { path = "../lib/logger/" }
 mm = { path = "../lib/mm/" }
 mutex = { path = "../lib/mutex/" }
 executor = { path = "../lib/executor/" }
 pps = { path = "../lib/pps/" }
-arch = { path = "../lib/arch/" }
 time = { path = "../lib/time/" }
 timer = { path = "../lib/timer/" }
-driver = { path = "../lib/driver/" }
 shm = { path = "../lib/shm/" }
 systype = { path = "../lib/systype/" }
 vfs = { path = "../lib/vfs/" }
 osfs = { path = "../lib/osfs" }
 osfuture = { path = "../lib/osfuture" }
 net = { path = "../lib/net" }
-polyhal = { path = "../lib/polyhal" }
+# polyhal = { path = "../lib/polyhal" }
+polyhal-macro = { path = "../lib/polyhal/polyhal-macro" }
+simdebug = { path = "../lib/simdebug/" }
 
-fdt = { workspace = true }
 async-trait = { workspace = true }
-bitflags = { workspace = true }
-elf = { workspace = true }
 hashbrown = { workspace = true }
-riscv-rt = { workspace = true }
-spin = { workspace = true }
-sbi-rt = { workspace = true }
-log = { workspace = true }
-crate_interface = { workspace = true }
+flat_device_tree = { workspace = true }
+bitflags = { workspace = true }
 cfg-if = { workspace = true }
+crate_interface = { workspace = true }
+elf = { workspace = true }
 lazy_static = { workspace = true }
-riscv = { workspace = true }
+log = { workspace = true }
 strum = { workspace = true }
+virtio-drivers = { workspace = true }
 smoltcp = { workspace = true }
-virtio-drivers ={ workspace = true }
+spin = { workspace = true }
 
+[target.'cfg(target_arch = "riscv64")'.dependencies]
+riscv = { workspace = true }
+riscv-rt = { workspace = true }
+sbi-rt = { workspace = true }
+
+
+[target.'cfg(target_arch = "loongarch64")'.dependencies]
+loongArch64 = { workspace = true }
 
 [build-dependencies]
 config = { path = "../lib/config/" }

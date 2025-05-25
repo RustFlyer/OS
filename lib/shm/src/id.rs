@@ -1,5 +1,4 @@
-use arch::riscv64::time::get_time_s;
-use bitflags::bitflags;
+use arch::time::get_time_ms;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -29,7 +28,7 @@ impl ShmStat {
             segsz: sz,
             atime: 0,
             dtime: 0,
-            ctime: get_time_s(),
+            ctime: get_time_ms() / 1000,
             cpid: cpid,
             lpid: 0,
             nattch: 0,
@@ -38,7 +37,7 @@ impl ShmStat {
 
     pub fn attach(&mut self, lpid: usize) {
         // atime is set to the current time.
-        self.atime = get_time_s();
+        self.atime = get_time_ms() / 1000;
         // lpid is set to the process-ID of the calling process.
         self.lpid = lpid;
         // nattch is incremented by one.
@@ -49,7 +48,7 @@ impl ShmStat {
     /// which self ShmStat belongs to;
     pub fn detach(&mut self, lpid: usize) -> bool {
         // dtime is set to the current time.
-        self.dtime = get_time_s();
+        self.dtime = get_time_ms() / 1000;
         // lpid is set to the process-ID of the calling process.
         self.lpid = lpid;
         // nattch is decremented by one.

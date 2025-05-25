@@ -20,7 +20,7 @@ use super::{
 const QS: usize = 32;
 const NET_BUF_LEN: usize = 1526;
 
-pub fn create_virt_net_dev(transport: MmioTransport) -> DevResult<Box<VirtIoNetDevImpl>> {
+pub fn create_virt_net_dev(transport: MmioTransport<'static>) -> DevResult<Box<VirtIoNetDevImpl>> {
     const NONE_BUF: Option<Box<NetBuf>> = None;
 
     let inner =
@@ -75,7 +75,7 @@ pub struct VirtIoNetDev<T: Transport, const QS: usize> {
     pub(crate) inner: VirtIONetRaw<VirtHalImpl, T, QS>,
 }
 
-pub type VirtIoNetDevImpl = VirtIoNetDev<MmioTransport, 32>;
+pub type VirtIoNetDevImpl = VirtIoNetDev<MmioTransport<'static>, 32>;
 
 impl Debug for VirtIoNetDevImpl {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {

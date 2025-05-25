@@ -3,8 +3,8 @@ use alloc::string::String;
 use alloc::string::ToString;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use arch::riscv64::time::get_time_ms;
-use arch::riscv64::time::get_time_us;
+use arch::time::get_time_ms;
+use arch::time::get_time_us;
 use core::cell::SyncUnsafeCell;
 use core::sync::atomic::AtomicUsize;
 use core::time::Duration;
@@ -12,7 +12,7 @@ use osfuture::suspend_now;
 use shm::manager::SHARED_MEMORY_MANAGER;
 use time::itime::ITimer;
 
-use arch::riscv64::time::get_time_duration;
+use arch::time::get_time_duration;
 use config::process::CloneFlags;
 use config::process::INIT_PROC_ID;
 use config::vfs::AtFd;
@@ -134,7 +134,7 @@ impl Task {
             .init_user(sp, entry_point.to_usize(), argc, argv, envp);
 
         *self.timer_mut() = TaskTimeStat::new();
-        *self.elf_mut() = elf_file;
+        unsafe { self.set_elf(elf_file) };
         *self.name_mut() = name;
         self.with_mut_fdtable(|table| table.close());
         self.with_mut_sig_handler(|handlers| handlers.reset_user_defined());
@@ -192,7 +192,7 @@ impl Task {
         let cwd;
         let itimers;
 
-        let elf = SyncUnsafeCell::new((*self.elf_mut()).clone());
+        let elf = SyncUnsafeCell::new(unsafe { self.elf() });
 
         let mut name = self.get_name();
 

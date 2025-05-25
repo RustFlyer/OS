@@ -4,19 +4,23 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+arch = { path = "../arch" }
 config = { path = "../config" }
-mutex = { path = "../mutex" }
 mm = { path = "../mm" }
 
-spin = { workspace = true }
-virtio-drivers ={ workspace = true }
-uart_16550 = { workspace = true }
+mutex = { path = "../mutex" }
+polyhal-macro = { path = "../polyhal/polyhal-macro" }
 log = { workspace = true }
+spin = { workspace = true }
+uart_16550 = { workspace = true }
 smoltcp = { workspace = true }
-fdt = { workspace = true }
 async-trait = { workspace = true }
 downcast-rs = { workspace = true }
+virtio-drivers = { workspace = true }
 
 [features]
 smoltcp = []
 default = ["smoltcp"]
+
+[target.'cfg(target_arch = "riscv64")'.dependencies]
+sbi-rt = { workspace = true, features = ["legacy"] }

@@ -9,24 +9,24 @@
  * Copyright (c) 2023 by ${git_name_email}, All Rights Reserved.
  */
 
-use riscv::register::sstatus;
+use sleep_mutex::SleepMutex;
+use spin_mutex::SpinMutex;
 use spin_then_sleep_mutex::SleepMutexCas;
 
-use self::sleep_mutex::SleepMutex;
-use self::spin_mutex::SpinMutex;
+#[cfg(target_arch = "loongarch64")]
+use loongArch64::register::crmd;
+#[cfg(target_arch = "riscv64")]
+use riscv::register::sstatus;
+
 pub mod optimistic_mutex;
-/// ShareMutex
 pub mod share_mutex;
-/// SleepMutex
 pub mod sleep_mutex;
-/// SpinMutex
 pub mod spin_mutex;
 pub mod spin_then_sleep_mutex;
 
 pub use share_mutex::{ShareMutex, new_share_mutex};
-/// SpinLock
+
 pub type SpinLock<T> = SpinMutex<T, Spin>;
-/// SpinNoIrqLock(Cannot be interrupted)
 pub type SpinNoIrqLock<T> = SpinMutex<T, SpinNoIrq>;
 pub type SleepLock<T> = SleepMutex<T, SpinNoIrq>;
 pub type SleepCASLock<T> = SleepMutexCas<T, SpinNoIrq>;
@@ -62,20 +62,35 @@ pub struct SieGuard(bool);
 
 impl SieGuard {
     fn new() -> Self {
-        Self(unsafe {
-            let sie_before = sstatus::read().sie();
-            sstatus::clear_sie();
-            sie_before
-        })
+        let old_ie = {
+            #[cfg(target_arch = "riscv64")]
+            {
+                let sie = sstatus::read().sie();
+                unsafe {
+                    sstatus::clear_sie();
+                }
+                sie
+            }
+            #[cfg(target_arch = "loongarch64")]
+            {
+                let ie = crmd::read().ie();
+                crmd::set_ie(false);
+                ie
+            }
+        };
+        Self(old_ie)
     }
 }
 
 impl Drop for SieGuard {
     fn drop(&mut self) {
         if self.0 {
+            #[cfg(target_arch = "riscv64")]
             unsafe {
                 sstatus::set_sie();
             }
+            #[cfg(target_arch = "loongarch64")]
+            crmd::set_ie(true);
         }
     }
 }

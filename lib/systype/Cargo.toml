@@ -5,5 +5,4 @@ edition = "2021"
 
 [dependencies]
 time = { path = "../time" }
-
 strum = { workspace = true }

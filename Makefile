@@ -4,30 +4,40 @@
 # Build Configuration Variables
 # ======================
 
+# Target architecture
+export ARCH = riscv64
+# export ARCH = loongarch64
+
 # Docker image name for development environment
 # Kernel package/output name
 # Bootloader selection (default BIOS for QEMU)
-# Target architecture specification
+# Target archeitecture full name
 DOCKER_NAME = os
 PACKAGE_NAME = kernel
 BOOTLOADER = default
-TARGET = riscv64gc-unknown-none-elf
+
+ifeq ($(ARCH),riscv64)
+	TARGET = riscv64gc-unknown-none-elf
+else ifeq ($(ARCH),loongarch64)
+	TARGET = loongarch64-unknown-none
+else
+	$(error "Unsupported architecture: $(ARCH).")
+endif
 
 # Number of CPU cores
 # Target board (QEMU emulator)
 # Build mode (debug/release)
 # Logging level (trace/debug/info/warn/error/off)
 # Conditionally compile `when_debug` macro
-export SMP = 4
+export SMP = 1
 export BOARD = qemu
 export MODE = debug
 export LOG = trace
 export DEBUG = off
 
-QEMU = qemu-system-riscv64
-GDB = riscv64-unknown-elf-gdb
-OBJDUMP = rust-objdump --arch-name=riscv64
-OBJCOPY = rust-objcopy --binary-architecture=riscv64
+QEMU = qemu-system-$(ARCH)
+OBJDUMP = rust-objdump --arch-name=$(ARCH)
+OBJCOPY = rust-objcopy --binary-architecture=$(ARCH)
 PAGER = less
 
 DISASM_ARGS = -d -s
@@ -45,17 +55,46 @@ USER_BINS := $(patsubst $(USER_APPS_DIR)/%.rs, $(TARGET_DIR)/%.bin, $(USER_APPS)
 FS_IMG_DIR := fsimg
 FS_IMG := $(FS_IMG_DIR)/sdcard.img
 
+ifeq ($(ARCH),riscv64)
+	QEMU_ARGS := -m 128
+	QEMU_ARGS += -machine virt 
+	QEMU_ARGS += -nographic 
+	QEMU_ARGS += -bios $(BOOTLOADER) 
+	QEMU_ARGS += -kernel $(KERNEL_ELF) 
+	QEMU_ARGS += -smp $(SMP)
+	QEMU_ARGS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
+	QEMU_ARGS += -device virtio-blk-device,drive=x0
+	QEMU_ARGS += -device virtio-net-device,netdev=net0
+	QEMU_ARGS += -netdev user,id=net0
 
-QEMU_ARGS := -m 128
-QEMU_ARGS += -machine virt 
-QEMU_ARGS += -nographic 
-QEMU_ARGS += -bios $(BOOTLOADER) 
-QEMU_ARGS += -kernel $(KERNEL_ELF) 
-QEMU_ARGS += -smp $(SMP)
-QEMU_ARGS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
-QEMU_ARGS += -device virtio-blk-device,drive=x0
-QEMU_ARGS += -device virtio-net-device,netdev=net0
-QEMU_ARGS += -netdev user,id=net0
+	GDB = riscv64-unknown-elf-gdb
+	GDB_ARGS = riscv:rv64
+endif
+
+ifeq ($(ARCH),loongarch64)
+	QEMU_ARGS := -m 1G
+	QEMU_ARGS += -nographic
+	QEMU_ARGS += -kernel $(KERNEL_ELF)
+	QEMU_ARGS += -smp $(SMP)
+	QEMU_ARGS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
+	QEMU_ARGS += -device virtio-blk-pci,drive=x0
+	QEMU_ARGS += -no-reboot
+	QEMU_ARGS += -device virtio-net-pci,netdev=net0 
+	QEMU_ARGS += -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555
+	QEMU_ARGS += -rtc base=utc
+# QEMU_ARGS += -drive file=disk-la.img,if=none,format=raw,id=x1
+# QEMU_ARGS += -device virtio-blk-pci,drive=x1 
+
+	QEMU_ARGS += -dtb loongarch.dtb
+# QEMU_ARGS += -bios uefi_bios.bin
+# QEMU_ARGS += -vga none
+# QEMU_ARGS += -D qemu.log -d guest_errors,unimp,in_asm
+# QEMU_ARGS += -machine virt,dumpdtb=loongarch.dtb
+# QEMU_ARGS += -machine virt,accel=tcg
+
+	GDB = loongarch64-unknown-linux-gnu-gdb
+	GDB_ARGS = Loongarch64
+endif
 
 
 PHONY := all
@@ -115,7 +154,7 @@ gdbserver: all
 PHONY += gdbclient
 gdbclient: all
 	@$(GDB) -ex 'file $(KERNEL_ELF)' \
-			-ex 'set arch riscv:rv64' \
+			-ex 'set arch $(GDB_ARGS)' \
 			-ex 'target remote localhost:1234'
 
 

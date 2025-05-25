@@ -1,6 +1,6 @@
+use arch::hart::hart_start;
 use config::device::MAX_HARTS;
 use config::mm::HART_START_ADDR;
-use driver::sbi;
 
 /// 启动子HART
 ///
@@ -10,7 +10,6 @@ pub fn start_harts(hart_id: usize) {
         if i == hart_id {
             continue;
         }
-        let status: isize = sbi::hart_start(i, HART_START_ADDR) as _;
-        log::info!("[kernel] start to wake up hart {}... status {}", i, status);
+        hart_start(i, HART_START_ADDR);
     }
 }

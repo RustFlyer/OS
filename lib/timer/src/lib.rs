@@ -7,10 +7,9 @@ mod event;
 mod timer;
 mod timer_manager;
 
-use core::time::Duration;
-
-use arch::riscv64::time::get_time_duration;
+use arch::time::get_time_duration;
 pub use async_timer::{TimedTaskResult, TimeoutFuture, run_with_timeout};
+use core::time::Duration;
 pub use event::IEvent;
 use osfuture::take_waker;
 pub use timer::{Timer, TimerState};

@@ -1,12 +1,14 @@
-use crate::print;
 use core::fmt;
+
+use driver::print;
 use logger::LogInterface;
 use mutex::SpinNoIrqLock;
+
+static LOG_LOCK: SpinNoIrqLock<()> = SpinNoIrqLock::new(());
+
 pub fn print_in_color(args: fmt::Arguments, color_code: u8) {
     print!("\u{1B}[{}m{}\u{1B}[0m", color_code, args);
 }
-
-static LOG_LOCK: SpinNoIrqLock<()> = SpinNoIrqLock::new(());
 
 struct LogInterfaceImpl;
 

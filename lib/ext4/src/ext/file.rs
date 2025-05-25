@@ -64,7 +64,13 @@ impl ExtFile {
     /// - `a+`, `ab+`, or `a+b`: `O_RDWR | O_CREAT | O_APPEND`
     pub fn open(path: &CStr, flags: String) -> SysResult<Self> {
         let mut file: MaybeUninit<ext4_file> = MaybeUninit::uninit();
-        let err = unsafe { ext4_fopen(file.as_mut_ptr(), path.as_ptr(), flags.as_ptr()) };
+        let err = unsafe {
+            ext4_fopen(
+                file.as_mut_ptr(),
+                path.as_ptr(),
+                flags.as_ptr() as *const ::core::ffi::c_char,
+            )
+        };
         match err {
             0 => unsafe { Ok(Self(SyncUnsafeCell::new(file.assume_init()))) },
             e => {

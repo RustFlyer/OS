@@ -5,7 +5,7 @@ use mm::frame::FrameTracker;
 use mutex::SpinNoIrqLock;
 use virtio_drivers;
 
-static FrameSpace: SpinNoIrqLock<Vec<FrameTracker>> = SpinNoIrqLock::new(Vec::new());
+static FRAME_SPACE: SpinNoIrqLock<Vec<FrameTracker>> = SpinNoIrqLock::new(Vec::new());
 
 pub struct VirtHalImpl;
 
@@ -13,7 +13,7 @@ unsafe impl virtio_drivers::Hal for VirtHalImpl {
     /// DMA Memory Alloc
     /// - pages: Numbers of Page Needed
     /// - direction: Direction of I/O
-    ///  
+    ///
     /// Returns (Base PhyAddr of Alloc Frame, Virt Ptr to Frame)
     fn dma_alloc(
         pages: usize,
@@ -21,7 +21,7 @@ unsafe impl virtio_drivers::Hal for VirtHalImpl {
     ) -> (virtio_drivers::PhysAddr, core::ptr::NonNull<u8>) {
         assert!(pages > 0);
         let mut base = PhysPageNum::new(0);
-        let mut frame_space = FrameSpace.lock();
+        let mut frame_space = FRAME_SPACE.lock();
         let mut frame_batch = FrameTracker::build_contiguous(pages).expect("virtio alloc no page!");
         for frame_id in 0..pages {
             let frame = frame_batch.pop().unwrap();
@@ -53,6 +53,7 @@ unsafe impl virtio_drivers::Hal for VirtHalImpl {
         let ppn_ed = PhysPageNum::new(ppn_st.to_usize() + pages);
         for _ppn in ppn_st.to_usize()..ppn_ed.to_usize() {
             // Here frame which owns the ppn should be dealloc
+            // todo!()
         }
         0
     }
@@ -72,6 +73,7 @@ unsafe impl virtio_drivers::Hal for VirtHalImpl {
         let va = pa.to_va_kernel();
         let va_ptr = va.to_usize() as *mut u8;
 
+        log::debug!("[mmio_phys_to_virt] {:?} -> {:?}", pa, va);
         unsafe { NonNull::new_unchecked(va_ptr) }
     }
 

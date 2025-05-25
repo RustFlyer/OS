@@ -17,7 +17,7 @@ use crate::vm::user_ptr::UserWritePtr;
 
 use super::{
     addr_space::AddrSpace,
-    mem_perm::MemPerm,
+    mapping_flags::MappingFlags,
     vm_area::{VmArea, VmaFlags},
 };
 
@@ -97,7 +97,7 @@ impl AddrSpace {
             let interp_name = {
                 let offset = interp.p_offset as usize;
                 let len = interp.p_filesz as usize;
-                let mut buf = vec![0u8; len];
+                let mut buf = alloc::vec![0u8; len];
                 elf_file.seek(SeekFrom::Start(offset as u64))?;
                 block_on(async { elf_file.read(&mut buf).await })?;
                 CString::from_vec_with_nul(buf)
@@ -175,15 +175,15 @@ impl AddrSpace {
             let offset = segment.p_offset as usize;
 
             let flags = segment.p_flags;
-            let mut prot = MemPerm::U;
+            let mut prot = MappingFlags::empty();
             if flags & elf::abi::PF_X != 0 {
-                prot |= MemPerm::X;
+                prot |= MappingFlags::X;
             }
             if flags & elf::abi::PF_W != 0 {
-                prot |= MemPerm::W;
+                prot |= MappingFlags::W;
             }
             if flags & elf::abi::PF_R != 0 {
-                prot |= MemPerm::R;
+                prot |= MappingFlags::R;
             }
 
             let area = VmArea::new_file_backed(
@@ -349,7 +349,7 @@ impl AddrSpace {
     }
 }
 
-pub mod aux {
+mod aux {
     //! Module for auxiliary headers.
     //!
     //! This module defines the structure of auxiliary headers used in ELF files.

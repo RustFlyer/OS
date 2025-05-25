@@ -20,15 +20,13 @@
 use alloc::{collections::btree_map::BTreeMap, vec::Vec};
 use core::{cmp, ops::Bound};
 
-use arch::riscv64::mm::{fence, tlb_shootdown_all};
+use arch::mm::{fence, tlb_shootdown_all};
 use mm::address::VirtAddr;
 use mutex::SpinLock;
 use systype::{SysError, SysResult};
 
-use crate::processor::current_task;
-
 use super::{
-    mem_perm::MemPerm,
+    mapping_flags::MappingFlags,
     page_table::{self, PageTable},
     pte::PteFlags,
     vm_area::{PageFaultInfo, VmArea, VmaFlags},
@@ -63,14 +61,14 @@ impl AddrSpace {
         })
     }
 
-    /// Creates an empty address space with the kernel part mapped for a user process.
-    ///
-    /// This should be the base of the address space for any user process.
+    /// Creates an empty user address space. Any user address space should be created
+    /// via this function.
     ///
     /// # Errors
     /// Returns [`ENOMEM`] if memory allocation needed for the address space fails.
     pub fn build_user() -> SysResult<Self> {
         let addr_space = Self::build()?;
+        #[cfg(target_arch = "riscv64")]
         addr_space.page_table.map_kernel();
         Ok(addr_space)
     }
@@ -234,7 +232,9 @@ impl AddrSpace {
     /// the range to be changed is rounded up to page size, which means more than
     /// `length` bytes will be changed if `length` is not page-aligned. `addr + length`
     /// should be a valid address.
-    pub fn change_prot(&self, addr: VirtAddr, length: usize, prot: MemPerm) {
+    ///
+    /// `prot` needs to have `RWX` bits set; other bits must be zero.
+    pub fn change_prot(&self, addr: VirtAddr, length: usize, prot: MappingFlags) {
         let length = VirtAddr::new(length).round_up().to_usize();
         let end_addr = VirtAddr::new(addr.to_usize() + length);
         let mut vm_areas_lock = self.vm_areas.lock();
@@ -278,7 +278,7 @@ impl AddrSpace {
     /// address space. Specifically, the new address space maps virtual memory areas to
     /// data identical to the original address space when the function is called.
     ///
-    /// This function uses the copy-on-write (COW) mechanism to share the same physical
+    /// This function uses the copy-on-write (CoW) mechanism to share the same physical
     /// memory pages between the original address space and the new address space. When
     /// one of them writes to a shared page, the page is copied and the writer gets a
     /// new physical page elsewhere.
@@ -295,7 +295,12 @@ impl AddrSpace {
                     .0;
                 let mut pte = *old_pte;
                 if vma.flags().contains(VmaFlags::PRIVATE) && pte.flags().contains(PteFlags::W) {
-                    pte.set_flags(pte.flags().difference(PteFlags::W));
+                    #[cfg(target_arch = "riscv64")]
+                    let new_flags = pte.flags().difference(PteFlags::W);
+                    #[cfg(target_arch = "loongarch64")]
+                    let new_flags = pte.flags().difference(PteFlags::W | PteFlags::D);
+
+                    pte.set_flags(new_flags);
                     *old_pte = pte;
                 }
                 *new_pte = pte;
@@ -366,26 +371,8 @@ impl AddrSpace {
     /// Returns [`SysError::EFAULT`] if the fault address is invalid or the access permission
     /// is not allowed. Otherwise, returns [`SysError::ENOMEM`] if memory allocation fails
     /// when handling the page fault.
-    pub fn handle_page_fault(&self, fault_addr: VirtAddr, access: MemPerm) -> SysResult<()> {
+    pub fn handle_page_fault(&self, fault_addr: VirtAddr, access: MappingFlags) -> SysResult<()> {
         let mut vm_areas_lock = self.vm_areas.lock();
-
-        if fault_addr.to_usize() == 0x2b40d0 {
-            //0x3fffffa000
-            log::error!(
-                "[handle_page_fault] process {}: page fault at {:#x}",
-                current_task().pid(),
-                fault_addr.to_usize()
-            );
-            vm_areas_lock.iter().for_each(|(_, vma)| {
-                log::warn!(
-                    "[{:?}][{:?}]: {:#x} ~ {:#x}",
-                    vma.map_type,
-                    vma.pte_flags(),
-                    vma.start_va().to_usize(),
-                    vma.end_va().to_usize()
-                )
-            });
-        }
 
         let vma = vm_areas_lock
             .range_mut(..=fault_addr)
@@ -393,12 +380,12 @@ impl AddrSpace {
             .filter(|(_, vma)| vma.contains(fault_addr))
             .map(|(_, vma)| vma)
             .ok_or(SysError::EFAULT)?;
-
         let page_fault_info = PageFaultInfo {
             fault_addr,
             page_table: &self.page_table,
             access,
         };
+
         vma.handle_page_fault(page_fault_info)
     }
 }

@@ -19,23 +19,17 @@ use signal::*;
 use time::*;
 use user::{sys_getgid, sys_getuid};
 
-use crate::processor::current_task;
-
 pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
     let Some(syscall_no) = SyscallNo::from_repr(syscall_no) else {
         log::error!("Syscall number not included: {syscall_no}");
         unimplemented!()
     };
 
-    // if args.iter().find(|t| **t as i32 == 0x109).is_some() {
-    //     log::error!("[{}] args: {:?}", syscall_no.as_str(), args);
-    // }
-
-    log::warn!(
-        "task {} call [{}]",
-        current_task().tid(),
-        syscall_no.as_str(),
-    );
+    // log::warn!(
+    //     "task {} call [{}]",
+    //     current_task().tid(),
+    //     syscall_no.as_str(),
+    // );
 
     let result = match syscall_no {
         GETTIMEOFDAY => sys_gettimeofday(args[0], args[1]).await,

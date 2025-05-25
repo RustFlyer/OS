@@ -7,10 +7,12 @@ use alloc::sync::Arc;
 use pps::ProcessorPrivilegeState;
 
 use core::arch::asm;
+#[cfg(target_arch = "riscv64")]
 use riscv::register::sstatus;
+#[cfg(target_arch = "riscv64")]
 use riscv::register::sstatus::FS;
 
-use arch::riscv64::interrupt::{disable_interrupt, enable_interrupt};
+use arch::trap::{disable_interrupt, enable_interrupt};
 
 const HART_ONE: Hart = Hart::new(0);
 
@@ -65,7 +67,7 @@ impl Hart {
     }
 
     pub fn set_pps(&mut self, pps: &ProcessorPrivilegeState) {
-        self.pps = pps.clone();
+        self.pps = *pps;
     }
 
     pub fn get_pps(&self) -> &ProcessorPrivilegeState {
@@ -142,7 +144,10 @@ pub fn current_hart() -> &'static mut Hart {
     let ret;
     unsafe {
         let tp: usize;
+        #[cfg(target_arch = "riscv64")]
         asm!("mv {}, tp", out(reg) tp);
+        #[cfg(target_arch = "loongarch64")]
+        asm!("move {}, $tp", out(reg) tp);
         ret = &mut *(tp as *mut Hart);
     }
 
@@ -154,21 +159,28 @@ pub fn set_current_hart(id: usize) {
     hart.set_hart_id(id);
     let hart_addr = hart as *const _ as usize;
     unsafe {
+        #[cfg(target_arch = "riscv64")]
         asm!("mv tp, {}", in(reg) hart_addr);
+        #[cfg(target_arch = "loongarch64")]
+        asm!("move $tp, {}", in(reg) hart_addr);
     }
 }
 
 pub fn get_current_hart() -> &'static mut Hart {
     let hart_ptr: *mut Hart;
     unsafe {
+        #[cfg(target_arch = "riscv64")]
         asm!("mv {}, tp", out(reg) hart_ptr);
+        #[cfg(target_arch = "loongarch64")]
+        asm!("move {}, $tp", out(reg) hart_ptr);
         &mut *hart_ptr
     }
 }
 
 pub fn init(id: usize) {
+    set_current_hart(id);
+    #[cfg(target_arch = "riscv64")]
     unsafe {
-        set_current_hart(id);
         sstatus::set_fs(FS::Initial);
     }
 }

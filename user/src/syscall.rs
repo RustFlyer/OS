@@ -110,81 +110,169 @@ const SYSCALL_GETRANDOM: usize = 278;
 const SYSCALL_MEMBARRIER: usize = 283;
 const SYSCALL_COPY_FILE_RANGE: usize = 285;
 
-// it seams that we can't simply the follows
 #[macro_export]
 macro_rules! syscall {
     ($name:ident, $id:expr) => {
         pub fn $name() -> isize {
-            syscall($id, [0, 0, 0, 0, 0, 0])
+            use core::mem::MaybeUninit;
+
+            #[cfg(target_arch = "riscv64")]
+            let mut args: [usize; 6] = [0, 0, 0, 0, 0, 0];
+            #[cfg(target_arch = "loongarch64")]
+            let mut args: [usize; 7] = [0, 0, 0, 0, 0, 0, 0];
+
+            syscall($id, args)
         }
     };
     ($name:ident, $id:expr, $t0:ty) => {
         pub fn $name(a0: $t0) -> isize {
-            syscall($id, [a0 as usize, 0, 0, 0, 0, 0])
+            use core::mem::MaybeUninit;
+
+            #[cfg(target_arch = "riscv64")]
+            let mut args: [usize; 6] = [0, 0, 0, 0, 0, 0];
+            #[cfg(target_arch = "loongarch64")]
+            let mut args: [usize; 7] = [0, 0, 0, 0, 0, 0, 0];
+
+            args[0] = a0 as usize;
+            syscall($id, args)
         }
     };
     ($name:ident, $id:expr, $t0:ty, $t1:ty) => {
         pub fn $name(a0: $t0, a1: $t1) -> isize {
-            syscall($id, [a0 as usize, a1 as usize, 0, 0, 0, 0])
+            use core::mem::MaybeUninit;
+
+            #[cfg(target_arch = "riscv64")]
+            let mut args: [usize; 6] = [0, 0, 0, 0, 0, 0];
+            #[cfg(target_arch = "loongarch64")]
+            let mut args: [usize; 7] = [0, 0, 0, 0, 0, 0, 0];
+
+            args[0] = a0 as usize;
+            args[1] = a1 as usize;
+            syscall($id, args)
         }
     };
     ($name:ident, $id:expr, $t0:ty, $t1:ty, $t2:ty) => {
         pub fn $name(a0: $t0, a1: $t1, a2: $t2) -> isize {
-            syscall($id, [a0 as usize, a1 as usize, a2 as usize, 0, 0, 0])
+            use core::mem::MaybeUninit;
+
+            #[cfg(target_arch = "riscv64")]
+            let mut args: [usize; 6] = [0, 0, 0, 0, 0, 0];
+            #[cfg(target_arch = "loongarch64")]
+            let mut args: [usize; 7] = [0, 0, 0, 0, 0, 0, 0];
+
+            args[0] = a0 as usize;
+            args[1] = a1 as usize;
+            args[2] = a2 as usize;
+            syscall($id, args)
         }
     };
     ($name:ident, $id:expr, $t0:ty, $t1:ty, $t2:ty, $t3:ty) => {
         pub fn $name(a0: $t0, a1: $t1, a2: $t2, a3: $t3) -> isize {
-            syscall(
-                $id,
-                [a0 as usize, a1 as usize, a2 as usize, a3 as usize, 0, 0],
-            )
+            use core::mem::MaybeUninit;
+
+            #[cfg(target_arch = "riscv64")]
+            let mut args: [usize; 6] = [0, 0, 0, 0, 0, 0];
+            #[cfg(target_arch = "loongarch64")]
+            let mut args: [usize; 7] = [0, 0, 0, 0, 0, 0, 0];
+
+            args[0] = a0 as usize;
+            args[1] = a1 as usize;
+            args[2] = a2 as usize;
+            args[3] = a3 as usize;
+            syscall($id, args)
         }
     };
     ($name:ident, $id:expr, $t0:ty, $t1:ty, $t2:ty, $t3:ty, $t4:ty) => {
         pub fn $name(a0: $t0, a1: $t1, a2: $t2, a3: $t3, a4: $t4) -> isize {
-            syscall(
-                $id,
-                [
-                    a0 as usize,
-                    a1 as usize,
-                    a2 as usize,
-                    a3 as usize,
-                    a4 as usize,
-                    0,
-                ],
-            )
+            use core::mem::MaybeUninit;
+
+            #[cfg(target_arch = "riscv64")]
+            let mut args: [usize; 6] = [0, 0, 0, 0, 0, 0];
+            #[cfg(target_arch = "loongarch64")]
+            let mut args: [usize; 7] = [0, 0, 0, 0, 0, 0, 0];
+
+            args[0] = a0 as usize;
+            args[1] = a1 as usize;
+            args[2] = a2 as usize;
+            args[3] = a3 as usize;
+            args[4] = a4 as usize;
+            syscall($id, args)
         }
     };
     ($name:ident, $id:expr, $t0:ty, $t1:ty, $t2:ty, $t3:ty, $t4:ty, $t5:ty) => {
         pub fn $name(a0: $t0, a1: $t1, a2: $t2, a3: $t3, a4: $t4, a5: $t5) -> isize {
-            syscall(
-                $id,
-                [
-                    a0 as usize,
-                    a1 as usize,
-                    a2 as usize,
-                    a3 as usize,
-                    a4 as usize,
-                    a5 as usize,
-                ],
-            )
+            use core::mem::MaybeUninit;
+
+            #[cfg(target_arch = "riscv64")]
+            let mut args: [usize; 6] = [0, 0, 0, 0, 0, 0];
+            #[cfg(target_arch = "loongarch64")]
+            let mut args: [usize; 7] = [0, 0, 0, 0, 0, 0, 0];
+
+            args[0] = a0 as usize;
+            args[1] = a1 as usize;
+            args[2] = a2 as usize;
+            args[3] = a3 as usize;
+            args[4] = a4 as usize;
+            args[5] = a5 as usize;
+            syscall($id, args)
         }
     };
+    ($name:ident, $id:expr, $t0:ty, $t1:ty, $t2:ty, $t3:ty, $t4:ty, $t5:ty, $t6:ty) => {
+        pub fn $name(a0: $t0, a1: $t1, a2: $t2, a3: $t3, a4: $t4, a5: $t5) -> isize {
+            use core::mem::MaybeUninit;
+
+            #[cfg(target_arch = "riscv64")]
+            compile_error!("syscall with 7 arguments is not supported on riscv64");
+
+            #[cfg(target_arch = "riscv64")]
+            let mut args: [usize; 7] = [0, 0, 0, 0, 0, 0, 0];
+            #[cfg(target_arch = "loongarch64")]
+            let mut args: [usize; 7] = [0, 0, 0, 0, 0, 0, 0];
+
+            args[0] = a0 as usize;
+            args[1] = a1 as usize;
+            args[2] = a2 as usize;
+            args[3] = a3 as usize;
+            args[4] = a4 as usize;
+            args[5] = a5 as usize;
+            args[6] = a6 as usize;
+            syscall($id, args)
+        }
+    }
 }
 
+#[cfg(target_arch = "riscv64")]
 fn syscall(id: usize, args: [usize; 6]) -> isize {
     let mut ret: isize;
     unsafe {
         asm!(
             "ecall",
-            inlateout("x10") args[0] => ret,
-            in("x11") args[1],
-            in("x12") args[2],
-            in("x13") args[3],
-            in("x14") args[4],
-            in("x15") args[5],
-            in("x17") id
+            inlateout("a0") args[0] => ret,
+            in("a1") args[1],
+            in("a2") args[2],
+            in("a3") args[3],
+            in("a4") args[4],
+            in("a5") args[5],
+            in("a7") id
+        );
+    }
+    ret
+}
+
+#[cfg(target_arch = "loongarch64")]
+fn syscall(id: usize, args: [usize; 7]) -> isize {
+    let mut ret: isize;
+    unsafe {
+        asm!(
+            "syscall 0",
+            inlateout("$a0") args[0] => ret,
+            in("$a1") args[1],
+            in("$a2") args[2],
+            in("$a3") args[3],
+            in("$a4") args[4],
+            in("$a5") args[5],
+            in("$a6") args[6],
+            in("$a7") id
         );
     }
     ret

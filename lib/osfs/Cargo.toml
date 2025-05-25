@@ -5,17 +5,16 @@ edition = "2024"
 
 [dependencies]
 config = { path = "../config" }
+driver = { path = "../driver" }
 ext4   = { path = "../ext4" }
 fat32  = { path = "../fat32" }
-vfs    = { path = "../vfs" }
-systype =  { path = "../systype" }
 mutex  = { path = "../mutex" }
-driver = { path = "../driver" }
 osfuture = { path = "../osfuture" }
-
+systype =  { path = "../systype" }
+vfs    = { path = "../vfs" }
 async-trait = { workspace = true }
 bitflags = { workspace = true }
-spin = { workspace = true }
-log = { workspace = true }
-strum = { workspace = true }
 crate_interface = { workspace = true }
+log = { workspace = true }
+spin = { workspace = true }
+strum = { workspace = true }

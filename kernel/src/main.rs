@@ -7,16 +7,14 @@
 #![allow(dead_code)]
 
 mod boot;
-mod console;
-mod driver_os;
 mod entry;
 mod lang_item;
 mod link_app;
 mod loader;
 mod logging;
 mod net;
+mod osdriver;
 mod processor;
-mod sbi;
 mod syscall;
 mod task;
 mod trap;
@@ -25,6 +23,7 @@ mod vm;
 use core::ptr;
 
 use ::net::net_bench;
+use arch::mm::fence;
 use config::mm::{DTB_END, DTB_START};
 use mm::{self, frame, heap};
 use processor::hart;
@@ -34,7 +33,6 @@ extern crate alloc;
 
 static mut INITIALIZED: bool = false;
 
-#[unsafe(no_mangle)]
 pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
     executor::init(hart_id);
 
@@ -43,6 +41,7 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         /* Initialize logger */
         logger::init();
         log::info!("hart {}: initializing kernel", hart_id);
+        log::info!("dtb_addr: {:#x}", dtb_addr);
 
         /* Initialize heap allocator and page table */
         unsafe {
@@ -54,7 +53,7 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
             log::info!("hart {}: initialized frame allocator", hart_id);
             vm::switch_to_kernel_page_table();
             log::info!("hart {}: switched to kernel page table", hart_id);
-            riscv::asm::fence();
+            fence();
             ptr::write_volatile(&raw mut INITIALIZED, true);
         }
 
@@ -92,22 +91,20 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         log::info!("device tree blob PA start: {:#x}", dtb_addr);
         log::info!("====== kernel memory layout end ======");
 
-        driver_os::probe_test();
+        osdriver::probe_tree();
 
-        driver::init();
+        // driver::init();
         log::info!("hart {}: initialized driver", hart_id);
 
         // block_device_test();
         // net_bench();
 
         osfs::init();
-        log::info!("hart {}: initialized FS", hart_id);
+        log::info!("hart {}: initialized FS success", hart_id);
 
         // boot::start_harts(hart_id);
 
-        loader::init();
-
-        trap::init();
+        // loader::init();
 
         task::init();
     } else {
@@ -119,6 +116,11 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         }
     }
 
+    arch::trap::init();
+
+    #[cfg(target_arch = "loongarch64")]
+    trap::trap_handler::tlb_init();
+
     hart::init(hart_id);
 
     log::info!("hart {}: running", hart_id);
@@ -126,6 +128,4 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
     loop {
         executor::task_run_always_alone(hart_id);
     }
-    #[allow(unused)]
-    sbi::shutdown(false);
 }

@@ -12,7 +12,7 @@ pub mod tid;
 pub mod time;
 pub mod timeid;
 
-use arch::riscv64::time::get_time_duration;
+use arch::time::get_time_duration;
 use future::spawn_kernel_task;
 use net::poll_interfaces;
 use osfuture::yield_now;
@@ -44,7 +44,7 @@ pub fn timer_init() {
     spawn_kernel_task(async {
         let mut ticks: usize = 0;
         loop {
-            ticks = ticks + 1;
+            ticks += 1;
             if ticks % 1000 == 0 {
                 let current = get_time_duration();
                 TIMER_MANAGER.check(current);

@@ -28,7 +28,7 @@ use core::{cmp, fmt::Debug, mem};
 
 use bitflags::bitflags;
 
-use arch::riscv64::mm::{sfence_vma_addr, sfence_vma_all_except_global};
+use arch::mm::{tlb_flush_addr, tlb_shootdown};
 use config::mm::{KERNEL_MAP_OFFSET, PAGE_SIZE};
 use mm::{
     address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum},
@@ -40,10 +40,12 @@ use shm::SharedMemory;
 use systype::{SysError, SysResult};
 use vfs::file::File;
 
-use crate::processor::current_task;
+#[cfg(target_arch = "riscv64")]
+use arch::mm::tlb_flush_all_except_global;
 
 use super::{
-    mem_perm::MemPerm,
+    mapping_flags::MappingFlags,
+    mmap::MmapProt,
     page_table::PageTable,
     pte::{PageTableEntry, PteFlags},
 };
@@ -60,8 +62,8 @@ pub struct VmArea {
     end: VirtAddr,
     /// Flags of the VMA.
     flags: VmaFlags,
-    /// Memory protection of the VMA.
-    prot: MemPerm,
+    /// Memory protection of the VMA. Only `RWXU` bits should be set.
+    prot: MappingFlags,
     /// Cache for leaf page table entry flags, which are default when creating
     /// a new leaf entry.
     pte_flags: PteFlags,
@@ -108,6 +110,9 @@ pub enum TypedArea {
 /// The handler is responsible for handling a “normal” page fault, which is not a CoW page fault
 /// or a page fault due to TLB not being flushed. The handler is called when the permission is
 /// allowed, the fault is not a CoW fault, and the page is not already mapped by another thread.
+///
+/// “Handling a page fault” here means allocating a new page and mapping it to the faulting
+/// virtual address by updating the page table. It does not do anything to the TLB.
 type PageFaultHandler = fn(&mut VmArea, PageFaultInfo) -> SysResult<()>;
 
 /// Data passed to a page fault handler.
@@ -119,8 +124,9 @@ pub struct PageFaultInfo<'a> {
     pub fault_addr: VirtAddr,
     /// Page table.
     pub page_table: &'a PageTable,
-    /// How the address was accessed when the fault occurred. Only one bit should be set.
-    pub access: MemPerm,
+    /// Type of memory access that caused the page fault. Only one of `R`, `W`, and `X`
+    /// can be set.
+    pub access: MappingFlags,
 }
 
 bitflags! {
@@ -141,10 +147,11 @@ impl VmArea {
     ///
     /// `start_va` must be page-aligned.
     ///
-    /// `pte_flags` needs to have `RWX` bits set properly; other bits except `U` must be
-    /// zero.
-    pub fn new_kernel(start_va: VirtAddr, end_va: VirtAddr, prot: MemPerm) -> Self {
+    /// `prot` needs to have `RWXU` bits set properly; other bits must be zero.
+    pub fn new_kernel(start_va: VirtAddr, end_va: VirtAddr, prot: MappingFlags) -> Self {
         debug_assert!(start_va.to_usize() % PAGE_SIZE == 0);
+        debug_assert!((MappingFlags::RWX | MappingFlags::U).contains(prot));
+
         Self::new_fixed_offset(
             start_va,
             end_va,
@@ -159,20 +166,33 @@ impl VmArea {
     /// an area in the kernel space. This function is used to map a MMIO region.
     ///
     /// `start_va` must be page-aligned.
+    ///
+    /// `prot` needs to have `RWXU` bits set properly; other bits must be zero.
     pub fn new_fixed_offset(
         start_va: VirtAddr,
         end_va: VirtAddr,
         flags: VmaFlags,
-        prot: MemPerm,
+        prot: MappingFlags,
         offset: usize,
     ) -> Self {
         debug_assert!(start_va.to_usize() % PAGE_SIZE == 0);
+        debug_assert!((MappingFlags::RWX | MappingFlags::U).contains(prot));
+
         Self {
             start: start_va,
             end: end_va.round_up(),
             flags,
-            // Set bits A and D because kernel pages always reside in memory.
-            pte_flags: PteFlags::from(prot) | PteFlags::A | PteFlags::D,
+            pte_flags: {
+                let pte_flags = PteFlags::from(prot | MappingFlags::V | MappingFlags::G);
+                #[cfg(target_arch = "riscv64")]
+                {
+                    pte_flags | PteFlags::A | PteFlags::D
+                }
+                #[cfg(target_arch = "loongarch64")]
+                {
+                    pte_flags
+                }
+            },
             prot,
             pages: BTreeMap::new(),
             map_type: TypedArea::Offset(OffsetArea { offset }),
@@ -197,13 +217,12 @@ impl VmArea {
     /// filled with zeros. Make sure that the file region defined by `offset` and `len`
     /// is within the file.
     ///
-    /// `prot` should have `U` bit set, because this VMA is supposed to be used in user
-    /// space.
+    /// `prot` needs to have `RWX` bits set properly; other bits must be zero.
     pub fn new_file_backed(
         start_va: VirtAddr,
         end_va: VirtAddr,
         flags: VmaFlags,
-        prot: MemPerm,
+        prot: MappingFlags,
         file: Arc<dyn File>,
         offset: usize,
         len: usize,
@@ -213,12 +232,24 @@ impl VmArea {
                 || ((len < end_va.to_usize() - start_va.to_usize())
                     && flags.contains(VmaFlags::PRIVATE))
         );
-        debug_assert!(prot.contains(MemPerm::U));
+        debug_assert!(MappingFlags::RWX.contains(prot));
+
+        let prot = prot | MappingFlags::U;
         Self {
             start: start_va.round_down(),
             end: end_va.round_up(),
             flags,
-            pte_flags: PteFlags::from(prot),
+            pte_flags: {
+                let prot = prot | MappingFlags::V | MappingFlags::U;
+                #[cfg(target_arch = "riscv64")]
+                {
+                    PteFlags::from(prot) | PteFlags::A
+                }
+                #[cfg(target_arch = "loongarch64")]
+                {
+                    PteFlags::from(prot)
+                }
+            },
             prot,
             pages: BTreeMap::new(),
             map_type: TypedArea::FileBacked(FileBackedArea::new(file, offset, len)),
@@ -238,12 +269,12 @@ impl VmArea {
         start_va: VirtAddr,
         end_va: VirtAddr,
         flags: VmaFlags,
-        prot: MemPerm,
+        prot: MappingFlags,
         shm: ShareMutex<SharedMemory>,
     ) -> Self {
         debug_assert!(start_va.to_usize() % PAGE_SIZE == 0);
         debug_assert!(end_va.to_usize() % PAGE_SIZE == 0);
-        debug_assert!(prot.contains(MemPerm::U));
+        // debug_assert!(prot.contains(MemPerm::U));
         Self {
             start: start_va,
             end: end_va,
@@ -260,22 +291,43 @@ impl VmArea {
     ///
     /// `start_va` and `end_va` must be page-aligned.
     ///
-    /// `prot` should have `U` bit set, because this VMA is supposed to be used in user
-    /// space.
+    /// `prot` needs to have `RWX` bits set properly; other bits must be zero.
+    /// Generally, `prot` should have `RW` bits set, because an anonymous area which
+    /// cannot be written is useless.
     pub fn new_anonymous(
         start_va: VirtAddr,
         end_va: VirtAddr,
         flags: VmaFlags,
-        prot: MemPerm,
+        prot: MappingFlags,
     ) -> Self {
         debug_assert!(start_va.to_usize() % PAGE_SIZE == 0);
         debug_assert!(end_va.to_usize() % PAGE_SIZE == 0);
-        debug_assert!(prot.contains(MemPerm::U));
+        debug_assert!(MappingFlags::RWX.contains(prot));
+        debug_assert!({
+            // We allow `prot` to be anything, but we warn if it does not
+            // have `RW` bits set.
+            if !prot.contains(MappingFlags::R | MappingFlags::W) {
+                log::warn!("Anonymous area should have `RW` bits set for most cases");
+            }
+            true
+        });
+
+        let prot = prot | MappingFlags::U;
         Self {
             start: start_va,
             end: end_va,
             flags,
-            pte_flags: PteFlags::from(prot),
+            pte_flags: {
+                let prot = prot | MappingFlags::V | MappingFlags::U;
+                #[cfg(target_arch = "riscv64")]
+                {
+                    PteFlags::from(prot) | PteFlags::A | PteFlags::D
+                }
+                #[cfg(target_arch = "loongarch64")]
+                {
+                    PteFlags::from(prot)
+                }
+            },
             prot,
             pages: BTreeMap::new(),
             map_type: TypedArea::Anonymous(AnonymousArea),
@@ -289,12 +341,23 @@ impl VmArea {
     pub fn new_stack(start_va: VirtAddr, end_va: VirtAddr) -> Self {
         debug_assert!(start_va.to_usize() % PAGE_SIZE == 0);
         debug_assert!(end_va.to_usize() % PAGE_SIZE == 0);
+
         Self {
             start: start_va,
             end: end_va,
             flags: VmaFlags::PRIVATE,
-            pte_flags: PteFlags::V | PteFlags::R | PteFlags::W | PteFlags::U,
-            prot: MemPerm::R | MemPerm::W | MemPerm::U,
+            pte_flags: {
+                let prot = MappingFlags::V | MappingFlags::R | MappingFlags::W | MappingFlags::U;
+                #[cfg(target_arch = "riscv64")]
+                {
+                    PteFlags::from(prot) | PteFlags::A | PteFlags::D
+                }
+                #[cfg(target_arch = "loongarch64")]
+                {
+                    PteFlags::from(prot)
+                }
+            },
+            prot: MappingFlags::R | MappingFlags::W | MappingFlags::U,
             pages: BTreeMap::new(),
             map_type: TypedArea::Anonymous(AnonymousArea),
             handler: Some(AnonymousArea::fault_handler),
@@ -311,8 +374,18 @@ impl VmArea {
             start: start_va,
             end: end_va,
             flags: VmaFlags::PRIVATE,
-            pte_flags: PteFlags::V | PteFlags::R | PteFlags::W | PteFlags::U,
-            prot: MemPerm::R | MemPerm::W | MemPerm::U,
+            pte_flags: {
+                let prot = MappingFlags::V | MappingFlags::R | MappingFlags::W | MappingFlags::U;
+                #[cfg(target_arch = "riscv64")]
+                {
+                    PteFlags::from(prot) | PteFlags::A | PteFlags::D
+                }
+                #[cfg(target_arch = "loongarch64")]
+                {
+                    PteFlags::from(prot)
+                }
+            },
+            prot: MappingFlags::R | MappingFlags::W | MappingFlags::U,
             pages: BTreeMap::new(),
             map_type: TypedArea::Heap(AnonymousArea),
             handler: Some(AnonymousArea::fault_handler),
@@ -422,31 +495,32 @@ impl VmArea {
     /// This function invalidates all valid page table entries in the VMA, and drops
     /// the `VmArea` itself. This is the proper way to drop a `VmArea` which is
     /// associated with a [`AddrSpace`].
-    pub fn unmap_area(self, page_table: &PageTable) {
-        for (vpn, _) in self.pages {
+    pub fn unmap_area(mut self, page_table: &PageTable) {
+        for (vpn, _) in mem::take(&mut self.pages) {
             let pte = page_table.find_entry(vpn).unwrap();
             *pte = PageTableEntry::default();
         }
-        sfence_vma_all_except_global();
+        tlb_shootdown(self.start_va().to_usize(), self.length());
     }
 
-    /// Changes the protection flags of the VMA, possibly updating page table entries.
+    /// Changes the protection flags of a user space VMA, possibly updating page table
+    /// entries.
     ///
-    /// `new_prot` should always have `U` bit set, because this function is supposed to be
-    /// used in user space.
-    pub fn change_prot(&mut self, page_table: &PageTable, new_prot: MemPerm) {
-        debug_assert!(new_prot.contains(MemPerm::U));
+    /// `new_prot` needs to have `RWX` bits set properly; other bits must be zero. This
+    /// function cannot change the `U` bit.
+    pub fn change_prot(&mut self, page_table: &PageTable, new_prot: MappingFlags) {
+        debug_assert!(MappingFlags::RWX.contains(new_prot));
 
         let old_prot = self.prot;
         self.prot = new_prot;
-        self.pte_flags = PteFlags::from(new_prot);
+        self.pte_flags = (self.pte_flags & !PteFlags::RWX_MASK) | PteFlags::from(new_prot);
         for &vpn in self.pages.keys() {
             let pte = page_table.find_entry(vpn).unwrap();
             pte.set_flags(self.pte_flags);
         }
         // Flush the TLB if any kind of permission is downgraded.
         if !new_prot.contains(old_prot) {
-            sfence_vma_all_except_global();
+            tlb_shootdown(self.start_va().to_usize(), self.length());
         }
     }
 
@@ -477,10 +551,12 @@ impl VmArea {
         }
 
         let pte = {
+            #[allow(unused_variables)]
             let (pte, flush_all) =
                 page_table.find_entry_force(fault_addr.page_number(), pte_flags)?;
+            #[cfg(target_arch = "riscv64")]
             if flush_all {
-                sfence_vma_all_except_global();
+                tlb_flush_all_except_global();
             }
             pte
         };
@@ -492,17 +568,19 @@ impl VmArea {
         // );
         // log::error!("handle_page_fault {:?}", info.fault_addr);
         if pte.is_valid() {
-            if access == MemPerm::W && !pte.flags().contains(PteFlags::W) {
+            if access == MappingFlags::W
+                && !MappingFlags::from(pte.flags()).contains(MappingFlags::W)
+            {
                 // Copy-on-write page fault.
                 self.handle_cow_fault(fault_addr, pte)?;
             } else {
                 // The page is already mapped by another thread, so just flush the TLB.
-                sfence_vma_addr(fault_addr.to_usize());
             }
         } else {
             // log::warn!("handle_fault: pte not valid");
             self.handler.unwrap()(self, info)?;
         }
+        tlb_flush_addr(fault_addr.to_usize());
 
         Ok(())
     }
@@ -521,29 +599,33 @@ impl VmArea {
         // log::error!("[handle_cow_fault] fault_addr: {:?}", fault_addr);
         let fault_vpn = fault_addr.page_number();
         let fault_page = self.pages.get(&fault_vpn).unwrap();
-        // Note: The if-else branch does not work as expected because the reference
-        // count of a page is not necessarily 1 when the page is not shared. For
-        // example, the page may be in the page cache of a file, which increments the
-        // reference count of the page. The current implementation is not buggy, but
-        // it is not optimal.
         if Arc::strong_count(fault_page) > 1 {
             // Allocate a new page and copy the content if the page is shared.
             let new_page = Page::build()?;
             new_page.copy_from_page(fault_page);
+
             let mut new_pte = *pte;
-            new_pte.set_flags(new_pte.flags() | PteFlags::W);
+
+            #[cfg(target_arch = "riscv64")]
+            let new_flags = new_pte.flags().difference(PteFlags::W);
+            #[cfg(target_arch = "loongarch64")]
+            let new_flags = new_pte.flags().difference(PteFlags::W | PteFlags::D);
+
+            new_pte.set_flags(new_flags);
             new_pte.set_ppn(new_page.ppn());
             *pte = new_pte;
-            sfence_vma_addr(fault_addr.to_usize());
-            // Here, the `insert` will drop the old `Arc<Page>` tracked by the VMA,
-            // which will decrement the reference count of the `Page`.
             self.pages.insert(fault_vpn, Arc::new(new_page));
         } else {
-            // If the page is not shared, just set the write bit.
+            // Just set the write bit if the page is not shared.
             let mut new_pte = *pte;
-            new_pte.set_flags(new_pte.flags() | PteFlags::W);
+
+            #[cfg(target_arch = "riscv64")]
+            let new_flags = new_pte.flags().union(PteFlags::W);
+            #[cfg(target_arch = "loongarch64")]
+            let new_flags = new_pte.flags().union(PteFlags::W | PteFlags::D);
+
+            new_pte.set_flags(new_flags);
             *pte = new_pte;
-            sfence_vma_addr(fault_addr.to_usize());
         }
         // log::error!("[handle_cow_fault] success");
         Ok(())
@@ -594,6 +676,11 @@ impl VmArea {
     /// Returns the PTE flags of the VMA.
     pub fn pte_flags(&self) -> PteFlags {
         self.pte_flags
+    }
+
+    /// Returns the protection flags of the VMA.
+    pub fn prot(&self) -> MappingFlags {
+        self.prot
     }
 
     /// Returns the mapping from virtual page numbers to `Arc<Page>`s mapped in this VMA.
@@ -860,7 +947,7 @@ impl FileBackedArea {
         }
 
         // The page to be mapped to the faulting address.
-        let page = if flags.contains(VmaFlags::PRIVATE) && access == MemPerm::W {
+        let page = if flags.contains(VmaFlags::PRIVATE) && access == MappingFlags::W {
             // Write to a private VMA: Do copy-on-write beforehand.
             let page = Page::build()?;
             page.copy_from_page(&cached_page);
@@ -869,7 +956,7 @@ impl FileBackedArea {
             // Other conditions: Just use the cached page.
             if flags.contains(VmaFlags::PRIVATE) {
                 // Read from or execute a private VMA: Mark the page as read-only, which
-                // posiibly means copy-on-write.
+                // possibly means copy-on-write.
                 pte_flags = pte_flags.difference(PteFlags::W);
             }
             cached_page

@@ -1,13 +1,14 @@
 #![no_std]
-#![no_main]
-#![allow(non_upper_case_globals)]
-#![feature(format_args_nl)]
 
-use core::task::Waker;
-extern crate alloc;
 use alloc::sync::Arc;
-use core::fmt::{self};
-use qemu::{UartDevice, VirtBlkDevice};
+use core::{
+    fmt::{self, Write},
+    task::Waker,
+};
+use virtio_drivers::transport::{mmio::MmioTransport, pci::PciTransport};
+
+use console::console_putchar;
+use qemu::UartDevice;
 use spin::Once;
 
 pub mod cpu;
@@ -17,11 +18,18 @@ pub mod manager;
 pub mod net;
 pub mod plic;
 pub mod qemu;
-pub mod sbi;
 
-pub use sbi::sbi_print;
 pub use uart_16550::MmioSerialPort;
 pub use virtio_drivers::transport::DeviceType;
+
+pub mod console;
+
+extern crate alloc;
+
+#[cfg(target_arch = "riscv64")]
+pub type DevTransport = MmioTransport<'static>;
+#[cfg(target_arch = "loongarch64")]
+pub type DevTransport = PciTransport;
 
 pub static BLOCK_DEVICE: Once<Arc<dyn BlockDevice>> = Once::new();
 pub static CHAR_DEVICE: Once<Arc<dyn CharDevice>> = Once::new();
@@ -50,28 +58,39 @@ pub fn init() {
     // init_block_device();
     // init_char_device();
     log::info!("success init driver");
+    init_char_device();
+
+    log::debug!("test");
+    let buf = "hello char dev";
+    CHAR_DEVICE.get().unwrap().write(buf.as_bytes());
 }
 
-pub fn init_block_device() {
-    log::info!("BLOCK_DEVICE init");
-    BLOCK_DEVICE.call_once(|| Arc::new(VirtBlkDevice::new()));
+fn init_block_device() {
+    log::debug!("block in");
+    // BLOCK_DEVICE.call_once(|| Arc::new(VirtBlkDevice::new()));
+    log::debug!("block out");
 }
 
-pub fn init_char_device() {
-    log::info!("CHAR_DEVICE init");
+fn init_char_device() {
     CHAR_DEVICE.call_once(|| Arc::new(UartDevice::new()));
 }
 
-pub fn shutdown(failure: bool) -> ! {
-    sbi::hart_shutdown(failure);
+struct Console;
+
+impl Write for Console {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        for c in s.as_bytes() {
+            console_putchar(*c);
+        }
+        Ok(())
+    }
 }
 
-pub fn set_timer(timer: usize) {
-    sbi::set_timer(timer);
-}
-
-pub fn print(args: fmt::Arguments<'_>) {
-    sbi_print(args);
+pub fn console_print(args: fmt::Arguments<'_>) {
+    // Note: Is the lock necessary?
+    // static PRINT_MUTEX: SpinNoIrqLock<()> = SpinNoIrqLock::new(());
+    // let _lock = PRINT_MUTEX.lock();
+    Console.write_fmt(args).unwrap();
 }
 
 pub fn block_device_test() {
@@ -91,19 +110,14 @@ pub fn block_device_test() {
 
 #[macro_export]
 macro_rules! print {
-    ($($arg:tt)*) => {{
-        $crate::print(format_args!($($arg)*));
-    }};
+    ($fmt: literal $(, $($arg: tt)+)?) => {
+        $crate::console_print(format_args!($fmt $(, $($arg)+)?))
+    }
 }
 
 #[macro_export]
 macro_rules! println {
-    () => {
-        $crate::print!("\n")
-    };
-    ($($arg:tt)*) => {{
-        // $crate::print(format_args_nl!($($arg)*));
-        $crate::print(format_args!($($arg)*));
-        $crate::print!("\n")
-    }};
+    ($fmt: literal $(, $($arg: tt)+)?) => {
+        $crate::console_print(format_args!(concat!($fmt, "\n") $(, $($arg)+)?))
+    }
 }

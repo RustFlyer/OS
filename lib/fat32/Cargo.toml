@@ -4,14 +4,13 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-vfs = { path = "../vfs/" }
-driver = { path = "../driver/" }
 config = { path = "../config/" }
-systype = { path = "../systype/" }
+driver = { path = "../driver/" }
 mutex = { path = "../mutex/" }
 simdebug = { path = "../simdebug/" }
+systype = { path = "../systype/" }
 time = { path = "../time/" }
-
+vfs = { path = "../vfs/" }
+async-trait = { workspace = true }
 fatfs = { workspace = true }
 log = { workspace = true }
-async-trait = { workspace = true }

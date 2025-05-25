@@ -1,15 +1,11 @@
-pub mod kernel_trap_handler;
 pub mod trap_context;
 pub mod trap_env;
 pub mod trap_handler;
 pub mod trap_return;
 pub mod trap_syscall;
 
-#[allow(unused)]
-pub use arch::riscv64::{
-    interrupt::{disable_interrupt, enable_interrupt},
-    time::{get_time_duration, set_nx_timer_irq},
-};
+use arch::trap::enable_interrupt;
+
 pub use trap_handler::trap_handler;
 pub use trap_return::trap_return;
 
@@ -19,13 +15,6 @@ pub use trap_return::trap_return;
     2. enables interrupt in case of it is a interrupt type trap
 */
 pub unsafe fn load_trap_handler() {
-    trap_env::set_kernel_stvec();
+    trap_env::set_kernel_trap_entry();
     enable_interrupt();
-}
-
-pub fn init() {
-    unsafe {
-        riscv::register::sie::set_stimer();
-        riscv::register::sstatus::set_sie();
-    }
 }

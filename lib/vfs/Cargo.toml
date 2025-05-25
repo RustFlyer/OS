@@ -8,10 +8,9 @@ config = { path = "../config" }
 driver = { path = "../driver" }
 mm = { path = "../mm" }
 mutex = { path = "../mutex" }
-systype = { path = "../systype" }
 osfuture = { path = "../osfuture" }
+systype = { path = "../systype" }
 time = { path = "../time" }
-
 async-trait = { workspace = true }
 downcast-rs = { workspace = true }
 elf = { workspace = true }

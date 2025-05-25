@@ -20,7 +20,7 @@ default = ["boot"]
 
 [dependencies]
 log = { workspace = true }
-fdt = { workspace = true }
+flat_device_tree = { workspace = true }
 bitflags = { workspace = true }
 cfg-if = { workspace = true }
 spin = { workspace = true }

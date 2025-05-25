@@ -13,7 +13,7 @@ use systype::{SysError, SyscallResult};
 use crate::{
     processor::current_task,
     vm::{
-        mem_perm::MemPerm,
+        mapping_flags::MappingFlags,
         mmap::{MmapFlags, MmapProt},
         user_ptr::UserWritePtr,
     },
@@ -66,7 +66,6 @@ pub async fn sys_mmap(
     let task = current_task();
     let flags = MmapFlags::from_bits_truncate(flags);
     let prot = MmapProt::from_bits_truncate(prot);
-    let perm = MemPerm::from_mmapprot(prot);
     let va = VirtAddr::new(addr);
     let file = if !flags.contains(MmapFlags::MAP_ANONYMOUS) {
         Some(task.with_mut_fdtable(|table| table.get_file(fd as usize))?)
@@ -74,7 +73,7 @@ pub async fn sys_mmap(
         None
     };
 
-    log::info!("[sys_mmap] addr: {addr:#x}, length: {length:#x}, perm: {perm:?}, flags: {flags:?}");
+    log::info!("[sys_mmap] addr: {addr:#x}, length: {length:#x}, flags: {flags:?}");
 
     if addr == 0 && flags.contains(MmapFlags::MAP_FIXED) {
         return Err(SysError::EINVAL);
@@ -126,7 +125,7 @@ pub fn sys_mprotect(addr: usize, len: usize, prot: i32) -> SyscallResult {
 
     log::info!("[sys_mprotect] addr: {addr:#x}, len: {len:#x}, prot: {prot:?}");
 
-    addr_space.change_prot(VirtAddr::new(addr), len, MemPerm::from_mmapprot(prot));
+    addr_space.change_prot(VirtAddr::new(addr), len, MappingFlags::from_mmapprot(prot));
     Ok(0)
 }
 
@@ -217,12 +216,12 @@ pub fn sys_shmat(shmid: usize, shmaddr: usize, shmflg: i32) -> SyscallResult {
     }
 
     let shmaddr_aligned = shmaddr.round_down();
-    let mut mem_perm = MemPerm::RW | MemPerm::U;
+    let mut mem_perm = MmapProt::PROT_READ | MmapProt::PROT_WRITE;
     if shmflg.contains(ShmAtFlags::SHM_EXEC) {
-        mem_perm.insert(MemPerm::X);
+        mem_perm.insert(MmapProt::PROT_EXEC);
     }
     if shmflg.contains(ShmAtFlags::SHM_RDONLY) {
-        mem_perm.remove(MemPerm::W);
+        mem_perm.remove(MmapProt::PROT_WRITE);
     }
 
     let ret_addr;

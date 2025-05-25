@@ -1,7 +1,7 @@
 use core::{ops::DerefMut, time::Duration};
 
 use alloc::{boxed::Box, sync::Arc, vec::Vec};
-use arch::riscv64::time::{get_time_duration, get_time_us};
+use arch::time::{get_time_duration, get_time_us};
 use driver::net::NetDevice;
 use mutex::{ShareMutex, SpinNoIrqLock, new_share_mutex};
 use smoltcp::{

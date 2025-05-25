@@ -12,7 +12,6 @@ systype = { path = "../systype" }
 osfuture = { path = "../osfuture" }
 simdebug = { path = "../simdebug" }
 
-
 smoltcp = { workspace = true }
 spin = { workspace = true }
 log = { workspace = true }

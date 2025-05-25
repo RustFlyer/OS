@@ -1,10 +1,10 @@
-use crate::println;
-use crate::sbi;
 use core::panic::PanicInfo;
+
+use arch::hart::hart_shutdown;
+use driver::println;
 
 #[panic_handler]
 fn panic_handler(info: &PanicInfo) -> ! {
     println!("{:?}", info);
-    sbi::shutdown(true);
-    loop {}
+    hart_shutdown();
 }

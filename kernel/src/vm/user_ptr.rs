@@ -34,17 +34,15 @@
 use core::{cmp, fmt::Debug, marker::PhantomData, ops::ControlFlow, slice};
 
 use alloc::{ffi::CString, vec::Vec};
-use bitflags::bitflags;
 use config::mm::{PAGE_SIZE, USER_END};
 use mm::address::VirtAddr;
-use riscv::{interrupt::supervisor, register::scause};
 use systype::{SysError, SysResult};
 
-use super::{addr_space::AddrSpace, mem_perm::MemPerm};
-use crate::{
-    processor::current_hart,
-    trap::trap_env::{set_kernel_stvec, set_kernel_stvec_user_rw},
-};
+use super::{addr_space::AddrSpace, mapping_flags::MappingFlags};
+use crate::trap::trap_env::{set_kernel_trap_entry, set_user_rw_trap_entry};
+
+#[cfg(target_arch = "riscv64")]
+use crate::processor::current_hart;
 
 /// Smart pointer that can be used to read memory in user address space.
 pub type UserReadPtr<'a, T> = UserPtr<'a, T, ReadMarker>;
@@ -161,7 +159,7 @@ where
             self.addr_space,
             self.ptr as usize,
             size_of::<T>(),
-            MemPerm::R,
+            MappingFlags::R,
         )?;
         Ok(unsafe { self.ptr.read() })
     }
@@ -196,7 +194,7 @@ where
             self.addr_space,
             self.ptr as usize,
             len * size_of::<T>(),
-            MemPerm::R,
+            MappingFlags::R,
         )?;
         let mut vec: Vec<T> = Vec::with_capacity(len);
         unsafe {
@@ -221,7 +219,7 @@ where
             self.addr_space,
             self.ptr as usize,
             size_of::<T>(),
-            MemPerm::R,
+            MappingFlags::R,
         )?;
         Ok(unsafe { &*self.ptr })
     }
@@ -247,7 +245,7 @@ where
             self.addr_space,
             self.ptr as usize,
             len * size_of::<T>(),
-            MemPerm::R,
+            MappingFlags::R,
         )?;
         Ok(unsafe { slice::from_raw_parts(self.ptr, len) })
     }
@@ -300,7 +298,7 @@ where
                 self.addr_space,
                 self.ptr as usize,
                 (len - 1) * size_of::<usize>(),
-                MemPerm::R,
+                MappingFlags::R,
                 &mut push_and_check,
             )?;
         }
@@ -349,7 +347,7 @@ where
                 self.addr_space,
                 self.ptr as usize,
                 len - 1,
-                MemPerm::R,
+                MappingFlags::R,
                 &mut push_and_check,
             )?;
         }
@@ -378,7 +376,7 @@ where
             self.addr_space,
             self.ptr as usize,
             size_of::<T>(),
-            MemPerm::W,
+            MappingFlags::W,
         )?;
         unsafe { self.ptr.write(value) };
         Ok(())
@@ -416,7 +414,7 @@ where
             self.addr_space,
             self.ptr as usize,
             size_of_val(values),
-            MemPerm::W,
+            MappingFlags::W,
         )?;
         unsafe {
             self.ptr
@@ -440,7 +438,7 @@ where
             self.addr_space,
             self.ptr as usize,
             size_of::<T>(),
-            MemPerm::W,
+            MappingFlags::W,
         )?;
         Ok(unsafe { &mut *self.ptr })
     }
@@ -467,7 +465,7 @@ where
             self.addr_space,
             self.ptr as usize,
             len * size_of::<T>(),
-            MemPerm::W,
+            MappingFlags::W,
         )?;
         Ok(unsafe { slice::from_raw_parts_mut(self.ptr, len) })
     }
@@ -488,7 +486,7 @@ fn check_user_access(
     addr_space: &AddrSpace,
     mut addr: usize,
     len: usize,
-    perm: MemPerm,
+    perm: MappingFlags,
 ) -> SysResult<()> {
     if len == 0 {
         return Ok(());
@@ -505,9 +503,9 @@ fn check_user_access(
         return Err(SysError::EFAULT);
     }
 
-    set_kernel_stvec_user_rw();
+    set_user_rw_trap_entry();
 
-    let checker = if perm.contains(MemPerm::W) {
+    let checker = if perm.contains(MappingFlags::W) {
         try_write
     } else {
         try_read
@@ -519,15 +517,14 @@ fn check_user_access(
             // to try mapping the page. If this also fails, then we know the access
             // is not allowed.
             if let Err(e) = addr_space.handle_page_fault(VirtAddr::new(addr), perm) {
-                log::error!("fail to handle_page_fault in userptr");
-                set_kernel_stvec();
+                set_kernel_trap_entry();
                 return Err(e);
             }
         }
         addr = (addr + PAGE_SIZE) & !(PAGE_SIZE - 1);
     }
 
-    set_kernel_stvec();
+    set_kernel_trap_entry();
     Ok(())
 }
 
@@ -560,7 +557,7 @@ unsafe fn access_with_checking<F, T>(
     addr_space: &AddrSpace,
     mut addr: usize,
     len: usize,
-    perm: MemPerm,
+    perm: MappingFlags,
     f: &mut F,
 ) -> SysResult<()>
 where
@@ -582,9 +579,9 @@ where
         return Err(SysError::EFAULT);
     }
 
-    set_kernel_stvec_user_rw();
+    set_user_rw_trap_entry();
 
-    let checker = if perm.contains(MemPerm::W) {
+    let checker = if perm.contains(MappingFlags::W) {
         try_write
     } else {
         try_read
@@ -596,7 +593,7 @@ where
             // to try mapping the page. If this also fails, then we know the access
             // is not allowed.
             if let Err(e) = addr_space.handle_page_fault(VirtAddr::new(addr), perm) {
-                set_kernel_stvec();
+                set_kernel_trap_entry();
                 return Err(e);
             }
         }
@@ -606,9 +603,7 @@ where
             match f(item) {
                 ControlFlow::Continue(()) => {}
                 ControlFlow::Break(()) => {
-                    // log::error!("end");
-
-                    set_kernel_stvec();
+                    set_kernel_trap_entry();
                     return Ok(());
                 }
             }
@@ -617,7 +612,7 @@ where
     }
     // log::error!("end");
 
-    set_kernel_stvec();
+    set_kernel_trap_entry();
     Ok(())
 }
 
@@ -628,7 +623,7 @@ where
 /// is not mapped in the page table.
 ///
 /// # Safety
-/// This function must be called after calling `set_kernel_stvec_user_rw` to
+/// This function must be called after calling `set_user_rw_trap_entry` to
 /// enable kernel memory access to user space.
 pub unsafe fn try_read(va: usize) -> bool {
     unsafe extern "C" {
@@ -648,7 +643,7 @@ pub unsafe fn try_read(va: usize) -> bool {
 /// is not mapped in the page table.
 ///
 /// # Safety
-/// This function must be called after calling `set_kernel_stvec_user_rw` to
+/// This function must be called after calling `set_user_rw_trap_entry` to
 /// enable kernel memory access to user space.
 pub unsafe fn try_write(va: usize) -> bool {
     unsafe extern "C" {
@@ -666,6 +661,7 @@ pub struct SumGuard;
 
 impl SumGuard {
     pub fn new() -> Self {
+        #[cfg(target_arch = "riscv64")]
         current_hart().get_mut_pps().inc_sum_cnt();
         Self
     }
@@ -673,6 +669,7 @@ impl SumGuard {
 
 impl Drop for SumGuard {
     fn drop(&mut self) {
+        #[cfg(target_arch = "riscv64")]
         current_hart().get_mut_pps().dec_sum_cnt();
     }
 }

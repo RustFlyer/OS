@@ -1,5 +1,5 @@
 use alloc::sync::Arc;
-use arch::riscv64::time::{get_time_duration, set_nx_timer_irq};
+use arch::time::{get_time_duration, set_nx_timer_irq};
 use osfuture::{block_on_with_result, suspend_now, take_waker, yield_now};
 use timer::TIMER_MANAGER;
 

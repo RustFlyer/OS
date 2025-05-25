@@ -16,10 +16,10 @@ pub async fn async_syscall(task: &Task) -> bool {
     let mut cx = task.trap_context_mut();
     let syscall_no = cx.syscall_no();
     cx.sepc_forward();
-    cx.save_last_user_a0();
+    cx.save_last_user_ret_val();
     let sys_ret = syscall(syscall_no, cx.syscall_args()).await;
     cx = task.trap_context_mut();
-    cx.set_user_a0(sys_ret);
+    cx.set_user_ret_val(sys_ret);
     if sys_ret == -(SysError::EINTR as isize) as usize {
         log::warn!("[async_syscall] EINTR, set interrupted to true");
         return true;

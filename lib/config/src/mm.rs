@@ -8,7 +8,13 @@ pub const RAM_SIZE: usize = 128 * 1024 * 1024;
 pub const RAM_END: usize = RAM_START + RAM_SIZE;
 
 /// Start of kernel address space
+#[cfg(target_arch = "riscv64")]
 pub const VIRT_START: usize = 0xffff_ffc0_8000_0000;
+#[cfg(target_arch = "loongarch64")]
+pub const VIRT_START: usize = 0x9000_0000_8000_0000;
+#[cfg(not(any(target_arch = "riscv64", target_arch = "loongarch64")))]
+// Fallback to make `build.rs` happy (actually never used)
+pub const VIRT_START: usize = 0x8000_0000_0000_0000;
 /// End of kernel address space
 pub const VIRT_END: usize = VIRT_START + RAM_SIZE;
 /// Offset of kernel from `RAM_START`
@@ -93,9 +99,9 @@ pub const PA_WIDTH_SV39: usize = 56;
 /// Width of a virtual address in Sv39
 pub const VA_WIDTH_SV39: usize = 39;
 /// Width of a physical page number in Sv39
-pub const PPN_WIDTH_SV39: usize = PA_WIDTH_SV39 - PAGE_OFFSET_WIDTH;
+pub const PPN_WIDTH: usize = PA_WIDTH_SV39 - PAGE_OFFSET_WIDTH;
 /// Width of a virtual page number in Sv39
-pub const VPN_WIDTH_SV39: usize = VA_WIDTH_SV39 - PAGE_OFFSET_WIDTH;
+pub const VPN_WIDTH: usize = 64 - PAGE_OFFSET_WIDTH;
 
 /// Width of a page table entry in Sv39 (64-bit)
 pub const PTE_WIDTH: usize = 8;

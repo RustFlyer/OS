@@ -10,7 +10,10 @@ use systype::SysResult;
 
 use super::sig_info::{Sig, SigInfo};
 
-global_asm!(include_str!("_sigreturn_trampoline.asm"));
+#[cfg(target_arch = "riscv64")]
+global_asm!(include_str!("riscv64_sigreturn_trampoline.asm"));
+#[cfg(target_arch = "loongarch64")]
+global_asm!(include_str!("loongarch64_sigreturn_trampoline.asm"));
 
 pub async fn sig_check(task: Arc<Task>, interrupted: &mut bool) {
     let old_mask = task.get_sig_mask();
@@ -43,13 +46,9 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
 
     if *interrupted && action.flags.contains(SigActionFlag::SA_RESTART) {
         cx.sepc -= 4;
-        log::warn!(
-            "[sig_exec] restart interrupted syscall, orignal a0: {}, last_a0: {}",
-            cx.user_reg[10],
-            cx.last_a0
-        );
-        cx.restore_last_user_a0();
+        cx.restore_last_user_ret_val();
         *interrupted = false;
+        log::info!("[sig_exec] restart syscall");
     }
 
     match action.atype {

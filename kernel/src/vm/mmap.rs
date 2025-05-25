@@ -5,7 +5,7 @@ use mm::address::VirtAddr;
 use systype::{SysError, SysResult};
 use vfs::file::File;
 
-use crate::vm::mem_perm::MemPerm;
+use crate::vm::mapping_flags::MappingFlags;
 
 use super::{
     addr_space::AddrSpace,
@@ -51,9 +51,11 @@ bitflags! {
     }
 }
 
-impl MemPerm {
+impl MappingFlags {
+    /// Creates a set of `MappingFlags` from a set of `MmapProt`. `RWX` bits are set
+    /// according to the `MmapProt` bits.
     pub fn from_mmapprot(prot: MmapProt) -> Self {
-        let mut ret = Self::U;
+        let mut ret = MappingFlags::empty();
         if prot.contains(MmapProt::PROT_READ) {
             ret |= Self::R;
         }
@@ -112,8 +114,11 @@ impl AddrSpace {
             }
         }?;
 
-        let mem_prot = MemPerm::from_mmapprot(prot);
-        log::debug!("[map_file] mem_prot: {:?}", mem_prot);
+        let mem_prot = MappingFlags::from_mmapprot(prot);
+
+        // info!("[map_file] vma_flag: [{vma_flag:?}], mem_prot: [{mem_prot:?}]");
+        // info!("[map_file] offset: [{offset:?}], length: [{length:?}]");
+        // info!("[map_file] va_start: [{va_start:?}], va_end: [{va_end:?}]");
 
         let area = match file {
             Some(file) => VmArea::new_file_backed(
