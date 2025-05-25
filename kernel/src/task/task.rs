@@ -326,10 +326,6 @@ impl Task {
         Arc::as_ptr(&self.addr_space()) as usize
     }
 
-    pub fn elf_mut(&self) -> &mut Arc<dyn File> {
-        unsafe { &mut *self.elf.get() }
-    }
-    
     /// # Safety
     /// The caller must ensure that no other hart is accessing the elf
     /// file at the same time.
@@ -368,6 +364,7 @@ impl Task {
         &self.pgid
     }
 
+    #[allow(clippy::mut_from_ref)]
     pub fn sig_mask_mut(&self) -> &mut SigSet {
         unsafe { &mut *self.sig_mask.get() }
     }

@@ -223,8 +223,7 @@ pub async fn sys_recvfrom(
         .downcast_arc::<Socket>()
         .map_err(|_| SysError::ENOTSOCK)?;
 
-    let mut temp = Vec::with_capacity(len);
-    unsafe { temp.set_len(len) };
+    let mut temp = vec![0; len];
 
     task.set_state(TaskState::Interruptable);
     let (bytes, remote_addr) = socket.sk.recvfrom(&mut temp).await?;
