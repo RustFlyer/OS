@@ -148,6 +148,7 @@ impl VmArea {
     /// `start_va` must be page-aligned.
     ///
     /// `prot` needs to have `RWXU` bits set properly; other bits must be zero.
+    #[cfg(target_arch = "riscv64")]
     pub fn new_kernel(start_va: VirtAddr, end_va: VirtAddr, prot: MappingFlags) -> Self {
         debug_assert!(start_va.to_usize() % PAGE_SIZE == 0);
         debug_assert!((MappingFlags::RWX | MappingFlags::U).contains(prot));

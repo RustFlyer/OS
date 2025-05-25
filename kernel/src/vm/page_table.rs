@@ -21,16 +21,15 @@ use systype::{SysError, SysResult};
 use arch::mm::tlb_flush_all_except_global;
 #[cfg(target_arch = "riscv64")]
 use config::mm::{
-    MMIO_END, MMIO_PHYS_RANGES, MMIO_START, VIRT_END, bss_end, bss_start, data_end, data_start,
-    kernel_end, kernel_start, rodata_end, rodata_start, text_end, text_start, trampoline_end,
-    trampoline_start,
+    VIRT_END, bss_end, bss_start, data_end, data_start, kernel_end, kernel_start, rodata_end,
+    rodata_start, text_end, text_start, trampoline_end, trampoline_start,
 };
 
 use super::pte::{PageTableEntry, PteFlags};
 use crate::frame::FrameTracker;
 
 #[cfg(target_arch = "riscv64")]
-use super::mapping_flags::MappingFlags;
+use super::{iomap::IO_MAPPINGS, mapping_flags::MappingFlags};
 #[cfg(target_arch = "riscv64")]
 use crate::vm::vm_area::{OffsetArea, VmArea};
 
@@ -58,7 +57,9 @@ pub struct PageTable {
 #[cfg(target_arch = "riscv64")]
 lazy_static::lazy_static! {
     /// The kernel page table.
-    pub static ref KERNEL_PAGE_TABLE: PageTable = unsafe { PageTable::build_kernel_page_table() };
+    pub static ref KERNEL_PAGE_TABLE: SpinLock<PageTable> = SpinLock::new(unsafe {
+        PageTable::build_kernel_page_table()
+    });
 }
 
 impl PageTable {
@@ -80,8 +81,14 @@ impl PageTable {
 
     /// Constructs the kernel page table.
     ///
-    /// The kernel page table is a page table that maps the entire kernel space.
-    /// The mapping is linear, i.e., VPN = PPN + KERNEL_MAP_OFFSET.
+    /// The kernel page table maps the kernel's code and data sections, and an
+    /// area which maps allocatable frames. Besides these areas, there are also a
+    /// kind of special areas—MMIO areas, which is not mapped by this function.
+    ///
+    /// The mapping in the kernel page table is linear, i.e., VPN = PPN +
+    /// KERNEL_MAP_OFFSET.
+    ///
+    /// MMIO areas are mapped in the [`vm::iomap`] module.
     ///
     /// # Safety
     /// This function should be called only once during the kernel initialization.
@@ -91,11 +98,7 @@ impl PageTable {
     /// frames, which should not happen in practice.
     #[cfg(target_arch = "riscv64")]
     unsafe fn build_kernel_page_table() -> Self {
-        use config::mm::{DTB_ADDR, DTB_END, DTB_START};
-
-        use crate::vm::vm_area::VmaFlags;
-
-        let mut page_table = Self::build().expect("out of memory");
+        let mut page_table = Self::build().unwrap();
 
         /* Map the kernel's .text, .rodata, .data, and .bss sections */
 
@@ -104,14 +107,6 @@ impl PageTable {
         let text_prot = MappingFlags::R | MappingFlags::X;
         let text_vma = VmArea::new_kernel(text_start_va, text_end_va, text_prot);
         OffsetArea::map(&text_vma, &mut page_table);
-
-        // Map the kernel's signal handling trampoline.
-        let trampoline_start_va = VirtAddr::new(trampoline_start());
-        let trampoline_end_va = VirtAddr::new(trampoline_end());
-        let trampoline_prot = MappingFlags::R | MappingFlags::X | MappingFlags::U;
-        let trampoline_vma =
-            VmArea::new_kernel(trampoline_start_va, trampoline_end_va, trampoline_prot);
-        OffsetArea::map(&trampoline_vma, &mut page_table);
 
         let rodata_start_va = VirtAddr::new(rodata_start());
         let rodata_end_va = VirtAddr::new(rodata_end());
@@ -131,6 +126,14 @@ impl PageTable {
         let bss_vma = VmArea::new_kernel(bss_start_va, bss_end_va, bss_prot);
         OffsetArea::map(&bss_vma, &mut page_table);
 
+        /* Map the kernel's signal handling trampoline */
+        let trampoline_start_va = VirtAddr::new(trampoline_start());
+        let trampoline_end_va = VirtAddr::new(trampoline_end());
+        let trampoline_prot = MappingFlags::R | MappingFlags::X | MappingFlags::U;
+        let trampoline_vma =
+            VmArea::new_kernel(trampoline_start_va, trampoline_end_va, trampoline_prot);
+        OffsetArea::map(&trampoline_vma, &mut page_table);
+
         /* Map the allocatable frames */
         let alloc_start_va = VirtAddr::new(kernel_end());
         let alloc_end_va = VirtAddr::new(VIRT_END);
@@ -138,25 +141,14 @@ impl PageTable {
         let alloc_vma = VmArea::new_kernel(alloc_start_va, alloc_end_va, alloc_prot);
         OffsetArea::map(&alloc_vma, &mut page_table);
 
-        /* Map memory-mapped I/O */
-        let mmio_prot = MappingFlags::R | MappingFlags::W;
-        for &(start_pa, len) in MMIO_PHYS_RANGES {
-            let mmio_start_va = VirtAddr::new(start_pa + KERNEL_MAP_OFFSET);
-            let mmio_end_va = VirtAddr::new(start_pa + len + KERNEL_MAP_OFFSET);
-            let mmio_vma = VmArea::new_kernel(mmio_start_va, mmio_end_va, mmio_prot);
-            OffsetArea::map(&mmio_vma, &mut page_table);
-        }
-
         /* Map dtb memory*/
-        let offset = DTB_START - unsafe { DTB_ADDR };
-        let dtb_start = VirtAddr::new(DTB_START);
-        let dtb_end = VirtAddr::new(DTB_END);
-
-        let dtb_prot = MappingFlags::R | MappingFlags::W;
-        let dtb_vma =
-            VmArea::new_fixed_offset(dtb_start, dtb_end, VmaFlags::PRIVATE, dtb_prot, offset);
-
-        OffsetArea::map(&dtb_vma, &mut page_table);
+        // let offset = DTB_START - unsafe { DTB_ADDR };
+        // let dtb_start = VirtAddr::new(DTB_START);
+        // let dtb_end = VirtAddr::new(DTB_END);
+        // let dtb_prot = MappingFlags::R | MappingFlags::W;
+        // let dtb_vma =
+        // VmArea::new_fixed_offset(dtb_start, dtb_end, VmaFlags::PRIVATE, dtb_prot, offset);
+        // OffsetArea::map(&dtb_vma, &mut page_table);
 
         page_table
     }
@@ -432,40 +424,39 @@ impl PageTable {
     /// This method does not allocate any frame or make this page table own any frame.
     #[cfg(target_arch = "riscv64")]
     pub fn map_kernel(&self) {
-        // Map the kernel areas.
+        let kernel_page_table = unsafe { PageTableMem::new(KERNEL_PAGE_TABLE.lock().root) };
+        let mut page_table = unsafe { PageTableMem::new(self.root) };
 
-        use config::mm::{DTB_END, DTB_START};
+        // Copy part of the top level kernel page table to `self`.
+
+        // Map the kernel areas.
         let kernel_vpn_start = VirtAddr::new(kernel_start()).page_number();
         let kernel_vpn_end = VirtAddr::new(kernel_end()).page_number();
-        // Range of the top-level PTEs that covers the kernel space.
         let index_start = kernel_vpn_start.indices()[2];
         let index_end = kernel_vpn_end.indices()[2];
-
-        let mut page_table = unsafe { PageTableMem::new(self.root) };
-        let kernel_page_table = unsafe { PageTableMem::new(KERNEL_PAGE_TABLE.root) };
         let src = &kernel_page_table.as_slice()[index_start..=index_end];
         let dst = &mut page_table.as_slice_mut()[index_start..=index_end];
         dst.copy_from_slice(src);
 
         // Map the memory-mapped I/O space.
-        let mmio_vpn_start = VirtAddr::new(MMIO_START).page_number();
-        let mmio_vpn_end = VirtAddr::new(MMIO_END).page_number();
-        let index_start = mmio_vpn_start.indices()[2];
-        let index_end = mmio_vpn_end.indices()[2];
+        // let dtb_vpn_start = VirtAddr::new(DTB_START).page_number();
+        // let dtb_vpn_end = VirtAddr::new(DTB_END).page_number();
+        // let index_start = dtb_vpn_start.indices()[2];
+        // let index_end = dtb_vpn_end.indices()[2];
+        // let src = &kernel_page_table.as_slice()[index_start..=index_end];
+        // let dst = &mut page_table.as_slice_mut()[index_start..=index_end];
+        // dst.copy_from_slice(src);
 
-        let src = &kernel_page_table.as_slice()[index_start..=index_end];
-        let dst = &mut page_table.as_slice_mut()[index_start..=index_end];
-        dst.copy_from_slice(src);
-
-        // Map the memory-mapped I/O space.
-        let dtb_vpn_start = VirtAddr::new(DTB_START).page_number();
-        let dtb_vpn_end = VirtAddr::new(DTB_END).page_number();
-        let index_start = dtb_vpn_start.indices()[2];
-        let index_end = dtb_vpn_end.indices()[2];
-
-        let src = &kernel_page_table.as_slice()[index_start..=index_end];
-        let dst = &mut page_table.as_slice_mut()[index_start..=index_end];
-        dst.copy_from_slice(src);
+        // Map the MMIO areas.
+        for (&start_va, &length) in IO_MAPPINGS.lock().iter() {
+            let start_vpn = start_va.page_number();
+            let end_vpn = VirtAddr::new(start_va.to_usize() + length).page_number();
+            let index_start = start_vpn.indices()[2];
+            let index_end = end_vpn.indices()[2];
+            let src = &kernel_page_table.as_slice()[index_start..=index_end];
+            let dst = &mut page_table.as_slice_mut()[index_start..=index_end];
+            dst.copy_from_slice(src);
+        }
     }
 
     /// Adds a `FrameTracker` to the page table so that the frame can be deallocated
@@ -473,40 +464,6 @@ impl PageTable {
     /// table must be tracked by calling this method.
     fn track_frame(&self, frame: FrameTracker) {
         self.frames.lock().push(frame);
-    }
-
-    /// Map the physical addresses of I/O memory resources to core virtual
-    /// addresses.
-    ///
-    /// Linux also has this function.
-    pub fn ioremap(&self, paddr: usize, size: usize) -> SysResult<()> {
-        #[cfg(target_arch = "loongarch64")]
-        let flags = PteFlags::V | PteFlags::W | PteFlags::D;
-        #[cfg(target_arch = "riscv64")]
-        let flags = PteFlags::V | PteFlags::W | PteFlags::R | PteFlags::A | PteFlags::D;
-
-        let mut vpn = VirtAddr::new(paddr + KERNEL_MAP_OFFSET)
-            .round_down()
-            .page_number();
-        let mut ppn = vpn.to_ppn_kernel();
-        let mut size = size as isize;
-        while size > 0 {
-            self.map_page_to(vpn, ppn, flags)?;
-            vpn = VirtPageNum::new(vpn.to_usize() + 1);
-            ppn = PhysPageNum::new(ppn.to_usize() + 1);
-            size -= PAGE_SIZE as isize;
-        }
-        Ok(())
-    }
-
-    pub fn iounmap(&self, vaddr: usize, size: usize) {
-        let mut vpn = VirtAddr::new(vaddr).page_number();
-        let mut size = size as isize;
-        while size > 0 {
-            self.unmap_page(vpn);
-            vpn = VirtPageNum::new(vpn.to_usize() + 1);
-            size -= PAGE_SIZE as isize;
-        }
     }
 }
 
@@ -567,7 +524,7 @@ impl PageTableMem {
 pub unsafe fn switch_to_kernel_page_table() {
     // SAFETY: the boot page table never gets dropped.
     unsafe {
-        switch_page_table(&KERNEL_PAGE_TABLE);
+        switch_page_table(&KERNEL_PAGE_TABLE.lock());
     }
 }
 
@@ -624,5 +581,5 @@ pub fn trace_page_table_lookup(root: PhysPageNum, va: VirtAddr) {
 /// For debugging purposes.
 #[cfg(target_arch = "riscv64")]
 pub fn trace_kernel_page_table_lookup(va: VirtAddr) {
-    trace_page_table_lookup(KERNEL_PAGE_TABLE.root(), va);
+    trace_page_table_lookup(KERNEL_PAGE_TABLE.lock().root(), va);
 }

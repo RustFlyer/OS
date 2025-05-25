@@ -5,6 +5,9 @@ pub mod mmap;
 pub mod shm;
 pub mod user_ptr;
 
+#[cfg(target_arch = "riscv64")]
+pub mod iomap;
+
 mod page_table;
 mod pte;
 mod vm_area;

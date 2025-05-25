@@ -14,7 +14,7 @@ use mm::address::PhysAddr;
 use net::init_network;
 use virtio_drivers::transport::{self, Transport, mmio::MmioTransport};
 
-use crate::vm::KERNEL_PAGE_TABLE;
+use crate::vm::{iomap::{ioremap, iounmap}, KERNEL_PAGE_TABLE};
 
 pub fn probe_mmio(device_tree: &Fdt) {
     let blk = probe_virtio_blk(&device_tree);
@@ -44,9 +44,7 @@ pub fn probe_virtio_net(root: &Fdt) -> Option<DeviceMeta> {
             let mmio_size = reg.size?;
             log::debug!("[probe_virtio_net] probe reg {:?}", reg);
 
-            KERNEL_PAGE_TABLE
-                .ioremap(mmio_base_paddr.to_usize(), mmio_size)
-                .expect("can not ioremap");
+            ioremap(mmio_base_paddr.to_usize(), mmio_size).expect("can not ioremap");
 
             if probe_mmio_device(
                 mmio_base_paddr.to_va_kernel().to_usize() as *mut u8,
@@ -95,10 +93,7 @@ pub fn probe_virtio_blk(root: &Fdt) -> Option<Arc<VirtBlkDevice>> {
 
             log::debug!("[probe_virtio_blk] irq_no :{:?}", irq_no);
 
-            let res = KERNEL_PAGE_TABLE.ioremap(mmio_base_paddr.to_usize(), mmio_size);
-            if res.is_err() {
-                break;
-            }
+            ioremap(mmio_base_paddr.to_usize(), mmio_size).expect("can not ioremap");
 
             if let Some(transport) = probe_mmio_device(
                 mmio_base_paddr.to_va_kernel().to_usize() as *mut u8,
@@ -115,7 +110,7 @@ pub fn probe_virtio_blk(root: &Fdt) -> Option<Arc<VirtBlkDevice>> {
             if dev.is_some() {
                 break;
             }
-            KERNEL_PAGE_TABLE.iounmap(mmio_base_paddr.to_va_kernel().to_usize(), mmio_size);
+            iounmap(mmio_base_paddr.to_usize());
         }
     }
     if dev.is_none() {
@@ -231,6 +226,8 @@ fn probe_serial_console(stdout: &node::FdtNode) -> MmioSerialPort {
             log::info!(
                 "uart: base_paddr:{base_paddr:#x}, size:{size:#x}, reg_io_width:{reg_io_width}, reg_shift:{reg_shift}"
             );
+
+            ioremap(base_paddr, size).expect("ioremap serial console failed");
 
             log::debug!("MmioSerialPort::new {:#x}", base_vaddr);
             unsafe { MmioSerialPort::new(base_vaddr) }
