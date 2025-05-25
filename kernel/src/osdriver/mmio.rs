@@ -95,9 +95,10 @@ pub fn probe_virtio_blk(root: &Fdt) -> Option<Arc<VirtBlkDevice>> {
 
             log::debug!("[probe_virtio_blk] irq_no :{:?}", irq_no);
 
-            KERNEL_PAGE_TABLE
-                .ioremap(mmio_base_paddr.to_usize(), mmio_size)
-                .expect("can not ioremap");
+            let res = KERNEL_PAGE_TABLE.ioremap(mmio_base_paddr.to_usize(), mmio_size);
+            if res.is_err() {
+                break;
+            }
 
             if let Some(transport) = probe_mmio_device(
                 mmio_base_paddr.to_va_kernel().to_usize() as *mut u8,
