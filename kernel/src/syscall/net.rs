@@ -1,4 +1,5 @@
-use alloc::{sync::Arc, vec::Vec};
+use alloc::sync::Arc;
+
 use config::vfs::OpenFlags;
 use net::poll_interfaces;
 use systype::{SysError, SyscallResult};
@@ -179,7 +180,7 @@ pub async fn sys_sendto(
             if dest_addr != 0 {
                 return Err(SysError::EISCONN);
             }
-            socket.sk.sendto(&buf, None).await?
+            socket.sk.sendto(buf, None).await?
         }
         SocketType::DGRAM => {
             let sockaddr = if dest_addr != 0 {
@@ -187,7 +188,7 @@ pub async fn sys_sendto(
             } else {
                 None
             };
-            socket.sk.sendto(&buf, sockaddr).await?
+            socket.sk.sendto(buf, sockaddr).await?
         }
         _ => unimplemented!(),
     };

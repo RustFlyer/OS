@@ -37,7 +37,11 @@ impl TaskManager {
     pub fn remove_task(&self, tid: Tid) {
         self.0.lock().remove(&tid);
         log::debug!("[remove_task] {tid}");
-        let _ = self.for_each(|t| Ok(log::debug!("thread {}, name: {}", t.tid(), t.get_name())));
+        self.for_each(|t| {
+            log::debug!("thread {}, name: {}", t.tid(), t.get_name());
+            Ok(())
+        })
+        .unwrap();
     }
 
     pub fn get_task(&self, tid: Tid) -> Option<Arc<Task>> {

@@ -45,7 +45,6 @@ use arch::mm::tlb_flush_all_except_global;
 
 use super::{
     mapping_flags::MappingFlags,
-    mmap::MmapProt,
     page_table::PageTable,
     pte::{PageTableEntry, PteFlags},
 };
@@ -602,7 +601,9 @@ impl VmArea {
             let mut new_pte = *pte;
 
             #[cfg(target_arch = "riscv64")]
-            let new_flags = new_pte.flags().union(PteFlags::W | PteFlags::A | PteFlags::D);
+            let new_flags = new_pte
+                .flags()
+                .union(PteFlags::W | PteFlags::A | PteFlags::D);
             #[cfg(target_arch = "loongarch64")]
             let new_flags = new_pte.flags().union(PteFlags::W | PteFlags::D);
 
@@ -616,7 +617,9 @@ impl VmArea {
             let mut new_pte = *pte;
 
             #[cfg(target_arch = "riscv64")]
-            let new_flags = new_pte.flags().union(PteFlags::W | PteFlags::A | PteFlags::D);
+            let new_flags = new_pte
+                .flags()
+                .union(PteFlags::W | PteFlags::A | PteFlags::D);
             #[cfg(target_arch = "loongarch64")]
             let new_flags = new_pte.flags().union(PteFlags::W | PteFlags::D);
 

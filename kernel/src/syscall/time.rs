@@ -1,7 +1,7 @@
+use alloc::sync::Arc;
 use core::time::Duration;
 
-use alloc::sync::Arc;
-use arch::time::{get_time_duration, get_time_us,get_time_ms};
+use arch::time::{get_time_duration, get_time_us};
 use osfuture::{Select2Futures, SelectOutput};
 use systype::{SysError, SyscallResult};
 use time::{TMS, TimeSpec, TimeVal, TimeValue, itime::ITimerVal};

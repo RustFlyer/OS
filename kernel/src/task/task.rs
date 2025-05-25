@@ -156,7 +156,7 @@ impl Task {
     ) -> Self {
         let tid = tid_alloc();
         let pgid = tid.0;
-        let task = Task {
+        Task {
             tid,
             process: None,
             is_process: true,
@@ -185,8 +185,7 @@ impl Task {
             is_yield: AtomicBool::new(false),
             itimers: new_share_mutex([ITimer::default(); 3]),
             name: SyncUnsafeCell::new(name),
-        };
-        task
+        }
     }
 
     pub fn new_fork_clone(

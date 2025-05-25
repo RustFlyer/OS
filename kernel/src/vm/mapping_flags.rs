@@ -37,7 +37,7 @@ bitflags! {
     /// A page table entry in LoongArch does not have `R`, `X`, `U`, and `A` bits.
     /// Instead, it uses `NR` and `NX` bits to represent non-readable and non-executable.
     /// It uses `PLV` bits to represent the privilege level of the page, which is similar
-    /// to the `U` bit in RISC-V page table entries. 
+    /// to the `U` bit in RISC-V page table entries.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct MappingFlags: u64 {
         const V = 1 << 0;

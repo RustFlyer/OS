@@ -234,7 +234,7 @@ pub fn sys_shmat(shmid: usize, shmaddr: usize, shmflg: i32) -> SyscallResult {
         return Err(SysError::EINVAL);
     }
     SHARED_MEMORY_MANAGER.attach(shmid, task.pid());
-    return Ok(ret_addr.into());
+    Ok(ret_addr.into())
 }
 
 /// `shmdt()` detaches the shared memory segment located at the address specified by `shmaddr`
@@ -292,7 +292,7 @@ pub fn sys_shmctl(shmid: usize, cmd: i32, buf: usize) -> SyscallResult {
     let addrspace = task.addr_space();
 
     match cmd {
-        IPC_STAT if IPC_STAT == 2 => {
+        2 => {
             let shm_manager = SHARED_MEMORY_MANAGER.0.lock();
             if let Some(shm) = shm_manager.get(&shmid) {
                 let mut buf = UserWritePtr::<ShmStat>::new(buf, &addrspace);
@@ -302,7 +302,7 @@ pub fn sys_shmctl(shmid: usize, cmd: i32, buf: usize) -> SyscallResult {
                 Err(SysError::EINVAL)
             }
         }
-        IPC_RMID if IPC_RMID == 0 => Ok(0),
+        0 => Ok(0),
         cmd => {
             log::error!("[sys_shmctl] unimplemented cmd {cmd}");
             Err(SysError::EINVAL)

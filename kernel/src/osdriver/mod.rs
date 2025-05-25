@@ -1,5 +1,3 @@
-use config::mm::{DTB_ADDR, KERNEL_MAP_OFFSET};
-
 #[cfg(target_arch = "riscv64")]
 pub mod mmio;
 #[cfg(target_arch = "loongarch64")]
@@ -10,7 +8,8 @@ use mmio::*;
 #[cfg(target_arch = "loongarch64")]
 use pci::*;
 
-use driver::BLOCK_DEVICE;
+use config::mm::{DTB_ADDR, KERNEL_MAP_OFFSET};
+
 use flat_device_tree::Fdt;
 
 pub fn probe_tree() {

@@ -205,7 +205,7 @@ impl Task {
             parent = (*self.parent_mut()).clone();
             pgid = (*self.pgid_mut()).clone();
             cwd = self.cwd();
-            itimers = new_share_mutex(self.with_mut_itimers(|t| t.clone()));
+            itimers = new_share_mutex(self.with_mut_itimers(|t| *t));
 
             shm_maps = (*self.shm_maps_mut()).clone();
             let len = threadgroup.lock().len();
@@ -233,7 +233,7 @@ impl Task {
         let sig_handlers = if cloneflags.contains(CloneFlags::SIGHAND) {
             self.sig_handlers_mut().clone()
         } else {
-            new_share_mutex(self.with_mut_sig_handler(|handlers| (*handlers).clone()))
+            new_share_mutex(self.with_mut_sig_handler(|handlers| *handlers))
         };
 
         let sig_manager = SyncUnsafeCell::new(SigManager::new());

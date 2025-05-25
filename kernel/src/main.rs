@@ -22,7 +22,6 @@ mod vm;
 
 use core::ptr;
 
-use ::net::net_bench;
 use arch::mm::fence;
 use config::mm::{DTB_END, DTB_START};
 use mm::{self, frame, heap};

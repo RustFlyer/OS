@@ -1,20 +1,20 @@
 use alloc::collections::btree_map::BTreeMap;
 
 use config::mm::{KERNEL_MAP_OFFSET, PAGE_SIZE};
-use mm::address::{VirtAddr, VirtPageNum};
+use mm::address::VirtAddr;
 use mutex::SpinNoIrqLock;
 use systype::SysResult;
 
 use super::{
     KERNEL_PAGE_TABLE,
     mapping_flags::MappingFlags,
-    page_table::PageTable,
     vm_area::{OffsetArea, VmArea},
 };
 
 /// A map of I/O memory mappings, where the key is the starting virtual address
 /// of an I/O mapping area, and the value is the length of that area.
-pub static IO_MAPPINGS: SpinNoIrqLock<BTreeMap<VirtAddr, usize>> = SpinNoIrqLock::new(BTreeMap::new());
+pub static IO_MAPPINGS: SpinNoIrqLock<BTreeMap<VirtAddr, usize>> =
+    SpinNoIrqLock::new(BTreeMap::new());
 
 /// Map the physical addresses of I/O memory resources to the kernel page
 /// table.

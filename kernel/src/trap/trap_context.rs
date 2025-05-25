@@ -1,10 +1,9 @@
-use core::{arch::asm, fmt::Debug};
-
-use arch::trap::disable_interrupt;
 #[cfg(target_arch = "loongarch64")]
 use loongArch64::register::{CpuMode, prmd};
 #[cfg(target_arch = "riscv64")]
 use riscv::register::sstatus::{self, SPP, Sstatus};
+
+use arch::trap::disable_interrupt;
 
 /// when sp points to user stack of a task/process,
 /// sscratch(in RISCV) points to the start

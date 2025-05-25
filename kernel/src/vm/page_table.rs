@@ -9,9 +9,9 @@ use alloc::vec::Vec;
 use loongArch64::register::pgdl;
 
 use arch::mm::{fence, switch_pagetable, tlb_shootdown};
-use config::mm::{KERNEL_MAP_OFFSET, PAGE_SIZE, PTE_PER_TABLE};
+use config::mm::PTE_PER_TABLE;
 use mm::{
-    address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum},
+    address::{PhysPageNum, VirtAddr, VirtPageNum},
     page_cache::page::Page,
 };
 use mutex::SpinLock;

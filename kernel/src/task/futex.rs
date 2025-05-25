@@ -42,7 +42,7 @@ impl FutexAddr {
 
     pub fn check(&self, addrspace: &AddrSpace) -> SysResult<()> {
         unsafe {
-            UserReadPtr::<VirtAddr>::new(self.addr.to_usize(), &addrspace).read()?;
+            UserReadPtr::<VirtAddr>::new(self.addr.to_usize(), addrspace).read()?;
         }
         Ok(())
     }
@@ -65,12 +65,12 @@ pub static FUTEX_MANAGER: Lazy<Vec<SpinNoIrqLock<FutexManager>>> = Lazy::new(|| 
 });
 
 pub fn single_futex_manager() -> impl DerefMut<Target = FutexManager> {
-    FUTEX_MANAGER.get(0).unwrap().lock()
+    FUTEX_MANAGER.first().unwrap().lock()
 }
 
 pub fn futex_manager(is_multi_group: bool, val32: u32) -> impl DerefMut<Target = FutexManager> {
     if !is_multi_group {
-        FUTEX_MANAGER.get(0).unwrap().lock()
+        FUTEX_MANAGER.first().unwrap().lock()
     } else {
         let mut r = FUTEX_MANAGER.get(1).unwrap().lock();
         r.val32 = val32;
@@ -89,7 +89,7 @@ impl FutexManager {
         Self {
             hash: HashMap::new(),
             val32: 0,
-            is_mask: is_mask,
+            is_mask,
         }
     }
 
@@ -102,8 +102,7 @@ impl FutexManager {
         if let Some(waiters) = self.hash.get_mut(key) {
             waiters.push(waiter);
         } else {
-            let mut waiters = Vec::new();
-            waiters.push(waiter);
+            let waiters = vec![waiter];
             self.hash.insert(*key, waiters);
         }
         Ok(())
@@ -164,7 +163,7 @@ impl FutexManager {
             SysError::EINVAL
         })?;
 
-        let n = min(n_req as usize, old_waiters.len());
+        let n = min(n_req, old_waiters.len());
 
         let iter = 0..n;
         if let Some(new_waiters) = self.hash.get_mut(&new) {

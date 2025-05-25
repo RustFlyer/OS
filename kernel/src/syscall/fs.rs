@@ -1,28 +1,20 @@
-use alloc::{
-    boxed::Box,
-    ffi::CString,
-    string::{String, ToString},
-    vec::Vec,
-};
-use arch::time::get_time_duration;
+use alloc::{boxed::Box, ffi::CString, string::ToString, vec::Vec};
 use core::{
     cmp, mem,
     pin::Pin,
     task::{Context, Poll},
     time::Duration,
 };
-use osfuture::{Select2Futures, SelectOutput};
-use time::TimeSpec;
-use timer::{TimedTaskResult, TimeoutFuture};
 
 use strum::FromRepr;
 
+use arch::time::get_time_duration;
 use config::{
     device::BLOCK_SIZE,
     inode::InodeMode,
     vfs::{AccessFlags, AtFd, AtFlags, MountFlags, OpenFlags, PollEvents, RenameFlags, SeekFrom},
 };
-use driver::{BLOCK_DEVICE, println};
+use driver::BLOCK_DEVICE;
 use osfs::{
     FS_MANAGER,
     dev::{
@@ -36,7 +28,10 @@ use osfs::{
     pipe::{inode::PIPE_BUF_LEN, new_pipe},
     pselect::{FilePollRet, PSelectFuture},
 };
+use osfuture::{Select2Futures, SelectOutput};
 use systype::{SysError, SysResult, SyscallResult};
+use time::TimeSpec;
+use timer::{TimedTaskResult, TimeoutFuture};
 use vfs::{
     file::File,
     kstat::Kstat,
@@ -46,10 +41,7 @@ use vfs::{
 use crate::{
     processor::current_task,
     task::{TaskState, sig_members::IntrBySignalFuture, signal::sig_info::SigSet},
-    vm::{
-        addr_space::AddrSpace,
-        user_ptr::{UserPtr, UserReadPtr, UserReadWritePtr, UserWritePtr},
-    },
+    vm::user_ptr::{UserReadPtr, UserReadWritePtr, UserWritePtr},
 };
 
 /// The `open`() system call opens the file specified by `pathname`.  If the specified file does not ex‐
@@ -946,8 +938,7 @@ pub async fn sys_readv(fd: usize, iov: usize, iovcnt: usize) -> SyscallResult {
 
     let iovs = {
         let mut iovs_ptr = UserReadPtr::<IoVec>::new(iov, &addrspace);
-        let pointers = unsafe { iovs_ptr.read_array(iovcnt)? };
-        pointers
+        unsafe { iovs_ptr.read_array(iovcnt)? }
     };
 
     // log::info!("[sys_readv] iov: {:?}", iovs);
@@ -975,8 +966,7 @@ pub async fn sys_writev(fd: usize, iov: usize, iovcnt: usize) -> SyscallResult {
 
     let iovs = {
         let mut iovs_ptr = UserReadPtr::<IoVec>::new(iov, &addrspace);
-        let pointers = unsafe { iovs_ptr.read_array(iovcnt)? };
-        pointers
+        unsafe { iovs_ptr.read_array(iovcnt)? }
     };
 
     // log::info!("[sys_writev] iov: {:?}", iovs);
@@ -1508,9 +1498,9 @@ pub async fn sys_pselect6(
     log::debug!("[sys_pselect6] thread: {} call", task.tid());
     log::info!("[sys_pselect6] timeout: {:?}", timeout);
 
-    let mut polls = Vec::<FilePollRet>::with_capacity(nfds as usize);
+    let mut polls = Vec::<FilePollRet>::with_capacity(nfds);
 
-    for fd in 0..nfds as usize {
+    for fd in 0..nfds {
         let mut events = PollEvents::empty();
 
         readfds
@@ -1541,9 +1531,15 @@ pub async fn sys_pselect6(
     let pselect_future = PSelectFuture::new(polls);
 
     let mut sweep_and_cont = || {
-        readfds.as_mut().map(|fds| fds.clear());
-        writefds.as_mut().map(|fds| fds.clear());
-        exceptfds.as_mut().map(|fds| fds.clear());
+        if let Some(fds) = readfds.as_mut() {
+            fds.clear()
+        }
+        if let Some(fds) = writefds.as_mut() {
+            fds.clear()
+        }
+        if let Some(fds) = exceptfds.as_mut() {
+            fds.clear()
+        }
         task.set_state(TaskState::Running);
 
         if let Some(mask) = old_mask {
@@ -1580,12 +1576,16 @@ pub async fn sys_pselect6(
     for (fd, events) in ret_vec {
         if events.contains(PollEvents::IN) || events.contains(PollEvents::HUP) {
             log::info!("read ready fd {fd}");
-            readfds.as_mut().map(|fds| fds.set(fd));
+            if let Some(fds) = readfds.as_mut() {
+                fds.set(fd)
+            }
             ret += 1;
         }
         if events.contains(PollEvents::OUT) {
             log::info!("write ready fd {fd}");
-            writefds.as_mut().map(|fds| fds.set(fd));
+            if let Some(fds) = writefds.as_mut() {
+                fds.set(fd)
+            }
             ret += 1;
         }
     }
@@ -1614,7 +1614,6 @@ pub async fn sys_pread64(fd: usize, buf: usize, count: usize, offset: usize) -> 
 /// `fd` at offset `offset`.
 ///
 /// The file offset is not changed.
-
 pub async fn sys_pwrite64(fd: usize, buf: usize, count: usize, offset: usize) -> SyscallResult {
     let task = current_task();
     let addr_space = task.addr_space();
