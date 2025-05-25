@@ -60,10 +60,12 @@ pub fn user_exception_handler(task: &Task, e: Exception) {
             if let Err(e) = addr_space.handle_page_fault(fault_addr, access) {
                 // TODO: Send SIGSEGV to the task
                 log::error!(
-                    "[user_exception_handler] unsolved page fault at {:#x}, access: {:?}, error: {:?}",
+                    "[user_exception_handler] unsolved page fault at {:#x}, \
+                    access: {:?}, error: {:?}, bad instruction at {:#x}",
                     fault_addr.to_usize(),
                     access,
-                    e.as_str()
+                    e.as_str(),
+                    era::read().pc()
                 );
                 task.set_state(TaskState::Zombie);
             }
