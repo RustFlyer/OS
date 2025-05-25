@@ -28,6 +28,7 @@ fn kernel_exception_handler(_e: Exception) {
 fn kernel_interrupt_handler(i: Interrupt) {
     match i {
         Interrupt::Timer => {
+            log::debug!("kernel time interrupt");
             TIMER_MANAGER.check(get_time_duration());
             ticlr::clear_timer_interrupt();
         }

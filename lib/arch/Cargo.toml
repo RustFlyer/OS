@@ -8,6 +8,7 @@ config = { path = "../config" }
 polyhal-macro = { path = "../polyhal/polyhal-macro" }
 bit_field = { workspace = true }
 spin = { workspace = true }
+log = { workspace = true }
 
 [target.'cfg(target_arch = "riscv64")'.dependencies]
 riscv = { workspace = true }

@@ -27,7 +27,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
 
     // log::warn!(
     //     "task {} call [{}]",
-    //     current_task().tid(),
+    //     crate::processor::current_task().tid(),
     //     syscall_no.as_str(),
     // );
 
@@ -150,6 +150,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         GETEGID => sys_getegid(),
         MEMBARRIER => sys_membarrier(args[0], args[1], args[2]),
         SHUTDOWN => sys_shutdown(args[0], args[1]),
+        STATX => sys_statx(args[0], args[1], args[2], args[3], args[4]),
         _ => {
             println!("Syscall not implemented: {}", syscall_no.as_str());
             unimplemented!()

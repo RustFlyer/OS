@@ -124,6 +124,7 @@ pub enum SyscallNo {
     GETRANDOM = 278,
     MEMBARRIER = 283,
     COPY_FILE_RANGE = 285,
+    STATX = 291,
 }
 
 impl core::fmt::Display for SyscallNo {
@@ -250,6 +251,7 @@ impl SyscallNo {
             GETRANDOM => "getrandom",
             MEMBARRIER => "membarrier",
             COPY_FILE_RANGE => "copy_file_range",
+            STATX => "statx",
         }
     }
 }

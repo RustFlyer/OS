@@ -56,12 +56,9 @@ pub trait CharDevice: Send + Sync {
 
 pub fn init() {
     // init_block_device();
-    // init_char_device();
-    log::info!("success init driver");
     init_char_device();
 
-    log::debug!("test");
-    let buf = "hello char dev";
+    let buf = "hello char dev\n";
     CHAR_DEVICE.get().unwrap().write(buf.as_bytes());
 }
 

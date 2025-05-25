@@ -1626,3 +1626,101 @@ pub async fn sys_pwrite64(fd: usize, buf: usize, count: usize, offset: usize) ->
 
     file.write(buf).await
 }
+
+/// This function returns information about a file, storing it in the buffer pointed to by statxbuf. The returned buffer is a structure of the following type:
+/// ```c
+/// struct statx {
+///     __u32 stx_mask;        /* Mask of bits indicating
+///                               filled fields */
+///     __u32 stx_blksize;     /* Block size for filesystem I/O */
+///     __u64 stx_attributes;  /* Extra file attribute indicators */
+///     __u32 stx_nlink;       /* Number of hard links */
+///     __u32 stx_uid;         /* User ID of owner */
+///     __u32 stx_gid;         /* Group ID of owner */
+///     __u16 stx_mode;        /* File type and mode */
+///     __u64 stx_ino;         /* Inode number */
+///     __u64 stx_size;        /* Total size in bytes */
+///     __u64 stx_blocks;      /* Number of 512B blocks allocated */
+///     __u64 stx_attributes_mask;
+///                            /* Mask to show what's supported
+///                               in stx_attributes */
+///     /* The following fields are file timestamps */
+///     struct statx_timestamp stx_atime;  /* Last access */
+///     struct statx_timestamp stx_btime;  /* Creation */
+///     struct statx_timestamp stx_ctime;  /* Last status change */
+///     struct statx_timestamp stx_mtime;  /* Last modification */
+///     /* If this file represents a device, then the next two
+///        fields contain the ID of the device */
+///     __u32 stx_rdev_major;  /* Major ID */
+///     __u32 stx_rdev_minor;  /* Minor ID */
+///     /* The next two fields contain the ID of the device
+///        containing the filesystem where the file resides */
+///     __u32 stx_dev_major;   /* Major ID */
+///     __u32 stx_dev_minor;   /* Minor ID */
+///     __u64 stx_mnt_id;      /* Mount ID */
+///     /* Direct I/O alignment restrictions */
+///     __u32 stx_dio_mem_align;
+///     __u32 stx_dio_offset_align;
+/// };
+/// ```
+/// The file timestamps are structures of the following type:
+/// ```c
+/// struct statx_timestamp {
+///     __s64 tv_sec;    /* Seconds since the Epoch (UNIX time) */
+///     __u32 tv_nsec;   /* Nanoseconds since tv_sec */
+/// };
+/// ```
+pub fn sys_statx(
+    dirfd: usize,
+    pathname: usize,
+    flags: usize,
+    mask: usize,
+    statxbuf: usize,
+) -> SyscallResult {
+    pub struct STATX {
+        stx_mask: u32,
+        stx_blksize: u32,
+        stx_attributes: u64,
+        stx_nlink: u32,
+        stx_uid: u32,
+        stx_gid: u32,
+        stx_mode: u16,
+        stx_ino: u64,
+        stx_size: u64,
+        stx_blocks: u64,
+        stx_attributes_mask: u64,
+        __pad: [u32; 20],
+    }
+
+    let task = current_task();
+    let addrspace = task.addr_space();
+    let pathname = UserReadPtr::<u8>::new(pathname, &addrspace).read_c_string(256)?;
+    let path = pathname.into_string().map_err(|_| SysError::EINVAL)?;
+    let dirfd = AtFd::from(dirfd);
+
+    log::debug!("[sys_statx] path: {}, dirfd: {:?}", path, dirfd);
+
+    let dentry = task.walk_at(dirfd, path)?;
+
+    let stat = dentry.inode().unwrap().get_attr()?;
+    let statx = STATX {
+        stx_mask: 0,
+        stx_blksize: stat.st_blksize,
+        stx_attributes: 0,
+        stx_nlink: stat.st_nlink,
+        stx_uid: stat.st_uid,
+        stx_gid: stat.st_gid,
+        stx_mode: stat.st_mode as u16,
+        stx_ino: stat.st_ino,
+        stx_size: stat.st_size,
+        stx_blocks: stat.st_blocks,
+        stx_attributes_mask: 0,
+        __pad: [0; 20],
+    };
+
+    unsafe {
+        UserWritePtr::<STATX>::new(statxbuf, &addrspace).write(statx)?;
+    }
+
+    Ok(0)
+}
