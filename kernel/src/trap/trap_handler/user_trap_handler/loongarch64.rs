@@ -2,7 +2,7 @@ use core::arch::naked_asm;
 
 use loongArch64::register::estat::{self, Exception, Interrupt, Trap};
 use loongArch64::register::{
-    badv, ecfg, era, prmd, pwch, pwcl, stlbps, ticlr, tlbidx, tlbrehi, tlbrentry
+    badv, ecfg, era, prmd, pwch, pwcl, stlbps, ticlr, tlbidx, tlbrehi, tlbrentry,
 };
 
 use arch::{
@@ -84,6 +84,7 @@ pub fn user_exception_handler(task: &Task, e: Exception) {
 pub fn user_interrupt_handler(task: &Task, i: Interrupt) {
     match i {
         Interrupt::Timer => {
+            log::debug!("user time interrupt");
             ticlr::clear_timer_interrupt();
 
             // If the executor does not have other tasks, no need to yield

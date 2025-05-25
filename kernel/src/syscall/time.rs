@@ -1,7 +1,7 @@
 use core::time::Duration;
 
 use alloc::sync::Arc;
-use arch::time::{get_time_duration, get_time_us,get_time_ms};
+use arch::time::{get_time_duration, get_time_ms, get_time_us};
 use osfuture::{Select2Futures, SelectOutput};
 use systype::{SysError, SyscallResult};
 use time::{TMS, TimeSpec, TimeVal, TimeValue, itime::ITimerVal};
@@ -98,7 +98,7 @@ pub async fn sys_times(tms: usize) -> SyscallResult {
 /// };
 /// ```
 pub async fn sys_nanosleep(req: usize, rem: usize) -> SyscallResult {
-    // log::error!("[sys_nanosleep] called {}", get_time_ms());
+    log::debug!("[sys_nanosleep] called {}", get_time_ms());
 
     let task = current_task();
     let req_time = {
@@ -125,11 +125,11 @@ pub async fn sys_nanosleep(req: usize, rem: usize) -> SyscallResult {
     }?;
 
     if remain.is_zero() {
-        // log::debug!("[sys_nanosleep] sleep enough {}", get_time_ms());
+        log::debug!("[sys_nanosleep] sleep enough {}", get_time_ms());
         return Ok(0);
     }
 
-    // log::debug!("[sys_nanosleep] not sleep enough");
+    log::debug!("[sys_nanosleep] not sleep enough");
     let addr_space = task.addr_space();
     let mut rem_write = UserWritePtr::<TimeSpec>::new(rem, &addr_space);
     if !rem_write.is_null() {

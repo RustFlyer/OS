@@ -22,8 +22,7 @@ mod vm;
 
 use core::ptr;
 
-use ::net::net_bench;
-use arch::mm::fence;
+use arch::{mm::fence, time::init_timer};
 use config::mm::{DTB_END, DTB_START};
 use mm::{self, frame, heap};
 use processor::hart;
@@ -42,6 +41,12 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         logger::init();
         log::info!("hart {}: initializing kernel", hart_id);
         log::info!("dtb_addr: {:#x}", dtb_addr);
+
+        #[cfg(target_arch = "loongarch64")]
+        log::warn!("ARCH: loongarch64");
+
+        #[cfg(target_arch = "riscv64")]
+        log::warn!("ARCH: riscv64");
 
         /* Initialize heap allocator and page table */
         unsafe {
@@ -92,19 +97,12 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         log::info!("====== kernel memory layout end ======");
 
         osdriver::probe_tree();
-
-        // driver::init();
         log::info!("hart {}: initialized driver", hart_id);
-
-        // block_device_test();
-        // net_bench();
 
         osfs::init();
         log::info!("hart {}: initialized FS success", hart_id);
 
         // boot::start_harts(hart_id);
-
-        // loader::init();
 
         task::init();
     } else {

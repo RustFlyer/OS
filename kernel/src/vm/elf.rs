@@ -110,6 +110,7 @@ impl AddrSpace {
                 let dentry = Path::new(sys_root_dentry(), interp_name).walk()?;
                 <dyn File>::open(dentry)?
             };
+            log::debug!("[load_elf] open interp_file");
             let interp_stream: ElfStream<LittleEndian, _> =
                 ElfStream::open_stream(interp_file.as_ref()).map_err(|e| match e {
                     ElfParseError::IOError(_) => SysError::EIO,

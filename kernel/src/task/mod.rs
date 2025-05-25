@@ -30,8 +30,8 @@ pub fn init() {
     };
 
     Task::spawn_from_elf(init_proc, "init_proc");
-    // timer_init();
-    net_poll_init();
+    timer_init();
+    // net_poll_init();
     // elf_test();
 }
 

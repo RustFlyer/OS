@@ -5,8 +5,8 @@
 # ======================
 
 # Target architecture
-export ARCH = riscv64
-# export ARCH = loongarch64
+# export ARCH = riscv64
+export ARCH = loongarch64
 
 # Docker image name for development environment
 # Kernel package/output name
@@ -93,6 +93,7 @@ ifeq ($(ARCH),loongarch64)
 # QEMU_ARGS += -machine virt,accel=tcg
 
 	GDB = loongarch64-unknown-linux-gnu-gdb
+# GDB = loongarch64-linux-gnu-gdb
 	GDB_ARGS = Loongarch64
 endif
 
@@ -191,19 +192,20 @@ fs-img: user
 	@mkdir -p emnt
 	@sudo mount -t ext4 -o loop $(FS_IMG) emnt
 	@sudo cp -r $(USER_ELFS) emnt/
-	@sudo cp -r testcase/basic/* emnt/
-	@sudo cp -r testcase/busybox/* emnt/
-	@sudo cp -r testcase/lua/* emnt/
-	@sudo cp -r testcase/UnixBench/* emnt/
-	@sudo cp -r testcase/libc-test/* emnt/
-	@sudo cp -r testcase/iozone/* emnt/
-	@sudo cp -r testcase/iperf/* emnt/
-	@sudo cp -r testcase/netperf/* emnt/
+	-sudo cp -r testcase/$(ARCH)/basic/* emnt/
+	-sudo cp -r testcase/$(ARCH)/busybox/* emnt/
+	-sudo cp -r testcase/$(ARCH)/lua/* emnt/
+	-sudo cp -r testcase/$(ARCH)/UnixBench/* emnt/
+	-sudo cp -r testcase/$(ARCH)/libc-test/* emnt/
+	-sudo cp -r testcase/$(ARCH)/iozone/* emnt/
+	-sudo cp -r testcase/$(ARCH)/iperf/* emnt/
+	-sudo cp -r testcase/$(ARCH)/netperf/* emnt/
 	@sudo cp -r img-data/* emnt/
 	@sudo chmod -R 755 emnt/
 	@sudo umount emnt
 	@sudo rm -rf emnt
 	@echo "building fs-img finished"
+	@echo "Attention: cp error can be ignored"
 
 
 .PHONY: $(PHONY)
