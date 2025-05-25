@@ -148,6 +148,7 @@ impl VmArea {
     /// `start_va` must be page-aligned.
     ///
     /// `prot` needs to have `RWXU` bits set properly; other bits must be zero.
+    #[cfg(target_arch = "riscv64")]
     pub fn new_kernel(start_va: VirtAddr, end_va: VirtAddr, prot: MappingFlags) -> Self {
         debug_assert!(start_va.to_usize() % PAGE_SIZE == 0);
         debug_assert!((MappingFlags::RWX | MappingFlags::U).contains(prot));
@@ -601,7 +602,9 @@ impl VmArea {
             let mut new_pte = *pte;
 
             #[cfg(target_arch = "riscv64")]
-            let new_flags = new_pte.flags().union(PteFlags::W | PteFlags::A | PteFlags::D);
+            let new_flags = new_pte
+                .flags()
+                .union(PteFlags::W | PteFlags::A | PteFlags::D);
             #[cfg(target_arch = "loongarch64")]
             let new_flags = new_pte.flags().union(PteFlags::W | PteFlags::D);
 
@@ -615,7 +618,9 @@ impl VmArea {
             let mut new_pte = *pte;
 
             #[cfg(target_arch = "riscv64")]
-            let new_flags = new_pte.flags().union(PteFlags::W | PteFlags::A | PteFlags::D);
+            let new_flags = new_pte
+                .flags()
+                .union(PteFlags::W | PteFlags::A | PteFlags::D);
             #[cfg(target_arch = "loongarch64")]
             let new_flags = new_pte.flags().union(PteFlags::W | PteFlags::D);
 
