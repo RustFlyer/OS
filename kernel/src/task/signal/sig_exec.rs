@@ -66,8 +66,6 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
             Ok(false)
         }
         ActionType::User { entry } => {
-            log::error!("write before");
-
             // The signal being delivered is also added to the signal mask, unless
             // SA_NODEFER was specified when registering the handler.
             if !action.flags.contains(SigActionFlag::SA_NODEFER) {
@@ -94,7 +92,7 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
             };
             // extend the sig_stack
             // 在栈上压入一个sig_cx，存储trap frame里的寄存器信息
-            log::error!("[sig context] sp: {:#x}", sp);
+            log::debug!("[sig context] sp: {:#x}", sp);
 
             let mut new_sp = sp - size_of::<SigContext>();
             let addr_space = task.addr_space();
@@ -110,12 +108,11 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
                 fpstate: [0; 66],
             };
             sig_cx.user_reg[0] = cx.sepc;
-            log::error!("[sig context] sig_cx_ptr: {sig_cx_ptr:?}");
-            log::error!("[sig context] SigContext: {:#x}", size_of::<SigContext>());
+            log::debug!("[sig context] sig_cx_ptr: {sig_cx_ptr:?}");
+            log::debug!("[sig context] SigContext: {:#x}", size_of::<SigContext>());
 
             unsafe { sig_cx_ptr.write(sig_cx)? };
 
-            log::error!("write after");
             task.set_sig_cx_ptr(new_sp);
             // user defined void (*sa_handler)(int);
             cx.user_reg[10] = si.sig.raw();
@@ -159,7 +156,7 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
             cx.user_reg[3] = sig_cx.user_reg[3];
             cx.user_reg[4] = sig_cx.user_reg[4];
 
-            (cx.sepc == 0x68094).then(|| simdebug::stop());
+            (cx.sepc == 0x68094).then(simdebug::stop);
 
             log::debug!("cx.sepc: {:#x}", cx.sepc);
             log::debug!("cx.user_reg[1]: {:#x}", cx.user_reg[1]);

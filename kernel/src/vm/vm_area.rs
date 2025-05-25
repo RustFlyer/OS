@@ -301,7 +301,7 @@ impl VmArea {
             // We allow `prot` to be anything, but we warn if it does not
             // have `RW` bits set.
             if !prot.contains(MappingFlags::R | MappingFlags::W) {
-                log::warn!("Anonymous area should have `RW` bits set for most cases");
+                log::warn!("Anonymous area should have `RW` bits set for most cases; got: {prot:?}");
             }
             true
         });

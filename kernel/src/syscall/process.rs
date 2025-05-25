@@ -159,7 +159,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
             }
         }
         let tid = zombie_task.tid();
-        log::error!(
+        log::debug!(
             "[sys_wait4] remove tid [{}] task [{}]",
             tid,
             zombie_task.get_name()
@@ -487,7 +487,7 @@ pub fn sys_set_tid_address(tidptr: usize) -> SyscallResult {
 /// Typical application: After the daemon process starts, it first starts as root,
 /// and then sets gid/gid to a regular user to reduce permissions and enhance system security.
 pub fn sys_setgid(gid: usize) -> SyscallResult {
-    log::error!("[sys_setgid] unimplemented call gid: {gid}");
+    log::warn!("[sys_setgid] unimplemented call gid: {gid}");
     Ok(0)
 }
 

@@ -126,7 +126,7 @@ pub async fn sys_futex(
             task.set_wake_up_signal(wake_up_signal);
             if timeout != 0 {
                 let ts = unsafe { UserReadPtr::<TimeSpec>::new(timeout, &addrspace).read() }?;
-                (!ts.is_valid()).then(|| return SysError::EINVAL);
+                (!ts.is_valid()).then_some(SysError::EINVAL);
                 log::debug!("[sys_futex] Wait for {:?}", ts);
 
                 let rem = task.suspend_timeout(ts.into()).await;
@@ -150,7 +150,7 @@ pub async fn sys_futex(
         FutexOp::WakeBitset | FutexOp::Wake => {
             // log::debug!("[sys_futex] wake");
             let n_wake = futex_manager(is_multi_group, val3).wake(&key, val)?;
-            return Ok(n_wake);
+            Ok(n_wake)
         }
         FutexOp::Requeue | FutexOp::CmpRequeue => {
             if op.contains(FutexOp::CmpRequeue) && futex_addr.read() as u32 != val3 {
@@ -166,7 +166,7 @@ pub async fn sys_futex(
         _ => {
             log::error!(
                 "[panic?] unimplemented futexop({:#x}:{}) {:?} called by {}",
-                futex_op as i32,
+                futex_op,
                 futex_op as usize,
                 op,
                 task.get_name()
@@ -195,7 +195,7 @@ pub fn sys_kill(pid: isize, sig_code: i32) -> SyscallResult {
 
     match pid {
         _ if pid > 0 => {
-            log::error!("[sys_kill] Send {sig_code} to {pid}");
+            log::info!("[sys_kill] Send {sig_code} to {pid}");
             if let Some(task) = TASK_MANAGER.get_task(pid as usize) {
                 log::debug!(
                     "[sys_kill] thread {} name {} gets killed",
@@ -219,15 +219,14 @@ pub fn sys_kill(pid: isize, sig_code: i32) -> SyscallResult {
 
         -1 => {
             TASK_MANAGER.for_each(|task| {
-                Ok(
-                    if task.pid() != INIT_PROC_ID && task.is_process() && sig.raw() != 0 {
-                        task.receive_siginfo(SigInfo {
-                            sig,
-                            code: SigInfo::USER,
-                            details: SigDetails::Kill { pid: task.pid() },
-                        });
-                    },
-                )
+                if task.pid() != INIT_PROC_ID && task.is_process() && sig.raw() != 0 {
+                    task.receive_siginfo(SigInfo {
+                        sig,
+                        code: SigInfo::USER,
+                        details: SigDetails::Kill { pid: task.pid() },
+                    });
+                }
+                Ok(())
             })?;
         }
 
@@ -235,7 +234,6 @@ pub fn sys_kill(pid: isize, sig_code: i32) -> SyscallResult {
             todo!()
         }
     }
-    log::error!("[sys_kill] out");
     Ok(0)
 }
 
@@ -582,7 +580,7 @@ pub async fn sys_rt_sigtimedwait(set: usize, info: usize, timeout: usize) -> Sys
         if !timeout.is_valid() {
             return Err(SysError::EINVAL);
         }
-        log::warn!("[sys_rt_sigtimedwait] {:?}", timeout);
+        log::info!("[sys_rt_sigtimedwait] {:?}", timeout);
         task.suspend_timeout(timeout.into()).await;
     } else {
         suspend_now().await;
@@ -591,7 +589,7 @@ pub async fn sys_rt_sigtimedwait(set: usize, info: usize, timeout: usize) -> Sys
     task.set_state(TaskState::Running);
     let si = task.with_mut_sig_manager(|pending| pending.dequeue_expect(set));
     if let Some(si) = si {
-        log::warn!("[sys_rt_sigtimedwait] I'm woken by {:?}", si);
+        log::info!("[sys_rt_sigtimedwait] I'm woken by {:?}", si);
         if !info.is_null() {
             unsafe {
                 info.write(si)?;
@@ -599,7 +597,7 @@ pub async fn sys_rt_sigtimedwait(set: usize, info: usize, timeout: usize) -> Sys
         }
         Ok(si.sig.raw())
     } else {
-        log::warn!("[sys_rt_sigtimedwait] I'm woken by timeout");
+        log::info!("[sys_rt_sigtimedwait] I'm woken by timeout");
         Err(SysError::EAGAIN)
     }
 }

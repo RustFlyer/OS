@@ -376,7 +376,7 @@ impl Task {
 
         let tg_lock = self.thread_group_mut();
         let mut threadgroup = tg_lock.lock();
-        log::warn!(
+        log::info!(
             "[exit] thread {}, name: {} do exit, is_process: {}, tg_len: {}, leader state: {:?}",
             self.tid(),
             self.get_name(),

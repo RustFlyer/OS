@@ -70,10 +70,10 @@ impl Task {
         manager.add(si);
         if manager.should_wake.contain_signal(si.sig) && self.is_in_state(TaskState::Interruptable)
         {
-            log::warn!("[Task::recv] tid {} has been woken", self.tid());
+            log::info!("[Task::recv] tid {} has been woken", self.tid());
             self.wake();
         } else {
-            log::warn!(
+            log::info!(
                 "[Task::recv] tid {} hasn't been woken, should_wake {:?}, state {:?}",
                 self.tid(),
                 manager.should_wake,
