@@ -429,9 +429,11 @@ impl UdpSocket {
     pub fn get_ephemeral_port() -> u16 {
         let mut curr = CURR.lock();
         let port = *curr;
-        *curr += 1;
-        if *curr > PORT_END {
+        let next_port: u32 = port as u32 + 1;
+        if next_port > PORT_END as u32 {
             *curr = PORT_START;
+        } else {
+            *curr = next_port as u16;
         }
         port
     }
