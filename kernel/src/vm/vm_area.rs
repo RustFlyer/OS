@@ -168,6 +168,7 @@ impl VmArea {
     /// `start_va` must be page-aligned.
     ///
     /// `prot` needs to have `RWXU` bits set properly; other bits must be zero.
+    #[cfg(target_arch = "riscv64")]
     pub fn new_fixed_offset(
         start_va: VirtAddr,
         end_va: VirtAddr,
@@ -184,14 +185,7 @@ impl VmArea {
             flags,
             pte_flags: {
                 let pte_flags = PteFlags::from(prot | MappingFlags::V | MappingFlags::G);
-                #[cfg(target_arch = "riscv64")]
-                {
-                    pte_flags | PteFlags::A | PteFlags::D
-                }
-                #[cfg(target_arch = "loongarch64")]
-                {
-                    pte_flags
-                }
+                pte_flags | PteFlags::A | PteFlags::D
             },
             prot,
             pages: BTreeMap::new(),
@@ -243,11 +237,11 @@ impl VmArea {
                 let prot = prot | MappingFlags::V | MappingFlags::U;
                 #[cfg(target_arch = "riscv64")]
                 {
-                    PteFlags::from(prot) | PteFlags::A
+                    PteFlags::from(prot) | PteFlags::A | PteFlags::D
                 }
                 #[cfg(target_arch = "loongarch64")]
                 {
-                    PteFlags::from(prot)
+                    PteFlags::from(prot) | PteFlags::D
                 }
             },
             prot,
@@ -325,7 +319,7 @@ impl VmArea {
                 }
                 #[cfg(target_arch = "loongarch64")]
                 {
-                    PteFlags::from(prot)
+                    PteFlags::from(prot) | PteFlags::D
                 }
             },
             prot,
@@ -354,7 +348,7 @@ impl VmArea {
                 }
                 #[cfg(target_arch = "loongarch64")]
                 {
-                    PteFlags::from(prot)
+                    PteFlags::from(prot) | PteFlags::D
                 }
             },
             prot: MappingFlags::R | MappingFlags::W | MappingFlags::U,
@@ -382,7 +376,7 @@ impl VmArea {
                 }
                 #[cfg(target_arch = "loongarch64")]
                 {
-                    PteFlags::from(prot)
+                    PteFlags::from(prot) | PteFlags::D
                 }
             },
             prot: MappingFlags::R | MappingFlags::W | MappingFlags::U,
@@ -607,27 +601,27 @@ impl VmArea {
             let mut new_pte = *pte;
 
             #[cfg(target_arch = "riscv64")]
-            let new_flags = new_pte.flags().difference(PteFlags::W);
+            let new_flags = new_pte.flags().union(PteFlags::W | PteFlags::A | PteFlags::D);
             #[cfg(target_arch = "loongarch64")]
-            let new_flags = new_pte.flags().difference(PteFlags::W | PteFlags::D);
+            let new_flags = new_pte.flags().union(PteFlags::W | PteFlags::D);
 
             new_pte.set_flags(new_flags);
             new_pte.set_ppn(new_page.ppn());
             *pte = new_pte;
+
             self.pages.insert(fault_vpn, Arc::new(new_page));
         } else {
             // Just set the write bit if the page is not shared.
             let mut new_pte = *pte;
 
             #[cfg(target_arch = "riscv64")]
-            let new_flags = new_pte.flags().union(PteFlags::W);
+            let new_flags = new_pte.flags().union(PteFlags::W | PteFlags::A | PteFlags::D);
             #[cfg(target_arch = "loongarch64")]
             let new_flags = new_pte.flags().union(PteFlags::W | PteFlags::D);
 
             new_pte.set_flags(new_flags);
             *pte = new_pte;
         }
-        // log::error!("[handle_cow_fault] success");
         Ok(())
     }
 

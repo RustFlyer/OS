@@ -196,7 +196,6 @@ impl PageTable {
             }
             #[cfg(target_arch = "loongarch64")]
             {
-                // TODO: Check the required bits for LoongArch
                 let _ = inner_flags;
                 PteFlags::empty()
             }
@@ -485,6 +484,7 @@ impl PageTable {
         let flags = PteFlags::V | PteFlags::W | PteFlags::D;
         #[cfg(target_arch = "riscv64")]
         let flags = PteFlags::V | PteFlags::W | PteFlags::R | PteFlags::A | PteFlags::D;
+
         let mut vpn = VirtAddr::new(paddr + KERNEL_MAP_OFFSET)
             .round_down()
             .page_number();

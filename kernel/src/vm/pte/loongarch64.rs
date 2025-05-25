@@ -21,7 +21,7 @@ bitflags! {
     ///   - 2: Weakly-ordered UnCached (WUC)
     /// - `G`: Global. If set, the address range pointed at by the PTE is global
     ///   mapped, which is in all address spaces.
-    /// - `P`: Physical page existing. The meaning of this bit is ambiguous, and we will
+    /// - `P`: Physical page existing. The meaning of this bit is ambiguous, so we will
     ///   set it to 0 for now.
     /// - `W`: Write. If set, the page pointed at by the PTE is writable.
     /// - `X`: Execute. If set, the page pointed at by the PTE is executable.
