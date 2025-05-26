@@ -105,6 +105,7 @@ impl SocketSetWrapper {
     where
         F: FnOnce(&mut T) -> R,
     {
+        // log::debug!("[with_socket_mut] {:?}", handle);
         let mut set = self.0.lock();
         let socket = set.get_mut(handle);
         f(socket)

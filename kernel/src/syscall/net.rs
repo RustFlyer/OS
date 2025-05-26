@@ -10,7 +10,7 @@ use crate::{
         addr::{SaFamily, SockAddr, read_sockaddr, write_sockaddr},
         sock::Sock,
         socket::Socket,
-        sockopt::{SocketLevel, SocketOpt},
+        sockopt::{SocketLevel, SocketOpt, TcpSocketOpt},
     },
     processor::current_task,
     task::TaskState,
@@ -133,7 +133,31 @@ pub fn sys_getsockopt(
             }
         }
         SocketLevel::IPPROTO_IP | SocketLevel::IPPROTO_TCP => {
-            todo!()
+            const MAX_SEGMENT_SIZE: usize = 1460;
+            let mut optval = UserWritePtr::<u32>::new(optval, &addrspace);
+            let mut optlen = UserWritePtr::<u32>::new(optlen, &addrspace);
+
+            unsafe {
+                match TcpSocketOpt::try_from(optname)? {
+                    TcpSocketOpt::MAXSEG => {
+                        optval.write(MAX_SEGMENT_SIZE as u32)?;
+                        optlen.write(size_of::<u32>() as u32)?
+                    }
+                    TcpSocketOpt::NODELAY => {
+                        optval.write(0)?;
+                        optlen.write(size_of::<u32>() as u32)?
+                    }
+                    TcpSocketOpt::INFO => {}
+                    TcpSocketOpt::CONGESTION => {
+                        log::error!("[sys_getsockopt] TcpSocketOpt::CONGESTION");
+                        // optval.write_array("reno".as_bytes() as *const u8)?;
+                        optlen.write(0)?
+                    }
+                    opt => {
+                        log::error!("[sys_getsockopt] unsupported IPPROTO_TCP opt {opt:?}")
+                    }
+                };
+            }
         }
         SocketLevel::IPPROTO_IPV6 => todo!(),
     }

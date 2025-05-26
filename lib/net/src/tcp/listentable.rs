@@ -183,16 +183,18 @@ impl ListenTable {
         while !list.is_empty() {
             let port = list.pop().unwrap();
             if let Some(entry) = self.tcp[port as usize].lock().deref_mut() {
-                // log::debug!("[check_after_poll] ");
+                log::debug!("[check_after_poll] port: {}", port);
                 let mut listen_handles = entry.handles.lock();
                 let mut ret = None;
                 for (i, &handle) in listen_handles.iter().enumerate() {
+                    log::error!("[check_after_poll] port: {}, handle: {}", port, handle);
                     let sock: &mut tcp::Socket<'_> = sockets.get_mut(handle);
                     // SOCKET_SET.with_socket_mut::<tcp::Socket, _, _>(handle, |sock| {
                     log::debug!("[check_after_poll] sock.state()? {}", sock.state());
                     if sock.state() == State::SynReceived {
                         log::debug!("[check_after_poll] success get handle!");
                         entry.syn_queue.push_back(handle);
+
                         entry.syn_recv_sleep.store(true, Ordering::Relaxed);
                         let local_addr = sock.local_endpoint().unwrap();
                         ret = Some((handle, local_addr, i));
@@ -204,14 +206,14 @@ impl ListenTable {
                     }
                 }
 
-                // if let Some((handle, local_addr, index)) = ret {
-                // listen_handles.remove(index);
-                // let new_handle = SOCKET_SET.add(SocketSetWrapper::new_tcp_socket());
-                // SOCKET_SET.with_socket_mut::<tcp::Socket, _, _>(new_handle, |sock| {
-                //     sock.listen(local_addr).unwrap();
-                // });
-                // listen_handles.push(new_handle);
-                // }
+                if let Some((handle, local_addr, index)) = ret {
+                    listen_handles.remove(index);
+                    // let new_handle = SOCKET_SET.add(SocketSetWrapper::new_tcp_socket());
+                    // SOCKET_SET.with_socket_mut::<tcp::Socket, _, _>(new_handle, |sock| {
+                    //     sock.listen(local_addr).unwrap();
+                    // });
+                    // listen_handles.push(new_handle);
+                }
             }
         }
     }
