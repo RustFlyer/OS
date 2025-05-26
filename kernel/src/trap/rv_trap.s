@@ -27,7 +27,7 @@ __trap_from_user:
     sd x1, 1*8(sp)
     # Skip sp (x2), it will be saved later
 
-    # Save x3~x31 (x4 is tp, thread pointer, hence it's skipped)
+    # Save x3~x31
     .set n, 3
     .rept 29
         SAVE_GP %n

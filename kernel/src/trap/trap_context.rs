@@ -213,6 +213,67 @@ impl TrapContext {
         }
     }
 
+    pub fn set_user_a0(&mut self, val: usize) {
+        #[cfg(target_arch = "riscv64")] 
+        {
+            self.user_reg[10] = val;
+        }
+
+        #[cfg(target_arch = "loongarch64")]
+        {
+            self.user_reg[4] = val;
+        }
+    }
+
+    pub fn set_user_a1(&mut self, val: usize) {
+        #[cfg(target_arch = "riscv64")]
+        {
+            self.user_reg[11] = val;
+        }
+
+        #[cfg(target_arch = "loongarch64")]
+        {
+            self.user_reg[5] = val;
+        }
+    }
+
+    pub fn set_user_a2(&mut self, val: usize) {
+        #[cfg(target_arch = "riscv64")]
+        {
+            self.user_reg[12] = val;
+        }
+
+        #[cfg(target_arch = "loongarch64")]
+        {
+            self.user_reg[6] = val;
+        }
+    }
+
+    pub fn get_user_a0(&self) -> usize {
+        #[cfg(target_arch = "riscv64")]
+        {
+            self.user_reg[2]
+        }
+
+        #[cfg(target_arch = "loongarch64")]
+        {
+            self.user_reg[3]
+        }
+    }
+
+
+    pub fn get_user_sp(&self) -> usize {
+        #[cfg(target_arch = "riscv64")]
+        {
+            self.user_reg[2]
+        }
+
+        #[cfg(target_arch = "loongarch64")]
+        {
+            self.user_reg[3]
+        }
+    }
+
     /// set entry to user space.
     /// when the application temps to return from trap_return, it will
     /// step in `entry` address in user space.
