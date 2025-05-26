@@ -33,6 +33,14 @@ pub fn set_trap_handler(handler_addr: usize, mode: TrapMode) {
         TrapMode::Direct => 0,
         TrapMode::Vectored => 1,
     };
+    // Modifying the `ecfg` and `eentry` registers must be done atomically.
+    let old_ie = crmd::read().ie();
+    disable_interrupt();
     ecfg::set_vs(vs);
     eentry::set_eentry(handler_addr);
+    if old_ie {
+        enable_interrupt();
+    } else {
+        disable_interrupt();
+    }
 }
