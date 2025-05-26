@@ -5,8 +5,8 @@
 # ======================
 
 # Target architecture
-export ARCH = riscv64
-# export ARCH = loongarch64
+# export ARCH = riscv64
+export ARCH = loongarch64
 export COMPLIB = musl
 # export COMPLIB = glibc
 

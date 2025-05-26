@@ -4,11 +4,13 @@ use core::{mem, ptr};
 use alloc::sync::Arc;
 use config::mm::KERNEL_MAP_OFFSET;
 use driver::hal::VirtHalImpl;
+use driver::net::loopback::LoopbackDev;
 use driver::qemu::VirtBlkDevice;
 use driver::{BLOCK_DEVICE, BlockDevice};
 use flat_device_tree::Fdt;
 use flat_device_tree::node::FdtNode;
 use flat_device_tree::standard_nodes::Compatible;
+use net::init_network;
 use virtio_drivers::device::console::VirtIOConsole;
 use virtio_drivers::transport::mmio::{MmioTransport, VirtIOHeader};
 use virtio_drivers::transport::pci::bus::{BarInfo, MemoryBarType};
@@ -179,6 +181,8 @@ pub fn probe_pci<'a>(fdt: &'a Fdt<'a>) {
         log::info!("Found PCIe node: {}", pcie_node.name);
         enumerate_pci(pcie_node, Cam::Ecam);
     }
+
+    init_network(LoopbackDev::new(), true);
 }
 
 pub fn enumerate_pci(pci_node: FdtNode, cam: Cam) {
