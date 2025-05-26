@@ -197,7 +197,6 @@ fs-img: user
 	-sudo cp -r testcase/$(ARCH)/$(COMPLIB)/basic/* emnt/
 	-sudo cp -r testcase/$(ARCH)/$(COMPLIB)/busybox/* emnt/
 	-sudo cp -r testcase/$(ARCH)/$(COMPLIB)/lua/* emnt/
-	-sudo cp -r testcase/$(ARCH)/$(COMPLIB)/UnixBench/* emnt/
 	-sudo cp -r testcase/$(ARCH)/$(COMPLIB)/libc-test/* emnt/
 	-sudo cp -r testcase/$(ARCH)/$(COMPLIB)/iozone/* emnt/
 	-sudo cp -r testcase/$(ARCH)/$(COMPLIB)/iperf/* emnt/
@@ -208,7 +207,7 @@ fs-img: user
 	@sudo umount emnt
 	@sudo rm -rf emnt
 	@echo "building fs-img finished"
-	@echo "Attention: cp error can be ignored"
+	@echo "Attention: cp error may be ignored"
 
 
 .PHONY: $(PHONY)
