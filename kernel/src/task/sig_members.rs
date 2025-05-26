@@ -292,10 +292,8 @@ impl ActionType {
 #[derive(Copy, Clone, Debug)]
 pub struct Action {
     pub atype: ActionType,
-    // 一个位掩码，每个比特位对应于系统中的一个信号。它用于在处理程序例程执行期间阻塞其他信号。
-    // 在例程结束后，内核会重置其值，回复到信号处理之前的原值
-    pub flags: SigActionFlag,
-    pub mask: SigSet,
+    pub flags: SigActionFlag,   //信号处理的附加信息
+    pub mask: SigSet,    // 一个位掩码，每个比特位对应于系统中的一个信号，用于在处理程序执行期间阻塞其他信号。
 }
 
 bitflags! {

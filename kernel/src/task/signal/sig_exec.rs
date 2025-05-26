@@ -6,6 +6,7 @@ use crate::task::signal::sig_info::SigSet;
 use crate::task::{Task, sig_members::ActionType};
 use crate::vm::user_ptr::UserWritePtr;
 use alloc::sync::Arc;
+use driver::print;
 use systype::SysResult;
 
 use super::sig_info::{Sig, SigInfo};
@@ -35,6 +36,8 @@ pub async fn sig_check(task: Arc<Task>, interrupted: &mut bool) {
 async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysResult<bool> {
     let action = task.sig_handlers_mut().lock().get(si.sig);
     let cx = task.trap_context_mut();
+    #[cfg(target_arch = "loongarch64")]
+    log::debug!("[sig context] TrapContext.sp: {:#x}", cx.user_reg[3]);
     let old_mask = task.get_sig_mask();
 
     // log::debug!(
@@ -87,12 +90,18 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
                     // 用户自定义的信号处理函数将使用进程的普通栈空间，
                     // 即和其他普通函数相同的栈。这个栈通常就是进程的主栈，
                     // 也就是在进程启动时由操作系统自动分配的栈。
-                    cx.user_reg[2]
+                    #[cfg(target_arch = "loongarch64")]
+                    {
+                        cx.user_reg[3]
+                    }
+                    #[cfg(target_arch = "riscv64")]
+                    {
+                        cx.user_reg[2]
+                    }
                 }
             };
             // extend the sig_stack
             // 在栈上压入一个sig_cx，存储trap frame里的寄存器信息
-            log::debug!("[sig context] sp: {:#x}", sp);
 
             let mut new_sp = sp - size_of::<SigContext>();
             let addr_space = task.addr_space();
@@ -155,8 +164,6 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
             cx.user_reg[2] = new_sp;
             cx.user_reg[3] = sig_cx.user_reg[3];
             cx.user_reg[4] = sig_cx.user_reg[4];
-
-            (cx.sepc == 0x68094).then(simdebug::stop);
 
             log::debug!("cx.sepc: {:#x}", cx.sepc);
             log::debug!("cx.user_reg[1]: {:#x}", cx.user_reg[1]);
