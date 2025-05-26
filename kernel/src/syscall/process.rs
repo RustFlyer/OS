@@ -389,6 +389,11 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
     let args = read_string_array(argv)?;
     let mut envs = read_string_array(envp)?;
 
+    if path.is_empty() {
+        log::warn!("[sys_execve] path is empty");
+        return Err(SysError::ENOENT);
+    }
+
     envs.push(String::from(
         r#"PATH=/:/bin:/sbin:/usr/bin:/usr/local/bin:/usr/local/sbin:"#,
     ));

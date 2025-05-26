@@ -29,7 +29,7 @@ use core::{cmp, fmt::Debug, mem};
 use bitflags::bitflags;
 
 use arch::mm::{tlb_flush_addr, tlb_shootdown};
-use config::mm::{KERNEL_MAP_OFFSET, PAGE_SIZE};
+use config::mm::PAGE_SIZE;
 use mm::{
     address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum},
     page_cache::page::Page,
@@ -42,6 +42,8 @@ use vfs::file::File;
 
 #[cfg(target_arch = "riscv64")]
 use arch::mm::tlb_flush_all_except_global;
+#[cfg(target_arch = "riscv64")]
+use config::mm::KERNEL_MAP_OFFSET;
 
 use super::{
     mapping_flags::MappingFlags,
@@ -63,8 +65,8 @@ pub struct VmArea {
     flags: VmaFlags,
     /// Memory protection of the VMA. Only `RWXU` bits should be set.
     prot: MappingFlags,
-    /// Cache for leaf page table entry flags, which are default when creating
-    /// a new leaf entry.
+    /// Cache for leaf page table entry flags, which are default when a new leaf entry
+    /// is created for a shared VMA.
     pte_flags: PteFlags,
     /// Allocated physical pages.
     pages: BTreeMap<VirtPageNum, Arc<Page>>,
@@ -184,8 +186,7 @@ impl VmArea {
             end: end_va.round_up(),
             flags,
             pte_flags: {
-                let pte_flags = PteFlags::from(prot | MappingFlags::V | MappingFlags::G);
-                pte_flags | PteFlags::A | PteFlags::D
+                PteFlags::from(prot | MappingFlags::V | MappingFlags::G) | PteFlags::A | PteFlags::D
             },
             prot,
             pages: BTreeMap::new(),
@@ -234,14 +235,14 @@ impl VmArea {
             end: end_va.round_up(),
             flags,
             pte_flags: {
-                let prot = prot | MappingFlags::V | MappingFlags::U;
+                let mapping_flags = prot | MappingFlags::V | MappingFlags::U;
                 #[cfg(target_arch = "riscv64")]
                 {
-                    PteFlags::from(prot) | PteFlags::A | PteFlags::D
+                    PteFlags::from(mapping_flags) | PteFlags::A | PteFlags::D
                 }
                 #[cfg(target_arch = "loongarch64")]
                 {
-                    PteFlags::from(prot) | PteFlags::D
+                    PteFlags::from(mapping_flags)
                 }
             },
             prot,
@@ -255,8 +256,7 @@ impl VmArea {
     ///
     /// `start_va` and `end_va` must be page-aligned.
     ///
-    /// `prot` should have `U` bit set, because this VMA is supposed to be used in user
-    /// space.
+    /// `prot` should have `RWX` bits set properly; other bits must be zero.
     ///
     /// `shm` is the [`SharedMemory`] to be mapped to the VMA.
     pub fn new_shared_memory(
@@ -268,12 +268,24 @@ impl VmArea {
     ) -> Self {
         debug_assert!(start_va.to_usize() % PAGE_SIZE == 0);
         debug_assert!(end_va.to_usize() % PAGE_SIZE == 0);
-        // debug_assert!(prot.contains(MemPerm::U));
+        debug_assert!(MappingFlags::RWX.contains(prot));
+
+        let prot = prot | MappingFlags::U;
         Self {
             start: start_va,
             end: end_va,
             flags,
-            pte_flags: PteFlags::from(prot),
+            pte_flags: {
+                let mapping_flags = prot | MappingFlags::V | MappingFlags::U;
+                #[cfg(target_arch = "riscv64")]
+                {
+                    PteFlags::from(mapping_flags) | PteFlags::A | PteFlags::D
+                }
+                #[cfg(target_arch = "loongarch64")]
+                {
+                    PteFlags::from(mapping_flags)
+                }
+            },
             prot,
             pages: BTreeMap::new(),
             map_type: TypedArea::SharedMemory(SharedMemoryArea::new(shm)),
@@ -301,7 +313,9 @@ impl VmArea {
             // We allow `prot` to be anything, but we warn if it does not
             // have `RW` bits set.
             if !prot.contains(MappingFlags::R | MappingFlags::W) {
-                log::warn!("Anonymous area should have `RW` bits set for most cases; got: {prot:?}");
+                log::warn!(
+                    "Anonymous area should have `RW` bits set for most cases; got: {prot:?}"
+                );
             }
             true
         });
@@ -312,14 +326,14 @@ impl VmArea {
             end: end_va,
             flags,
             pte_flags: {
-                let prot = prot | MappingFlags::V | MappingFlags::U;
+                let mapping_flags = prot | MappingFlags::V | MappingFlags::U;
                 #[cfg(target_arch = "riscv64")]
                 {
-                    PteFlags::from(prot) | PteFlags::A | PteFlags::D
+                    PteFlags::from(mapping_flags) | PteFlags::A | PteFlags::D
                 }
                 #[cfg(target_arch = "loongarch64")]
                 {
-                    PteFlags::from(prot) | PteFlags::D
+                    PteFlags::from(mapping_flags)
                 }
             },
             prot,
@@ -341,14 +355,15 @@ impl VmArea {
             end: end_va,
             flags: VmaFlags::PRIVATE,
             pte_flags: {
-                let prot = MappingFlags::V | MappingFlags::R | MappingFlags::W | MappingFlags::U;
+                let mapping_flags =
+                    MappingFlags::V | MappingFlags::R | MappingFlags::W | MappingFlags::U;
                 #[cfg(target_arch = "riscv64")]
                 {
-                    PteFlags::from(prot) | PteFlags::A | PteFlags::D
+                    PteFlags::from(mapping_flags) | PteFlags::A | PteFlags::D
                 }
                 #[cfg(target_arch = "loongarch64")]
                 {
-                    PteFlags::from(prot) | PteFlags::D
+                    PteFlags::from(mapping_flags)
                 }
             },
             prot: MappingFlags::R | MappingFlags::W | MappingFlags::U,
@@ -369,14 +384,15 @@ impl VmArea {
             end: end_va,
             flags: VmaFlags::PRIVATE,
             pte_flags: {
-                let prot = MappingFlags::V | MappingFlags::R | MappingFlags::W | MappingFlags::U;
+                let mapping_flags =
+                    MappingFlags::V | MappingFlags::R | MappingFlags::W | MappingFlags::U;
                 #[cfg(target_arch = "riscv64")]
                 {
-                    PteFlags::from(prot) | PteFlags::A | PteFlags::D
+                    PteFlags::from(mapping_flags) | PteFlags::A | PteFlags::D
                 }
                 #[cfg(target_arch = "loongarch64")]
                 {
-                    PteFlags::from(prot) | PteFlags::D
+                    PteFlags::from(mapping_flags)
                 }
             },
             prot: MappingFlags::R | MappingFlags::W | MappingFlags::U,
@@ -506,8 +522,18 @@ impl VmArea {
         debug_assert!(MappingFlags::RWX.contains(new_prot));
 
         let old_prot = self.prot;
-        self.prot = new_prot;
-        self.pte_flags = (self.pte_flags & !PteFlags::RWX_MASK) | PteFlags::from(new_prot);
+        self.prot = new_prot | MappingFlags::U;
+        self.pte_flags = {
+            let mapping_flags = self.prot | MappingFlags::V;
+            #[cfg(target_arch = "riscv64")]
+            {
+                PteFlags::from(mapping_flags) | PteFlags::A | PteFlags::D
+            }
+            #[cfg(target_arch = "loongarch64")]
+            {
+                PteFlags::from(mapping_flags)
+            }
+        };
         for &vpn in self.pages.keys() {
             let pte = page_table.find_entry(vpn).unwrap();
             pte.set_flags(self.pte_flags);
@@ -601,9 +627,7 @@ impl VmArea {
             let mut new_pte = *pte;
 
             #[cfg(target_arch = "riscv64")]
-            let new_flags = new_pte
-                .flags()
-                .union(PteFlags::W | PteFlags::A | PteFlags::D);
+            let new_flags = new_pte.flags().union(PteFlags::W);
             #[cfg(target_arch = "loongarch64")]
             let new_flags = new_pte.flags().union(PteFlags::W | PteFlags::D);
 
@@ -617,9 +641,7 @@ impl VmArea {
             let mut new_pte = *pte;
 
             #[cfg(target_arch = "riscv64")]
-            let new_flags = new_pte
-                .flags()
-                .union(PteFlags::W | PteFlags::A | PteFlags::D);
+            let new_flags = new_pte.flags().union(PteFlags::W);
             #[cfg(target_arch = "loongarch64")]
             let new_flags = new_pte.flags().union(PteFlags::W | PteFlags::D);
 
@@ -839,9 +861,9 @@ impl OffsetArea {
 ///   cache of the file. Any write to the same page in the file in another private,
 ///   writable VMA does not affect the data on this page.
 /// - Private, writable: A page in this kind of VMA may or may not be mapped to a page
-///   in the page cache of the file, depending on whether the page is written to for
-///   the first time. Assuming the page is first read from and then written to, the
-///   behavior is as follows:
+///   in the page cache of the file, depending on whether the page have been written to
+///   or not. Assuming the page is first read from and then written to, the behavior is
+///   as follows:
 ///   - When the page is first read from, it is mapped to a page in the page cache of
 ///     the file, and is marked as copy-on-write.
 ///   - When the page is first written to, a copy-on-write page fault occurs, and a new
@@ -930,8 +952,7 @@ impl FileBackedArea {
 
         if area_offset + PAGE_SIZE > region_len {
             // Part of the page is in the file region, and part of the page is not.
-            // Similar to the case where the whole page is not in the file region,
-            // we allocate a new page and copy the first part of the page from the
+            // We allocate a new page and copy the first part of the page from the
             // file region, and fill the rest with zeros.
             let page = Page::build()?;
             let copy_len = region_len - area_offset;
@@ -953,9 +974,15 @@ impl FileBackedArea {
         } else {
             // Other conditions: Just use the cached page.
             if flags.contains(VmaFlags::PRIVATE) {
-                // Read from or execute a private VMA: Mark the page as read-only, which
-                // possibly means copy-on-write.
-                pte_flags = pte_flags.difference(PteFlags::W);
+                // Read from or execute a private VMA: Make sure we mark the page as read-only.
+                #[cfg(target_arch = "riscv64")]
+                {
+                    pte_flags = pte_flags.difference(PteFlags::W);
+                }
+                #[cfg(target_arch = "loongarch64")]
+                {
+                    pte_flags = pte_flags.difference(PteFlags::W | PteFlags::D);
+                }
             }
             cached_page
         };

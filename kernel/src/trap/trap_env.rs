@@ -35,5 +35,3 @@ pub fn set_user_trap_entry() {
 pub fn set_user_rw_trap_entry() {
     set_trap_handler(__user_rw_trap_vector as usize, TrapMode::Vectored);
 }
-
- 
