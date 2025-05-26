@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 config = { path = "../config" }
-polyhal-macro = { path = "../polyhal/polyhal-macro" }
+polyhal-macro = { path = "../polyhal-macro" }
 bit_field = { workspace = true }
 spin = { workspace = true }
 log = { workspace = true }

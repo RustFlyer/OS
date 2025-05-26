@@ -9,7 +9,7 @@ config = { path = "../config" }
 mm = { path = "../mm" }
 
 mutex = { path = "../mutex" }
-polyhal-macro = { path = "../polyhal/polyhal-macro" }
+polyhal-macro = { path = "../polyhal-macro" }
 log = { workspace = true }
 spin = { workspace = true }
 uart_16550 = { workspace = true }
