@@ -51,13 +51,17 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         /* Initialize heap allocator and page table */
         unsafe {
             config::mm::DTB_ADDR = dtb_addr;
-            log::info!("hart {}: initializing DTB_ADDR {:#x}", hart_id, dtb_addr);
+            log::info!("hart {}: initialized DTB_ADDR {:#x}", hart_id, dtb_addr);
+
             heap::init_heap_allocator();
             log::info!("hart {}: initialized heap allocator", hart_id);
+
             frame::init_frame_allocator();
             log::info!("hart {}: initialized frame allocator", hart_id);
+
             vm::switch_to_kernel_page_table();
             log::info!("hart {}: switched to kernel page table", hart_id);
+
             fence();
             ptr::write_volatile(&raw mut INITIALIZED, true);
         }
@@ -114,13 +118,14 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         }
     }
 
-    arch::trap::init();
-
     #[cfg(target_arch = "loongarch64")]
     trap::trap_handler::tlb_init();
 
-    hart::init(hart_id);
+    arch::trap::init();
+    trap::trap_env::set_kernel_trap_entry();
+    arch::time::init_timer();
 
+    hart::init(hart_id);
     log::info!("hart {}: running", hart_id);
 
     loop {

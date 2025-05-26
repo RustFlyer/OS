@@ -38,7 +38,7 @@ pub fn set_nx_timer_irq() {
 /// Initialize the timer.
 ///
 /// This function must be called once to set up the timer.
-pub fn init_timer(times: usize) {
+pub fn init_timer() {
     // This function does nothing on RISC-V, as there is nothing to do before
     // calls to `set_nx_timer_irq`.
 }

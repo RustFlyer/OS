@@ -172,7 +172,7 @@ __trap_from_kernel:
     st.d  $a7, $sp, 18*8
 
     la.abs  $t0, kernel_trap_handler
-    jirl $r0, $t0, 0
+    jirl $ra, $t0, 0
 
     ld.d  $ra, $sp, 1*8
     ld.d  $t0, $sp, 2*8

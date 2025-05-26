@@ -154,7 +154,6 @@ pub async fn task_executor_unit(task: Arc<Task>) {
     );
     task.set_waker(take_waker().await);
     set_nx_timer_irq();
-    arch::time::init_timer(1);
 
     loop {
         // trap_return connects user and kernel.

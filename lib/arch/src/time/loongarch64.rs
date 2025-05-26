@@ -1,10 +1,15 @@
 use core::time::Duration;
-use loongArch64::register::ecfg::{self, LineBasedInterrupt};
-use loongArch64::register::tcfg;
-use loongArch64::time::{Time, get_timer_freq};
+
+use loongArch64::{
+    register::{
+        ecfg::{self, LineBasedInterrupt},
+        tcfg,
+    },
+    time::{Time, get_timer_freq},
+};
 use spin::Lazy;
 
-use config::board::{CLOCK_FREQ, INTERRUPTS_PER_SEC};
+use config::board::INTERRUPTS_PER_SEC;
 
 // On LoongArch, we can get the timer frequency via the CPUCFG instruction.
 static FREQ: Lazy<usize> = Lazy::new(get_timer_freq);
@@ -36,17 +41,16 @@ pub fn set_nx_timer_irq() {
 
 /// Initialize the timer.
 ///
-/// This function must be called once to set up the timer.
-pub fn init_timer(times: usize) {
-    let ticks = (times * *FREQ / INTERRUPTS_PER_SEC + 3) & !3;
-    log::debug!("[init_timer] ticks: {ticks}");
-    tcfg::set_periodic(true);
+/// This function must be called exactly once to set up the timer.
+pub fn init_timer() {
+    let ticks = *FREQ / INTERRUPTS_PER_SEC;
     tcfg::set_init_val(ticks);
+    tcfg::set_periodic(true);
     tcfg::set_en(true);
 
-    let inter = LineBasedInterrupt::TIMER
+    let intr = LineBasedInterrupt::TIMER
         | LineBasedInterrupt::SWI0
         | LineBasedInterrupt::SWI1
         | LineBasedInterrupt::HWI0;
-    ecfg::set_lie(inter);
+    ecfg::set_lie(intr);
 }
