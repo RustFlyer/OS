@@ -5,8 +5,10 @@
 # ======================
 
 # Target architecture
-# export ARCH = riscv64
-export ARCH = loongarch64
+export ARCH = riscv64
+# export ARCH = loongarch64
+export COMPLIB = musl
+# export COMPLIB = glibc
 
 # Docker image name for development environment
 # Kernel package/output name
@@ -192,14 +194,15 @@ fs-img: user
 	@mkdir -p emnt
 	@sudo mount -t ext4 -o loop $(FS_IMG) emnt
 	@sudo cp -r $(USER_ELFS) emnt/
-	-sudo cp -r testcase/$(ARCH)/basic/* emnt/
-	-sudo cp -r testcase/$(ARCH)/busybox/* emnt/
-	-sudo cp -r testcase/$(ARCH)/lua/* emnt/
-	-sudo cp -r testcase/$(ARCH)/UnixBench/* emnt/
-	-sudo cp -r testcase/$(ARCH)/libc-test/* emnt/
-	-sudo cp -r testcase/$(ARCH)/iozone/* emnt/
-	-sudo cp -r testcase/$(ARCH)/iperf/* emnt/
-	-sudo cp -r testcase/$(ARCH)/netperf/* emnt/
+	-sudo cp -r testcase/$(ARCH)/$(COMPLIB)/basic/* emnt/
+	-sudo cp -r testcase/$(ARCH)/$(COMPLIB)/busybox/* emnt/
+	-sudo cp -r testcase/$(ARCH)/$(COMPLIB)/lua/* emnt/
+	-sudo cp -r testcase/$(ARCH)/$(COMPLIB)/UnixBench/* emnt/
+	-sudo cp -r testcase/$(ARCH)/$(COMPLIB)/libc-test/* emnt/
+	-sudo cp -r testcase/$(ARCH)/$(COMPLIB)/iozone/* emnt/
+	-sudo cp -r testcase/$(ARCH)/$(COMPLIB)/iperf/* emnt/
+	-sudo cp -r testcase/$(ARCH)/$(COMPLIB)/netperf/* emnt/
+	-sudo cp -r testcase/$(ARCH)/$(COMPLIB)/libcbench/* emnt/
 	@sudo cp -r img-data/* emnt/
 	@sudo chmod -R 755 emnt/
 	@sudo umount emnt
