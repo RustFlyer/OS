@@ -1,5 +1,5 @@
 use core::time::Duration;
-
+use loongArch64::register::ecfg::{self, LineBasedInterrupt};
 use loongArch64::register::tcfg;
 use loongArch64::time::{Time, get_timer_freq};
 use spin::Lazy;
@@ -43,4 +43,10 @@ pub fn init_timer(times: usize) {
     tcfg::set_periodic(true);
     tcfg::set_init_val(ticks);
     tcfg::set_en(true);
+
+    let inter = LineBasedInterrupt::TIMER
+        | LineBasedInterrupt::SWI0
+        | LineBasedInterrupt::SWI1
+        | LineBasedInterrupt::HWI0;
+    ecfg::set_lie(inter);
 }
