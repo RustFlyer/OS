@@ -27,8 +27,9 @@ impl File for RtcFile {
     }
 
     fn ioctl(&self, cmd: usize, arg: usize) -> SyscallResult {
+        let cmd = (cmd as u32) as u64;
         let Some(cmd) = RtcIoctlCmd::from_repr(cmd as u64) else {
-            log::error!("[TtyFile::ioctl] cmd {cmd} not included");
+            log::error!("[TtyFile::ioctl] cmd {cmd:#x} not included");
             unimplemented!()
         };
         match cmd {

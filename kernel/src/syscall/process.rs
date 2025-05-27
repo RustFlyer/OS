@@ -7,7 +7,7 @@ use crate::task::{
 };
 use crate::vm::user_ptr::{UserReadPtr, UserWritePtr};
 use crate::{processor::current_task, task::future::spawn_user_task};
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use bitflags::*;
@@ -421,7 +421,65 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
         name.push_str(arg);
         name.push(' ');
     });
-    task.execve(file, args, envs, name)?;
+
+    if let Err(e) = task.execve(file.clone(), args.clone(), envs.clone(), name) {
+        match e {
+            SysError::ENOEXEC => {
+                let mut buf = vec![0; 128];
+
+                file.seek(config::vfs::SeekFrom::Start(0))?;
+                file.read(&mut buf).await?;
+                // log::debug!("[sys_execve] buf: {:?}", buf);
+
+                let mut firline = String::from_utf8(buf).unwrap();
+                // log::debug!("[sys_execve] firline: {:?}", firline);
+                if firline.starts_with("#!") {
+                    firline.remove(0);
+                    firline.remove(0);
+                    let idx = firline.find("\n").ok_or(SysError::ENOEXEC)?;
+                    firline.truncate(idx);
+
+                    let mut exargs: Vec<String> =
+                        firline.split_whitespace().map(|s| s.to_string()).collect();
+                    let mut path = exargs[0].clone();
+
+                    // to fix
+                    {
+                        path = path.rsplit('/').next().unwrap().to_string();
+                        log::debug!("[sys_execve] path: {}", path);
+                    }
+
+                    exargs.extend(args);
+                    log::debug!("[sys_execve] exargs: {:?}", exargs);
+
+                    let dentry = {
+                        let path = Path::new(sys_root_dentry(), path);
+                        let dentry = path.walk()?;
+                        if !dentry.is_negative()
+                            && dentry.inode().unwrap().inotype() == InodeType::SymLink
+                        {
+                            Path::resolve_symlink_through(Arc::clone(&dentry))?
+                        } else {
+                            dentry
+                        }
+                    };
+
+                    let file = <dyn File>::open(dentry)?;
+                    log::info!("[sys_execve]: open file");
+                    let mut name = String::new();
+                    exargs.iter().for_each(|arg| {
+                        name.push_str(arg);
+                        name.push(' ');
+                    });
+
+                    task.execve(file.clone(), exargs, envs, name)?;
+                } else {
+                    Err(SysError::ENOEXEC)?
+                }
+            }
+            e => Err(e)?,
+        }
+    }
     log::info!("[sys_execve]: finish execve and convert to a new task");
     Ok(0)
 }
