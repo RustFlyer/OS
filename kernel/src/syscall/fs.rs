@@ -1677,6 +1677,7 @@ pub fn sys_statx(
     mask: usize,
     statxbuf: usize,
 ) -> SyscallResult {
+    #[derive(Debug)]
     pub struct STATX {
         stx_mask: u32,
         stx_blksize: u32,
@@ -1702,7 +1703,7 @@ pub fn sys_statx(
 
     let dentry = task.walk_at(dirfd, path)?;
 
-    let stat = dentry.inode().unwrap().get_attr()?;
+    let stat = dentry.inode().ok_or(SysError::ENOENT)?.get_attr()?;
     let statx = STATX {
         stx_mask: 0,
         stx_blksize: stat.st_blksize,
@@ -1717,6 +1718,8 @@ pub fn sys_statx(
         stx_attributes_mask: 0,
         __pad: [0; 20],
     };
+
+    log::debug!("{:?}", statx);
 
     unsafe {
         UserWritePtr::<STATX>::new(statxbuf, &addrspace).write(statx)?;
