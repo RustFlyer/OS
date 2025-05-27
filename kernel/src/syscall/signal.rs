@@ -401,6 +401,10 @@ pub fn sys_rt_sigaction(
         let mut action = unsafe { new_sa.read()? };
 
         log::info!("[sys_rt_sigaction] new action: {:?}", action);
+        log::info!(
+            "[sys_rt_sigaction] new action restorer: {:#x}",
+            action.restorer
+        );
 
         action.sa_mask.remove(SigSet::SIGKILL | SigSet::SIGSTOP);
 

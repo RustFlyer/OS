@@ -83,11 +83,11 @@ impl Hart {
         new_task: &mut Arc<Task>,
         pps: &mut ProcessorPrivilegeState,
     ) {
-        // log::debug!(
-        //     "[hart] switch to task {} tid {}",
-        //     new_task.get_name(),
-        //     new_task.tid()
-        // );
+        log::debug!(
+            "[hart] switch to task {} tid {}",
+            new_task.get_name(),
+            new_task.tid()
+        );
         disable_interrupt();
         pps.auto_sum(); // `pps` is the user task's PPS which is to be enabled.
         core::mem::swap(self.get_mut_pps(), pps);

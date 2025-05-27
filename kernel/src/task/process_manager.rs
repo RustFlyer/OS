@@ -58,6 +58,9 @@ impl ProcessGroupManager {
 
     /// removes a process group by its leader task.
     pub fn remove(&self, process: &Arc<Task>) {
+        if self.0.lock().get_mut(&process.get_pgid()).is_none() {
+            return;
+        }
         self.0
             .lock()
             .get_mut(&process.get_pgid())

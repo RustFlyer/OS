@@ -168,6 +168,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
         task.remove_child(zombie_task.clone());
 
         TASK_MANAGER.remove_task(tid);
+
         PROCESS_GROUP_MANAGER.remove(&zombie_task);
         Ok(tid)
     } else if option.contains(WaitOptions::WNOHANG) {

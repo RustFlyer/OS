@@ -1758,6 +1758,12 @@ pub fn sys_statx(
     let dirfd = AtFd::from(dirfd);
     let flags = StatxFlags::from_bits_truncate(flags as u32);
 
+    let from_timespec = |ts: TimeSpec| StatxTimestamp {
+        tv_sec: ts.tv_sec as i64,
+        tv_nsec: ts.tv_nsec as u32,
+        __reserved: 0,
+    };
+
     log::debug!(
         "[sys_statx] path: {}, dirfd: {:?}, flags: {:#x}, mask: {:#x}",
         path,
@@ -1801,23 +1807,23 @@ pub fn sys_statx(
         stx_blksize: stat.st_blksize,
         stx_attributes: 0,
         stx_nlink: stat.st_nlink,
-        stx_uid: stat.st_uid + 1,
-        stx_gid: stat.st_gid + 1,
+        stx_uid: stat.st_uid,
+        stx_gid: stat.st_gid,
         __spare0: 0,
         stx_mode: stat.st_mode as u16,
         stx_ino: stat.st_ino,
-        stx_size: stat.st_size + 4096,
-        stx_blocks: stat.st_blocks + 8,
+        stx_size: stat.st_size,
+        stx_blocks: stat.st_blocks,
         stx_attributes_mask: 0,
-        stx_atime: StatxTimestamp::default(),
+        stx_atime: from_timespec(stat.st_atime),
         stx_btime: StatxTimestamp::default(),
-        stx_ctime: StatxTimestamp::default(),
-        stx_mtime: StatxTimestamp::default(),
+        stx_ctime: from_timespec(stat.st_ctime),
+        stx_mtime: from_timespec(stat.st_mtime),
         stx_rdev_major: 0,
         stx_rdev_minor: 0,
         stx_dev_major: 0,
         stx_dev_minor: 0,
-        stx_mnt_id: 0xffffffffffffffff,
+        stx_mnt_id: 0,
         stx_dio_mem_align: 0,
         stx_dio_offset_align: 0,
         __spare2: [0; 12],

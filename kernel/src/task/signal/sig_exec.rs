@@ -171,6 +171,11 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
             log::debug!("cx.user_reg[3]: {:#x}", cx.user_reg[3]);
             log::debug!("cx.user_reg[4]: {:#x}", cx.user_reg[4]);
 
+            cx.user_reg
+                .iter()
+                .enumerate()
+                .for_each(|(idx, u)| log::debug!("r[{idx:02}]: {:#x}", u));
+
             log::debug!("sig: {:#x}", task.sig_manager_mut().bitmap.bits());
 
             Ok(true)
