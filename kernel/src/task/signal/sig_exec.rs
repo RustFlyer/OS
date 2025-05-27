@@ -90,14 +90,7 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
                     // 用户自定义的信号处理函数将使用进程的普通栈空间，
                     // 即和其他普通函数相同的栈。这个栈通常就是进程的主栈，
                     // 也就是在进程启动时由操作系统自动分配的栈。
-                    #[cfg(target_arch = "loongarch64")]
-                    {
-                        cx.user_reg[3]
-                    }
-                    #[cfg(target_arch = "riscv64")]
-                    {
-                        cx.user_reg[2]
-                    }
+                    cx.get_user_sp()
                 }
             };
             // extend the sig_stack
@@ -122,9 +115,10 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
 
             unsafe { sig_cx_ptr.write(sig_cx)? };
 
+            // restore the new stack pointer in Task for sigreturn to recover
             task.set_sig_cx_ptr(new_sp);
             // user defined void (*sa_handler)(int);
-            cx.user_reg[10] = si.sig.raw();
+            cx.set_user_a0(si.sig.raw());
 
             // if sa_flags contains SA_SIGINFO, It means user defined function is
             // void (*sa_sigaction)(int, siginfo_t *, void *sig_cx); which two more
@@ -135,7 +129,7 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
             if action.flags.contains(SigActionFlag::SA_SIGINFO) {
                 // log::error!("[SA_SIGINFO] set sig_cx {sig_cx:?}");
                 // a2
-                cx.user_reg[12] = new_sp;
+                cx.set_user_a2(new_sp);
                 #[derive(Default, Copy, Clone)]
                 #[repr(C)]
                 pub struct LinuxSigInfo {
@@ -153,7 +147,7 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
                 new_sp -= size_of::<LinuxSigInfo>();
                 let mut siginfo_ptr = UserWritePtr::<LinuxSigInfo>::new(new_sp, &addr_space);
                 unsafe { siginfo_ptr.write(siginfo_v)? };
-                cx.user_reg[11] = new_sp;
+                cx.set_user_a1(new_sp);
             }
 
             cx.sepc = entry;
@@ -161,9 +155,7 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
             // _sigreturn_trampoline, which calls sys_sigreturn)
             cx.user_reg[1] = _sigreturn_trampoline as usize;
             // sp (it will be used later by sys_sigreturn to restore sig_cx)
-            cx.user_reg[2] = new_sp;
-            cx.user_reg[3] = sig_cx.user_reg[3];
-            cx.user_reg[4] = sig_cx.user_reg[4];
+            cx.set_user_sp(new_sp);
 
             log::debug!("cx.sepc: {:#x}", cx.sepc);
             log::debug!("cx.user_reg[1]: {:#x}", cx.user_reg[1]);
@@ -177,6 +169,8 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
                 .for_each(|(idx, u)| log::debug!("r[{idx:02}]: {:#x}", u));
 
             log::debug!("sig: {:#x}", task.sig_manager_mut().bitmap.bits());
+
+            simdebug::stop();
 
             Ok(true)
         }
