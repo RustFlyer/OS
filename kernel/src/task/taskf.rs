@@ -336,9 +336,6 @@ impl Task {
                 AtFd::Normal(fd) => self.with_mut_fdtable(|table| table.get_file(fd))?.dentry(),
             }
         };
-        if path.is_empty() {
-            return Ok(base_dir);
-        }
         Path::new(base_dir, path).walk()
     }
 

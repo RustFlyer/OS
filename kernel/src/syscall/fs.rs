@@ -1677,6 +1677,15 @@ pub fn sys_statx(
     mask: usize,
     statxbuf: usize,
 ) -> SyscallResult {
+    #[repr(C)]
+    #[derive(Debug, Default)]
+    pub struct StatxTimestamp {
+        pub tv_sec: i64,     // __s64
+        pub tv_nsec: u32,    // __u32
+        pub __reserved: i32, // int
+    }
+
+    #[repr(C)]
     #[derive(Debug)]
     pub struct STATX {
         stx_mask: u32,
@@ -1686,11 +1695,60 @@ pub fn sys_statx(
         stx_uid: u32,
         stx_gid: u32,
         stx_mode: u16,
+        __spare0: u16,
         stx_ino: u64,
         stx_size: u64,
         stx_blocks: u64,
         stx_attributes_mask: u64,
-        __pad: [u32; 20],
+        pub stx_atime: StatxTimestamp,
+        pub stx_btime: StatxTimestamp,
+        pub stx_ctime: StatxTimestamp,
+        pub stx_mtime: StatxTimestamp,
+        pub stx_rdev_major: u32,
+        pub stx_rdev_minor: u32,
+        pub stx_dev_major: u32,
+        pub stx_dev_minor: u32,
+        pub stx_mnt_id: u64,
+        pub stx_dio_mem_align: u32,
+        pub stx_dio_offset_align: u32,
+        pub __spare2: [u64; 12], // 预留
+    }
+
+    bitflags::bitflags! {
+        #[derive(Default)]
+        pub struct StatxMask: u32 {
+            const TYPE        = 0x00000001; // STATX_TYPE
+            const MODE        = 0x00000002; // STATX_MODE
+            const NLINK       = 0x00000004; // STATX_NLINK
+            const UID         = 0x00000008; // STATX_UID
+            const GID         = 0x00000010; // STATX_GID
+            const ATIME       = 0x00000020; // STATX_ATIME
+            const MTIME       = 0x00000040; // STATX_MTIME
+            const CTIME       = 0x00000080; // STATX_CTIME
+            const INO         = 0x00000100; // STATX_INO
+            const SIZE        = 0x00000200; // STATX_SIZE
+            const BLOCKS      = 0x00000400; // STATX_BLOCKS
+            const BASIC_STATS = 0x000007ff; // common mask
+            const BTIME       = 0x00000800; // STATX_BTIME (Linux 4.11+)
+            const ALL         = 0x00000fff; // all
+        }
+    }
+
+    bitflags::bitflags! {
+        #[derive(Default)]
+        pub struct StatxFlags: u32 {
+            /// AT_SYMLINK_NOFOLLOW: Do not follow symbolic links.
+            const SYMLINK_NOFOLLOW  = 0x100;  // AT_SYMLINK_NOFOLLOW
+            /// AT_NO_AUTOMOUNT: Suppress terminal automount traversal
+            const NO_AUTOMOUNT      = 0x800;  // AT_NO_AUTOMOUNT
+            /// AT_EMPTY_PATH: Allow empty relative pathname
+            const EMPTY_PATH        = 0x1000; // AT_EMPTY_PATH
+            // statx-only flags:
+            /// STATX_FORCE_SYNC: Force synchronised I/O, as per description
+            const STATX_FORCE_SYNC  = 0x2000; // STATX_FORCE_SYNC
+            /// STATX_DONT_SYNC: Don't sync before reading attributes
+            const STATX_DONT_SYNC   = 0x4000; // STATX_DONT_SYNC
+        }
     }
 
     let task = current_task();
@@ -1698,28 +1756,74 @@ pub fn sys_statx(
     let pathname = UserReadPtr::<u8>::new(pathname, &addrspace).read_c_string(256)?;
     let path = pathname.into_string().map_err(|_| SysError::EINVAL)?;
     let dirfd = AtFd::from(dirfd);
+    let flags = StatxFlags::from_bits_truncate(flags as u32);
 
-    log::debug!("[sys_statx] path: {}, dirfd: {:?}", path, dirfd);
+    log::debug!(
+        "[sys_statx] path: {}, dirfd: {:?}, flags: {:#x}, mask: {:#x}",
+        path,
+        dirfd,
+        flags,
+        mask
+    );
 
-    let dentry = task.walk_at(dirfd, path)?;
+    let dentry = {
+        if flags.contains(StatxFlags::EMPTY_PATH) {
+            let dirfd: AtFd = AtFd::from(dirfd);
+            match dirfd {
+                AtFd::FdCwd => Err(SysError::EINVAL)?,
+                AtFd::Normal(fd) => task.with_mut_fdtable(|t| t.get_file(fd))?.dentry(),
+            }
+        } else {
+            let dentry = task.walk_at(AtFd::from(dirfd), path)?;
+            if !flags.contains(StatxFlags::SYMLINK_NOFOLLOW)
+                && !dentry.is_negative()
+                && dentry.inode().unwrap().inotype().is_symlink()
+            {
+                Path::resolve_symlink_through(dentry)?
+            } else {
+                dentry
+            }
+        }
+    };
+
+    // log::debug!("[sys_statx] dentry opened {:?}", dentry.path());
+
+    let nmask = StatxMask::TYPE
+        | StatxMask::MODE
+        | StatxMask::NLINK
+        | StatxMask::INO
+        | StatxMask::SIZE
+        | StatxMask::BLOCKS;
 
     let stat = dentry.inode().ok_or(SysError::ENOENT)?.get_attr()?;
     let statx = STATX {
-        stx_mask: 0,
+        stx_mask: nmask.bits(),
         stx_blksize: stat.st_blksize,
         stx_attributes: 0,
         stx_nlink: stat.st_nlink,
-        stx_uid: stat.st_uid,
-        stx_gid: stat.st_gid,
+        stx_uid: stat.st_uid + 1,
+        stx_gid: stat.st_gid + 1,
+        __spare0: 0,
         stx_mode: stat.st_mode as u16,
         stx_ino: stat.st_ino,
-        stx_size: stat.st_size,
-        stx_blocks: stat.st_blocks,
+        stx_size: stat.st_size + 4096,
+        stx_blocks: stat.st_blocks + 8,
         stx_attributes_mask: 0,
-        __pad: [0; 20],
+        stx_atime: StatxTimestamp::default(),
+        stx_btime: StatxTimestamp::default(),
+        stx_ctime: StatxTimestamp::default(),
+        stx_mtime: StatxTimestamp::default(),
+        stx_rdev_major: 0,
+        stx_rdev_minor: 0,
+        stx_dev_major: 0,
+        stx_dev_minor: 0,
+        stx_mnt_id: 0xffffffffffffffff,
+        stx_dio_mem_align: 0,
+        stx_dio_offset_align: 0,
+        __spare2: [0; 12],
     };
 
-    log::debug!("{:?}", statx);
+    // log::debug!("{:?}", statx);
 
     unsafe {
         UserWritePtr::<STATX>::new(statxbuf, &addrspace).write(statx)?;
