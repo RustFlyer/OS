@@ -6,7 +6,6 @@ use crate::task::signal::sig_info::SigSet;
 use crate::task::{Task, sig_members::ActionType};
 use crate::vm::user_ptr::UserWritePtr;
 use alloc::sync::Arc;
-use driver::print;
 use systype::SysResult;
 
 use super::sig_info::{Sig, SigInfo};
@@ -163,10 +162,10 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
             log::debug!("cx.user_reg[3]: {:#x}", cx.user_reg[3]);
             log::debug!("cx.user_reg[4]: {:#x}", cx.user_reg[4]);
 
-            cx.user_reg
-                .iter()
-                .enumerate()
-                .for_each(|(idx, u)| log::debug!("r[{idx:02}]: {:#x}", u));
+            // cx.user_reg
+            //     .iter()
+            //     .enumerate()
+            //     .for_each(|(idx, u)| log::debug!("r[{idx:02}]: {:#x}", u));
 
             log::debug!("sig: {:#x}", task.sig_manager_mut().bitmap.bits());
 

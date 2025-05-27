@@ -98,7 +98,7 @@ pub fn sys_setsockopt(
 }
 
 pub fn sys_getsockopt(
-    sockfd: usize,
+    _sockfd: usize,
     level: usize,
     optname: usize,
     optval: usize,
@@ -152,9 +152,6 @@ pub fn sys_getsockopt(
                         log::error!("[sys_getsockopt] TcpSocketOpt::CONGESTION");
                         // optval.write_array("reno".as_bytes() as *const u8)?;
                         optlen.write(0)?
-                    }
-                    opt => {
-                        log::error!("[sys_getsockopt] unsupported IPPROTO_TCP opt {opt:?}")
                     }
                 };
             }

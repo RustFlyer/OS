@@ -94,8 +94,8 @@ ifeq ($(ARCH),loongarch64)
 # QEMU_ARGS += -machine virt,dumpdtb=loongarch.dtb
 # QEMU_ARGS += -machine virt,accel=tcg
 
-	GDB = loongarch64-unknown-linux-gnu-gdb
-# GDB = loongarch64-linux-gnu-gdb
+# GDB = loongarch64-unknown-linux-gnu-gdb
+	GDB = loongarch64-linux-gnu-gdb
 	GDB_ARGS = Loongarch64
 endif
 

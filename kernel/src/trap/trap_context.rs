@@ -74,6 +74,7 @@ impl TrapContext {
             // prmd.set_pie(false);
             // TODO: set pplv to ring3, but it seems useless and dangerous and unimplemented
             // status.set_pplv(CpuMode::Ring3);
+            status = status | 4;
         }
 
         let mut context = Self {
@@ -214,7 +215,7 @@ impl TrapContext {
     }
 
     pub fn set_user_a0(&mut self, val: usize) {
-        #[cfg(target_arch = "riscv64")] 
+        #[cfg(target_arch = "riscv64")]
         {
             self.user_reg[10] = val;
         }
@@ -260,7 +261,6 @@ impl TrapContext {
             self.user_reg[3]
         }
     }
-
 
     pub fn get_user_sp(&self) -> usize {
         #[cfg(target_arch = "riscv64")]

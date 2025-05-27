@@ -341,7 +341,7 @@ pub async fn sys_sigreturn() -> SyscallResult {
     let addr_space = task.addr_space();
     let mut sig_cx_ptr = UserReadPtr::<SigContext>::new(sig_cx_ptr, &addr_space);
     // log::debug!("[sys_sigreturn] sig_cx_ptr: {sig_cx_ptr:?}");
-    //恢复信号处理前的状态
+    // 恢复信号处理前的状态
     unsafe {
         let sig_cx = sig_cx_ptr.read()?;
         *mask = sig_cx.mask;

@@ -698,7 +698,7 @@ pub fn sys_prlimit64(
     let mut nlimit = UserReadPtr::<RLimit>::new(new_limit, &addrspace);
     let mut olimit = UserWritePtr::<RLimit>::new(old_limit, &addrspace);
 
-    let ptask = if pid == 0 {
+    let _ptask = if pid == 0 {
         task.clone()
     } else {
         TASK_MANAGER.get_task(pid).ok_or(SysError::EINVAL)?
