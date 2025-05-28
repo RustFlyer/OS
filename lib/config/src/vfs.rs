@@ -160,13 +160,6 @@ bitflags! {
     }
 }
 
-#[derive(Default, Clone, Copy, Debug, Eq, PartialEq)]
-#[repr(C)]
-pub struct TimeSpec {
-    pub sec: u64,
-    pub nsec: u64,
-}
-
 bitflags! {
     /// renameat flag
    pub struct RenameFlag: u32 {
