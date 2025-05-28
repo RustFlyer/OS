@@ -10,12 +10,12 @@ use arch::{
     trap::TIMER_IRQ,
 };
 use mm::address::VirtAddr;
+use systype::memory_flags::MappingFlags;
 use timer::TIMER_MANAGER;
 
 use crate::processor::current_hart;
 use crate::task::{Task, TaskState};
 use crate::trap::load_trap_handler;
-use crate::vm::mapping_flags::MappingFlags;
 use crate::vm::user_ptr::UserReadPtr;
 
 #[unsafe(no_mangle)]

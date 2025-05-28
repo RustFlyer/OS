@@ -7,6 +7,7 @@
 extern crate alloc;
 
 pub mod error;
+pub mod memory_flags;
 pub mod rlimit;
 pub mod rusage;
 pub mod time;

@@ -34,13 +34,16 @@ name = "arch"
 version = "0.1.0"
 dependencies = [
  "bit_field",
+ "bitflags 2.9.1",
  "config",
  "log",
  "loongArch64",
+ "mm",
  "polyhal-macro",
  "riscv",
  "sbi-rt",
  "spin",
+ "systype",
 ]
 
 [[package]]
@@ -931,6 +934,7 @@ dependencies = [
 name = "systype"
 version = "0.1.0"
 dependencies = [
+ "bitflags 2.9.1",
  "strum",
 ]
 

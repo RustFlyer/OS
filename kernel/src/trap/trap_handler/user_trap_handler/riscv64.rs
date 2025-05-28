@@ -6,12 +6,12 @@ use riscv::{
 
 use arch::time::{get_time_duration, set_nx_timer_irq};
 use mm::address::VirtAddr;
+use systype::memory_flags::MappingFlags;
 use timer::TIMER_MANAGER;
 
 use crate::processor::current_hart;
 use crate::task::{Task, TaskState};
 use crate::trap::load_trap_handler;
-use crate::vm::mapping_flags::MappingFlags;
 use crate::vm::user_ptr::UserReadPtr;
 
 /// handle exception or interrupt from a task, return if success.

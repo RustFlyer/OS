@@ -1,9 +1,6 @@
-use loongArch64::ipi::{csr_mail_send, send_ipi_single};
-
-pub fn hart_start(hart_id: usize, start_addr: usize) {
-    // Note: This function is adapted from `polyhal`, but is not used in the current kernel.
-    // csr_mail_send(start_addr as u64, hart_id, 0);
-    // send_ipi_single(1, 1);
+pub fn hart_start(_hart_id: usize, _start_addr: usize) {
+    // LoongArch does not require the first hart to start other harts.
+    // In fact, all harts are started by the bootloader.
 }
 
 pub fn hart_shutdown() -> ! {

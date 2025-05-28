@@ -9,7 +9,6 @@ use mm::address::VirtAddr;
 use timer::TIMER_MANAGER;
 
 use crate::task::TaskState;
-use crate::vm::mapping_flags::MappingFlags;
 
 #[unsafe(no_mangle)]
 pub fn kernel_trap_handler() {
