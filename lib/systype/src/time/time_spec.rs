@@ -1,6 +1,6 @@
 use core::time::Duration;
 
-use crate::TimeValue;
+use super::TimeValue;
 
 /// This is a detailed time statistic. Its recorded time accuracy
 /// is down to nanoseconds.
@@ -30,11 +30,6 @@ impl TimeSpec {
 
     pub fn into_ms(&self) -> usize {
         self.tv_sec * 1_000 + self.tv_nsec / 1_000_000
-    }
-
-    pub fn from_another(&mut self, tspec: config::vfs::TimeSpec) {
-        self.tv_nsec = tspec.nsec as usize;
-        self.tv_sec = tspec.sec as usize;
     }
 }
 

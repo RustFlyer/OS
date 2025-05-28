@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
 use config::{device::BLOCK_SIZE, inode::InodeType};
-use systype::SysResult;
+use systype::error::SysResult;
 use vfs::{
     inode::{Inode, InodeMeta},
     inoid::alloc_ino,

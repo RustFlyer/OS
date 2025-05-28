@@ -3,7 +3,7 @@ use config::inode::{InodeMode, InodeType};
 use exe::{dentry::ExeDentry, inode::ExeInode};
 use meminfo::{dentry::MemInfoDentry, inode::MemInfoInode};
 use mounts::{dentry::MountsDentry, inode::MountsInode};
-use systype::SysResult;
+use systype::error::SysResult;
 use vfs::{dentry::Dentry, inode::Inode};
 
 use crate::simple::{dentry::SimpleDentry, inode::SimpleInode};

@@ -8,7 +8,7 @@ use dev::DevFsType;
 use driver::{BLOCK_DEVICE, BlockDevice};
 use mutex::SpinNoIrqLock;
 use proc::{fs::ProcFsType, init_procfs};
-use systype::{SysError, SysResult};
+use systype::error::{SysError, SysResult};
 use tmp::TmpFsType;
 use vfs::{SYS_ROOT_DENTRY, file::File, fstype::FileSystemType};
 

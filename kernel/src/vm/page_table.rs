@@ -5,17 +5,20 @@
 
 use alloc::vec::Vec;
 
-#[cfg(target_arch = "loongarch64")]
-use loongArch64::register::pgdl;
-
-use arch::mm::{fence, switch_pagetable, tlb_shootdown};
+use arch::{
+    mm::{fence, switch_pagetable, tlb_shootdown},
+    pte::{PageTableEntry, PteFlags},
+};
 use config::mm::PTE_PER_TABLE;
 use mm::{
     address::{PhysPageNum, VirtAddr, VirtPageNum},
     page_cache::page::Page,
 };
 use mutex::SpinLock;
-use systype::{SysError, SysResult};
+use systype::error::{SysError, SysResult};
+
+#[cfg(target_arch = "loongarch64")]
+use loongArch64::register::pgdl;
 
 #[cfg(target_arch = "riscv64")]
 use arch::mm::tlb_flush_all_except_global;
@@ -24,12 +27,13 @@ use config::mm::{
     VIRT_END, bss_end, bss_start, data_end, data_start, kernel_end, kernel_start, rodata_end,
     rodata_start, text_end, text_start, trampoline_end, trampoline_start,
 };
+#[cfg(target_arch = "riscv64")]
+use systype::memory_flags::MappingFlags;
 
-use super::pte::{PageTableEntry, PteFlags};
 use crate::frame::FrameTracker;
 
 #[cfg(target_arch = "riscv64")]
-use super::{iomap::IO_MAPPINGS, mapping_flags::MappingFlags};
+use super::iomap::IO_MAPPINGS;
 #[cfg(target_arch = "riscv64")]
 use crate::vm::vm_area::{OffsetArea, VmArea};
 

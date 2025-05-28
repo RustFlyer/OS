@@ -1,4 +1,4 @@
-use systype::SysError;
+use systype::error::SysError;
 
 use crate::{syscall::syscall, task::Task};
 

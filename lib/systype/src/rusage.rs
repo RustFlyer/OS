@@ -1,4 +1,4 @@
-use time::TimeVal;
+use crate::time::TimeVal;
 
 /// Rusage is resource usage statistics. It records various data of resource
 /// used by a running process.

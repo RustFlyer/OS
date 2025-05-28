@@ -2,7 +2,7 @@ use core::task::Waker;
 
 use net::{NetPollState, addr::UNSPECIFIED_IPV4, tcp::core::TcpSocket, udp::UdpSocket};
 use smoltcp::wire::IpEndpoint;
-use systype::{SysError, SysResult};
+use systype::error::{SysError, SysResult};
 
 use crate::processor::current_task;
 

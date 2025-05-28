@@ -29,8 +29,10 @@ use osfs::{
     pselect::{FilePollRet, PSelectFuture},
 };
 use osfuture::{Select2Futures, SelectOutput};
-use systype::{SysError, SysResult, SyscallResult};
-use time::TimeSpec;
+use systype::{
+    error::{SysError, SysResult, SyscallResult},
+    time::TimeSpec,
+};
 use timer::{TimedTaskResult, TimeoutFuture};
 use vfs::{
     file::File,

@@ -2,7 +2,7 @@ use alloc::{string::String, sync::Arc};
 use dentry::RtcDentry;
 use file::RtcFile;
 use inode::RtcInode;
-use systype::SysResult;
+use systype::error::SysResult;
 use vfs::{dentry::Dentry, path::Path, sys_root_dentry};
 
 pub mod dentry;

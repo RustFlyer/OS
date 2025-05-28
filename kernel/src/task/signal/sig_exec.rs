@@ -1,14 +1,16 @@
+use alloc::sync::Arc;
 use core::arch::global_asm;
 
-use crate::task::TaskState;
-use crate::task::sig_members::{SigActionFlag, SigContext};
-use crate::task::signal::sig_info::SigSet;
-use crate::task::{Task, sig_members::ActionType};
-use crate::vm::user_ptr::UserWritePtr;
-use alloc::sync::Arc;
-use systype::SysResult;
+use systype::error::SysResult;
 
-use super::sig_info::{Sig, SigInfo};
+use crate::task::{
+    Task, TaskState,
+    sig_members::{ActionType, SigActionFlag, SigContext},
+    signal::sig_info::{SigInfo, SigSet},
+};
+use crate::vm::user_ptr::UserWritePtr;
+
+use super::sig_info::Sig;
 
 #[cfg(target_arch = "riscv64")]
 global_asm!(include_str!("riscv64_sigreturn_trampoline.asm"));

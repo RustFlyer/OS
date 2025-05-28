@@ -2,7 +2,7 @@ use alloc::{boxed::Box, ffi::CString, sync::Arc};
 use core::panic;
 
 use async_trait::async_trait;
-use systype::SysResult;
+use systype::error::SysResult;
 use vfs::file::{File, FileMeta};
 
 use crate::{dentry::ExtDentry, ext::file::ExtFile, inode::link::ExtLinkInode};

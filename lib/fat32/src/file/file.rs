@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use config::inode::InodeType;
 use fatfs::{Read, Seek, Write};
 use mutex::ShareMutex;
-use systype::{SysError, SysResult};
+use systype::error::{SysError, SysResult};
 use vfs::{
     direntry::DirEntry,
     file::{File, FileMeta},

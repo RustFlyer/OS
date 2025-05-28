@@ -1,6 +1,6 @@
 use alloc::sync::{Arc, Weak};
 use config::inode::InodeMode;
-use systype::{SysError, SysResult};
+use systype::error::SysResult;
 use vfs::{
     dentry::{Dentry, DentryMeta},
     file::File,
@@ -30,11 +30,11 @@ impl Dentry for RtcDentry {
         &self.meta
     }
 
-    fn base_link(&self, _dentry: &dyn Dentry, _old_dentry: &dyn Dentry) -> systype::SysResult<()> {
+    fn base_link(&self, _dentry: &dyn Dentry, _old_dentry: &dyn Dentry) -> SysResult<()> {
         todo!()
     }
 
-    fn base_rmdir(&self, _dentry: &dyn Dentry) -> systype::SysResult<()> {
+    fn base_rmdir(&self, _dentry: &dyn Dentry) -> SysResult<()> {
         todo!()
     }
 
@@ -43,7 +43,7 @@ impl Dentry for RtcDentry {
         _dentry: &dyn Dentry,
         _new_dir: &dyn Dentry,
         _new_dentry: &dyn Dentry,
-    ) -> systype::SysResult<()> {
+    ) -> SysResult<()> {
         todo!()
     }
 

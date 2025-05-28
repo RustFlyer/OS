@@ -1,4 +1,4 @@
-use time::TimeSpec;
+use systype::time::TimeSpec;
 
 #[derive(Debug, Clone, Copy, Default)]
 #[repr(C)]

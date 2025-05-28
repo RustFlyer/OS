@@ -4,5 +4,6 @@
 
 pub mod hart;
 pub mod mm;
+pub mod pte;
 pub mod time;
 pub mod trap;

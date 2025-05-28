@@ -5,7 +5,7 @@ use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::sync::Weak;
 use mutex::SpinNoIrqLock;
-use systype::SysResult;
+use systype::error::SysResult;
 
 use crate::task::tid::Tid;
 

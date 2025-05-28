@@ -3,7 +3,7 @@ use alloc::sync::{Arc, Weak};
 use async_trait::async_trait;
 use config::inode::InodeType;
 use driver::console::console_getchar;
-use systype::SysResult;
+use systype::error::SysResult;
 use vfs::stat::Stat;
 use vfs::{
     dentry::{Dentry, DentryMeta},
@@ -103,7 +103,7 @@ impl File for StdInFile {
         &self.meta
     }
 
-    async fn base_read(&self, buf: &mut [u8], _pos: usize) -> systype::SysResult<usize> {
+    async fn base_read(&self, buf: &mut [u8], _pos: usize) -> SysResult<usize> {
         if buf.is_empty() {
             return Ok(0);
         }

@@ -1,6 +1,5 @@
 pub mod addr_space;
 pub mod elf;
-pub mod mapping_flags;
 pub mod mmap;
 pub mod shm;
 pub mod user_ptr;
@@ -9,7 +8,6 @@ pub mod user_ptr;
 pub mod iomap;
 
 mod page_table;
-mod pte;
 mod vm_area;
 
 pub use page_table::switch_to_kernel_page_table;

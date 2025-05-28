@@ -10,7 +10,6 @@ mm = { path = "../mm" }
 mutex = { path = "../mutex" }
 osfuture = { path = "../osfuture" }
 systype = { path = "../systype" }
-time = { path = "../time" }
 async-trait = { workspace = true }
 downcast-rs = { workspace = true }
 elf = { workspace = true }

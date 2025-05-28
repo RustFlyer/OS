@@ -34,13 +34,16 @@ name = "arch"
 version = "0.1.0"
 dependencies = [
  "bit_field",
+ "bitflags 2.9.1",
  "config",
  "log",
  "loongArch64",
+ "mm",
  "polyhal-macro",
  "riscv",
  "sbi-rt",
  "spin",
+ "systype",
 ]
 
 [[package]]
@@ -320,7 +323,6 @@ dependencies = [
  "mutex",
  "simdebug",
  "systype",
- "time",
  "vfs",
 ]
 
@@ -439,7 +441,6 @@ dependencies = [
  "spin",
  "strum",
  "systype",
- "time",
  "timer",
  "vfs",
  "virtio-drivers",
@@ -462,9 +463,9 @@ checksum = "d750af042f7ef4f724306de029d18836c26c1765a54a6a3f094cbd23a7267ffa"
 
 [[package]]
 name = "libloading"
-version = "0.8.7"
+version = "0.8.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a793df0d7afeac54f95b471d3af7f0d4fb975699f972341a4b76988d49cdf0c"
+checksum = "07033963ba89ebaf1584d767badaa2e8fcec21aedea6b8c0346d487d49c28667"
 dependencies = [
  "cfg-if",
  "windows-targets",
@@ -535,7 +536,6 @@ checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
 name = "mm"
 version = "0.1.0"
 dependencies = [
- "arch",
  "bitflags 2.9.1",
  "bitmap-allocator",
  "buddy_system_allocator",
@@ -548,7 +548,6 @@ dependencies = [
  "mutex",
  "riscv",
  "sbi-rt",
- "simdebug",
  "systype",
 ]
 
@@ -868,12 +867,6 @@ dependencies = [
 [[package]]
 name = "simdebug"
 version = "0.1.0"
-dependencies = [
- "arch",
- "cfg-if",
- "config",
- "log",
-]
 
 [[package]]
 name = "smoltcp"
@@ -941,8 +934,8 @@ dependencies = [
 name = "systype"
 version = "0.1.0"
 dependencies = [
+ "bitflags 2.9.1",
  "strum",
- "time",
 ]
 
 [[package]]
@@ -963,15 +956,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "time"
-version = "0.1.0"
-dependencies = [
- "arch",
- "config",
- "log",
 ]
 
 [[package]]
@@ -1011,7 +995,6 @@ dependencies = [
  "bitflags 2.9.1",
  "buddy_system_allocator",
  "config",
- "time",
 ]
 
 [[package]]
@@ -1036,7 +1019,6 @@ dependencies = [
  "osfuture",
  "spin",
  "systype",
- "time",
 ]
 
 [[package]]

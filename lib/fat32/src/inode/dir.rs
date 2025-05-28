@@ -1,7 +1,7 @@
 use alloc::sync::Arc;
 use config::inode::InodeType;
 use mutex::{ShareMutex, new_share_mutex};
-use systype::SysResult;
+use systype::error::SysResult;
 use vfs::{
     inode::{Inode, InodeMeta},
     inoid::alloc_ino,

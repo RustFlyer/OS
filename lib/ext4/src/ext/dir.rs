@@ -19,7 +19,7 @@ use lwext4_rust::{
 };
 
 use config::inode::InodeType;
-use systype::{SysError, SysResult};
+use systype::error::{SysError, SysResult};
 
 use super::file::ExtFile;
 

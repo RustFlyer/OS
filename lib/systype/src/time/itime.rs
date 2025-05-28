@@ -1,6 +1,6 @@
 use core::time::Duration;
 
-use crate::{TimeVal, TimeValue};
+use super::{TimeVal, TimeValue};
 
 #[derive(Debug, Clone, Copy, Default)]
 #[repr(C)]

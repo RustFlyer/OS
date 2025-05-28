@@ -1,7 +1,8 @@
 use bitflags::bitflags;
 
-use super::*;
-use crate::vm::mapping_flags::MappingFlags;
+use systype::memory_flags::MappingFlags;
+
+use super::PageTableEntry;
 
 /// Offset of the physical page number in a page table entry. In LoongArch64,
 /// the physical page number is located at bits 12-`PA_LEN - 1` in a page table entry.

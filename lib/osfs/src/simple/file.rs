@@ -2,7 +2,7 @@ use alloc::boxed::Box;
 use alloc::sync::Arc;
 use async_trait::async_trait;
 use config::mm::PAGE_SIZE;
-use systype::{SysError, SysResult};
+use systype::error::{SysError, SysResult};
 use vfs::{
     dentry::Dentry,
     file::{File, FileMeta},

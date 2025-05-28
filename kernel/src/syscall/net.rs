@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 
 use config::vfs::OpenFlags;
 use net::poll_interfaces;
-use systype::{SysError, SyscallResult};
+use systype::error::{SysError, SyscallResult};
 
 use crate::{
     net::{

@@ -7,7 +7,7 @@ use alloc::{
 use config::vfs::MountFlags;
 use driver::BlockDevice;
 use mutex::SpinNoIrqLock;
-use systype::{SysError, SysResult};
+use systype::error::{SysError, SysResult};
 
 use crate::{dentry::Dentry, superblock::SuperBlock};
 

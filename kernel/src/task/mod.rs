@@ -9,6 +9,7 @@ pub mod task;
 pub mod taskf;
 pub mod threadgroup;
 pub mod tid;
+pub mod time_stat;
 pub mod time;
 pub mod timeid;
 

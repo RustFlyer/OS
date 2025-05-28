@@ -1,21 +1,18 @@
+use alloc::{boxed::Box, vec::Vec};
 use core::{ops::DerefMut, sync::atomic::Ordering, task::Waker};
 
-use alloc::{boxed::Box, vec::Vec};
-use mutex::{ShareMutex, SpinNoIrqLock};
-use osfuture::yield_now;
 use smoltcp::{
     iface::{SocketHandle, SocketSet},
     socket::tcp::{self, State},
     wire::{IpEndpoint, IpListenEndpoint},
 };
-use systype::{SysError, SysResult};
 
-use crate::{SOCKET_SET, SocketSetWrapper, socketset::LISTEN_QUEUE_SIZE};
+use mutex::{ShareMutex, SpinNoIrqLock};
+use systype::error::{SysError, SysResult};
 
-use super::{
-    core::TcpSocket,
-    listenentry::{ListenTableEntry, PORT_NUM},
-};
+use crate::{SOCKET_SET, socketset::LISTEN_QUEUE_SIZE};
+
+use super::listenentry::{ListenTableEntry, PORT_NUM};
 
 /// A table for managing TCP listen ports.
 /// Each index corresponds to a specific port number.

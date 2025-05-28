@@ -5,8 +5,7 @@ use downcast_rs::{DowncastSync, impl_downcast};
 use config::inode::{InodeMode, InodeState, InodeType};
 use mm::page_cache::PageCache;
 use mutex::SpinNoIrqLock;
-use systype::SysResult;
-use time::TimeSpec;
+use systype::{error::SysResult, time::TimeSpec};
 
 use crate::{stat::Stat, superblock::SuperBlock};
 
