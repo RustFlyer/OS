@@ -137,7 +137,7 @@ impl FutexManager {
                     }
                 } else {
                     let waiter = waiters.pop().unwrap();
-                    log::info!("[futex_wake] {:?} has been woken", waiter);
+                    log::warn!("[futex_wake] {:?} has been woken", waiter);
                     waiter.wake();
                 }
 

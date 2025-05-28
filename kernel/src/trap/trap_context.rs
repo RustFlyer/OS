@@ -253,12 +253,12 @@ impl TrapContext {
     pub fn get_user_a0(&self) -> usize {
         #[cfg(target_arch = "riscv64")]
         {
-            self.user_reg[2]
+            self.user_reg[10]
         }
 
         #[cfg(target_arch = "loongarch64")]
         {
-            self.user_reg[3]
+            self.user_reg[4]
         }
     }
 

@@ -70,10 +70,10 @@ impl Task {
         manager.add(si);
         if manager.should_wake.contain_signal(si.sig) && self.is_in_state(TaskState::Interruptable)
         {
-            log::info!("[Task::recv] tid {} has been woken", self.tid());
+            log::warn!("[Task::recv] tid {} has been woken", self.tid());
             self.wake();
         } else {
-            log::info!(
+            log::warn!(
                 "[Task::recv] tid {} hasn't been woken, should_wake {:?}, state {:?}",
                 self.tid(),
                 manager.should_wake,
@@ -292,8 +292,8 @@ impl ActionType {
 #[derive(Copy, Clone, Debug)]
 pub struct Action {
     pub atype: ActionType,
-    pub flags: SigActionFlag,   //信号处理的附加信息
-    pub mask: SigSet,    // 一个位掩码，每个比特位对应于系统中的一个信号，用于在处理程序执行期间阻塞其他信号。
+    pub flags: SigActionFlag, //信号处理的附加信息
+    pub mask: SigSet, // 一个位掩码，每个比特位对应于系统中的一个信号，用于在处理程序执行期间阻塞其他信号。
 }
 
 bitflags! {

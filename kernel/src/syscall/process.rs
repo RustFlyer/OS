@@ -285,7 +285,7 @@ pub fn sys_clone(
     chilren_tid_ptr: usize,
 ) -> SyscallResult {
     log::info!(
-        "[sys_clone] flags:{flags:?}, stack:{stack:#x}, tls:{tls_ptr:#x}, parent_tid:{parent_tid_ptr:#x}, child_tid:{chilren_tid_ptr:x}"
+        "[sys_clone] flags:{flags:#x}, stack:{stack:#x}, tls:{tls_ptr:#x}, parent_tid:{parent_tid_ptr:#x}, child_tid:{chilren_tid_ptr:x}"
     );
     let task = current_task();
     let addrspace = task.addr_space();
@@ -322,7 +322,7 @@ pub fn sys_clone(
     spawn_user_task(new_task);
     log::info!("[sys_clone] clone success",);
 
-    task.set_is_yield(true);
+    // task.set_is_yield(true);
 
     Ok(new_tid)
 }

@@ -141,6 +141,8 @@ pub fn get_hart(hart_id: usize) -> &'static mut Hart {
 }
 
 pub fn current_hart() -> &'static mut Hart {
+    return get_hart(0);
+
     let ret;
     unsafe {
         let tp: usize;

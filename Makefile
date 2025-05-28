@@ -55,7 +55,7 @@ USER_BINS := $(patsubst $(USER_APPS_DIR)/%.rs, $(TARGET_DIR)/%.bin, $(USER_APPS)
 
 
 FS_IMG_DIR := fsimg
-FS_IMG := $(FS_IMG_DIR)/sdcard.img
+FS_IMG := $(FS_IMG_DIR)/$(ARCH)-sdcard.img
 
 ifeq ($(ARCH),riscv64)
 	QEMU_ARGS := -m 128

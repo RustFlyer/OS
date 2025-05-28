@@ -125,7 +125,7 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
     trap::trap_env::set_kernel_trap_entry();
     arch::time::init_timer();
 
-    hart::init(hart_id);
+    // hart::init(hart_id);
     log::info!("hart {}: running", hart_id);
 
     loop {

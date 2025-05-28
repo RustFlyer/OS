@@ -11,6 +11,7 @@ use crate::{
     },
     vm::user_ptr::{UserReadPtr, UserWritePtr},
 };
+use alloc::string::String;
 use config::process::INIT_PROC_ID;
 use osfuture::suspend_now;
 use systype::{SysError, SyscallResult};
@@ -111,7 +112,7 @@ pub async fn sys_futex(
     let op = FutexOp::exstract_main_futex_flags(futex_op);
     match op {
         FutexOp::WaitBitset | FutexOp::Wait => {
-            // log::debug!("[sys_futex] Wait Get Locked op: {:?} mask: {:#x}", op, val3);
+            log::debug!("[sys_futex] Wait Get Locked op: {:?} mask: {:#x}", op, val3);
             let r = futex_addr.read();
             if r != val {
                 log::debug!("[sys_futex] r: {:#x} val: {:#x}", r, val);
@@ -148,7 +149,7 @@ pub async fn sys_futex(
             Ok(0)
         }
         FutexOp::WakeBitset | FutexOp::Wake => {
-            // log::debug!("[sys_futex] wake");
+            log::debug!("[sys_futex] Wake");
             let n_wake = futex_manager(is_multi_group, val3).wake(&key, val)?;
             Ok(n_wake)
         }
@@ -182,7 +183,11 @@ pub async fn sys_futex(
 ///
 /// TODO: broadcast(to process group) when pid <= 0; permission check when sig_code == 0; i32 or u32
 pub fn sys_kill(pid: isize, sig_code: i32) -> SyscallResult {
-    // log::error!("[sys_kill] try to send sig_code {} to pid {}", sig_code, pid);
+    log::debug!(
+        "[sys_kill] try to send sig_code {} to pid {}",
+        sig_code,
+        pid
+    );
     // TASK_MANAGER.for_each(|task| {
     //     log::error!("[sys_kill] existing task's pid: {}", task.tid());
     //     Ok(())
@@ -341,7 +346,19 @@ pub async fn sys_sigreturn() -> SyscallResult {
     let addr_space = task.addr_space();
     let mut sig_cx_ptr = UserReadPtr::<SigContext>::new(sig_cx_ptr, &addr_space);
     // log::debug!("[sys_sigreturn] sig_cx_ptr: {sig_cx_ptr:?}");
-    // 恢复信号处理前的状态
+    // restore trap context before sig handle
+
+    let mut rs = String::new();
+    trap_cx
+        .user_reg
+        .iter()
+        .enumerate()
+        .for_each(|(idx, u)| rs.push_str(format!("r[{idx:02}] = {u:#x}, ").as_str()));
+    log::debug!(
+        "[sys_sigreturn] task: {} ,before trap context: [{:?}]",
+        task.get_name(),
+        rs
+    );
     unsafe {
         let sig_cx = sig_cx_ptr.read()?;
         *mask = sig_cx.mask;
@@ -350,7 +367,17 @@ pub async fn sys_sigreturn() -> SyscallResult {
         //log::debug!("[sys_sigreturn] restore trap_cx a0: {} with backup in sig_cx: {}", trap_cx.user_reg[10], sig_cx.user_reg[10]);
         trap_cx.user_reg = sig_cx.user_reg;
     }
-    log::debug!("[sys_sigreturn] trap context: {:?}", trap_cx.user_reg);
+    let mut rs = String::new();
+    trap_cx
+        .user_reg
+        .iter()
+        .enumerate()
+        .for_each(|(idx, u)| rs.push_str(format!("r[{idx:02}] = {u:#x}, ").as_str()));
+    log::debug!(
+        "[sys_sigreturn] task: {} ,after trap context: [{:?}]",
+        task.get_name(),
+        rs
+    );
     // log::debug!("sig: {:#x}", task.sig_manager_mut().bitmap.bits());
     // its return value is the a0 before signal interrupt, so that it won't be changed in async_syscall
     // trap_cx.display();
@@ -535,7 +562,7 @@ pub fn sys_tgkill(tgid: isize, tid: isize, signum: i32) -> SyscallResult {
 /// the wrong thread being signaled if a thread terminates and its
 /// thread ID is recycled. Avoid using this system call.
 pub fn sys_tkill(tid: isize, sig: i32) -> SyscallResult {
-    // log::debug!("[sys_tkill] tid: {tid}, signum: {sig}");
+    log::debug!("[sys_tkill] to tid: {tid}, signum: {sig}");
     let sig = Sig::from_i32(sig);
     if !sig.is_valid() || tid < 0 {
         return Err(SysError::EINVAL);

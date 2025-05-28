@@ -68,6 +68,8 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
             Ok(false)
         }
         ActionType::User { entry } => {
+            // log::debug!("[sig_exec] en");
+            // return Ok(true);
             // The signal being delivered is also added to the signal mask, unless
             // SA_NODEFER was specified when registering the handler.
             if !action.flags.contains(SigActionFlag::SA_NODEFER) {

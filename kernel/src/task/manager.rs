@@ -31,14 +31,26 @@ impl TaskManager {
     pub fn add_task(&self, task: &Arc<Task>) {
         self.0.lock().insert(task.tid(), Arc::downgrade(task));
         log::debug!("[add_task] {}", task.tid());
-        let _ = self.for_each(|t| Ok(log::debug!("thread {}, name: {}", t.tid(), t.get_name())));
+        let _ = self.for_each(|t| {
+            Ok(log::debug!(
+                "thread {}, name: {}, state: {:?}",
+                t.tid(),
+                t.get_name(),
+                t.get_state()
+            ))
+        });
     }
 
     pub fn remove_task(&self, tid: Tid) {
         self.0.lock().remove(&tid);
         log::debug!("[remove_task] {tid}");
         self.for_each(|t| {
-            log::debug!("thread {}, name: {}", t.tid(), t.get_name());
+            log::debug!(
+                "thread {}, name: {}, state: {:?}",
+                t.tid(),
+                t.get_name(),
+                t.get_state()
+            );
             Ok(())
         })
         .unwrap();
