@@ -7,7 +7,7 @@ use crate::task::{Task, sig_members::ActionType};
 use crate::vm::user_ptr::UserWritePtr;
 use alloc::sync::Arc;
 use driver::print;
-use systype::SysResult;
+use systype::error::SysResult;
 
 use super::sig_info::{Sig, SigInfo};
 

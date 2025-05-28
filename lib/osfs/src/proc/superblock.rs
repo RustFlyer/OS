@@ -1,7 +1,7 @@
 use alloc::sync::Arc;
 use config::vfs::StatFs;
 use driver::BlockDevice;
-use systype::SysResult;
+use systype::error::SysResult;
 use vfs::{
     fstype::FileSystemType,
     superblock::{SuperBlock, SuperBlockMeta},

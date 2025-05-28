@@ -1,6 +1,6 @@
 use alloc::{string::String, sync::Arc};
 use config::inode::InodeType;
-use systype::SysResult;
+use systype::error::SysResult;
 use vfs::{dentry::Dentry, inode::Inode, path::Path, sys_root_dentry};
 
 use crate::simple::{dentry::SimpleDentry, inode::SimpleInode};

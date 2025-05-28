@@ -3,8 +3,10 @@ use core::time::Duration;
 
 use arch::time::{get_time_duration, get_time_ms, get_time_us};
 use osfuture::{Select2Futures, SelectOutput};
-use systype::{SysError, SyscallResult};
-use time::{TMS, TimeSpec, TimeVal, TimeValue, itime::ITimerVal};
+use systype::{
+    error::{SysError, SyscallResult},
+    time::{ITimerVal, TMS, TimeSpec, TimeVal, TimeValue},
+};
 use timer::{TIMER_MANAGER, Timer};
 
 use crate::{

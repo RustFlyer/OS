@@ -1,6 +1,6 @@
 use alloc::sync::{Arc, Weak};
 use config::inode::InodeMode;
-use systype::{SysError, SysResult};
+use systype::error::{SysError, SysResult};
 use vfs::{
     dentry::{Dentry, DentryMeta},
     file::File,

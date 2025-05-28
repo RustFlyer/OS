@@ -11,7 +11,7 @@ use mutex::SpinNoIrqLock;
 use spin::Lazy;
 
 use mm::address::{PhysAddr, VirtAddr};
-use systype::{SysError, SysResult, SyscallResult};
+use systype::error::{SysError, SysResult, SyscallResult};
 
 use crate::{
     task::{Task, tid::Tid},

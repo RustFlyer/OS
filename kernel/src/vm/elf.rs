@@ -10,7 +10,7 @@ use config::{
 use elf::{self, ElfStream, ParseError as ElfParseError, endian::LittleEndian, file::FileHeader};
 use mm::address::VirtAddr;
 use osfuture::block_on;
-use systype::{SysError, SysResult};
+use systype::error::{SysError, SysResult};
 use vfs::{file::File, path::Path, sys_root_dentry};
 
 use crate::vm::user_ptr::UserWritePtr;

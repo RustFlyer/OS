@@ -1,11 +1,11 @@
-#![no_main]
 #![no_std]
 
-use disk::DiskCursor;
-use fatfs::{Dir, DirIter, Error, File, FileSystem, LossyOemCpConverter, NullTimeProvider};
-use systype::SysError;
-
 extern crate alloc;
+
+use fatfs::{Dir, DirIter, Error, File, FileSystem, LossyOemCpConverter, NullTimeProvider};
+
+use disk::DiskCursor;
+use systype::error::SysError;
 
 pub mod dentry;
 pub mod disk;
@@ -19,7 +19,7 @@ type FatFile = File<'static, DiskCursor, NullTimeProvider, LossyOemCpConverter>;
 type FatDirIter = DirIter<'static, DiskCursor, NullTimeProvider, LossyOemCpConverter>;
 type FatFs = FileSystem<DiskCursor>;
 
-pub const fn as_sys_err(err: fatfs::Error<()>) -> systype::SysError {
+pub const fn as_sys_err(err: fatfs::Error<()>) -> SysError {
     match err {
         Error::NotFound => SysError::ENOENT,
         _ => SysError::EIO,

@@ -1,7 +1,7 @@
 use alloc::{ffi::CString, sync::Arc};
 
 use config::{inode::InodeType, vfs::MountFlags};
-use systype::SysResult;
+use systype::error::SysResult;
 use vfs::{
     dentry::Dentry,
     fstype::{FileSystemType, FileSystemTypeMeta},
@@ -61,7 +61,7 @@ impl FileSystemType for ExtFsType {
         Ok(root_dentry)
     }
 
-    fn kill_sblk(&self, _sblk: Arc<dyn SuperBlock>) -> systype::SysResult<()> {
+    fn kill_sblk(&self, _sblk: Arc<dyn SuperBlock>) -> SysResult<()> {
         todo!()
     }
 }

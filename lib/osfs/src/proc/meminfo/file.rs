@@ -2,7 +2,7 @@ use core::cmp;
 
 use alloc::boxed::Box;
 use async_trait::async_trait;
-use systype::{SysError, SysResult};
+use systype::error::{SysError, SysResult};
 use vfs::{
     direntry::DirEntry,
     file::{File, FileMeta},

@@ -3,7 +3,7 @@ use alloc::sync::Arc;
 use config::vfs::StatFs;
 use driver::BlockDevice;
 use spin::Once;
-use systype::SysResult;
+use systype::error::SysResult;
 
 use crate::{dentry::Dentry, fstype::FileSystemType};
 

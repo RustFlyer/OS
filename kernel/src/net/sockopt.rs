@@ -1,4 +1,4 @@
-use systype::SysError;
+use systype::error::SysError;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 #[allow(non_camel_case_types)]

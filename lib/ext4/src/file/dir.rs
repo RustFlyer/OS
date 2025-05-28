@@ -1,6 +1,7 @@
 use alloc::sync::Arc;
 
 use mutex::ShareMutex;
+use systype::error::SysResult;
 use vfs::file::{File, FileMeta};
 
 use crate::{dentry::ExtDentry, ext::dir::ExtDir, inode::dir::ExtDirInode};
@@ -27,7 +28,7 @@ impl File for ExtDirFile {
         &self.meta
     }
 
-    fn base_load_dir(&self) -> systype::SysResult<()> {
+    fn base_load_dir(&self) -> SysResult<()> {
         let mut dir = self.dir.lock();
 
         dir.rewind();

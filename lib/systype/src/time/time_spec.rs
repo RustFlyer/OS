@@ -1,6 +1,6 @@
 use core::time::Duration;
 
-use crate::TimeValue;
+use super::TimeValue;
 
 /// This is a detailed time statistic. Its recorded time accuracy
 /// is down to nanoseconds.

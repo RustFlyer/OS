@@ -23,7 +23,7 @@ use core::{cmp, ops::Bound};
 use arch::mm::{fence, tlb_shootdown_all};
 use mm::address::VirtAddr;
 use mutex::SpinLock;
-use systype::{SysError, SysResult};
+use systype::error::{SysError, SysResult};
 
 use super::{
     mapping_flags::MappingFlags,

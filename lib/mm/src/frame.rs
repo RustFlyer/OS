@@ -19,12 +19,13 @@
 //! frames in batch, respectively.
 
 use alloc::vec::Vec;
-use bitmap_allocator::{BitAlloc, BitAlloc64K};
 use core::{cell::SyncUnsafeCell, mem::ManuallyDrop};
-use systype::{SysError, SysResult};
+
+use bitmap_allocator::{BitAlloc, BitAlloc64K};
 
 use config::mm::{PAGE_SIZE, RAM_END, kernel_end_phys};
 use mutex::SpinNoIrqLock;
+use systype::error::{SysError, SysResult};
 
 use crate::address::{PhysAddr, PhysPageNum, VirtPageNum};
 

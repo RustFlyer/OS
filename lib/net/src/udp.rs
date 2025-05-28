@@ -4,18 +4,16 @@ use core::{
     task::Waker,
 };
 
-use mutex::SpinNoIrqLock;
-use osfuture::{suspend_now, take_waker, yield_now};
 use smoltcp::{
     iface::SocketHandle,
-    socket::{
-        self,
-        udp::{self, BindError, SendError},
-    },
+    socket::udp::{self, BindError, SendError},
     wire::{IpEndpoint, IpListenEndpoint},
 };
+
+use mutex::SpinNoIrqLock;
+use osfuture::{suspend_now, take_waker, yield_now};
 use spin::RwLock;
-use systype::{SysError, SysResult};
+use systype::error::{SysError, SysResult};
 
 use crate::{
     NetPollState, SOCKET_SET, SocketSetWrapper,

@@ -10,7 +10,7 @@ use core::{
 
 use alloc::sync::Arc;
 use smoltcp::wire::{IpAddress, IpEndpoint, IpListenEndpoint};
-use systype::{SysError, SysResult};
+use systype::error::{SysError, SysResult};
 
 use crate::vm::{
     addr_space::AddrSpace,

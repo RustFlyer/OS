@@ -3,7 +3,7 @@ use alloc::boxed::Box;
 use async_trait::async_trait;
 use config::vfs::PollEvents;
 use osfuture::take_waker;
-use systype::{SysError, SysResult};
+use systype::error::{SysError, SysResult};
 use vfs::{
     file::{File, FileMeta},
     inode::Inode,

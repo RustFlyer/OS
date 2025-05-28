@@ -12,7 +12,7 @@ use core::{
 use mm::address::VirtAddr;
 use mutex::{ShareMutex, SpinNoIrqLock, new_share_mutex};
 use osfs::{fd_table::FdTable, sys_root_dentry};
-use time::itime::ITimer;
+use systype::time::ITimer;
 use vfs::{dentry::Dentry, file::File};
 
 use super::{

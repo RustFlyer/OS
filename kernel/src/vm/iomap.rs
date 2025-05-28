@@ -3,7 +3,7 @@ use alloc::collections::btree_map::BTreeMap;
 use config::mm::{KERNEL_MAP_OFFSET, PAGE_SIZE};
 use mm::address::VirtAddr;
 use mutex::SpinNoIrqLock;
-use systype::SysResult;
+use systype::error::SysResult;
 
 use super::{
     KERNEL_PAGE_TABLE,

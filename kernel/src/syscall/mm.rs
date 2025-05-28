@@ -8,7 +8,7 @@ use shm::{
     id::ShmStat,
     manager::{SHARED_MEMORY_KEY_ALLOCATOR, SHARED_MEMORY_MANAGER},
 };
-use systype::{SysError, SyscallResult};
+use systype::error::{SysError, SyscallResult};
 
 use crate::{
     processor::current_task,

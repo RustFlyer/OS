@@ -8,7 +8,7 @@
 use alloc::{string::String, sync::Arc};
 
 use config::inode::InodeType;
-use systype::{SysError, SysResult};
+use systype::error::{SysError, SysResult};
 
 use crate::{dentry::Dentry, file::File, sys_root_dentry};
 

@@ -2,7 +2,7 @@ use core::time::Duration;
 
 use arch::time::get_time_duration;
 use config::time::TIME_SLICE_DUATION;
-use time::TMS;
+use systype::time::TMS;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum TaskState {

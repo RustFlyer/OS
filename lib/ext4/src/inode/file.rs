@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 
 use config::device::BLOCK_SIZE;
 use mutex::{ShareMutex, new_share_mutex};
-use systype::SysResult;
+use systype::error::SysResult;
 use vfs::{
     inode::{Inode, InodeMeta},
     stat::Stat,

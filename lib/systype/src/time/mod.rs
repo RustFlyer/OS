@@ -1,14 +1,13 @@
-#![no_std]
-
-pub mod itime;
-pub mod time_spec;
-pub mod time_val;
-pub mod tms;
+mod itime;
+mod time_spec;
+mod time_val;
+mod tms;
 
 use core::time::Duration;
 
-pub use time_spec::TimeSpec;
-pub use time_val::{ITimerVal, TimeVal};
+pub use itime::*;
+pub use time_spec::*;
+pub use time_val::*;
 pub use tms::TMS;
 
 pub trait TimeValue: Copy + Clone + Into<Duration> + From<Duration> {

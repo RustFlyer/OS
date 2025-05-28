@@ -1,7 +1,7 @@
 use alloc::sync::Arc;
 use config::{inode::InodeType, vfs::MountFlags};
 use driver::BlockDevice;
-use systype::SysResult;
+use systype::error::SysResult;
 use vfs::{
     dentry::Dentry,
     fstype::{FileSystemType, FileSystemTypeMeta},

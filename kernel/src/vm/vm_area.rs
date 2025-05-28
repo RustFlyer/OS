@@ -37,7 +37,7 @@ use mm::{
 use mutex::ShareMutex;
 use osfuture::block_on;
 use shm::SharedMemory;
-use systype::{SysError, SysResult};
+use systype::error::{SysError, SysResult};
 use vfs::file::File;
 
 #[cfg(target_arch = "riscv64")]

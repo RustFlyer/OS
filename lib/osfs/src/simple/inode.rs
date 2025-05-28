@@ -1,5 +1,5 @@
 use alloc::sync::Arc;
-use systype::SysResult;
+use systype::error::SysResult;
 use vfs::{
     inode::{Inode, InodeMeta},
     inoid::alloc_ino,

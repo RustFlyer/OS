@@ -9,7 +9,7 @@ use config::{
     inode::{InodeMode, InodeType},
     vfs::OpenFlags,
 };
-use systype::{SysError, SysResult};
+use systype::error::{SysError, SysResult};
 use vfs::{
     dentry::{Dentry, DentryMeta},
     file::File,

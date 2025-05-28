@@ -1,5 +1,5 @@
 use alloc::sync::{Arc, Weak};
-use systype::SysResult;
+use systype::error::SysResult;
 use vfs::{
     dentry::{Dentry, DentryMeta},
     file::{File, FileMeta},

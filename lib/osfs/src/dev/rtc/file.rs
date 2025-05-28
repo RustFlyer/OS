@@ -1,6 +1,8 @@
 use alloc::sync::Arc;
+
 use async_trait::async_trait;
-use systype::SyscallResult;
+
+use systype::error::SyscallResult;
 use vfs::{
     dentry::Dentry,
     file::{File, FileMeta},

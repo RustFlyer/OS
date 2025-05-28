@@ -3,7 +3,7 @@ use alloc::sync::{Arc, Weak};
 use async_trait::async_trait;
 use config::inode::InodeType;
 use driver::print;
-use systype::SysResult;
+use systype::error::SysResult;
 use vfs::stat::Stat;
 use vfs::{
     dentry::{Dentry, DentryMeta},

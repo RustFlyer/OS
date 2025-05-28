@@ -4,7 +4,7 @@ use config::mm::{MMAP_END, MMAP_START, PAGE_SIZE};
 use mm::address::VirtAddr;
 use mutex::ShareMutex;
 use shm::SharedMemory;
-use systype::{SysError, SysResult};
+use systype::error::{SysError, SysResult};
 
 use super::{addr_space::AddrSpace, mmap::MmapProt};
 use crate::vm::{

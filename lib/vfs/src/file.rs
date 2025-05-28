@@ -3,9 +3,9 @@ use alloc::ffi::CString;
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use async_trait::async_trait;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
+use async_trait::async_trait;
 use downcast_rs::{DowncastSync, impl_downcast};
 
 use config::{
@@ -15,7 +15,7 @@ use config::{
 };
 use mm::page_cache::page::Page;
 use mutex::SpinNoIrqLock;
-use systype::{SysError, SysResult, SyscallResult};
+use systype::error::{SysError, SysResult, SyscallResult};
 
 use crate::{dentry::Dentry, direntry::DirEntry, inode::Inode, superblock::SuperBlock};
 
@@ -464,13 +464,14 @@ mod elf_impls {
     //! This module contains implementations of the [`elf::io::Read`] and [`elf::io::Seek`]
     //! traits for the [`File`] trait. It allows the [`elf`] crate to create an [`ElfStream`]
     //! which reads ELF file data from an underlying [`File`].
+
     use elf::io::{Read, Seek, SeekFrom as ElfSeekFrom};
     use elf::parse::IOError;
     use elf::parse::ParseError;
 
     use config::vfs::SeekFrom;
     use osfuture::block_on;
-    use systype::SysError;
+    use systype::error::SysError;
 
     use super::File;
 

@@ -3,11 +3,5 @@ name = "simdebug"
 version = "0.1.0"
 edition = "2024"
 
-[dependencies]
-arch = { path = "../arch" }
-config = { path = "../config" }
-cfg-if = { workspace = true }
-log = { workspace = true }
-
 [features]
 ondebug = []

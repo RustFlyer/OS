@@ -15,7 +15,7 @@ use mm::{
     page_cache::page::Page,
 };
 use mutex::SpinLock;
-use systype::{SysError, SysResult};
+use systype::error::{SysError, SysResult};
 
 #[cfg(target_arch = "riscv64")]
 use arch::mm::tlb_flush_all_except_global;

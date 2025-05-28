@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 use bitflags::bitflags;
 use config::mm::{MMAP_END, MMAP_START, PAGE_SIZE};
 use mm::address::VirtAddr;
-use systype::{SysError, SysResult};
+use systype::error::{SysError, SysResult};
 use vfs::file::File;
 
 use crate::vm::mapping_flags::MappingFlags;

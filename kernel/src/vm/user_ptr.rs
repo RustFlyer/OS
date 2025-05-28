@@ -36,7 +36,7 @@ use core::{cmp, fmt::Debug, marker::PhantomData, ops::ControlFlow, slice};
 use alloc::{ffi::CString, vec::Vec};
 use config::mm::{PAGE_SIZE, USER_END};
 use mm::address::VirtAddr;
-use systype::{SysError, SysResult};
+use systype::error::{SysError, SysResult};
 
 use super::{addr_space::AddrSpace, mapping_flags::MappingFlags};
 use crate::trap::trap_env::{set_kernel_trap_entry, set_user_rw_trap_entry};

@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use config::vfs::{OpenFlags, PollEvents};
 use net::{poll_interfaces, tcp::core::TcpSocket, udp::UdpSocket};
 use osfuture::take_waker;
-use systype::SysResult;
+use systype::error::SysResult;
 use vfs::{
     file::{File, FileMeta},
     sys_root_dentry,

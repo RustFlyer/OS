@@ -27,7 +27,7 @@
 use core::cell::SyncUnsafeCell;
 
 use config::mm::PAGE_SIZE;
-use systype::SysResult;
+use systype::error::SysResult;
 
 use crate::{address::PhysPageNum, frame::FrameTracker};
 

@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 use arch::time::get_time_duration;
-use systype::SyscallResult;
+use systype::error::SyscallResult;
 
 use crate::{processor::current_task, vm::user_ptr::UserWritePtr};
 

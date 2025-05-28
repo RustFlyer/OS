@@ -14,7 +14,7 @@ use lwext4_rust::bindings::{
 };
 
 use config::vfs::{OpenFlags, SeekFrom};
-use systype::{SysError, SysResult};
+use systype::error::{SysError, SysResult};
 
 /// Wrapper for `lwext4_rust` crate's `ext4_file` struct.
 pub struct ExtFile(

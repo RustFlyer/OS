@@ -15,8 +15,7 @@ use mutex::{SpinNoIrqLock, new_share_mutex};
 use osfs::sys_root_dentry;
 use osfuture::suspend_now;
 use shm::manager::SHARED_MEMORY_MANAGER;
-use systype::SysResult;
-use time::itime::ITimer;
+use systype::{error::SysResult, time::ITimer};
 use timer::{TIMER_MANAGER, Timer};
 use vfs::{dentry::Dentry, file::File, path::Path};
 
