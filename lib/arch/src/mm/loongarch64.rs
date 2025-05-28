@@ -2,6 +2,8 @@ use core::arch::asm;
 
 use loongArch64::register::pgdl;
 
+use crate::pte::PageTableEntry;
+
 /// Switches the current page table being used by the MMU to the one
 /// at the given physical page number `root`.
 pub fn switch_pagetable(root: usize) {
@@ -59,4 +61,27 @@ pub fn tlb_shootdown(_addr: usize, _length: usize) {
 pub fn tlb_shootdown_all() {
     tlb_flush_all_except_global();
     // TODO: Implement TLB shootdown mechanism for LoongArch64.
+}
+
+/// Fills the TLB with the given page table entries for the current faulting
+/// virtual address.
+///
+/// `vpn` is the virtual page number of `pte0` or `pte1`. `pte0` and `pte1` are
+/// two page table entries that is to be filled into the TLB.
+///
+/// This function must be called when the kernel is handling a page fault.
+pub fn tlb_fill(pte0: PageTableEntry, pte1: PageTableEntry) {
+    let tlbelo0 = pte0.bits();
+    let tlbelo1 = pte1.bits();
+    unsafe {
+        asm!(
+            "
+            csrwr {}, 0x12
+            csrwr {}, 0x13
+            tlbfill
+            ",
+            in(reg) tlbelo0,
+            in(reg) tlbelo1,
+        )
+    }
 }

@@ -3,11 +3,10 @@ use alloc::collections::btree_map::BTreeMap;
 use config::mm::{KERNEL_MAP_OFFSET, PAGE_SIZE};
 use mm::address::VirtAddr;
 use mutex::SpinNoIrqLock;
-use systype::SysResult;
+use systype::{error::SysResult, memory_flags::MappingFlags};
 
 use super::{
     KERNEL_PAGE_TABLE,
-    mapping_flags::MappingFlags,
     vm_area::{OffsetArea, VmArea},
 };
 

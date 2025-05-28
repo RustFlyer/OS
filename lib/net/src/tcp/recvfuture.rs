@@ -4,11 +4,11 @@ use core::{
 };
 
 use smoltcp::socket::tcp;
-use systype::{SysError, SyscallResult};
 
-use crate::{SOCKET_SET, tcp::RCV_SHUTDOWN};
+use systype::error::{SysError, SyscallResult};
 
 use super::core::TcpSocket;
+use crate::{SOCKET_SET, tcp::RCV_SHUTDOWN};
 
 pub struct TcpRecvFuture<'a> {
     socket: &'a TcpSocket,

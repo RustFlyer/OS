@@ -5,7 +5,7 @@ use alloc::string::{String, ToString};
 use alloc::sync::{Arc, Weak};
 use config::inode::InodeMode;
 use mutex::SpinNoIrqLock;
-use systype::{SysError, SysResult};
+use systype::error::{SysError, SysResult};
 
 use crate::file::File;
 use crate::inode::Inode;

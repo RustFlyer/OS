@@ -3,7 +3,7 @@ extern crate alloc;
 use alloc::sync::Arc;
 use config::vfs::StatFs;
 use lwext4_rust::Ext4BlockWrapper;
-use systype::SysResult;
+use systype::error::SysResult;
 use vfs::superblock::{SuperBlock, SuperBlockMeta};
 
 use crate::disk::Disk;

@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 
 use config::vfs::SeekFrom;
 use mutex::{ShareMutex, new_share_mutex};
-use systype::{SysError, SysResult};
+use systype::error::{SysError, SysResult};
 use vfs::{
     direntry::DirEntry,
     file::{File, FileMeta},

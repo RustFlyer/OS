@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 
 use async_trait::async_trait;
 use mutex::SpinNoIrqLock;
-use systype::{SysResult, SyscallResult};
+use systype::error::{SysResult, SyscallResult};
 use vfs::{
     dentry::Dentry,
     file::{File, FileMeta},

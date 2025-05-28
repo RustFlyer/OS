@@ -16,7 +16,10 @@ use mm::*;
 use net::*;
 use process::*;
 use signal::*;
-use time::*;
+use time::{
+    sys_clock_gettime, sys_clock_nanosleep, sys_getitimer, sys_gettimeofday, sys_nanosleep,
+    sys_setitimer, sys_times,
+};
 use user::{sys_getgid, sys_getuid};
 
 pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {

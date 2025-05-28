@@ -1,29 +1,28 @@
+use alloc::vec::Vec;
 use core::{
     cell::UnsafeCell,
     sync::atomic::{AtomicBool, AtomicU8, Ordering},
     task::Waker,
 };
 
-use alloc::{boxed::Box, vec::Vec};
-use mutex::{SpinNoIrqLock, new_share_mutex};
-use osfuture::{suspend_now, take_waker, yield_now};
 use smoltcp::{
     iface::SocketHandle,
-    socket::tcp::{self, ConnectError, State},
+    socket::tcp::{self, ConnectError},
     wire::{IpAddress, IpEndpoint, IpListenEndpoint},
 };
-use systype::{SysError, SysResult};
-use timer::sleep_ms;
 
-use crate::{
-    ETH0, NetPollState, SOCKET_SET, SocketSetWrapper,
-    addr::{UNSPECIFIED_ENDPOINT_V4, UNSPECIFIED_IPV4, is_unspecified},
-    tcp::LISTEN_TABLE,
-};
+use mutex::{SpinNoIrqLock, new_share_mutex};
+use osfuture::{suspend_now, yield_now};
+use systype::error::{SysError, SysResult};
 
 use super::{
     RCV_SHUTDOWN, SEND_SHUTDOWN, SHUT_RD, SHUT_RDWR, SHUT_WR, SHUTDOWN_MASK, STATE_BUSY,
     STATE_CLOSED, STATE_CONNECTED, STATE_CONNECTING, STATE_LISTENING, core::TcpSocket, has_signal,
+};
+use crate::{
+    ETH0, NetPollState, SOCKET_SET, SocketSetWrapper,
+    addr::{UNSPECIFIED_ENDPOINT_V4, UNSPECIFIED_IPV4, is_unspecified},
+    tcp::LISTEN_TABLE,
 };
 
 impl TcpSocket {

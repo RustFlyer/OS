@@ -1,6 +1,6 @@
 use alloc::{boxed::Box, string::ToString};
 use async_trait::async_trait;
-use systype::{SysError, SysResult, SyscallResult};
+use systype::error::{SysError, SysResult, SyscallResult};
 use vfs::{
     direntry::DirEntry,
     file::{File, FileMeta},

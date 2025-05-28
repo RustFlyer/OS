@@ -4,7 +4,7 @@ use config::{
     vfs::{MountFlags, StatFs},
 };
 use driver::BlockDevice;
-use systype::SysResult;
+use systype::error::SysResult;
 use vfs::{
     dentry::Dentry,
     fstype::{FileSystemType, FileSystemTypeMeta},

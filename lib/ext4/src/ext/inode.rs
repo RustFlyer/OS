@@ -8,7 +8,7 @@ use lwext4_rust::{
     },
 };
 
-use systype::{SysError, SysResult};
+use systype::error::{SysError, SysResult};
 
 unsafe extern "C" {
     // Get/set mode

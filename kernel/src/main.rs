@@ -9,7 +9,6 @@
 mod boot;
 mod entry;
 mod lang_item;
-mod link_app;
 mod loader;
 mod logging;
 mod net;

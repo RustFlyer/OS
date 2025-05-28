@@ -13,7 +13,6 @@ mm = { path = "../lib/mm/" }
 mutex = { path = "../lib/mutex/" }
 executor = { path = "../lib/executor/" }
 pps = { path = "../lib/pps/" }
-time = { path = "../lib/time/" }
 timer = { path = "../lib/timer/" }
 shm = { path = "../lib/shm/" }
 systype = { path = "../lib/systype/" }

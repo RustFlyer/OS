@@ -1,6 +1,7 @@
 use alloc::sync::Arc;
+
 use config::vfs::StatFs;
-use mutex::{ShareMutex, new_share_mutex};
+use systype::error::SysResult;
 use vfs::superblock::{SuperBlock, SuperBlockMeta};
 
 use crate::{FatFs, as_sys_err, disk::DiskCursor};
@@ -20,7 +21,7 @@ impl FatSuperBlock {
                     DiskCursor {
                         sector: 0,
                         offset: 0,
-                        blk_dev: blk_dev,
+                        blk_dev,
                     },
                     fatfs::FsOptions::new(),
                 )
@@ -35,7 +36,7 @@ impl SuperBlock for FatSuperBlock {
         &self.meta
     }
 
-    fn stat_fs(&self) -> systype::SysResult<StatFs> {
+    fn stat_fs(&self) -> SysResult<StatFs> {
         let fs = &self.fs;
         let stat_fs = fs.stats().map_err(as_sys_err)?;
         let ft = fs.fat_type();
@@ -60,7 +61,7 @@ impl SuperBlock for FatSuperBlock {
         })
     }
 
-    fn sync_fs(&self, _wait: isize) -> systype::SysResult<()> {
+    fn sync_fs(&self, _wait: isize) -> SysResult<()> {
         todo!()
     }
 }

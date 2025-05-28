@@ -1,3 +1,10 @@
+use config::process::INIT_PROC_ID;
+use osfuture::suspend_now;
+use systype::{
+    error::{SysError, SyscallResult},
+    time::{TimeSpec, TimeValue},
+};
+
 use crate::{
     processor::current_task,
     task::{
@@ -12,10 +19,6 @@ use crate::{
     vm::user_ptr::{UserReadPtr, UserWritePtr},
 };
 use alloc::string::String;
-use config::process::INIT_PROC_ID;
-use osfuture::suspend_now;
-use systype::{SysError, SyscallResult};
-use time::{TimeSpec, TimeValue};
 
 /// futex - fast user-space locking
 ///

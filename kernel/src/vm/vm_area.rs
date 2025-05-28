@@ -28,7 +28,10 @@ use core::{cmp, fmt::Debug, mem};
 
 use bitflags::bitflags;
 
-use arch::mm::{tlb_flush_addr, tlb_shootdown};
+use arch::{
+    mm::{tlb_flush_addr, tlb_shootdown},
+    pte::{PageTableEntry, PteFlags},
+};
 use config::mm::PAGE_SIZE;
 use mm::{
     address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum},
@@ -37,7 +40,10 @@ use mm::{
 use mutex::ShareMutex;
 use osfuture::block_on;
 use shm::SharedMemory;
-use systype::{SysError, SysResult};
+use systype::{
+    error::{SysError, SysResult},
+    memory_flags::MappingFlags,
+};
 use vfs::file::File;
 
 #[cfg(target_arch = "riscv64")]
@@ -45,11 +51,7 @@ use arch::mm::tlb_flush_all_except_global;
 #[cfg(target_arch = "riscv64")]
 use config::mm::KERNEL_MAP_OFFSET;
 
-use super::{
-    mapping_flags::MappingFlags,
-    page_table::PageTable,
-    pte::{PageTableEntry, PteFlags},
-};
+use super::page_table::PageTable;
 
 /// A virtual memory area (VMA).
 ///

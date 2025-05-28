@@ -1,6 +1,6 @@
 use core::time::Duration;
 
-use crate::TimeValue;
+use super::TimeValue;
 
 /// This is a time statistic. Its recorded time accuracy
 /// is down to microseconds.
@@ -60,29 +60,5 @@ impl From<Duration> for TimeVal {
 impl From<TimeVal> for Duration {
     fn from(val: TimeVal) -> Self {
         Duration::new(val.tv_sec as u64, (val.tv_usec * 1000) as u32)
-    }
-}
-
-#[derive(Debug, Clone, Copy, Default)]
-#[repr(C)]
-pub struct ITimerVal {
-    pub it_interval: TimeVal,
-    pub it_value: TimeVal,
-}
-
-impl ITimerVal {
-    pub fn new(interval: TimeVal, value: TimeVal) -> Self {
-        Self {
-            it_interval: interval,
-            it_value: value,
-        }
-    }
-
-    pub fn is_valid(&self) -> bool {
-        self.it_interval.is_valid() && self.it_value.is_valid()
-    }
-
-    pub fn is_activated(&self) -> bool {
-        !(self.it_interval.is_zero() && self.it_value.is_zero())
     }
 }

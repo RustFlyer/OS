@@ -2,7 +2,10 @@ use alloc::{sync::Arc, vec::Vec};
 use core::fmt::Debug;
 
 use config::{fs::MAX_FDS, vfs::OpenFlags};
-use systype::{RLimit, SysError, SysResult};
+use systype::{
+    error::{SysError, SysResult},
+    rlimit::RLimit,
+};
 use vfs::file::File;
 
 use crate::dev::tty::TTY;

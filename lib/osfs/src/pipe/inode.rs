@@ -6,7 +6,7 @@ use config::{
     mm::PAGE_SIZE,
 };
 use mutex::SpinNoIrqLock;
-use systype::SysResult;
+use systype::error::SysResult;
 use vfs::{
     inode::{Inode, InodeMeta},
     inoid::alloc_ino,

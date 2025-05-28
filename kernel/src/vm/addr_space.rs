@@ -20,15 +20,19 @@
 use alloc::{collections::btree_map::BTreeMap, vec::Vec};
 use core::{cmp, ops::Bound};
 
-use arch::mm::{fence, tlb_shootdown_all};
+use arch::{
+    mm::{fence, tlb_shootdown_all},
+    pte::PteFlags,
+};
 use mm::address::VirtAddr;
 use mutex::SpinLock;
-use systype::{SysError, SysResult};
+use systype::{
+    error::{SysError, SysResult},
+    memory_flags::MappingFlags,
+};
 
 use super::{
-    mapping_flags::MappingFlags,
     page_table::{self, PageTable},
-    pte::PteFlags,
     vm_area::{PageFaultInfo, VmArea, VmaFlags},
 };
 

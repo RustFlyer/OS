@@ -1,7 +1,9 @@
 use alloc::boxed::Box;
+
 use async_trait::async_trait;
 use crate_interface::call_interface;
-use systype::{SysError, SysResult, SyscallResult};
+
+use systype::error::{SysError, SysResult, SyscallResult};
 use vfs::{
     direntry::DirEntry,
     file::{File, FileMeta},

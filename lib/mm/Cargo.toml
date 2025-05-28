@@ -4,10 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-arch = { path = "../arch" }
 config = { path = "../config" }
 mutex = { path = "../mutex" }
-simdebug = { path = "../simdebug" }
 systype = { path = "../systype" }
 bitflags = { workspace = true }
 bitmap-allocator = { workspace = true }

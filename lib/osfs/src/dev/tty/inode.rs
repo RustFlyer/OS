@@ -1,7 +1,7 @@
 use alloc::sync::Arc;
 use config::inode::InodeMode;
 use driver::{CHAR_DEVICE, CharDevice};
-use systype::SysResult;
+use systype::error::SysResult;
 use vfs::{
     inode::{Inode, InodeMeta},
     inoid::alloc_ino,

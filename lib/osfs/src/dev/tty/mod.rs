@@ -9,7 +9,7 @@ use dentry::TtyDentry;
 use file::TtyFile;
 use inode::TtyInode;
 use spin::Once;
-use systype::SysResult;
+use systype::error::SysResult;
 use vfs::{dentry::Dentry, path::Path};
 
 pub use ioctl::TtyIoctlCmd;

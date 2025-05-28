@@ -7,7 +7,7 @@ use lwext4_rust::{
     KernelDevOp,
     bindings::{SEEK_CUR, SEEK_END, SEEK_SET},
 };
-use systype::SysResult;
+use systype::error::SysResult;
 
 pub struct Disk {
     block_id: usize,

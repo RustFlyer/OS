@@ -3,8 +3,10 @@ use core::time::Duration;
 
 use arch::time::{get_time_duration, get_time_ms, get_time_us};
 use osfuture::{Select2Futures, SelectOutput};
-use systype::{SysError, SyscallResult};
-use time::{TMS, TimeSpec, TimeVal, TimeValue, itime::ITimerVal};
+use systype::{
+    error::{SysError, SyscallResult},
+    time::{ITimerVal, TMS, TimeSpec, TimeVal, TimeValue},
+};
 use timer::{TIMER_MANAGER, Timer};
 
 use crate::{
@@ -73,7 +75,7 @@ pub async fn sys_times(tms: usize) -> SyscallResult {
     let mut tms_ptr = UserWritePtr::<TMS>::new(tms, &addr_space);
     if !tms_ptr.is_null() {
         unsafe {
-            tms_ptr.write(TMS::from_task_time_stat(task.timer_mut()))?;
+            tms_ptr.write(TMS::from(&*task.timer_mut()))?;
         }
     }
     Ok(0)

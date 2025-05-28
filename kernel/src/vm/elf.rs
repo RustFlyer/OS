@@ -10,16 +10,17 @@ use config::{
 use elf::{self, ElfStream, ParseError as ElfParseError, endian::LittleEndian, file::FileHeader};
 use mm::address::VirtAddr;
 use osfuture::block_on;
-use systype::{SysError, SysResult};
+use systype::{
+    error::{SysError, SysResult},
+    memory_flags::MappingFlags,
+};
 use vfs::{file::File, path::Path, sys_root_dentry};
-
-use crate::vm::user_ptr::UserWritePtr;
 
 use super::{
     addr_space::AddrSpace,
-    mapping_flags::MappingFlags,
     vm_area::{VmArea, VmaFlags},
 };
+use crate::vm::user_ptr::UserWritePtr;
 
 impl AddrSpace {
     /// Loads an ELF executable into given address space.

@@ -1,4 +1,4 @@
-use systype::SyscallResult;
+use systype::error::SyscallResult;
 
 /// Returns the real user ID of the calling process.
 pub fn sys_getuid() -> SyscallResult {

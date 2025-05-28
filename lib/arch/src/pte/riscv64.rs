@@ -2,8 +2,9 @@ use core::fmt::Debug;
 
 use bitflags::bitflags;
 
-use super::*;
-use crate::vm::mapping_flags::MappingFlags;
+use systype::memory_flags::MappingFlags;
+
+use super::PageTableEntry;
 
 /// Offset of the physical page number in a page table entry. In RISC-V Sv39,
 /// the physical page number is located at bits 10-53 in a page table entry.

@@ -1,6 +1,6 @@
 extern crate alloc;
 use alloc::sync::Arc;
-use systype::SysResult;
+use systype::error::SysResult;
 
 use crate::inode::Inode;
 

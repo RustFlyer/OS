@@ -4,13 +4,13 @@ use config::mm::{MMAP_END, MMAP_START, PAGE_SIZE};
 use mm::address::VirtAddr;
 use mutex::ShareMutex;
 use shm::SharedMemory;
-use systype::{SysError, SysResult};
-
-use super::{addr_space::AddrSpace, mmap::MmapProt};
-use crate::vm::{
-    mapping_flags::MappingFlags,
-    vm_area::{VmArea, VmaFlags},
+use systype::{
+    error::{SysError, SysResult},
+    memory_flags::MappingFlags,
 };
+
+use super::addr_space::AddrSpace;
+use crate::vm::vm_area::{VmArea, VmaFlags};
 
 impl AddrSpace {
     /// Attach a shared memory area to the address space.
@@ -31,7 +31,7 @@ impl AddrSpace {
         mut addr: VirtAddr,
         length: usize,
         shm: ShareMutex<SharedMemory>,
-        prot: MmapProt,
+        prot: MappingFlags,
     ) -> SysResult<VirtAddr> {
         if addr.to_usize() == 0 {
             addr = self
@@ -55,8 +55,6 @@ impl AddrSpace {
         let va_start = addr;
         let va_end = VirtAddr::new(addr.to_usize() + length);
         let vma_flags = VmaFlags::SHARED;
-
-        let prot = MappingFlags::from_mmapprot(prot);
 
         let area = VmArea::new_shared_memory(va_start, va_end, vma_flags, prot, shm);
         self.add_area(area)?;

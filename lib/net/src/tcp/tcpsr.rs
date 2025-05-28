@@ -1,7 +1,7 @@
 use mutex::sleep_mutex::take_waker;
 use osfuture::yield_now;
 use smoltcp::socket::tcp;
-use systype::{SysError, SysResult};
+use systype::error::{SysError, SysResult};
 use timer::sleep_ms;
 
 use crate::{SOCKET_SET, socketset::TCP_TX_BUF_LEN};

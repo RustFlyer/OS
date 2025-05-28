@@ -1,14 +1,16 @@
+use alloc::sync::Arc;
 use core::arch::global_asm;
 
-use crate::task::TaskState;
-use crate::task::sig_members::{SigActionFlag, SigContext};
-use crate::task::signal::sig_info::SigSet;
-use crate::task::{Task, sig_members::ActionType};
-use crate::vm::user_ptr::UserWritePtr;
-use alloc::sync::Arc;
-use systype::SysResult;
+use systype::error::SysResult;
 
-use super::sig_info::{Sig, SigInfo};
+use crate::task::{
+    Task, TaskState,
+    sig_members::{ActionType, SigActionFlag, SigContext},
+    signal::sig_info::{SigInfo, SigSet},
+};
+use crate::vm::user_ptr::UserWritePtr;
+
+use super::sig_info::Sig;
 
 #[cfg(target_arch = "riscv64")]
 global_asm!(include_str!("riscv64_sigreturn_trampoline.asm"));
@@ -112,7 +114,6 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
             };
             sig_cx.user_reg[0] = cx.sepc;
             log::debug!("[sig context] sig_cx_ptr: {sig_cx_ptr:?}");
-            log::debug!("[sig context] SigContext: {:#x}", size_of::<SigContext>());
 
             unsafe { sig_cx_ptr.write(sig_cx)? };
 
@@ -158,11 +159,17 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
             // sp (it will be used later by sys_sigreturn to restore sig_cx)
             cx.set_user_sp(new_sp);
 
-            log::debug!("cx.sepc: {:#x}", cx.sepc);
-            log::debug!("cx.user_reg[1]: {:#x}", cx.user_reg[1]);
-            log::debug!("cx.user_reg[2]: {:#x}", cx.user_reg[2]);
-            log::debug!("cx.user_reg[3]: {:#x}", cx.user_reg[3]);
-            log::debug!("cx.user_reg[4]: {:#x}", cx.user_reg[4]);
+            #[cfg(target_arch = "riscv64")]
+            {
+                cx.user_reg[3] = sig_cx.user_reg[3];
+                cx.user_reg[4] = sig_cx.user_reg[4];
+            }
+            #[cfg(target_arch = "loongarch64")]
+            {
+                assert!(cx.user_reg[2] == sig_cx.user_reg[2]);
+                assert!(cx.user_reg[21] == sig_cx.user_reg[21]);
+                assert!(cx.user_reg[28] == sig_cx.user_reg[28]);
+            }
 
             // cx.user_reg
             //     .iter()

@@ -1,5 +1,6 @@
 use core::arch::naked_asm;
 
+use arch::mm::tlb_fill;
 use loongArch64::register::estat::{self, Exception, Interrupt, Trap};
 use loongArch64::register::{
     badv, ecfg, era, prmd, pwch, pwcl, stlbps, ticlr, tlbidx, tlbrehi, tlbrentry,
@@ -9,13 +10,13 @@ use arch::{
     time::{get_time_duration, set_nx_timer_irq},
     trap::TIMER_IRQ,
 };
-use mm::address::VirtAddr;
+use mm::address::{VirtAddr, VirtPageNum};
+use systype::memory_flags::MappingFlags;
 use timer::TIMER_MANAGER;
 
 use crate::processor::current_hart;
 use crate::task::{Task, TaskState};
 use crate::trap::load_trap_handler;
-use crate::vm::mapping_flags::MappingFlags;
 use crate::vm::user_ptr::UserReadPtr;
 
 #[unsafe(no_mangle)]
@@ -57,17 +58,31 @@ pub fn user_exception_handler(task: &Task, e: Exception) {
             };
             let fault_addr = VirtAddr::new(badv::read().vaddr());
             let addr_space = task.addr_space();
-            if let Err(e) = addr_space.handle_page_fault(fault_addr, access) {
-                // TODO: Send SIGSEGV to the task
-                log::error!(
-                    "[user_exception_handler] unsolved page fault at {:#x}, \
+            match addr_space.handle_page_fault(fault_addr, access) {
+                Ok(()) => {
+                    // Fill the TLB if the page fault is resolved successfully.
+                    // Note that this cannot be done in the `handle_page_fault` method,
+                    // because the method may be called by methods of `UserPtr`, which
+                    // is not from a page fault handling context.
+                    let fault_vpn = fault_addr.page_number();
+                    let fault_vpn0 = VirtPageNum::new(fault_vpn.to_usize() & !0x1);
+                    let fault_vpn1 = VirtPageNum::new(fault_vpn.to_usize() | 0x1);
+                    let pte0 = *addr_space.page_table.find_entry(fault_vpn0).unwrap();
+                    let pte1 = *addr_space.page_table.find_entry(fault_vpn1).unwrap();
+                    tlb_fill(pte0, pte1);
+                }
+                Err(e) => {
+                    // TODO: Send SIGSEGV to the task
+                    log::error!(
+                        "[user_exception_handler] unsolved page fault at {:#x}, \
                     access: {:?}, error: {:?}, bad instruction at {:#x}",
-                    fault_addr.to_usize(),
-                    access,
-                    e.as_str(),
-                    era::read().pc()
-                );
-                task.set_state(TaskState::Zombie);
+                        fault_addr.to_usize(),
+                        access,
+                        e.as_str(),
+                        era::read().pc()
+                    );
+                    task.set_state(TaskState::Zombie);
+                }
             }
         }
         Exception::InstructionNotExist => {

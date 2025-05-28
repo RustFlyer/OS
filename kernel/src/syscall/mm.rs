@@ -8,16 +8,12 @@ use shm::{
     id::ShmStat,
     manager::{SHARED_MEMORY_KEY_ALLOCATOR, SHARED_MEMORY_MANAGER},
 };
-use systype::{SysError, SyscallResult};
-
-use crate::{
-    processor::current_task,
-    vm::{
-        mapping_flags::MappingFlags,
-        mmap::{MmapFlags, MmapProt},
-        user_ptr::UserWritePtr,
-    },
+use systype::{
+    error::{SysError, SyscallResult},
+    memory_flags::{MappingFlags, MmapFlags, MmapProt},
 };
+
+use crate::{processor::current_task, vm::user_ptr::UserWritePtr};
 
 /// `mmap()` creates a new mapping in the virtual address space of the calling process.
 /// The starting address for the new mapping is specified in addr. The `length` argument
@@ -80,7 +76,7 @@ pub async fn sys_mmap(
     }
 
     task.addr_space()
-        .map_file(file, flags, prot, va, length, offset)
+        .map_file(file, flags, MappingFlags::from(prot), va, length, offset)
 }
 
 /// `munmap()` deletes the mappings for the specified address range, and causes further
@@ -125,7 +121,7 @@ pub fn sys_mprotect(addr: usize, len: usize, prot: i32) -> SyscallResult {
 
     log::info!("[sys_mprotect] addr: {addr:#x}, len: {len:#x}, prot: {prot:?}");
 
-    addr_space.change_prot(VirtAddr::new(addr), len, MappingFlags::from_mmapprot(prot));
+    addr_space.change_prot(VirtAddr::new(addr), len, MappingFlags::from(prot));
     Ok(0)
 }
 
@@ -227,7 +223,7 @@ pub fn sys_shmat(shmid: usize, shmaddr: usize, shmflg: i32) -> SyscallResult {
     let ret_addr;
     if let Some(shm) = SHARED_MEMORY_MANAGER.0.lock().get(&shmid) {
         ret_addr =
-            addrspace.attach_shm(shmaddr_aligned, shm.lock().size(), shm.clone(), mem_perm)?;
+            addrspace.attach_shm(shmaddr_aligned, shm.lock().size(), shm.clone(), MappingFlags::from(mem_perm))?;
 
         task.with_mut_shm_maps(|map| map.insert(ret_addr, shmid));
     } else {
