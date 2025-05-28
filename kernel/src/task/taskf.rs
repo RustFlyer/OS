@@ -1,45 +1,41 @@
-use alloc::collections::btree_map::BTreeMap;
-use alloc::string::String;
-use alloc::string::ToString;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use arch::time::get_time_ms;
-use arch::time::get_time_us;
-use core::cell::SyncUnsafeCell;
-use core::sync::atomic::AtomicUsize;
-use core::time::Duration;
+use alloc::{
+    collections::btree_map::BTreeMap,
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
+};
+use core::{cell::SyncUnsafeCell, sync::atomic::AtomicUsize, time::Duration};
+
+use arch::time::{get_time_duration, get_time_ms, get_time_us};
+use config::{
+    process::{CloneFlags, INIT_PROC_ID},
+    vfs::AtFd,
+};
+use mutex::{SpinNoIrqLock, new_share_mutex};
+use osfs::sys_root_dentry;
 use osfuture::suspend_now;
 use shm::manager::SHARED_MEMORY_MANAGER;
-use time::itime::ITimer;
-
-use arch::time::get_time_duration;
-use config::process::CloneFlags;
-use config::process::INIT_PROC_ID;
-use config::vfs::AtFd;
-use mutex::SpinNoIrqLock;
-use mutex::new_share_mutex;
-use osfs::sys_root_dentry;
 use systype::SysResult;
-use time::TaskTimeStat;
+use time::itime::ITimer;
 use timer::{TIMER_MANAGER, Timer};
-use vfs::dentry::Dentry;
-use vfs::file::File;
-use vfs::path::Path;
+use vfs::{dentry::Dentry, file::File, path::Path};
 
-use super::future::{self};
-use super::manager::TASK_MANAGER;
-use super::process_manager::PROCESS_GROUP_MANAGER;
-use super::sig_members::SigManager;
-use super::task::*;
-use super::threadgroup::ThreadGroup;
-use super::tid::TidAddress;
-use super::tid::tid_alloc;
-
-use crate::task::futex::FutexHashKey;
-use crate::task::futex::futex_manager;
-use crate::task::signal::sig_info::{Sig, SigDetails, SigInfo};
-use crate::vm::addr_space::{AddrSpace, switch_to};
-use crate::vm::user_ptr::UserWritePtr;
+use super::{
+    futex::{FutexHashKey, futex_manager},
+    future,
+    manager::TASK_MANAGER,
+    process_manager::PROCESS_GROUP_MANAGER,
+    sig_members::SigManager,
+    signal::sig_info::{Sig, SigDetails, SigInfo},
+    task::{Task, TaskState},
+    threadgroup::ThreadGroup,
+    tid::{TidAddress, tid_alloc},
+    time_stat::TaskTimeStat,
+};
+use crate::vm::{
+    addr_space::{AddrSpace, switch_to},
+    user_ptr::UserWritePtr,
+};
 
 impl Task {
     /// Switches Task to User

@@ -73,7 +73,7 @@ pub async fn sys_times(tms: usize) -> SyscallResult {
     let mut tms_ptr = UserWritePtr::<TMS>::new(tms, &addr_space);
     if !tms_ptr.is_null() {
         unsafe {
-            tms_ptr.write(TMS::from_task_time_stat(task.timer_mut()))?;
+            tms_ptr.write(TMS::from(&*task.timer_mut()))?;
         }
     }
     Ok(0)

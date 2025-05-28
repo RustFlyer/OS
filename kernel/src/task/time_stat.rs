@@ -1,8 +1,10 @@
-use arch::time::get_time_duration;
-use config::time::TIME_SLICE_DUATION;
 use core::time::Duration;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+use arch::time::get_time_duration;
+use config::time::TIME_SLICE_DUATION;
+use time::TMS;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum TaskState {
     KernelMode,
     UserMode,
@@ -16,7 +18,7 @@ enum TaskState {
 /// Also, this struct can record time of a user task running in
 /// cpu. If a task runs for a long time, the kernel can make
 /// the task give up the cpu relying on this struct.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TaskTimeStat {
     state: TaskState,
     task_start: Duration,
@@ -29,6 +31,13 @@ pub struct TaskTimeStat {
 
     last_transition: Duration,
     schedule_start_time: Duration,
+}
+
+impl Drop for TaskTimeStat {
+    fn drop(&mut self) {
+        let total = get_time_duration() - self.task_start;
+        log::info!("This Task run for {:?}", total);
+    }
 }
 
 impl TaskTimeStat {
@@ -133,9 +142,21 @@ impl TaskTimeStat {
     }
 }
 
-impl Drop for TaskTimeStat {
-    fn drop(&mut self) {
-        let total = get_time_duration() - self.task_start;
-        log::info!("This Task run for {:?}", total);
+impl Default for TaskTimeStat {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl From<&TaskTimeStat> for TMS {
+    fn from(tts: &TaskTimeStat) -> Self {
+        let (utime, stime) = tts.user_and_system_time();
+        let (cutime, cstime) = tts.child_user_system_time();
+        Self {
+            tms_utime: utime.as_micros() as usize,
+            tms_stime: stime.as_micros() as usize,
+            tms_cutime: cutime.as_micros() as usize,
+            tms_cstime: cstime.as_micros() as usize,
+        }
     }
 }
