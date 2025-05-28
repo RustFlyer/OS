@@ -49,6 +49,11 @@ impl PageTableEntry {
         let flags_mask = PteFlags::all().bits();
         self.bits = (self.bits & !flags_mask) | flags.bits();
     }
+
+    /// Returns the raw bits of the page table entry.
+    pub fn bits(self) -> u64 {
+        self.bits
+    }
 }
 
 impl Default for PageTableEntry {
