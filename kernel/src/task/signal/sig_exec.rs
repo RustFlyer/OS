@@ -129,7 +129,7 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
             // cause a random bug that sometimes user will trap into kernel because of
             // accessing kernel addrress
             if action.flags.contains(SigActionFlag::SA_SIGINFO) {
-                // log::error!("[SA_SIGINFO] set sig_cx {sig_cx:?}");
+                log::error!("[SA_SIGINFO] set sig_cx {sig_cx:?}");
                 // a2
                 cx.set_user_a2(new_sp);
                 #[derive(Default, Copy, Clone)]

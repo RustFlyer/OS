@@ -2,8 +2,8 @@ use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use strum::FromRepr;
 use bitflags::*;
+use strum::FromRepr;
 
 use config::inode::InodeType;
 use config::mm::USER_STACK_SIZE;
@@ -329,6 +329,7 @@ pub fn sys_clone(
     log::info!("[sys_clone] clone success",);
 
     // task.set_is_yield(true);
+    simdebug::stop();
 
     Ok(new_tid)
 }

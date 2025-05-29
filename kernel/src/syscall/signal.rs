@@ -364,6 +364,7 @@ pub async fn sys_sigreturn() -> SyscallResult {
     );
     unsafe {
         let sig_cx = sig_cx_ptr.read()?;
+        log::error!("{:?}", sig_cx);
         *mask = sig_cx.mask;
         // TODO: no sig_stack for now so don't need to restore
         trap_cx.sepc = sig_cx.user_reg[0];
@@ -457,9 +458,10 @@ pub fn sys_rt_sigaction(
             mask: action.sa_mask,
         };
 
-        // log::info!("[sys_rt_sigaction] new:{:?}", new);
+        log::info!("[sys_rt_sigaction] new:{:?}", new);
         task.sig_handlers_mut().lock().update(signum, new);
     }
+    simdebug::stop();
     Ok(0)
 }
 

@@ -238,7 +238,7 @@ macro_rules! syscall {
             args[6] = a6 as usize;
             syscall($id, args)
         }
-    }
+    };
 }
 
 #[cfg(target_arch = "riscv64")]
@@ -318,11 +318,12 @@ syscall!(sys_exit, SYSCALL_EXIT, i32);
 syscall!(sys_exit_group, SYSCALL_EXIT_GROUP, i32);
 syscall!(sys_kill, SYSCALL_KILL, usize, i32);
 syscall!(sys_fork, SYSCALL_CLONE);
-syscall!(sys_clone, SYSCALL_CLONE, usize, usize, usize, usize);
+syscall!(sys_clone, SYSCALL_CLONE, usize, usize, usize, usize, usize);
 syscall!(sys_waitpid, SYSCALL_WAIT4, isize, *mut i32);
 syscall!(sys_pipe, SYSCALL_PIPE, *mut i32);
 syscall!(sys_brk, SYSCALL_BRK, usize);
 syscall!(sys_yield, SYSCALL_SCHED_YIELD);
+syscall!(sys_prlimit64, SYSCALL_PRLIMIT64, usize, usize, usize, usize);
 syscall!(
     sys_execve,
     SYSCALL_EXECVE,

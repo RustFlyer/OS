@@ -155,6 +155,8 @@ pub async fn task_executor_unit(task: Arc<Task>) {
     task.set_waker(take_waker().await);
     set_nx_timer_irq();
 
+    (task.tid() == 4).then(|| simdebug::stop());
+
     loop {
         // trap_return connects user and kernel.
         trap::trap_return(&task);

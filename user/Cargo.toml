@@ -7,3 +7,4 @@ edition = "2024"
 bitflags = { workspace = true }
 buddy_system_allocator = { workspace = true }
 config = { path = "../lib/config/" }
+strum = { workspace = true }

@@ -18,6 +18,7 @@ use buddy_system_allocator::LockedHeap;
 use config::{inode::InodeMode, vfs::OpenFlags};
 pub use error::SyscallErr;
 use sig::{Sig, SigAction};
+use strum::FromRepr;
 use syscall::*;
 
 // const USER_HEAP_SIZE: usize = 16384;
@@ -159,6 +160,26 @@ pub fn getpid() -> isize {
 pub fn fork() -> isize {
     sys_fork()
 }
+
+pub fn prlimit64(pid: usize, resource: i32, new_limit: usize, old_limit: &RLimit) -> isize {
+    sys_prlimit64(
+        pid,
+        resource as usize,
+        new_limit,
+        old_limit as *const RLimit as usize,
+    )
+}
+
+pub fn clone(
+    flags: usize,
+    stack: usize,
+    parent_tid_ptr: usize,
+    tls_ptr: usize,
+    chilren_tid_ptr: usize,
+) -> isize {
+    sys_clone(flags, stack, parent_tid_ptr, tls_ptr, chilren_tid_ptr)
+}
+
 pub fn kill(pid: isize, sig: usize) -> isize {
     sys_kill(pid as usize, sig as i32)
 }
@@ -547,4 +568,58 @@ pub mod sig {
         pub const CLD_CONTINUED: i32 = 6;
         pub const NSIGCHLD: i32 = 6;
     }
+}
+
+#[derive(Default, Debug, Clone, Copy)]
+#[repr(C)]
+pub struct RLimit {
+    /// Soft limit: the kernel enforces for the corresponding resource
+    pub rlim_cur: usize,
+    /// Hard limit (ceiling for rlim_cur)
+    pub rlim_max: usize,
+}
+
+#[derive(FromRepr, Clone, Copy, Debug, Eq, PartialEq)]
+#[repr(i32)]
+pub enum Resource {
+    // Per-process CPU limit, in seconds.
+    CPU = 0,
+    // Largest file that can be created, in bytes.
+    FSIZE = 1,
+    // Maximum size of data segment, in bytes.
+    DATA = 2,
+    // Maximum size of stack segment, in bytes.
+    STACK = 3,
+    // Largest core file that can be created, in bytes.
+    CORE = 4,
+    // Largest resident set size, in bytes.
+    // This affects swapping; processes that are exceeding their
+    // resident set size will be more likely to have physical memory
+    // taken from them.
+    RSS = 5,
+    // Number of processes.
+    NPROC = 6,
+    // Number of open files.
+    NOFILE = 7,
+    // Locked-in-memory address space.
+    MEMLOCK = 8,
+    // Address space limit.
+    AS = 9,
+    // Maximum number of file locks.
+    LOCKS = 10,
+    // Maximum number of pending signals.
+    SIGPENDING = 11,
+    // Maximum bytes in POSIX message queues.
+    MSGQUEUE = 12,
+    // Maximum nice priority allowed to raise to.
+    // Nice levels 19 .. -20 correspond to 0 .. 39
+    // values of this resource limit.
+    NICE = 13,
+    // Maximum realtime priority allowed for non-priviledged
+    // processes.
+    RTPRIO = 14,
+    // Maximum CPU time in microseconds that a process scheduled under a real-time
+    // scheduling policy may consume without making a blocking system
+    // call before being forcibly descheduled.
+    RTTIME = 15,
 }
