@@ -148,7 +148,9 @@ pub async fn sys_futex(
                 return Err(SysError::EINTR);
             }
 
-            task.set_state(TaskState::Running);
+            if task.is_in_state(TaskState::Interruptable) {
+                task.set_state(TaskState::Running);
+            }
             Ok(0)
         }
         FutexOp::WakeBitset | FutexOp::Wake => {

@@ -74,7 +74,7 @@ impl Task {
             self.wake();
         } else {
             log::warn!(
-                "[Task::recv] tid {} hasn't been woken, should_wake {:?}, state {:?}",
+                "[Task::recv] tid {} hasn't been woken or it isn't interruptable, should_wake {:?}, state {:?}",
                 self.tid(),
                 manager.should_wake,
                 self.get_state()
