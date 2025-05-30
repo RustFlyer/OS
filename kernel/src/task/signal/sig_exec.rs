@@ -194,6 +194,7 @@ fn kill(task: &Arc<Task>, sig: Sig) {
     // exit all the memers of a thread group
     task.with_thread_group(|tg| {
         for t in tg.iter() {
+            t.wake();
             t.set_state(TaskState::Zombie);
         }
     });
