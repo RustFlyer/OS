@@ -621,6 +621,7 @@ name = "osfuture"
 version = "0.1.0"
 dependencies = [
  "log",
+ "simdebug",
 ]
 
 [[package]]

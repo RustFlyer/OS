@@ -179,8 +179,6 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
 
             log::debug!("sig: {:#x}", task.sig_manager_mut().bitmap.bits());
 
-            simdebug::stop();
-
             Ok(true)
         }
     }
@@ -197,6 +195,7 @@ fn kill(task: &Arc<Task>, sig: Sig) {
         for t in tg.iter() {
             t.set_state(TaskState::Zombie);
             t.wake();
+            log::debug!("[kill] wake all threads in group, now task: {:?}", t.get_name());
         }
     });
     // 将信号放入低7位 (第8位是core dump标志,在gdb调试崩溃程序中用到)

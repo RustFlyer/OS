@@ -521,12 +521,12 @@ impl Drop for Task {
     fn drop(&mut self) {
         let str = format!("Task [{}] is drop", self.get_name());
 
-        let lock = self.parent_mut().lock();
-        log::trace!(
-            "Task [{}] parent [{}]",
-            self.get_name(),
-            lock.clone().unwrap().upgrade().unwrap().get_name()
-        );
+        // let lock = self.parent_mut().lock();
+        // log::trace!(
+        //     "Task [{}] parent [{}]",
+        //     self.get_name(),
+        //     lock.clone().unwrap().upgrade().unwrap().get_name()
+        // );
 
         self.children
             .lock()

@@ -329,7 +329,6 @@ pub fn sys_clone(
     log::info!("[sys_clone] clone success",);
 
     // task.set_is_yield(true);
-    simdebug::stop();
 
     Ok(new_tid)
 }
