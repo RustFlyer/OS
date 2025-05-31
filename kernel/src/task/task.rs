@@ -459,7 +459,9 @@ impl Task {
 
     // ========== This Part You Can Set the Member of Task  ===========
     pub fn set_state(&self, state: TaskState) {
-        *self.state.lock() = state;
+        if self.get_state() != TaskState::Zombie || state == TaskState::WaitForRecycle {
+            *self.state.lock() = state;
+        }
     }
 
     pub fn set_parent(&mut self, parent: Arc<Task>) {

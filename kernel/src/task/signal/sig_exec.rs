@@ -58,6 +58,7 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
     match action.atype {
         ActionType::Ignore => Ok(false),
         ActionType::Kill => {
+            log::warn!("SIGKILL set the whole thread group Zombied");
             kill(&task, si.sig);
             Ok(false)
         }

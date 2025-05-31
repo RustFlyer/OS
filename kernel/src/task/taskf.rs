@@ -392,6 +392,8 @@ impl Task {
                 );
                 threadgroup.remove(self);
                 TASK_MANAGER.remove_task(self.tid());
+            } else {
+                log::info!("[exit] exiting process has at least one thread in group, just return");
             }
             // log::warn!("[do_exit] {} leaves before setting state", self.get_name());
             // log::warn!(
