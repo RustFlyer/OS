@@ -40,14 +40,11 @@ fn main() -> i32 {
         for test in TESTCASES {
             run_test(test);
         }
-        exit(33024);
     } else {
         loop {
             let mut exit_code: i32 = 0;
-            let _pid = wait(&mut exit_code);
-            println!("exit: {}", exit_code);
-            if exit_code == 33024 {
-                println!("break: {}", exit_code);
+            let pid = wait(&mut exit_code);
+            if pid < 0 {
                 break;
             }
         }

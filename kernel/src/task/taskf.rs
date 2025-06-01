@@ -346,6 +346,7 @@ impl Task {
         // );
 
         if self.tid() == INIT_PROC_ID {
+            log::warn!("kernel shutdown");
             hart_shutdown();
         }
 

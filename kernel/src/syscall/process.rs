@@ -124,7 +124,6 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
             log::info!("[sys_wait4] task [{}] fail: no child", task.get_name());
             return Err(SysError::ECHILD);
         }
-        // TODO: PGid and AnyChildInGroup targets
         match target {
             WaitFor::AnyChild => children
                 .values()
@@ -179,6 +178,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
         Ok(tid)
     } else if option.contains(WaitOptions::WNOHANG) {
         // 2. if WNOHANG option is set and there is no child for recycle, return immediately
+        log::debug!("[sys_wait4] WaitOptions::WNOHANG return");
         Ok(0)
     } else {
         // 3. if there is no child for recycle and WNOHANG option is not set, wait for SIGCHLD from target
