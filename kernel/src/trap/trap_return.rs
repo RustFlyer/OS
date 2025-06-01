@@ -32,6 +32,10 @@ pub fn trap_return(task: &Arc<Task>) {
     // log::debug!("sstatus: {:?}", task.trap_context_mut().sstatus);
     unsafe {
         let ptr = trap_cx as *mut TrapContext;
+        if task.tid() == 4 {
+            simdebug::stop();
+        }
+
         __return_to_user(ptr);
     }
     // log::info!("[trap_return] return from user space");
