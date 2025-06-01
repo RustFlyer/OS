@@ -372,7 +372,7 @@ pub async fn sys_sigreturn() -> SyscallResult {
     );
     unsafe {
         let sig_cx = sig_cx_ptr.read()?;
-        log::error!("{:?}", sig_cx);
+        // log::error!("{:?}", sig_cx);
         *mask = sig_cx.mask;
         // TODO: no sig_stack for now so don't need to restore
         trap_cx.sepc = sig_cx.user_reg[0];
