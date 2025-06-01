@@ -214,15 +214,15 @@ fs-img-submit: user
 	@dd if=/dev/zero of=$(FS_IMG) bs=1K count=524288 status=progress
 	@mkfs.ext4 -F $(FS_IMG)
 	@mkdir -p emnt
-	@sudo mount -t ext4 -o loop $(FS_IMG) emnt
-	@sudo cp -r $(USER_ELFS) emnt/
+	@mount -t ext4 -o loop $(FS_IMG) emnt
+	@cp -r $(USER_ELFS) emnt/
 
-	@sudo cp -r img-data/* emnt/
-	@sudo chmod -R 755 emnt/
-	@sudo umount emnt
-	@sudo rm -rf emnt
-	@echo "building fs-img finished"
-	@echo "Attention: cp error may be ignored"
+	@cp -r img-data/* emnt/
+	@chmod -R 755 emnt/
+	@umount emnt
+	@rm -rf emnt
+	@"building fs-img finished"
+	@"Attention: cp error may be ignored"
 
 PHONY += all
 all:

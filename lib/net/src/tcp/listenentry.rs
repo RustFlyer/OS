@@ -69,7 +69,7 @@ impl ListenTableEntry {
                         IpAddress::Ipv4(v4) => {
                             if dst.version() == IpVersion::Ipv4
                                 && v6.is_ipv4_mapped()
-                                && v6.as_octets()[12..] == v4.as_octets()[..]
+                                && v6.octets()[12..] == v4.octets()[..]
                             {
                                 return true;
                             }

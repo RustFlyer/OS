@@ -1,7 +1,6 @@
 #![no_std]
 #![no_main]
 #![feature(ip)]
-#![feature(ip_as_octets)]
 
 use alloc::{boxed::Box, sync::Arc, vec};
 use driver::net::NetDevice;
