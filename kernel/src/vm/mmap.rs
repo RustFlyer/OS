@@ -34,7 +34,7 @@ impl AddrSpace {
         length: usize,
         offset: usize,
     ) -> SysResult<usize> {
-        if addr.to_usize() == 0 {
+        if !flags.contains(MmapFlags::MAP_FIXED) {
             addr = self
                 .find_vacant_memory(
                     addr,

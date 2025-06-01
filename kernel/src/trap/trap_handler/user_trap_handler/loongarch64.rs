@@ -58,6 +58,7 @@ pub fn user_exception_handler(task: &Task, e: Exception) {
             };
             let fault_addr = VirtAddr::new(badv::read().vaddr());
             let addr_space = task.addr_space();
+            let inst_addr = era::read().pc();
             match addr_space.handle_page_fault(fault_addr, access) {
                 Ok(()) => {
                     // Fill the TLB if the page fault is resolved successfully.
@@ -79,7 +80,7 @@ pub fn user_exception_handler(task: &Task, e: Exception) {
                         fault_addr.to_usize(),
                         access,
                         e.as_str(),
-                        era::read().pc()
+                        inst_addr
                     );
                     task.set_state(TaskState::Zombie);
                 }
