@@ -338,17 +338,17 @@ impl Task {
     }
 
     pub fn exit(self: &Arc<Self>) {
-        // assert_ne!(
-        //     self.tid(),
-        //     INIT_PROC_ID,
-        //     "initproc die!!!, sepc {:#x}",
-        //     self.trap_context_mut().sepc
-        // );
+        assert_ne!(
+            self.tid(),
+            INIT_PROC_ID,
+            "initproc die!!!, sepc {:#x}",
+            self.trap_context_mut().sepc
+        );
 
-        if self.tid() == INIT_PROC_ID {
-            log::warn!("kernel shutdown");
-            hart_shutdown();
-        }
+        // if self.tid() == INIT_PROC_ID {
+        //     log::warn!("kernel shutdown");
+        //     hart_shutdown();
+        // }
 
         // release futexes in dropped threads.
         if let Some(address) = self.tid_address_mut().clear_child_tid {
