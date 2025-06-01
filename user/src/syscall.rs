@@ -319,7 +319,7 @@ syscall!(sys_exit_group, SYSCALL_EXIT_GROUP, i32);
 syscall!(sys_kill, SYSCALL_KILL, usize, i32);
 syscall!(sys_fork, SYSCALL_CLONE);
 syscall!(sys_clone, SYSCALL_CLONE, usize, usize, usize, usize, usize);
-syscall!(sys_waitpid, SYSCALL_WAIT4, isize, *mut i32);
+syscall!(sys_waitpid, SYSCALL_WAIT4, isize, *mut i32, isize);
 syscall!(sys_pipe, SYSCALL_PIPE, *mut i32);
 syscall!(sys_brk, SYSCALL_BRK, usize);
 syscall!(sys_yield, SYSCALL_SCHED_YIELD);

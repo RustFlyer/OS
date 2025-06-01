@@ -9,8 +9,8 @@ pub mod task;
 pub mod taskf;
 pub mod threadgroup;
 pub mod tid;
-pub mod time_stat;
 pub mod time;
+pub mod time_stat;
 pub mod timeid;
 
 use arch::time::get_time_duration;
@@ -24,16 +24,29 @@ use timer::{TIMER_MANAGER, sleep_ms};
 use vfs::file::File;
 
 pub fn init() {
+    // init_proc();
+    submit_init();
+    // timer_init();
+    net_poll_init();
+    // elf_test();
+}
+
+pub fn init_proc() {
     let init_proc = {
         let root = sys_root_dentry();
         let dentry = root.lookup("init_proc").unwrap();
         <dyn File>::open(dentry).unwrap()
     };
-
     Task::spawn_from_elf(init_proc, "init_proc");
-    // timer_init();
-    net_poll_init();
-    // elf_test();
+}
+
+pub fn submit_init() {
+    let submit = {
+        let root = sys_root_dentry();
+        let dentry = root.lookup("submit").unwrap();
+        <dyn File>::open(dentry).unwrap()
+    };
+    Task::spawn_from_elf(submit, "submit");
 }
 
 /// `timer_init` spawns a global timer update kernel thread.

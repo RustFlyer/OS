@@ -6,7 +6,10 @@ use alloc::{
 };
 use core::{cell::SyncUnsafeCell, sync::atomic::AtomicUsize, time::Duration};
 
-use arch::time::{get_time_duration, get_time_ms, get_time_us};
+use arch::{
+    hart::hart_shutdown,
+    time::{get_time_duration, get_time_ms, get_time_us},
+};
 use config::{
     process::{CloneFlags, INIT_PROC_ID},
     vfs::AtFd,
@@ -335,12 +338,16 @@ impl Task {
     }
 
     pub fn exit(self: &Arc<Self>) {
-        assert_ne!(
-            self.tid(),
-            INIT_PROC_ID,
-            "initproc die!!!, sepc {:#x}",
-            self.trap_context_mut().sepc
-        );
+        // assert_ne!(
+        //     self.tid(),
+        //     INIT_PROC_ID,
+        //     "initproc die!!!, sepc {:#x}",
+        //     self.trap_context_mut().sepc
+        // );
+
+        if self.tid() == INIT_PROC_ID {
+            hart_shutdown();
+        }
 
         // release futexes in dropped threads.
         if let Some(address) = self.tid_address_mut().clear_child_tid {

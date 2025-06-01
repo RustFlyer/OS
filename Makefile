@@ -5,8 +5,8 @@
 # ======================
 
 # Target architecture
-# export ARCH = riscv64
-export ARCH = loongarch64
+export ARCH = riscv64
+# export ARCH = loongarch64
 export COMPLIB = musl
 # export COMPLIB = glibc
 
@@ -227,27 +227,25 @@ fs-img-submit: user
 PHONY += all
 all:
 	@rm -rf vendor
-# @mkdir vendor
 	@tar xvf submit/vendor-rv.tar.gz
 
 	@rm -rf .cargo
 	@mkdir .cargo
 	@cp submit/config-rv.toml .cargo/config.toml
-	@make kernel MODE=release
+	@make kernel MODE=release LOG=
 	@cp target/riscv64gc-unknown-none-elf/release/kernel kernel-rv
-	@make fs-img-submit MODE=release ARCH=riscv64
+	@make fs-img-submit MODE=release ARCH=riscv64 LOG=
 	@cp fsimg/riscv64-sdcard.img disk.img
 
 	@rm -rf vendor/
-# @mkdir vendor
 	@tar xvf submit/vendor-la.tar.gz
 
 	@rm -rf .cargo
 	@mkdir .cargo
 	@cp submit/config-la.toml .cargo/config.toml
-	@make kernel MODE=release
+	@make kernel MODE=release LOG=
 	@cp target/loongarch64-unknown-none/release/kernel kernel-la
-	@make fs-img-submit MODE=release ARCH=loongarch64
+	@make fs-img-submit MODE=release ARCH=loongarch64 LOG=
 	@cp fsimg/loongarch64-sdcard.img disk-la.img
 
 

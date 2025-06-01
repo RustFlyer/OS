@@ -211,7 +211,7 @@ impl dyn File {
     /// Returns an `ENOENT` error if this dentry is a negative dentry.
     pub fn open(dentry: Arc<dyn Dentry>) -> SysResult<Arc<dyn File>> {
         if dentry.is_negative() {
-            log::debug!("dentry is negative");
+            log::debug!("dentry {} is negative", dentry.path());
             return Err(SysError::ENOENT);
         }
         Arc::clone(&dentry).base_open()

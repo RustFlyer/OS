@@ -480,6 +480,32 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
                     });
 
                     task.execve(file.clone(), exargs, envs, name)?;
+                } else if args[0].ends_with(".sh") {
+                    let mut exargs: Vec<String> = vec!["busybox".to_string(), "sh".to_string()];
+                    exargs.extend(args);
+
+                    let path = "busybox".to_string();
+                    let dentry = {
+                        let path = Path::new(sys_root_dentry(), path);
+                        let dentry = path.walk()?;
+                        if !dentry.is_negative()
+                            && dentry.inode().unwrap().inotype() == InodeType::SymLink
+                        {
+                            Path::resolve_symlink_through(Arc::clone(&dentry))?
+                        } else {
+                            dentry
+                        }
+                    };
+
+                    let file = <dyn File>::open(dentry)?;
+                    log::info!("[sys_execve]: open file");
+                    let mut name = String::new();
+                    exargs.iter().for_each(|arg| {
+                        name.push_str(arg);
+                        name.push(' ');
+                    });
+
+                    task.execve(file.clone(), exargs, envs, name)?;
                 } else {
                     Err(SysError::ENOEXEC)?
                 }

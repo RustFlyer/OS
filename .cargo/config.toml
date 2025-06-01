@@ -1,5 +1,6 @@
 [build]
-target = 'loongarch64-unknown-none'
+target = 'riscv64gc-unknown-none-elf'
+# target = 'loongarch64-unknown-none'
 
 [source.crates-io]
 replace-with = "vendored-sources"
