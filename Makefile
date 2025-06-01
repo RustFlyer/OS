@@ -221,8 +221,8 @@ fs-img-submit: user
 	@chmod -R 755 emnt/
 	@umount emnt
 	@rm -rf emnt
-	@"building fs-img finished"
-	@"Attention: cp error may be ignored"
+	@echo "building fs-img finished"
+	@echo "Attention: cp error may be ignored"
 
 PHONY += all
 all:
