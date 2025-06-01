@@ -10,6 +10,8 @@ export ARCH = loongarch64
 export COMPLIB = musl
 # export COMPLIB = glibc
 
+export SUBMIT = false
+
 # Docker image name for development environment
 # Kernel package/output name
 # Bootloader selection (default BIOS for QEMU)
@@ -100,8 +102,8 @@ ifeq ($(ARCH),loongarch64)
 endif
 
 
-PHONY := all
-all: $(KERNEL_ELF) $(KERNEL_ASM) $(USER_APPS)
+PHONY := all0
+all0: $(KERNEL_ELF) $(KERNEL_ASM) $(USER_APPS)
 
 
 $(KERNEL_ELF): build
@@ -124,12 +126,14 @@ PHONY += env
 env:
 	@(cargo install --list | grep "cargo-binutils" > /dev/null 2>&1) || cargo install cargo-binutils
 
-
-PHONY += build
-build: env user
+PHONY += kernel
+kernel:
 	@echo Platform: $(BOARD)
 	@cd kernel && make build
 	@echo "Updated: $(KERNEL_ELF)"
+
+PHONY += build
+build: user kernel
 
  
 PHONY += run
@@ -150,30 +154,20 @@ disasm: $(KERNEL_ASM)
 
  
 PHONY += gdbserver
-gdbserver: all
+gdbserver: all0
 	@$(QEMU) $(QEMU_ARGS) -s -S
 
 
 PHONY += gdbclient
-gdbclient: all
+gdbclient: all0
 	@$(GDB) -ex 'file $(KERNEL_ELF)' \
 			-ex 'set arch $(GDB_ARGS)' \
 			-ex 'target remote localhost:1234'
 
 
-PHONY += run-debug
-run-debug:
-	@make run DEBUG=on
-
-
 PHONY += run-docker
 run-docker:
 	@docker run --rm -it --network="host" -v ${PWD}:/mnt -w /mnt ${DOCKER_NAME} make run
-
-
-PHONY += run-docker-debug
-run-docker-debug:
-	@docker run --rm -it --network="host" -v ${PWD}:/mnt -w /mnt ${DOCKER_NAME} make run-debug
 
 
 PHONY += user
@@ -194,6 +188,7 @@ fs-img: user
 	@mkdir -p emnt
 	@sudo mount -t ext4 -o loop $(FS_IMG) emnt
 	@sudo cp -r $(USER_ELFS) emnt/
+
 	-sudo cp -r testcase/$(ARCH)/$(COMPLIB)/basic/* emnt/
 	-sudo cp -r testcase/$(ARCH)/$(COMPLIB)/busybox/* emnt/
 	-sudo cp -r testcase/$(ARCH)/$(COMPLIB)/lua/* emnt/
@@ -202,12 +197,58 @@ fs-img: user
 	-sudo cp -r testcase/$(ARCH)/$(COMPLIB)/iperf/* emnt/
 	-sudo cp -r testcase/$(ARCH)/$(COMPLIB)/netperf/* emnt/
 	-sudo cp -r testcase/$(ARCH)/$(COMPLIB)/libcbench/* emnt/
+
 	@sudo cp -r img-data/* emnt/
 	@sudo chmod -R 755 emnt/
 	@sudo umount emnt
 	@sudo rm -rf emnt
 	@echo "building fs-img finished"
 	@echo "Attention: cp error may be ignored"
+
+PHONY += fs-img
+fs-img-submit: user
+	@echo "building fs-img ext4..."
+	@echo $(FS_IMG)
+	@rm -rf $(FS_IMG)
+	@mkdir -p $(FS_IMG_DIR)
+	@dd if=/dev/zero of=$(FS_IMG) bs=1K count=524288 status=progress
+	@mkfs.ext4 -F $(FS_IMG)
+	@mkdir -p emnt
+	@sudo mount -t ext4 -o loop $(FS_IMG) emnt
+	@sudo cp -r $(USER_ELFS) emnt/
+
+	@sudo cp -r img-data/* emnt/
+	@sudo chmod -R 755 emnt/
+	@sudo umount emnt
+	@sudo rm -rf emnt
+	@echo "building fs-img finished"
+	@echo "Attention: cp error may be ignored"
+
+PHONY += all
+all:
+	@rm -rf vendor
+# @mkdir vendor
+	@tar xvf submit/vendor-rv.tar.gz
+
+	@rm -rf .cargo
+	@mkdir .cargo
+	@cp submit/config-rv.toml .cargo/config.toml
+	@make kernel MODE=release
+	@cp target/riscv64gc-unknown-none-elf/release/kernel kernel-rv
+	@make fs-img-submit MODE=release ARCH=riscv64
+	@cp fsimg/riscv64-sdcard.img disk.img
+
+	@rm -rf vendor/
+# @mkdir vendor
+	@tar xvf submit/vendor-la.tar.gz
+
+	@rm -rf .cargo
+	@mkdir .cargo
+	@cp submit/config-la.toml .cargo/config.toml
+	@make kernel MODE=release
+	@cp target/loongarch64-unknown-none/release/kernel kernel-la
+	@make fs-img-submit MODE=release ARCH=loongarch64
+	@cp fsimg/loongarch64-sdcard.img disk-la.img
 
 
 .PHONY: $(PHONY)
