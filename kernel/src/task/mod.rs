@@ -24,8 +24,8 @@ use timer::{TIMER_MANAGER, sleep_ms};
 use vfs::file::File;
 
 pub fn init() {
-    init_proc();
-    // submit_init();
+    // init_proc();
+    submit_init();
     // timer_init();
     net_poll_init();
     // elf_test();
