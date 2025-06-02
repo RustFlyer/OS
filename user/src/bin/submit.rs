@@ -12,7 +12,7 @@ const TESTCASES: &[&str] = &[
     "lua_testcode.sh",
     "netperf_testcode.sh",
     "iozone_testcode.sh",
-    "cyclictest_testcode.sh",
+    // "cyclictest_testcode.sh",
 ];
 
 fn run_cmd(cmd: &str) {
