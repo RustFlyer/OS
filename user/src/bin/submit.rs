@@ -6,11 +6,11 @@ extern crate user_lib;
 use user_lib::{execve, exit, fork, println, sleep, wait, waitpid, yield_};
 
 const TESTCASES: &[&str] = &[
-    "run-all.sh",
+    "basic_testcode.sh",
     "busybox_testcode.sh",
+    "libctest_testcode.sh",
     "lua_testcode.sh",
     "netperf_testcode.sh",
-    "libctest_testcode.sh",
     "iozone_testcode.sh",
     // "cyclictest_testcode.sh",
 ];

@@ -156,6 +156,10 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         MEMBARRIER => sys_membarrier(args[0], args[1], args[2]),
         SHUTDOWN => sys_shutdown(args[0], args[1]),
         STATX => sys_statx(args[0], args[1], args[2], args[3], args[4]),
+        CLONE3 => sys_clone3(args[0], args[1]),
+        MREMAP => sys_mremap(args[0], args[1], args[2], args[3] as i32, args[4]),
+        SETSID => sys_setsid(),
+        SCHED_GETAFFINITY => sys_sched_getaffinity(args[0], args[1], args[2]),
         _ => {
             println!("Syscall not implemented: {}", syscall_no.as_str());
             unimplemented!()

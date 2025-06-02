@@ -21,7 +21,7 @@ mod vm;
 
 use core::ptr;
 
-use arch::mm::fence;
+use arch::{hart::hart_shutdown, mm::fence};
 use config::mm::{DTB_END, DTB_START};
 use mm::{self, frame, heap};
 use processor::hart;

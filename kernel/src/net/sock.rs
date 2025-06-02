@@ -1,6 +1,8 @@
 use core::task::Waker;
 
-use net::{NetPollState, addr::UNSPECIFIED_IPV4, tcp::core::TcpSocket, udp::UdpSocket};
+use net::{
+    NetPollState, addr::UNSPECIFIED_IPV4, tcp::core::TcpSocket, udp::UdpSocket, unix::UnixSocket,
+};
 use smoltcp::wire::IpEndpoint;
 use systype::error::{SysError, SysResult};
 
@@ -11,6 +13,7 @@ use super::addr::SockAddr;
 pub enum Sock {
     Tcp(TcpSocket),
     Udp(UdpSocket),
+    Unix(UnixSocket),
 }
 
 impl Sock {
@@ -18,6 +21,7 @@ impl Sock {
         match self {
             Sock::Tcp(tcp) => tcp.set_nonblocking(true),
             Sock::Udp(udp) => udp.set_nonblocking(true),
+            Sock::Unix(_unix) => (),
         }
     }
 
@@ -42,6 +46,7 @@ impl Sock {
                 }
                 udp.bind(local_addr)
             }
+            Sock::Unix(_unix) => unimplemented!(),
         }
     }
 
@@ -49,6 +54,7 @@ impl Sock {
         match self {
             Sock::Tcp(tcp) => tcp.listen(current_task().waker_mut().as_ref().unwrap()),
             Sock::Udp(_udp) => Err(SysError::EOPNOTSUPP),
+            Sock::Unix(_unix) => unimplemented!(),
         }
     }
 
@@ -62,6 +68,7 @@ impl Sock {
                 let remote_addr = remote_addr.into_endpoint();
                 udp.connect(remote_addr)
             }
+            Sock::Unix(_unix) => Ok(()),
         }
     }
 
@@ -75,6 +82,7 @@ impl Sock {
                 let peer_addr = SockAddr::from_endpoint(udp.peer_addr()?);
                 Ok(peer_addr)
             }
+            Sock::Unix(_unix) => unimplemented!(),
         }
     }
 
@@ -88,6 +96,7 @@ impl Sock {
                 let local_addr = SockAddr::from_endpoint(udp.local_addr()?);
                 Ok(local_addr)
             }
+            Sock::Unix(_unix) => unimplemented!(),
         }
     }
 
@@ -98,6 +107,7 @@ impl Sock {
                 Some(addr) => udp.send_to(buf, addr.into_endpoint()).await,
                 None => udp.send(buf).await,
             },
+            Sock::Unix(_unix) => unimplemented!(),
         }
     }
 
@@ -111,6 +121,7 @@ impl Sock {
                 let (len, endpoint) = udp.recv_from(buf).await?;
                 Ok((len, SockAddr::from_endpoint(endpoint)))
             }
+            Sock::Unix(_unix) => unimplemented!(),
         }
     }
 
@@ -118,6 +129,7 @@ impl Sock {
         match self {
             Sock::Tcp(tcp) => tcp.poll().await,
             Sock::Udp(udp) => udp.poll().await,
+            Sock::Unix(_unix) => unimplemented!(),
         }
     }
 
@@ -125,6 +137,7 @@ impl Sock {
         match self {
             Sock::Tcp(tcp) => tcp.shutdown(how),
             Sock::Udp(udp) => udp.shutdown(),
+            Sock::Unix(_unix) => unimplemented!(),
         }
     }
 
@@ -135,6 +148,7 @@ impl Sock {
                 Ok(new_tcp)
             }
             Sock::Udp(_udp) => Err(SysError::EOPNOTSUPP),
+            Sock::Unix(_unix) => unimplemented!(),
         }
     }
 
@@ -142,6 +156,7 @@ impl Sock {
         match self {
             Sock::Tcp(tcp) => tcp.register_recv_waker(&waker),
             Sock::Udp(udp) => udp.register_recv_waker(&waker),
+            Sock::Unix(_unix) => unimplemented!(),
         }
     }
 
@@ -149,6 +164,7 @@ impl Sock {
         match self {
             Sock::Tcp(tcp) => tcp.register_send_waker(&waker),
             Sock::Udp(udp) => udp.register_send_waker(&waker),
+            Sock::Unix(_unix) => unimplemented!(),
         }
     }
 }

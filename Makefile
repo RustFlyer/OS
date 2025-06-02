@@ -5,10 +5,10 @@
 # ======================
 
 # Target architecture
-# export ARCH = riscv64
-export ARCH = loongarch64
-export COMPLIB = musl
-# export COMPLIB = glibc
+export ARCH = riscv64
+# export ARCH = loongarch64
+# export COMPLIB = musl
+export COMPLIB = glibc
 
 export SUBMIT = false
 
@@ -77,14 +77,15 @@ endif
 
 ifeq ($(ARCH),loongarch64)
 	QEMU_ARGS := -m 1G
+	QEMU_ARGS += -machine virt 	
 	QEMU_ARGS += -nographic
 	QEMU_ARGS += -kernel $(KERNEL_ELF)
 	QEMU_ARGS += -smp $(SMP)
 	QEMU_ARGS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
 	QEMU_ARGS += -device virtio-blk-pci,drive=x0
 	QEMU_ARGS += -no-reboot
-	QEMU_ARGS += -device virtio-net-pci,netdev=net0 
-	QEMU_ARGS += -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555
+# QEMU_ARGS += -device virtio-net-pci,netdev=net0 
+# QEMU_ARGS += -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555
 	QEMU_ARGS += -rtc base=utc
 # QEMU_ARGS += -drive file=disk-la.img,if=none,format=raw,id=x1
 # QEMU_ARGS += -device virtio-blk-pci,drive=x1 
@@ -198,16 +199,17 @@ fs-img: user
 	-sudo cp -r testcase/$(ARCH)/$(COMPLIB)/netperf/* emnt/
 	-sudo cp -r testcase/$(ARCH)/$(COMPLIB)/libcbench/* emnt/
 
-	@sudo cp -r img-data/* emnt/
+	@sudo cp -r img-data/common/* emnt/
+	@sudo cp -r img-data/$(ARCH)/* emnt/
 	@sudo chmod -R 755 emnt/
 	@sudo umount emnt
 	@sudo rm -rf emnt
 	@echo "building fs-img finished"
 	@echo "Attention: cp error may be ignored"
 
-PHONY += fs-img
-fs-img-submit: user
-	@echo "building fs-img ext4..."
+PHONY += fs-img-submit
+fs-img-submit-rv: user
+	@echo "building fs-img-submit ext4..."
 	@echo $(FS_IMG)
 	@rm -rf $(FS_IMG)
 	@mkdir -p $(FS_IMG_DIR)
@@ -217,11 +219,32 @@ fs-img-submit: user
 	@mount -t ext4 -o loop $(FS_IMG) emnt
 	@cp -r $(USER_ELFS) emnt/
 
-	@cp -r img-data/* emnt/
+	@cp -r img-data/common/* emnt/
+	@cp -r img-data/riscv64/* emnt/
 	@chmod -R 755 emnt/
 	@umount emnt
 	@rm -rf emnt
-	@echo "building fs-img finished"
+	@echo "building fs-img-submit finished"
+	@echo "Attention: cp error may be ignored"
+
+PHONY += fs-img-submit-la
+fs-img-submit-la: user
+	@echo "building fs-img-submit-la ext4..."
+	@echo $(FS_IMG)
+	@rm -rf $(FS_IMG)
+	@mkdir -p $(FS_IMG_DIR)
+	@dd if=/dev/zero of=$(FS_IMG) bs=1K count=524288 status=progress
+	@mkfs.ext4 -F $(FS_IMG)
+	@mkdir -p emnt
+	@mount -t ext4 -o loop $(FS_IMG) emnt
+	@cp -r $(USER_ELFS) emnt/
+
+	@cp -r img-data/common/* emnt/
+	@cp -r img-data/loongarch64/* emnt/
+	@chmod -R 755 emnt/
+	@umount emnt
+	@rm -rf emnt
+	@echo "building fs-img-submit-la finished"
 	@echo "Attention: cp error may be ignored"
 
 PHONY += all
@@ -234,7 +257,7 @@ all:
 	@cp submit/config-rv.toml .cargo/config.toml
 	@make kernel MODE=release LOG=
 	@cp target/riscv64gc-unknown-none-elf/release/kernel kernel-rv
-	@make fs-img-submit MODE=release ARCH=riscv64 LOG=
+	@make fs-img-submit-rv MODE=release ARCH=riscv64 LOG=
 	@cp fsimg/riscv64-sdcard.img disk.img
 
 	@rm -rf vendor/
@@ -245,7 +268,7 @@ all:
 	@cp submit/config-la.toml .cargo/config.toml
 	@make kernel MODE=release LOG=
 	@cp target/loongarch64-unknown-none/release/kernel kernel-la
-	@make fs-img-submit MODE=release ARCH=loongarch64 LOG=
+	@make fs-img-submit-la MODE=release ARCH=loongarch64 LOG=
 	@cp fsimg/loongarch64-sdcard.img disk-la.img
 
 

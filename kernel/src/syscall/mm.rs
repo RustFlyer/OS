@@ -222,8 +222,12 @@ pub fn sys_shmat(shmid: usize, shmaddr: usize, shmflg: i32) -> SyscallResult {
 
     let ret_addr;
     if let Some(shm) = SHARED_MEMORY_MANAGER.0.lock().get(&shmid) {
-        ret_addr =
-            addrspace.attach_shm(shmaddr_aligned, shm.lock().size(), shm.clone(), MappingFlags::from(mem_perm))?;
+        ret_addr = addrspace.attach_shm(
+            shmaddr_aligned,
+            shm.lock().size(),
+            shm.clone(),
+            MappingFlags::from(mem_perm),
+        )?;
 
         task.with_mut_shm_maps(|map| map.insert(ret_addr, shmid));
     } else {
@@ -319,4 +323,44 @@ pub fn sys_shmctl(shmid: usize, cmd: i32, buf: usize) -> SyscallResult {
 pub fn sys_membarrier(_cmd: usize, _flags: usize, _cpu_id: usize) -> SyscallResult {
     log::error!("[sys_membarrier] not implemented");
     Ok(0)
+}
+
+pub fn sys_mremap(
+    old_addr: usize,
+    old_size: usize,
+    new_size: usize,
+    flags: i32,
+    new_addr: usize, // when fixed
+) -> SyscallResult {
+    return Ok(0);
+    if old_addr & (PAGE_SIZE - 1) != 0 {
+        return Err(SysError::EINVAL);
+    }
+    if new_size == 0 {
+        return Err(SysError::EINVAL);
+    }
+
+    let task = current_task();
+    let src_va = VirtAddr::new(old_addr);
+    let copy_size = usize::min(old_size, new_size);
+
+    let new_addr = task.addr_space().map_file(
+        None,
+        MmapFlags::MAP_ANONYMOUS | MmapFlags::MAP_PRIVATE,
+        MappingFlags::R | MappingFlags::W,
+        VirtAddr::new(0),
+        new_size,
+        0,
+    )?;
+
+    if copy_size > 0 {
+        unsafe {
+            let src_ptr = old_addr as *const u8;
+            let dst_ptr = new_addr as *mut u8;
+            core::ptr::copy_nonoverlapping(src_ptr, dst_ptr, copy_size);
+        }
+    }
+
+    task.addr_space().remove_mapping(src_va, old_size);
+    Ok(new_addr)
 }

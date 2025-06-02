@@ -1,7 +1,7 @@
 use alloc::boxed::Box;
 use async_trait::async_trait;
 use config::vfs::{OpenFlags, PollEvents};
-use net::{poll_interfaces, tcp::core::TcpSocket, udp::UdpSocket};
+use net::{poll_interfaces, tcp::core::TcpSocket, udp::UdpSocket, unix::UnixSocket};
 use osfuture::take_waker;
 use systype::error::SysResult;
 use vfs::{
@@ -27,7 +27,7 @@ unsafe impl Send for Socket {}
 impl Socket {
     pub fn new(domain: SaFamily, types: SocketType, nonblock: bool) -> Self {
         let sk = match domain {
-            SaFamily::AF_UNIX => unimplemented!(),
+            SaFamily::AF_UNIX => Sock::Unix(UnixSocket {}),
             SaFamily::AF_INET | SaFamily::AF_INET6 => match types {
                 SocketType::STREAM => Sock::Tcp(TcpSocket::new_v4()),
                 SocketType::DGRAM => Sock::Udp(UdpSocket::new()),

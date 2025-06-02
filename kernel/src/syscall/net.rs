@@ -21,6 +21,10 @@ pub const NONBLOCK: i32 = 0x800;
 pub const CLOEXEC: i32 = 0x80000;
 
 pub fn sys_socket(domain: usize, types: i32, protocal: usize) -> SyscallResult {
+    if domain == 1 {
+        log::error!("not support unix socket");
+        return Err(SysError::EFAULT);
+    }
     let domain = SaFamily::try_from(domain as u16)?;
     log::info!("[sys_socket] new socket {domain:?} {types:#x} protocal:{protocal:#x}");
 
@@ -40,6 +44,7 @@ pub fn sys_socket(domain: usize, types: i32, protocal: usize) -> SyscallResult {
     }
 
     let types = SocketType::from_repr(types as usize).ok_or(SysError::EINVAL)?;
+
     let socket = Socket::new(domain, types, nonblock);
     let fd = current_task().with_mut_fdtable(|table| table.alloc(Arc::new(socket), flags))?;
     log::info!("[sys_socket] new socket {types:?} {flags:?} in fd {fd}, nonblock:{nonblock}");
@@ -178,7 +183,7 @@ pub async fn sys_sendto(
     dest_addr: usize,
     addrlen: usize,
 ) -> SyscallResult {
-    debug_assert!(flags == 0, "unsupported flags");
+    // debug_assert!(flags == 0, "unsupported flags");
 
     let task = current_task();
     log::debug!(

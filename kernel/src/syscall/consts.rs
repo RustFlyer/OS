@@ -112,6 +112,7 @@ pub enum SyscallNo {
     SHUTDOWN = 210,
     BRK = 214,
     MUNMAP = 215,
+    MREMAP = 216,
     CLONE = 220,
     EXECVE = 221,
     MMAP = 222,
@@ -125,6 +126,7 @@ pub enum SyscallNo {
     MEMBARRIER = 283,
     COPY_FILE_RANGE = 285,
     STATX = 291,
+    CLONE3 = 435,
 }
 
 impl core::fmt::Display for SyscallNo {
@@ -239,6 +241,7 @@ impl SyscallNo {
             SHUTDOWN => "shutdown",
             BRK => "brk",
             MUNMAP => "munmap",
+            MREMAP => "mremap",
             CLONE => "clone",
             EXECVE => "execve",
             MMAP => "mmap",
@@ -252,6 +255,7 @@ impl SyscallNo {
             MEMBARRIER => "membarrier",
             COPY_FILE_RANGE => "copy_file_range",
             STATX => "statx",
+            CLONE3 => "clone3",
         }
     }
 }

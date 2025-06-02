@@ -269,6 +269,7 @@ pub async fn sys_getcwd(buf: usize, len: usize) -> SyscallResult {
         buf.try_into_mut_slice(bsize)?
             .copy_from_slice(&cstr.into_bytes_with_nul());
     }
+
     Ok(ret)
 }
 

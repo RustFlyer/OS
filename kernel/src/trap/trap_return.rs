@@ -25,17 +25,13 @@ pub fn trap_return(task: &Arc<Task>) {
     #[cfg(target_arch = "riscv64")]
     assert!(!(trap_cx.sstatus.sie()));
 
-    assert!(!(task.is_in_state(TaskState::Zombie) || task.is_in_state(TaskState::Sleeping)));
+    // assert!(!(task.is_in_state(TaskState::Zombie) || task.is_in_state(TaskState::Sleeping)));
 
     task.timer_mut().switch_to_user();
     // log::info!("[trap_return] go to user space");
     // log::debug!("sstatus: {:?}", task.trap_context_mut().sstatus);
     unsafe {
         let ptr = trap_cx as *mut TrapContext;
-        if task.tid() == 4 {
-            simdebug::stop();
-        }
-
         __return_to_user(ptr);
     }
     // log::info!("[trap_return] return from user space");

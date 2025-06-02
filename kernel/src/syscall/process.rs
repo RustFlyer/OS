@@ -310,11 +310,15 @@ pub fn sys_clone(
 
     if flags.contains(CloneFlags::PARENT_SETTID) {
         let mut parent_tid = UserWritePtr::<usize>::new(parent_tid_ptr, &addrspace);
-        unsafe { parent_tid.write(new_tid)? };
+        if !parent_tid.is_null() {
+            unsafe { parent_tid.write(new_tid)? };
+        }
     }
     if flags.contains(CloneFlags::CHILD_SETTID) {
         let mut chilren_tid = UserWritePtr::<usize>::new(chilren_tid_ptr, &addrspace);
-        unsafe { chilren_tid.write(new_tid)? };
+        if !chilren_tid.is_null() {
+            unsafe { chilren_tid.write(new_tid)? };
+        }
         new_task.tid_address_mut().set_child_tid = Some(chilren_tid_ptr);
     }
     if flags.contains(CloneFlags::CHILD_CLEARTID) {
@@ -392,8 +396,8 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
         Ok(args)
     };
 
-    let path = read_string(path)?;
-    let args = read_string_array(argv)?;
+    let mut path = read_string(path)?;
+    let mut args = read_string_array(argv)?;
     let mut envs = read_string_array(envp)?;
 
     if path.is_empty() {
@@ -409,6 +413,23 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
     log::info!("[sys_execve] args: {args:?}");
     log::info!("[sys_execve] envs: {envs:?}");
     log::info!("[sys_execve] path: {path:?}");
+
+    let env_iter = envs.iter();
+    for env in env_iter {
+        if env.starts_with("PWD") {
+            if let Some((_key, value)) = env.split_once('=') {
+                if value == "/" {
+                    continue;
+                }
+                path.remove(0);
+                args[0].remove(0);
+                path.insert_str(0, value);
+                args[0].insert_str(0, value);
+                log::debug!("new path = {}", path);
+                break;
+            }
+        }
+    }
 
     let dentry = {
         let path = Path::new(sys_root_dentry(), path);
@@ -448,13 +469,13 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
 
                     let mut exargs: Vec<String> =
                         firline.split_whitespace().map(|s| s.to_string()).collect();
-                    let mut path = exargs[0].clone();
+                    let path = exargs[0].clone();
 
                     // to fix
-                    {
-                        path = path.rsplit('/').next().unwrap().to_string();
-                        log::debug!("[sys_execve] path: {}", path);
-                    }
+                    // {
+                    //     path = path.rsplit('/').next().unwrap().to_string();
+                    //     log::debug!("[sys_execve] path: {}", path);
+                    // }
 
                     exargs.extend(args);
                     log::debug!("[sys_execve] exargs: {:?}", exargs);
@@ -771,4 +792,90 @@ pub fn sys_prlimit64(
     }
 
     Ok(0)
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct CloneArgs {
+    pub flags: u64,
+    pub pidfd: u64,
+    pub child_tid: u64,
+    pub parent_tid: u64,
+    pub exit_signal: u64,
+    pub stack: u64,
+    pub stack_size: u64,
+    pub tls: u64,
+    pub set_tid: u64,
+    pub set_tid_size: u64,
+    pub cgroup: u64,
+}
+
+pub fn sys_clone3(user_args: usize, size: usize) -> SyscallResult {
+    if size < core::mem::size_of::<CloneArgs>() {
+        return Err(SysError::EINVAL);
+    }
+    let task = current_task();
+    let addrspace = task.addr_space();
+    let mut args_ptr = UserReadPtr::<CloneArgs>::new(user_args, &addrspace);
+    let args = unsafe { args_ptr.read()? };
+
+    log::info!(
+        "[sys_clone3] flags:0x{:x}, stack=0x{:x}, tls=0x{:x} parent_tid=0x{:x} child_tid=0x{:x} exit_signal={}",
+        args.flags,
+        args.stack,
+        args.tls,
+        args.parent_tid,
+        args.child_tid,
+        args.exit_signal
+    );
+
+    let flags = CloneFlags::from_bits(args.flags & !0xff).ok_or(SysError::EINVAL)?;
+    let new_task = task.fork(flags);
+    new_task.trap_context_mut().set_user_ret_val(0);
+    let new_tid = new_task.tid();
+
+    if args.stack != 0 {
+        new_task.trap_context_mut().set_user_sp(args.stack as usize);
+    }
+
+    if flags.contains(CloneFlags::PARENT_SETTID) && args.parent_tid != 0 {
+        let mut parent_tid = UserWritePtr::<usize>::new(args.parent_tid as usize, &addrspace);
+        unsafe { parent_tid.write(new_tid)? };
+    }
+
+    if flags.contains(CloneFlags::CHILD_SETTID) && args.child_tid != 0 {
+        let mut chilren_tid = UserWritePtr::<usize>::new(args.child_tid as usize, &addrspace);
+        unsafe { chilren_tid.write(new_tid)? };
+        new_task.tid_address_mut().set_child_tid = Some(args.child_tid as usize);
+    }
+
+    if flags.contains(CloneFlags::CHILD_CLEARTID) {
+        new_task.tid_address_mut().clear_child_tid = Some(args.child_tid as usize);
+    }
+
+    if flags.contains(CloneFlags::SETTLS) && args.tls != 0 {
+        new_task.trap_context_mut().set_user_tp(args.tls as usize);
+    }
+
+    log::info!("[sys_clone3] who is your parent? {}", new_task.ppid());
+    spawn_user_task(new_task);
+    log::info!("[sys_clone3] clone success",);
+
+    Ok(new_tid)
+}
+
+pub fn sys_setsid() -> SyscallResult {
+    let task = current_task();
+    Ok(task.pid())
+}
+
+pub fn sys_sched_getaffinity(pid: usize, cpusetsize: usize, mask: usize) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+
+    unsafe {
+        UserWritePtr::<u8>::new(mask, &addrspace).write(0)?;
+    }
+
+    Ok(task.pid())
 }

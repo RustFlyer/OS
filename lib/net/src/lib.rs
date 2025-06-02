@@ -21,6 +21,7 @@ pub mod rttoken;
 pub mod socketset;
 pub mod tcp;
 pub mod udp;
+pub mod unix;
 
 /// Some meaningless parameters. They will be parsed as bytes
 /// and mix with `RANDOM_SEED` to create ips and gateway address.
