@@ -163,6 +163,11 @@ impl Task {
     /// This function must be called before the current page table is dropped, or the kernel
     /// may lose its memory mappings.
     pub fn switch_addr_space(&self) {
+        log::trace!(
+            "Switching to task {}'s address space, page table at {:#x}",
+            self.tid(),
+            self.addr_space().page_table.root().to_usize()
+        );
         unsafe {
             let addrspace = self.addr_space();
             switch_to(&addrspace);
