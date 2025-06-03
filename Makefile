@@ -255,7 +255,7 @@ all:
 	@rm -rf .cargo
 	@mkdir .cargo
 	@cp submit/config-rv.toml .cargo/config.toml
-	@make kernel LOG=debug
+	@make user kernel LOG=debug
 	@cp target/riscv64gc-unknown-none-elf/debug/kernel kernel-rv
 	@make fs-img-submit-rv MODE=release ARCH=riscv64 LOG=debug
 	@cp fsimg/riscv64-sdcard.img disk.img
@@ -266,7 +266,7 @@ all:
 	@rm -rf .cargo
 	@mkdir .cargo
 	@cp submit/config-la.toml .cargo/config.toml
-	@make kernel LOG=
+	@make user kernel LOG=
 	@cp target/loongarch64-unknown-none/debug/kernel kernel-la
 	@make fs-img-submit-la MODE=release ARCH=loongarch64 LOG=
 	@cp fsimg/loongarch64-sdcard.img disk-la.img
