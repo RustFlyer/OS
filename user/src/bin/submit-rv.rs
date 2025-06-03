@@ -41,7 +41,13 @@ fn main() -> i32 {
 
     // run_cmd("./busybox ln -s /musl/lib/libc.so /lib/ld-linux-riscv64-lp64.so.1 ");
     chdir("/glibc");
-    run_cmd("./busybox cp /glibc/lib/ld-linux-riscv64-lp64d.so.1 /lib/ld-linux-riscv64-lp64d.so.1");
+    run_cmd("./busybox cp /musl/lib/* /lib/");
+    run_cmd("./busybox cp /musl/lib/libc.so /lib/ld-musl-riscv64-sf.so.1");
+    run_cmd("./busybox cp /glibc/lib/* /lib/");
+    run_cmd("./busybox cp /glibc/lib/libc.so /lib/libc.so.6");
+    run_cmd("./busybox cp /glibc/lib/libm.so /lib/libm.so.6");
+    run_cmd("./busybox cp /glibc/busybox /bin/");
+    run_cmd("./busybox cp /glibc/busybox /");
     run_cmd("./busybox --install -s /bin");
     if fork() == 0 {
         for test in TESTCASES {

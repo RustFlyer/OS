@@ -444,10 +444,10 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
     // }
 
     let dentry = {
-        let root = if path.starts_with("./") {
-            task.cwd().lock().clone()
-        } else {
+        let root = if path.starts_with("/") {
             sys_root_dentry()
+        } else {
+            task.cwd().lock().clone()
         };
 
         let path = Path::new(root, path);

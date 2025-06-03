@@ -38,13 +38,18 @@ fn main() -> i32 {
     println!("start to scan la-disk");
     mkdir("/bin");
     mkdir("/lib64");
+    mkdir("/usr");
+    mkdir("/usr/lib64");
 
     // run_cmd("./busybox ln -s /musl/lib/libc.so /lib/ld-linux-riscv64-lp64.so.1 ");
     chdir("/glibc");
+    run_cmd("./busybox cp /musl/lib/* /lib64/");
+    run_cmd("./busybox cp /musl/lib/libc.so /lib64/ld-musl-loongarch-lp64d.so.1");
+    run_cmd("./busybox cp /glibc/lib/* /lib64/");
+    run_cmd("./busybox cp /glibc/lib/* /usr/lib64/");
+    run_cmd("./busybox cp /glibc/busybox /bin/");
+    run_cmd("./busybox cp /glibc/busybox /");
     run_cmd("./busybox --install -s /bin");
-    run_cmd(
-        "./busybox cp /glibc/lib/ld-linux-riscv64-lp64d.so.1 /lib64/ld-linux-riscv64-lp64d.so.1",
-    );
     if fork() == 0 {
         for test in TESTCASES {
             run_test(test);

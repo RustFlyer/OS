@@ -38,17 +38,35 @@ pub fn easy_cmd(s: String) -> String {
         _ => s,
     }
 }
+
+fn run_cmd(cmd: &str) {
+    if fork() == 0 {
+        execve("./busybox", &["./busybox", "sh", "-c", cmd], &[]);
+    } else {
+        let mut result: i32 = 0;
+        waitpid(-1, &mut result);
+    }
+}
+
 #[unsafe(no_mangle)]
 fn main() {
     let mut i = 0;
+
+    mkdir("/usr");
+    mkdir("/usr/lib64");
 
     mkdir("/bin");
     chdir("musl");
     if fork() == 0 {
         let ret = fork();
         if ret == 0 {
-            // execve("./busybox", &["./busybox", "--install", "-s", "/bin"], &[]);
+            execve("./busybox", &["./busybox", "--install", "-s", "/bin"], &[]);
         }
+        run_cmd("./busybox cp /musl/lib/* /lib/");
+        run_cmd("./busybox cp /musl/lib/libc.so /lib/ld-musl-riscv64-sf.so.1");
+        run_cmd("./busybox cp /glibc/lib/* /lib/");
+        run_cmd("./busybox cp /glibc/busybox /bin/");
+        run_cmd("./busybox cp /glibc/busybox /");
 
         let mut exitcode = 0;
         waitpid(ret, &mut exitcode);
