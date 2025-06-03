@@ -60,7 +60,7 @@ app_3_end:
     .global app_4_end
     .align 3
 app_4_start:
-    .incbin "./target/riscv64gc-unknown-none-elf/debug/submit"
+    .incbin "./target/riscv64gc-unknown-none-elf/debug/submit-rv"
 app_4_end:
 
     .section .data

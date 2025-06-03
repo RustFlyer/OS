@@ -20,7 +20,7 @@ use super::{
     addr_space::AddrSpace,
     vm_area::{VmArea, VmaFlags},
 };
-use crate::vm::user_ptr::UserWritePtr;
+use crate::{processor::current_task, vm::user_ptr::UserWritePtr};
 
 impl AddrSpace {
     /// Loads an ELF executable into given address space.
@@ -117,6 +117,7 @@ impl AddrSpace {
                     ElfParseError::IOError(_) => SysError::EIO,
                     _ => SysError::ENOEXEC,
                 })?;
+            log::debug!("[load_elf] open interp_stream");
             entry =
                 self.load_segments(Arc::clone(&interp_file), &interp_stream, USER_INTERP_BASE)?;
             auxv.push(AuxHeader::new(AT_BASE, USER_INTERP_BASE));

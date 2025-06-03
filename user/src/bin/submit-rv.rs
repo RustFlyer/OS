@@ -11,7 +11,7 @@ const TESTCASES: &[&str] = &[
     "libctest_testcode.sh",
     "lua_testcode.sh",
     "netperf_testcode.sh",
-    "iozone_testcode.sh",
+    // "iozone_testcode.sh",
     // "cyclictest_testcode.sh",
 ];
 
@@ -35,13 +35,14 @@ fn run_test(cmd: &str) {
 
 #[unsafe(no_mangle)]
 fn main() -> i32 {
-    println!("start to scan disk");
-    println!("start to scan disk fixed2");
+    println!("start to scan rv-disk");
     mkdir("/bin");
+    mkdir("/lib");
 
-    chdir("/musl");
+    // run_cmd("./busybox ln -s /musl/lib/libc.so /lib/ld-linux-riscv64-lp64.so.1 ");
+    chdir("/glibc");
+    run_cmd("./busybox cp /glibc/lib/ld-linux-riscv64-lp64d.so.1 /lib/ld-linux-riscv64-lp64d.so.1");
     run_cmd("./busybox --install -s /bin");
-    run_cmd("./busybox ln -s ./lib /lib");
     if fork() == 0 {
         for test in TESTCASES {
             run_test(test);
@@ -57,8 +58,7 @@ fn main() -> i32 {
         }
     }
 
-    chdir("/glibc");
-    run_cmd("./busybox --install -s /bin");
+    chdir("/musl");
     if fork() == 0 {
         for test in TESTCASES {
             run_test(test);

@@ -3,7 +3,7 @@ use core::{mem, ptr::NonNull};
 use alloc::{string::ToString, sync::Arc};
 use config::mm::{DTB_ADDR, KERNEL_MAP_OFFSET};
 use driver::{
-    BLOCK_DEVICE, BlockDevice, CHAR_DEVICE, DeviceType, MmioSerialPort,
+    BLOCK_DEVICE, BLOCK_DEVICE2, BlockDevice, CHAR_DEVICE, DeviceType, MmioSerialPort,
     device::{DevId, DeviceMajor, DeviceMeta},
     net::{loopback::LoopbackDev, virtnet::create_virt_net_dev},
     println,
@@ -21,7 +21,7 @@ use crate::vm::{
 
 pub fn probe_mmio(device_tree: &Fdt) {
     let blk = probe_virtio_blk(&device_tree);
-    BLOCK_DEVICE.call_once(|| blk.unwrap());
+    // BLOCK_DEVICE.call_once(|| blk.unwrap());
 
     let mut buf: [u8; 512] = [0; 512];
     BLOCK_DEVICE.get().unwrap().read(0, &mut buf);
@@ -88,6 +88,7 @@ pub fn probe_virtio_net(root: &Fdt) -> Option<DeviceMeta> {
 pub fn probe_virtio_blk(root: &Fdt) -> Option<Arc<VirtBlkDevice>> {
     let device_tree = root;
     let mut dev = None;
+    let mut isdev = false;
     for node in device_tree.find_all_nodes("/soc/virtio_mmio") {
         for reg in node.reg() {
             let mmio_base_paddr = PhysAddr::new(reg.starting_address as usize);
@@ -108,19 +109,24 @@ pub fn probe_virtio_blk(root: &Fdt) -> Option<Arc<VirtBlkDevice>> {
                     "[probe_virtio_blk] created a new block device: {:?}",
                     dev.clone().unwrap().block_size()
                 );
-            }
 
-            if dev.is_some() {
+                if !isdev {
+                    BLOCK_DEVICE2.call_once(|| dev.unwrap());
+                } else {
+                    BLOCK_DEVICE.call_once(|| dev.unwrap());
+                }
+                isdev = true;
                 continue;
             }
+
             iounmap(mmio_base_paddr.to_usize());
         }
     }
-    if dev.is_none() {
+    if !isdev {
         log::warn!("No virtio block device found");
     }
     log::debug!("[probe_virtio_blk] pass");
-    dev
+    None
 }
 
 pub fn probe_mmio_device(

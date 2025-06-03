@@ -24,7 +24,7 @@ use osfs::{
             ioctl::{Pid, Termios},
         },
     },
-    fd_table::FdSet,
+    fd_table::{FdFlags, FdSet},
     pipe::{inode::PIPE_BUF_LEN, new_pipe},
     pselect::{FilePollRet, PSelectFuture},
 };
@@ -336,7 +336,9 @@ pub fn sys_fstatat(dirfd: usize, pathname: usize, stat_buf: usize, flags: i32) -
                 AtFd::Normal(fd) => task.with_mut_fdtable(|t| t.get_file(fd))?.dentry(),
             }
         } else {
+            log::debug!("dentry walk at");
             let dentry = task.walk_at(AtFd::from(dirfd), path)?;
+            log::debug!("dentry walk at");
             if !flags.contains(AtFlags::AT_SYMLINK_NOFOLLOW)
                 && !dentry.is_negative()
                 && dentry.inode().unwrap().inotype().is_symlink()
@@ -918,6 +920,15 @@ pub fn sys_fcntl(fd: usize, op: isize, arg: usize) -> SyscallResult {
             log::debug!("[sys_fcntl] {:?}", fd_info.flags());
             Ok(fd_info.flags().bits() as usize)
         }),
+        F_SETFD => {
+            let arg = OpenFlags::from_bits_retain(arg as i32);
+            let fd_flags = FdFlags::from(arg);
+            task.with_mut_fdtable(|table| {
+                let fd_info = table.get_mut(fd)?;
+                fd_info.set_flags(fd_flags);
+                Ok(0)
+            })
+        }
         _ => {
             log::error!("[sys_fcntl] not implemented {op:?}");
             Ok(0)
@@ -1289,6 +1300,9 @@ pub fn sys_renameat2(
 
     let parent_dentry = old_dentry.parent().expect("can not rename root dentry");
     // old_dentry.rename_to(&new_dentry, flags).map(|_| 0)
+    if old_dentry.is_negative() {
+        parent_dentry.lookup(old_dentry.name())?;
+    }
     parent_dentry.rename(
         old_dentry.as_ref(),
         parent_dentry.as_ref(),

@@ -105,6 +105,7 @@ impl Path {
                 }
                 let inode_type = dentry.inode().unwrap().inotype();
                 if inode_type == InodeType::SymLink {
+                    // log::debug!("[walk_recursive] read SymLink {}", dentry.path());
                     dentry = Self::resolve_symlink_recursive(Arc::clone(&dentry), counter)?;
                 } else if inode_type == InodeType::Dir {
                     break;
@@ -117,6 +118,7 @@ impl Path {
                     dentry = dentry.parent().ok_or(SysError::ENOENT)?;
                 }
                 name => {
+                    // log::debug!("[walk_recursive] {} try to look up {}", dentry.path(), name);
                     dentry = dentry.lookup(name)?;
                 }
             }

@@ -1,6 +1,9 @@
 [build]
 target = 'riscv64gc-unknown-none-elf'
 
+[target.riscv64gc-unknown-none-elf]
+rustflags = ["-Cforce-frame-pointers=yes"]
+
 [source.crates-io]
 replace-with = "vendored-sources"
 
@@ -31,6 +34,7 @@ replace-with = "vendored-sources"
 git = "https://github.com/adong660/rust-elf.git"
 branch = "no-std-elfstream"
 replace-with = "vendored-sources"
+
 
 [source.vendored-sources]
 directory = "vendor"

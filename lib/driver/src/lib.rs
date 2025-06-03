@@ -32,6 +32,7 @@ pub type DevTransport = MmioTransport<'static>;
 pub type DevTransport = PciTransport;
 
 pub static BLOCK_DEVICE: Once<Arc<dyn BlockDevice>> = Once::new();
+pub static BLOCK_DEVICE2: Once<Arc<dyn BlockDevice>> = Once::new();
 pub static CHAR_DEVICE: Once<Arc<dyn CharDevice>> = Once::new();
 
 pub trait BlockDevice: Send + Sync {

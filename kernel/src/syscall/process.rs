@@ -409,12 +409,16 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
         r#"PATH=/:/bin:/sbin:/usr/bin:/usr/local/bin:/usr/local/sbin:"#,
     ));
 
+    let mut busybox_prefix = String::from("bin");
+
     if task.cwd().lock().path().contains("musl") {
         envs.push(String::from(r#"PATH=/:/musl/lib:"#));
+        busybox_prefix = String::from("musl");
     }
 
     if task.cwd().lock().path().contains("glibc") {
         envs.push(String::from(r#"PATH=/:/glibc/lib:"#));
+        busybox_prefix = String::from("glibc");
     }
 
     log::info!("[sys_execve] task: {:?}", task.get_name());
@@ -422,22 +426,22 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
     log::info!("[sys_execve] envs: {envs:?}");
     log::info!("[sys_execve] path: {path:?}");
 
-    let env_iter = envs.iter();
-    for env in env_iter {
-        if env.starts_with("PWD") {
-            if let Some((_key, value)) = env.split_once('=') {
-                if value == "/" {
-                    continue;
-                }
-                path.remove(0);
-                args[0].remove(0);
-                path.insert_str(0, value);
-                args[0].insert_str(0, value);
-                log::debug!("new path = {}", path);
-                break;
-            }
-        }
-    }
+    // let env_iter = envs.iter();
+    // for env in env_iter {
+    //     if env.starts_with("PWD") {
+    //         if let Some((_key, value)) = env.split_once('=') {
+    //             if value == "/" {
+    //                 continue;
+    //             }
+    //             path.remove(0);
+    //             args[0].remove(0);
+    //             path.insert_str(0, value);
+    //             args[0].insert_str(0, value);
+    //             log::debug!("new path = {}", path);
+    //             break;
+    //         }
+    //     }
+    // }
 
     let dentry = {
         let root = if path.starts_with("./") {
@@ -455,8 +459,8 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
         }
     };
 
+    log::info!("[sys_execve]: open file {}", dentry.path());
     let file = <dyn File>::open(dentry)?;
-    log::info!("[sys_execve]: open file");
 
     let mut name = String::new();
     args.iter().for_each(|arg| {
@@ -473,9 +477,10 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
                 file.read(&mut buf).await?;
                 // log::debug!("[sys_execve] buf: {:?}", buf);
 
-                let mut firline = String::from_utf8(buf).unwrap();
+                let mut firline = String::from_utf8(buf);
                 // log::debug!("[sys_execve] firline: {:?}", firline);
-                if firline.starts_with("#!") {
+                if !firline.is_err() && firline.clone().unwrap().starts_with("#!") {
+                    let mut firline = firline.unwrap();
                     firline.remove(0);
                     firline.remove(0);
                     let idx = firline.find("\n").ok_or(SysError::ENOEXEC)?;

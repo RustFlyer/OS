@@ -1,6 +1,9 @@
 use alloc::vec::Vec;
 
-core::arch::global_asm!(include_str!("linkapp.asm"));
+#[cfg(target_arch = "riscv64")]
+core::arch::global_asm!(include_str!("linkapp-rv.asm"));
+#[cfg(target_arch = "loongarch64")]
+core::arch::global_asm!(include_str!("linkapp-la.asm"));
 
 /// get number of apps
 pub fn get_num_app() -> usize {

@@ -2,7 +2,11 @@
 #![no_std]
 #![feature(new_zeroed_alloc)]
 
-use alloc::{collections::btree_map::BTreeMap, string::String, sync::Arc};
+use alloc::{
+    collections::btree_map::BTreeMap,
+    string::{String, ToString},
+    sync::Arc,
+};
 use config::vfs::MountFlags;
 use dev::DevFsType;
 use driver::{BLOCK_DEVICE, BlockDevice};
@@ -41,6 +45,9 @@ pub fn register_dev() {
     let diskfs = DiskFsType::new();
     FS_MANAGER.lock().insert(diskfs.name(), diskfs);
 
+    let diskfsusr = DiskFsType::new();
+    FS_MANAGER.lock().insert("usr".to_string(), diskfsusr);
+
     let devfs = DevFsType::new();
     FS_MANAGER.lock().insert(devfs.name(), devfs);
 
@@ -67,6 +74,20 @@ pub fn init() {
         .mount("/", None, MountFlags::empty(), block_device)
         .unwrap();
     log::debug!("success mount diskfs");
+
+    // let block_device2 = Some(BLOCK_DEVICE.get().unwrap().clone());
+    // log::debug!("get BLOCK_DEVICE2");
+
+    // let usrfs = FS_MANAGER.lock().get("usr").unwrap().clone();
+    // usrfs
+    //     .mount(
+    //         "usr",
+    //         Some(diskfs_root.clone()),
+    //         MountFlags::empty(),
+    //         block_device2,
+    //     )
+    //     .unwrap();
+    // log::debug!("success mount usrfs");
 
     let devfs = FS_MANAGER.lock().get("devfs").unwrap().clone();
     devfs
