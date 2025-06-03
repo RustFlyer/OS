@@ -14,18 +14,24 @@ pub mod time_stat;
 pub mod timeid;
 
 use arch::time::get_time_duration;
+use config::inode::InodeMode;
 use future::spawn_kernel_task;
 use net::poll_interfaces;
-use osfuture::yield_now;
+use osfuture::{block_on, yield_now};
+use systype::error::SysError;
 pub use task::{Task, TaskState};
 
 use osfs::sys_root_dentry;
 use timer::{TIMER_MANAGER, sleep_ms};
 use vfs::file::File;
 
+use crate::loader::get_app_data_by_name;
+
 pub fn init() {
+    // init_proc_by_insert();
+    submit_init_by_insert();
     // init_proc();
-    submit_init();
+    // submit_init();
     // timer_init();
     net_poll_init();
     // elf_test();
@@ -40,6 +46,19 @@ pub fn init_proc() {
     Task::spawn_from_elf(init_proc, "init_proc");
 }
 
+pub fn init_proc_by_insert() {
+    let root = sys_root_dentry();
+    let dentry = root.new_neg_child("init_proc");
+    let _ = root.create(dentry.as_ref(), InodeMode::REG);
+
+    let file = <dyn File>::open(dentry).unwrap();
+    let initproc_u8 = get_app_data_by_name("init_proc").unwrap();
+    let _ = block_on(async { file.write(initproc_u8).await });
+    let _ = file.seek(config::vfs::SeekFrom::Start(0));
+
+    Task::spawn_from_elf(file, "init_proc");
+}
+
 pub fn submit_init() {
     let submit = {
         let root = sys_root_dentry();
@@ -47,6 +66,19 @@ pub fn submit_init() {
         <dyn File>::open(dentry).unwrap()
     };
     Task::spawn_from_elf(submit, "submit");
+}
+
+pub fn submit_init_by_insert() {
+    let root = sys_root_dentry();
+    let dentry = root.new_neg_child("submit");
+    let _ = root.create(dentry.as_ref(), InodeMode::REG);
+
+    let file = <dyn File>::open(dentry).unwrap();
+    let initproc_u8 = get_app_data_by_name("submit").unwrap();
+    let _ = block_on(async { file.write(initproc_u8).await });
+    let _ = file.seek(config::vfs::SeekFrom::Start(0));
+
+    Task::spawn_from_elf(file, "submit");
 }
 
 /// `timer_init` spawns a global timer update kernel thread.

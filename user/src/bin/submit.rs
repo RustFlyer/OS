@@ -3,7 +3,7 @@
 
 extern crate user_lib;
 
-use user_lib::{execve, exit, fork, println, sleep, wait, waitpid, yield_};
+use user_lib::{chdir, execve, exit, fork, mkdir, println, sleep, wait, waitpid, yield_};
 
 const TESTCASES: &[&str] = &[
     "basic_testcode.sh",
@@ -17,7 +17,7 @@ const TESTCASES: &[&str] = &[
 
 fn run_cmd(cmd: &str) {
     if fork() == 0 {
-        execve("busybox", &["busybox", "sh", "-c", cmd], &[]);
+        execve("./busybox", &["./busybox", "sh", "-c", cmd], &[]);
     } else {
         let mut result: i32 = 0;
         waitpid(-1, &mut result);
@@ -26,7 +26,7 @@ fn run_cmd(cmd: &str) {
 
 fn run_test(cmd: &str) {
     if fork() == 0 {
-        execve("busybox", &["busybox", "sh", cmd], &[]);
+        execve("./busybox", &["./busybox", "sh", cmd], &[]);
     } else {
         let mut result: i32 = 0;
         waitpid(-1, &mut result);
@@ -35,7 +35,30 @@ fn run_test(cmd: &str) {
 
 #[unsafe(no_mangle)]
 fn main() -> i32 {
-    run_cmd("busybox --install -s /bin");
+    println!("start to scan disk");
+    println!("start to scan disk fixed2");
+    mkdir("/bin");
+
+    chdir("/musl");
+    run_cmd("./busybox --install -s /bin");
+    run_cmd("./busybox ln -s ./lib /lib");
+    if fork() == 0 {
+        for test in TESTCASES {
+            run_test(test);
+        }
+        exit(0);
+    } else {
+        loop {
+            let mut exit_code: i32 = 0;
+            let pid = wait(&mut exit_code);
+            if pid < 0 {
+                break;
+            }
+        }
+    }
+
+    chdir("/glibc");
+    run_cmd("./busybox --install -s /bin");
     if fork() == 0 {
         for test in TESTCASES {
             run_test(test);

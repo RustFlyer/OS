@@ -19,6 +19,7 @@ pub fn init() -> SysResult<()> {
 
     parent.add_child(shm_dentry.clone());
     shm_dentry.set_inode(inode);
+    log::debug!("success init shm");
 
     Ok(())
 }

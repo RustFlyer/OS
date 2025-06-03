@@ -36,6 +36,7 @@ pub fn init() -> SysResult<()> {
     let rtc_inode = RtcInode::new(sb.clone().unwrap());
     rtc_dentry.set_inode(rtc_inode);
     // let rtc_file = RtcFile::new(rtc_dentry.clone());
+    log::debug!("success init rtc");
 
     Ok(())
 }

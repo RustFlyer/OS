@@ -1,5 +1,7 @@
 use alloc::vec::Vec;
 
+core::arch::global_asm!(include_str!("linkapp.asm"));
+
 /// get number of apps
 pub fn get_num_app() -> usize {
     unsafe extern "C" {

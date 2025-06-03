@@ -292,7 +292,7 @@ syscall!(
 syscall!(sys_close, SYSCALL_CLOSE, usize);
 syscall!(sys_getcwd, SYSCALL_GETCWD, *mut u8, usize);
 syscall!(sys_chdir, SYSCALL_CHDIR, *const u8);
-syscall!(sys_mkdir, SYSCALL_MKDIR, *const u8);
+syscall!(sys_mkdir, SYSCALL_MKDIR, isize, *const u8, usize);
 syscall!(sys_uname, SYSCALL_UNAME, *mut usize);
 syscall!(sys_dup, SYSCALL_DUP, usize);
 syscall!(sys_dup3, SYSCALL_DUP3, usize, usize, usize);

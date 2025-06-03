@@ -2,3 +2,9 @@
 /vendor
 .vscode
 /fsimg
+kernel-la
+kernel-rv
+disk.img
+disk-la.img
+sdcard-rv.img
+sdcard-la.img

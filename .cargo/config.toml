@@ -1,8 +1,5 @@
 [build]
-target = 'loongarch64-unknown-none'
-
-[target.riscv64gc-unknown-none-elf]
-rustflags = ["-Cforce-frame-pointers=yes"]
+target = 'riscv64gc-unknown-none-elf'
 
 [source.crates-io]
 replace-with = "vendored-sources"
@@ -23,6 +20,11 @@ replace-with = "vendored-sources"
 
 [source."git+https://github.com/EchudeT/smoltcp.git"]
 git = "https://github.com/EchudeT/smoltcp.git"
+replace-with = "vendored-sources"
+
+[source."git+https://github.com/adong660/loongArch64?branch=main"]
+git = "https://github.com/adong660/loongArch64"
+branch = "main"
 replace-with = "vendored-sources"
 
 [source."git+https://github.com/adong660/rust-elf.git?branch=no-std-elfstream"]

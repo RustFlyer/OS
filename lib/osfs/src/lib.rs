@@ -38,6 +38,9 @@ pub fn get_block_device() -> SysResult<Arc<dyn BlockDevice>> {
 }
 
 pub fn register_dev() {
+    let diskfs = DiskFsType::new();
+    FS_MANAGER.lock().insert(diskfs.name(), diskfs);
+
     let devfs = DevFsType::new();
     FS_MANAGER.lock().insert(devfs.name(), devfs);
 
@@ -53,9 +56,6 @@ pub fn register_dev() {
 
 pub fn init() {
     register_dev();
-
-    let diskfs = DiskFsType::new();
-    FS_MANAGER.lock().insert(diskfs.name(), diskfs);
 
     let diskfs = FS_MANAGER.lock().get(DISK_FS_NAME).unwrap().clone();
     log::debug!("get ext4 diskfs");
@@ -88,6 +88,7 @@ pub fn init() {
     log::debug!("success mount tmpfs");
 
     SYS_ROOT_DENTRY.call_once(|| diskfs_root);
+    log::debug!("success init disk root");
 
     dev::tty::init().expect("dev-tty init fails");
     dev::rtc::init().expect("dev-rtc init fails");

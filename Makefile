@@ -120,7 +120,7 @@ build2docker:
 
 PHONY += docker
 docker:
-	@docker run --rm -it --network="host" -v ${PWD}:/mnt -w /mnt ${DOCKER_NAME} bash
+	@docker run --privileged --rm -it --network="host" -v ${PWD}:/mnt -w /mnt ${DOCKER_NAME} bash
 
  
 PHONY += env
@@ -255,9 +255,9 @@ all:
 	@rm -rf .cargo
 	@mkdir .cargo
 	@cp submit/config-rv.toml .cargo/config.toml
-	@make kernel MODE=release LOG=
+	@make kernel MODE=release LOG=debug
 	@cp target/riscv64gc-unknown-none-elf/release/kernel kernel-rv
-	@make fs-img-submit-rv MODE=release ARCH=riscv64 LOG=
+	@make fs-img-submit-rv MODE=release ARCH=riscv64 LOG=debug
 	@cp fsimg/riscv64-sdcard.img disk.img
 
 	@rm -rf vendor/
@@ -271,6 +271,16 @@ all:
 	@make fs-img-submit-la MODE=release ARCH=loongarch64 LOG=
 	@cp fsimg/loongarch64-sdcard.img disk-la.img
 
+PHONY += dkernel
+dkernel:
+	@make user   ARCH=riscv64 MODE=debug LOG=debug
+	@make kernel ARCH=riscv64 MODE=debug LOG=debug
+	@cp target/riscv64gc-unknown-none-elf/debug/kernel kernel-rv
+
+PHONY += lkernel
+lkernel:
+	@make fs-img-submit-la  ARCH=loongarch64 LOG=debug
+	@cp fsimg/riscv64-sdcard.img disk.img
 
 .PHONY: $(PHONY)
 

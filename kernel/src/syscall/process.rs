@@ -409,6 +409,14 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
         r#"PATH=/:/bin:/sbin:/usr/bin:/usr/local/bin:/usr/local/sbin:"#,
     ));
 
+    if task.cwd().lock().path().contains("musl") {
+        envs.push(String::from(r#"PATH=/:/musl/lib:"#));
+    }
+
+    if task.cwd().lock().path().contains("glibc") {
+        envs.push(String::from(r#"PATH=/:/glibc/lib:"#));
+    }
+
     log::info!("[sys_execve] task: {:?}", task.get_name());
     log::info!("[sys_execve] args: {args:?}");
     log::info!("[sys_execve] envs: {envs:?}");
@@ -432,7 +440,13 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
     }
 
     let dentry = {
-        let path = Path::new(sys_root_dentry(), path);
+        let root = if path.starts_with("./") {
+            task.cwd().lock().clone()
+        } else {
+            sys_root_dentry()
+        };
+
+        let path = Path::new(root, path);
         let dentry = path.walk()?;
         if !dentry.is_negative() && dentry.inode().unwrap().inotype() == InodeType::SymLink {
             Path::resolve_symlink_through(Arc::clone(&dentry))?

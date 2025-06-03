@@ -35,5 +35,6 @@ pub fn init() -> SysResult<()> {
     let tty_file = TtyFile::new(tty_dentry.clone());
 
     TTY.call_once(|| tty_file);
+    log::debug!("success init tty");
     Ok(())
 }

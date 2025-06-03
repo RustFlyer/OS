@@ -140,6 +140,16 @@ pub fn getdents(fd: usize, buf: &mut [u8], len: usize) -> isize {
     sys_getdents64(fd, buf.as_mut_ptr(), len)
 }
 
+pub fn chdir(path: &str) -> isize {
+    let pathname = CString::new(path).unwrap();
+    sys_chdir(pathname.as_ptr() as _)
+}
+
+pub fn mkdir(path: &str) -> isize {
+    let pathname = CString::new(path).unwrap();
+    sys_mkdir(-100, pathname.as_ptr() as _, 0)
+}
+
 //************ task ***************/
 pub fn exit(exit_code: i32) -> ! {
     sys_exit(exit_code);

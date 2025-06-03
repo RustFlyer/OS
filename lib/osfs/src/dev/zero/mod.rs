@@ -22,6 +22,7 @@ pub fn init() -> SysResult<()> {
     let sb = parent.clone().superblock();
     let zero_inode = ZeroInode::new(sb.clone().unwrap());
     zero_dentry.set_inode(zero_inode);
+    log::debug!("success init zero");
 
     Ok(())
 }

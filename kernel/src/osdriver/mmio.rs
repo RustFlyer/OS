@@ -14,7 +14,10 @@ use mm::address::PhysAddr;
 use net::init_network;
 use virtio_drivers::transport::{self, Transport, mmio::MmioTransport};
 
-use crate::vm::{iomap::{ioremap, iounmap}, KERNEL_PAGE_TABLE};
+use crate::vm::{
+    KERNEL_PAGE_TABLE,
+    iomap::{ioremap, iounmap},
+};
 
 pub fn probe_mmio(device_tree: &Fdt) {
     let blk = probe_virtio_blk(&device_tree);
@@ -108,7 +111,7 @@ pub fn probe_virtio_blk(root: &Fdt) -> Option<Arc<VirtBlkDevice>> {
             }
 
             if dev.is_some() {
-                break;
+                continue;
             }
             iounmap(mmio_base_paddr.to_usize());
         }
