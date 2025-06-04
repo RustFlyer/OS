@@ -110,11 +110,11 @@ pub fn probe_virtio_blk(root: &Fdt) -> Option<Arc<VirtBlkDevice>> {
                     dev.clone().unwrap().block_size()
                 );
 
-                if !isdev {
-                    BLOCK_DEVICE2.call_once(|| dev.unwrap());
-                } else {
-                    BLOCK_DEVICE.call_once(|| dev.unwrap());
-                }
+                BLOCK_DEVICE.call_once(|| dev.unwrap());
+                // if !isdev {
+                //     BLOCK_DEVICE2.call_once(|| dev.unwrap());
+                // } else {
+                // }
                 isdev = true;
                 continue;
             }

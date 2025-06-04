@@ -60,7 +60,7 @@ FS_IMG_DIR := fsimg
 FS_IMG := $(FS_IMG_DIR)/$(ARCH)-sdcard.img
 
 ifeq ($(ARCH),riscv64)
-	QEMU_ARGS := -m 128
+	QEMU_ARGS := -m 1G
 	QEMU_ARGS += -machine virt 
 	QEMU_ARGS += -nographic 
 	QEMU_ARGS += -bios $(BOOTLOADER) 
