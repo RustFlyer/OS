@@ -4,6 +4,8 @@ pub mod mmio;
 pub mod pci;
 
 #[cfg(target_arch = "riscv64")]
+use crate::vm::iomap::ioremap;
+#[cfg(target_arch = "riscv64")]
 use mmio::*;
 #[cfg(target_arch = "loongarch64")]
 use pci::*;
@@ -21,6 +23,9 @@ pub fn probe_tree() {
     };
 
     let device_tree = unsafe {
+        log::debug!("dt: {:#x}", DTB_ADDR + KERNEL_MAP_OFFSET);
+        #[cfg(target_arch = "riscv64")]
+        ioremap(DTB_ADDR, 24 * 1024).expect("can not ioremap");
         Fdt::from_ptr((DTB_ADDR + KERNEL_MAP_OFFSET) as *const u8).expect("Parse DTB failed")
     };
 

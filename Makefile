@@ -258,7 +258,7 @@ all:
 	@make user kernel LOG=
 	@cp target/riscv64gc-unknown-none-elf/debug/kernel kernel-rv
 	@make fs-img-submit-rv MODE=release ARCH=riscv64 LOG=debug
-	@cp fsimg/riscv64-sdcard.img disk.img
+	@cp fsimg/riscv64-sdcard.img disk-rv.img
 
 	@rm -rf vendor/
 	@tar xvf submit/vendor-la.tar.gz

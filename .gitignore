@@ -4,7 +4,7 @@
 /fsimg
 kernel-la
 kernel-rv
-disk.img
+disk-rv.img
 disk-la.img
 sdcard-rv.img
 sdcard-la.img
