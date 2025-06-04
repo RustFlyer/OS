@@ -15,6 +15,6 @@ PHONY :=
 
 PHONY += build
 build:
-	cargo build $(CARGO_BUILD_ARGS)
+	cargo build $(CARGO_BUILD_ARGS) --offline
 
 .PHONY: build

@@ -11,6 +11,6 @@ env:
 
 PHONY += build
 build:
-	@cargo build $(MODE_ARG) 
+	@cargo build $(MODE_ARG) --offline
 
 .PHONY: $(PHONY)
