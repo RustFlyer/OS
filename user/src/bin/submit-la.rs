@@ -10,8 +10,8 @@ const TESTCASES: &[&str] = &[
     "busybox_testcode.sh",
     "libctest_testcode.sh",
     "lua_testcode.sh",
-    "netperf_testcode.sh",
-    // "iozone_testcode.sh",
+    "iozone_testcode.sh",
+    // "netperf_testcode.sh",
     // "cyclictest_testcode.sh",
 ];
 
@@ -50,6 +50,8 @@ fn main() -> i32 {
     run_cmd("./busybox cp /glibc/busybox /bin/");
     run_cmd("./busybox cp /glibc/busybox /");
     run_cmd("./busybox --install -s /bin");
+
+    chdir("/musl");
     if fork() == 0 {
         for test in TESTCASES {
             run_test(test);
@@ -65,7 +67,7 @@ fn main() -> i32 {
         }
     }
 
-    chdir("/musl");
+    chdir("/glibc");
     if fork() == 0 {
         for test in TESTCASES {
             run_test(test);
