@@ -28,7 +28,7 @@ _app_names:
     .global app_0_end
     .align 3
 app_0_start:
-    .incbin "./target/loongarch64-unknown-none/debug/init_proc"
+    .incbin "./target/loongarch64-unknown-none/debug/init_proc-la"
 app_0_end:
 
     .section .data

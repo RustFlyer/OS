@@ -52,15 +52,16 @@ fn run_cmd(cmd: &str) {
 fn main() {
     let mut i = 0;
 
-    mkdir("/usr");
-    mkdir("/usr/lib64");
-
-    mkdir("/bin");
-    chdir("musl");
     if fork() == 0 {
+        mkdir("/bin");
+        mkdir("/lib");
+
+        chdir("musl");
         run_cmd("./busybox cp /musl/lib/* /lib/");
         run_cmd("./busybox cp /musl/lib/libc.so /lib/ld-musl-riscv64-sf.so.1");
         run_cmd("./busybox cp /glibc/lib/* /lib/");
+        run_cmd("./busybox cp /glibc/lib/libc.so /lib/libc.so.6");
+        run_cmd("./busybox cp /glibc/lib/libm.so /lib/libm.so.6");
         run_cmd("./busybox cp /glibc/busybox /bin/");
         run_cmd("./busybox cp /glibc/busybox /");
         run_cmd("./busybox --install -s /bin");
@@ -74,7 +75,7 @@ fn main() {
             while ch != 13 {
                 ch = getchar();
                 print!("{}", ch as char);
-                if ch != 13 && ch != 127 {
+                if ch != 13 && ch != 127 && bptr < 128 {
                     buf[bptr] = ch;
                     bptr = bptr + 1;
                 }
@@ -118,11 +119,19 @@ fn main() {
 
             let args: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
 
-            if args[0] == "glibc" {
-                chdir("/glibc/");
+            if apppath.starts_with("glibc") {
+                if chdir("/glibc") < 0 {
+                    println!("fail to chdir glibc");
+                } else {
+                    println!("chdir glibc success");
+                }
                 continue;
-            } else if args[0] == "musl" {
-                chdir("musl");
+            } else if apppath.starts_with("musl") {
+                if chdir("/musl") < 0 {
+                    println!("fail to chdir musl");
+                } else {
+                    println!("chdir musl success");
+                }
                 continue;
             }
 

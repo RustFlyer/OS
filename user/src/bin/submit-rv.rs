@@ -49,6 +49,7 @@ fn main() -> i32 {
     run_cmd("./busybox cp /glibc/busybox /bin/");
     run_cmd("./busybox cp /glibc/busybox /");
     run_cmd("./busybox --install -s /bin");
+
     if fork() == 0 {
         for test in TESTCASES {
             run_test(test);

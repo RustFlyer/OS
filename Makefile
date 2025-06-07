@@ -281,8 +281,8 @@ dkernel:
 	@cp target/riscv64gc-unknown-none-elf/debug/kernel kernel-rv
 	@qemu-system-riscv64 -machine virt -kernel kernel-rv -m 128 -nographic -smp 1 -bios default -drive file=sdcard-rv.img,if=none,format=raw,id=x0 \
                     -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -no-reboot -device virtio-net-device,netdev=net -netdev user,id=net \
-                    -rtc base=utc \
-                    -drive file=disk.img,if=none,format=raw,id=x1 -device virtio-blk-device,drive=x1,bus=virtio-mmio-bus.1
+                    -rtc base=utc 
+# -drive file=disk-rv.img,if=none,format=raw,id=x1 -device virtio-blk-device,drive=x1,bus=virtio-mmio-bus.1
 
 PHONY += lkernel
 lkernel:
@@ -295,8 +295,8 @@ lkernel:
 	@qemu-system-loongarch64 -kernel kernel-la -m 1G -nographic -smp 1 -drive file=sdcard-la.img,if=none,format=raw,id=x0  \
                         -device virtio-blk-pci,drive=x0 -no-reboot  -device virtio-net-pci,netdev=net0 \
                         -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555  \
-                        -rtc base=utc \
-                        -drive file=disk-la.img,if=none,format=raw,id=x1 -device virtio-blk-pci,drive=x1
+                        -rtc base=utc 
+# -drive file=disk-la.img,if=none,format=raw,id=x1 -device virtio-blk-pci,drive=x1
 
 
 

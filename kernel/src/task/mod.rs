@@ -18,7 +18,6 @@ use config::inode::InodeMode;
 use future::spawn_kernel_task;
 use net::poll_interfaces;
 use osfuture::{block_on, yield_now};
-use systype::error::SysError;
 pub use task::{Task, TaskState};
 
 use osfs::sys_root_dentry;

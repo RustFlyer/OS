@@ -28,7 +28,7 @@ _app_names:
     .global app_0_end
     .align 3
 app_0_start:
-    .incbin "./target/riscv64gc-unknown-none-elf/debug/init_proc"
+    .incbin "./target/riscv64gc-unknown-none-elf/debug/init_proc-rv"
 app_0_end:
 
     .section .data
