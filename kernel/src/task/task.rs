@@ -23,7 +23,7 @@ use super::{
     tid::{Tid, TidHandle, tid_alloc},
     time_stat::TaskTimeStat,
 };
-use crate::{trap::trap_context::TrapContext, vm::addr_space::AddrSpace};
+use crate::{task::mask::CpuMask, trap::trap_context::TrapContext, vm::addr_space::AddrSpace};
 
 /// State of Task
 ///
@@ -141,6 +141,9 @@ pub struct Task {
 
     itimers: ShareMutex<[ITimer; 3]>,
 
+    /// Mask of CPUs allowed for the task.
+    cpus_on: SyncUnsafeCell<CpuMask>,
+
     // name, used for debug
     name: SyncUnsafeCell<String>,
 }
@@ -184,6 +187,7 @@ impl Task {
             is_syscall: AtomicBool::new(false),
             is_yield: AtomicBool::new(false),
             itimers: new_share_mutex([ITimer::default(); 3]),
+            cpus_on: SyncUnsafeCell::new(CpuMask::CPU0),
             name: SyncUnsafeCell::new(name),
         }
     }
@@ -221,6 +225,8 @@ impl Task {
 
         itimers: ShareMutex<[ITimer; 3]>,
 
+        cpus_on: SyncUnsafeCell<CpuMask>,
+
         name: SyncUnsafeCell<String>,
     ) -> Self {
         Task {
@@ -255,6 +261,7 @@ impl Task {
             is_syscall: AtomicBool::new(false),
             is_yield: AtomicBool::new(false),
             itimers,
+            cpus_on,
             name,
         }
     }
@@ -339,6 +346,11 @@ impl Task {
         unsafe {
             *self.elf.get() = elf;
         }
+    }
+
+    #[allow(clippy::mut_from_ref)]
+    pub fn cpus_on_mut(&self) -> &mut CpuMask {
+        unsafe { &mut *self.cpus_on.get() }
     }
 
     #[allow(clippy::mut_from_ref)]

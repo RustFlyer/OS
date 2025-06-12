@@ -1,7 +1,8 @@
 use alloc::sync::Arc;
 
-use config::vfs::OpenFlags;
+use config::{mm::PAGE_SIZE, vfs::OpenFlags};
 use net::poll_interfaces;
+use osfs::pipe::new_pipe;
 use systype::error::{SysError, SyscallResult};
 
 use crate::{
@@ -347,16 +348,29 @@ pub fn sys_shutdown(sockfd: usize, how: usize) -> SyscallResult {
         .downcast_arc::<Socket>()
         .map_err(|_| SysError::ENOTSOCK)?;
 
-    log::info!(
-        "[sys_shutdown] sockfd:{sockfd} shutdown {}",
-        match how {
-            0 => "READ",
-            1 => "WRITE",
-            2 => "READ AND WRITE",
-            _ => "Invalid argument",
-        }
-    );
+    log::info!("[sys_shutdown] sockfd:{sockfd} shutdown {}", match how {
+        0 => "READ",
+        1 => "WRITE",
+        2 => "READ AND WRITE",
+        _ => "Invalid argument",
+    });
 
     socket.sk.shutdown(how as u8)?;
+    Ok(0)
+}
+
+pub fn sys_socketpair(_domain: usize, _types: usize, _protocol: usize, sv: usize) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+    let mut sv = UserWritePtr::<[u32; 2]>::new(sv, &addrspace);
+    let (pipe_read, pipe_write) = new_pipe(PAGE_SIZE);
+    let pipe = task.with_mut_fdtable(|table| {
+        let fd_read = table.alloc(pipe_read, OpenFlags::empty())?;
+        let fd_write = table.alloc(pipe_write, OpenFlags::empty())?;
+        Ok([fd_read as u32, fd_write as u32])
+    })?;
+    unsafe {
+        sv.write(pipe)?;
+    }
     Ok(0)
 }

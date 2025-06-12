@@ -4,6 +4,7 @@ mod misc;
 mod mm;
 mod net;
 mod process;
+mod sche;
 mod signal;
 mod time;
 mod user;
@@ -15,12 +16,15 @@ use misc::{sys_getrandom, sys_sysinfo, sys_syslog, sys_uname};
 use mm::*;
 use net::*;
 use process::*;
+use sche::*;
 use signal::*;
 use time::{
     sys_clock_gettime, sys_clock_nanosleep, sys_getitimer, sys_gettimeofday, sys_nanosleep,
     sys_setitimer, sys_times,
 };
 use user::{sys_getgid, sys_getuid};
+
+use crate::syscall::time::sys_clock_getres;
 
 pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
     let Some(syscall_no) = SyscallNo::from_repr(syscall_no) else {
@@ -160,6 +164,15 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         MREMAP => sys_mremap(args[0], args[1], args[2], args[3] as i32, args[4]),
         SETSID => sys_setsid(),
         SCHED_GETAFFINITY => sys_sched_getaffinity(args[0], args[1], args[2]),
+        GETMEMPOLICY => sys_get_mempolicy(args[0], args[1], args[2], args[3], args[4] as isize),
+        SCHED_GETSCHEDULER => sys_sched_getscheduler(),
+        SCHED_GETPARAM => sys_sched_getparam(),
+        SCHED_SETSCHEDULER => sys_sched_setscheduler(),
+        CLOCK_GETRES => sys_clock_getres(args[0], args[1]),
+        MLOCK => sys_mlock(args[0], args[1]),
+        MUNLOCK => sys_munlock(args[0], args[1]),
+        SCHED_SETAFFINITY => sys_sched_setaffinity(args[0], args[1], args[2]),
+        SOCKETPAIR => sys_socketpair(args[0], args[1], args[2], args[3]),
         _ => {
             println!("Syscall not implemented: {}", syscall_no.as_str());
             unimplemented!()

@@ -289,7 +289,7 @@ impl dyn Dentry {
         match self.get_child(name) {
             Some(dentry) => Ok(dentry),
             None => {
-                // log::debug!("lookup: neg child {}", name);
+                log::debug!("lookup: neg child {}", name);
                 let dentry = self.new_neg_child(name);
                 match self.base_lookup(dentry.as_ref()) {
                     Ok(_) | Err(SysError::ENOENT) => Ok(dentry),

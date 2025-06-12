@@ -23,10 +23,10 @@ impl File for PipeWriteFile {
             .inode()
             .downcast_arc::<PipeInode>()
             .unwrap_or_else(|_| unreachable!());
-        log::info!(
-            "[PipeWriteFile::base_write_at] read pipe ino {}",
-            pipe.get_meta().ino
-        );
+        // log::info!(
+        //     "[PipeWriteFile::base_write_at] read pipe ino {}",
+        //     pipe.get_meta().ino
+        // );
         let revents = PipeWritePollFuture::new(pipe.clone(), PollEvents::OUT).await;
         if revents.contains(PollEvents::ERR) {
             return Err(SysError::EPIPE);

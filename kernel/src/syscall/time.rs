@@ -367,3 +367,16 @@ pub fn sys_getitimer(which: usize, curr_value: usize) -> SyscallResult {
 
     Ok(0)
 }
+
+/// finds the resolution (precision) of the specified clock clockid
+pub fn sys_clock_getres(_clockid: usize, res: usize) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+    let mut resptr = UserWritePtr::<TimeSpec>::new(res, &addrspace);
+    unsafe {
+        if !resptr.is_null() {
+            resptr.write(Duration::from_nanos(1).into())?;
+        }
+    }
+    Ok(0)
+}

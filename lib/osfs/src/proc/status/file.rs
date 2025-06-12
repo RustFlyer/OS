@@ -9,18 +9,26 @@ use vfs::{
     direntry::DirEntry,
     file::{File, FileMeta},
 };
-pub struct ExeFile {
+
+pub struct StatusFile {
     pub(crate) meta: FileMeta,
 }
 
 #[async_trait]
-impl File for ExeFile {
+impl File for StatusFile {
     fn meta(&self) -> &FileMeta {
         &self.meta
     }
 
-    async fn base_read(&self, _buf: &mut [u8], _offset: usize) -> SyscallResult {
-        todo!()
+    async fn base_read(&self, buf: &mut [u8], _offset: usize) -> SyscallResult {
+        let status = call_interface!(KernelProcIf::status());
+        log::info!("[/proc/self/status] read {}", status);
+        if buf.len() < status.len() {
+            log::warn!("readlink buf not big enough");
+            return Err(SysError::EINVAL);
+        }
+        buf[..status.len()].copy_from_slice(status.as_bytes());
+        Ok(status.len())
     }
 
     async fn base_write(&self, _buf: &[u8], _offset: usize) -> SyscallResult {
@@ -36,13 +44,13 @@ impl File for ExeFile {
     }
 
     fn base_readlink(&self, buf: &mut [u8]) -> SysResult<usize> {
-        let exe = call_interface!(KernelProcIf::exe());
-        log::info!("[/proc/self/exe] run {}", exe);
-        if buf.len() < exe.len() {
+        let status = call_interface!(KernelProcIf::status());
+        log::info!("[/proc/self/status] run {}", status);
+        if buf.len() < status.len() {
             log::warn!("readlink buf not big enough");
             return Err(SysError::EINVAL);
         }
-        buf[..exe.len()].copy_from_slice(exe.as_bytes());
-        Ok(exe.len())
+        buf[..status.len()].copy_from_slice(status.as_bytes());
+        Ok(status.len())
     }
 }

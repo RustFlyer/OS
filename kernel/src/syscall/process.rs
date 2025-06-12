@@ -409,17 +409,17 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
         r#"PATH=/:/bin:/sbin:/usr/bin:/usr/local/bin:/usr/local/sbin:"#,
     ));
 
-    let mut busybox_prefix = String::from("bin");
+    // let mut busybox_prefix = String::from("bin");
 
-    if task.cwd().lock().path().contains("musl") {
-        envs.push(String::from(r#"PATH=/:/musl/lib:"#));
-        busybox_prefix = String::from("musl");
-    }
+    // if task.cwd().lock().path().contains("musl") {
+    //     envs.push(String::from(r#"PATH=/:/musl/lib:"#));
+    //     // busybox_prefix = String::from("musl");
+    // }
 
-    if task.cwd().lock().path().contains("glibc") {
-        envs.push(String::from(r#"PATH=/:/glibc/lib:"#));
-        busybox_prefix = String::from("glibc");
-    }
+    // if task.cwd().lock().path().contains("glibc") {
+    //     envs.push(String::from(r#"PATH=/:/glibc/lib:"#));
+    //     // busybox_prefix = String::from("glibc");
+    // }
 
     log::info!("[sys_execve] task: {:?}", task.get_name());
     log::info!("[sys_execve] args: {args:?}");
@@ -885,16 +885,5 @@ pub fn sys_clone3(user_args: usize, size: usize) -> SyscallResult {
 
 pub fn sys_setsid() -> SyscallResult {
     let task = current_task();
-    Ok(task.pid())
-}
-
-pub fn sys_sched_getaffinity(pid: usize, cpusetsize: usize, mask: usize) -> SyscallResult {
-    let task = current_task();
-    let addrspace = task.addr_space();
-
-    unsafe {
-        UserWritePtr::<u8>::new(mask, &addrspace).write(0)?;
-    }
-
     Ok(task.pid())
 }

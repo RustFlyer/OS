@@ -251,6 +251,8 @@ impl Task {
             new_share_mutex(self.fdtable_mut().lock().clone())
         };
 
+        let cpus_on = self.cpus_on_mut().clone();
+
         let name = SyncUnsafeCell::new(name);
         let new = Arc::new(Self::new_fork_clone(
             tid,
@@ -277,6 +279,7 @@ impl Task {
             cwd,
             elf,
             itimers,
+            SyncUnsafeCell::new(cpus_on),
             name,
         ));
 
@@ -487,5 +490,28 @@ impl Task {
         // TODO: drop most resources here instead of wait4 function parent
         // called
         self.with_mut_fdtable(|table| table.close());
+    }
+
+    pub fn proc_status_read(&self) -> String {
+        let task = self;
+        let content = format!(
+            "Name:\t{}\n\
+             State:\tR (running)\n\
+             Tgid:\t{}\n\
+             Pid:\t{}\n\
+             PPid:\t{}\n\
+             Threads:\t{}\n\
+             Cpus_allowed:\t1\n\
+             Cpus_allowed_list:\t0\n\
+             Mems_allowed:\t1\n\
+             Mems_allowed_list:\t0\n",
+            task.get_name(),
+            task.tid(),
+            task.tid(),
+            task.ppid(),
+            1,
+        );
+
+        content
     }
 }

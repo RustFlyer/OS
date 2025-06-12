@@ -332,6 +332,7 @@ pub fn sys_mremap(
     flags: i32,
     new_addr: usize, // when fixed
 ) -> SyscallResult {
+    log::error!("[sys_mremap] not implemented");
     return Ok(0);
     if old_addr & (PAGE_SIZE - 1) != 0 {
         return Err(SysError::EINVAL);
@@ -363,4 +364,14 @@ pub fn sys_mremap(
 
     task.addr_space().remove_mapping(src_va, old_size);
     Ok(new_addr)
+}
+
+pub fn sys_mlock(addr: usize, len: usize) -> SyscallResult {
+    log::warn!("[sys_mlock] swap page mechanism not implemented");
+    Ok(0)
+}
+
+pub fn sys_munlock(addr: usize, len: usize) -> SyscallResult {
+    log::warn!("[sys_munlock] swap page mechanism not implemented");
+    Ok(0)
 }
