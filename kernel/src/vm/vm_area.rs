@@ -311,16 +311,6 @@ impl VmArea {
         debug_assert!(start_va.to_usize() % PAGE_SIZE == 0);
         debug_assert!(end_va.to_usize() % PAGE_SIZE == 0);
         debug_assert!(MappingFlags::RWX.contains(prot));
-        debug_assert!({
-            // We allow `prot` to be anything, but we warn if it does not
-            // have `RW` bits set.
-            if !prot.contains(MappingFlags::R | MappingFlags::W) {
-                log::warn!(
-                    "Anonymous area should have `RW` bits set for most cases; got: {prot:?}"
-                );
-            }
-            true
-        });
 
         let prot = prot | MappingFlags::U;
         Self {

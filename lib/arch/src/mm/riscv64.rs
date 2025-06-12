@@ -5,7 +5,7 @@ use riscv::register::satp::{self, Satp};
 
 /// Switches the current page table being used by the MMU to the one
 /// at the given physical page number `root`.
-pub fn switch_pagetable(root: usize) {
+pub fn switch_page_table(root: usize) {
     let mut satp = Satp::from_bits(0);
     satp.set_mode(riscv::register::satp::Mode::Sv39);
     satp.set_ppn(root);

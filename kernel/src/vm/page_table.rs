@@ -526,10 +526,7 @@ impl PageTableMem {
 /// This function must be called after the kernel page table is set up.
 #[cfg(target_arch = "riscv64")]
 pub unsafe fn switch_to_kernel_page_table() {
-    // SAFETY: the boot page table never gets dropped.
-    unsafe {
-        arch::mm::switch_page_table(&KERNEL_PAGE_TABLE.lock());
-    }
+    arch::mm::switch_page_table(KERNEL_PAGE_TABLE.lock().root().to_usize());
 }
 
 /// Switch to the kernel page table.
