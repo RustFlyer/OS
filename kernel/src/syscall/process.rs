@@ -27,7 +27,7 @@ use crate::task::{
 use crate::vm::user_ptr::{UserReadPtr, UserWritePtr};
 use crate::{processor::current_task, task::future::spawn_user_task};
 
-/// `gettid` returns the caller's thread ID (TID).  
+/// `gettid` returns the caller's thread ID (TID).
 ///
 /// # Type
 /// - In a single-threaded process, the thread ID is equal to the process ID (PID, as returned by getpid(2)).
@@ -283,15 +283,42 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
 /// - `CLONE_PARENT_SETTID`: Store the child thread ID at the location pointed to by parent_tid (clone())
 ///   in the parent's memory. The store operation completes before the clone call returns
 ///   control to user space.
+///
+/// # Note for architecture differences
+/// The order of the arguments differs between architectures.
+/// - On RISC-V, the order is: flags, stack, parent_tid, tls, child_tid.
+/// - On LoongArch, the order is: flags, stack, parent_tid, child_tid, tls.
 pub fn sys_clone(
+    arg1: usize,
+    arg2: usize,
+    arg3: usize,
+    arg4: usize,
+    arg5: usize,
+) -> SyscallResult {
+    let (flags, stack, parent_tid, child_tid, tls) = {
+        #[cfg(target_arch = "riscv64")]
+        {
+            (arg1, arg2, arg3, arg5, arg4)
+        }
+        #[cfg(target_arch = "loongarch64")]
+        {
+            (arg1, arg2, arg3, arg4, arg5)
+        }
+    };
+    __sys_clone(flags, stack, parent_tid, child_tid, tls)
+}
+
+/// This is the actual implementation of `sys_clone`. It is separated from `sys_clone` to
+/// allow for different argument orders on different architectures.
+fn __sys_clone(
     flags: usize,
     stack: usize,
     parent_tid_ptr: usize,
+    child_tid_ptr: usize,
     tls_ptr: usize,
-    chilren_tid_ptr: usize,
 ) -> SyscallResult {
     log::info!(
-        "[sys_clone] flags:{flags:#x}, stack:{stack:#x}, tls:{tls_ptr:#x}, parent_tid:{parent_tid_ptr:#x}, child_tid:{chilren_tid_ptr:x}"
+        "[sys_clone] flags:{flags:#x}, stack:{stack:#x}, tls:{tls_ptr:#x}, parent_tid:{parent_tid_ptr:#x}, child_tid:{child_tid_ptr:x}"
     );
     let task = current_task();
     let addrspace = task.addr_space();
@@ -313,12 +340,12 @@ pub fn sys_clone(
         unsafe { parent_tid.write(new_tid)? };
     }
     if flags.contains(CloneFlags::CHILD_SETTID) {
-        let mut chilren_tid = UserWritePtr::<usize>::new(chilren_tid_ptr, &addrspace);
+        let mut chilren_tid = UserWritePtr::<usize>::new(child_tid_ptr, &addrspace);
         unsafe { chilren_tid.write(new_tid)? };
-        new_task.tid_address_mut().set_child_tid = Some(chilren_tid_ptr);
+        new_task.tid_address_mut().set_child_tid = Some(child_tid_ptr);
     }
     if flags.contains(CloneFlags::CHILD_CLEARTID) {
-        new_task.tid_address_mut().clear_child_tid = Some(chilren_tid_ptr);
+        new_task.tid_address_mut().clear_child_tid = Some(child_tid_ptr);
     }
     if flags.contains(CloneFlags::SETTLS) {
         new_task.trap_context_mut().set_user_tp(tls_ptr);
@@ -534,7 +561,7 @@ enum WaitFor {
 /// with other threads, then 0 is written at the address specified in clear_child_tid and the kernel
 /// performs the following operation:
 /// > futex(clear_child_tid, FUTEX_WAKE, 1, NULL, NULL, 0);
-///  
+///
 /// The effect of this operation is to wake a single thread that is performing a `futex` wait on  the
 /// memory location. Errors from the futex wake operation are ignored.
 pub fn sys_set_tid_address(tidptr: usize) -> SyscallResult {
