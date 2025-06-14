@@ -72,7 +72,7 @@ impl AddrSpace {
             first_segment_addr + elf_stream.ehdr.e_phoff as usize,
         ));
 
-        // Load loadable segments (PT_LOAD).
+        // Load PT_LOAD segments.
         let mut entry = self.load_segments(Arc::clone(&elf_file), &elf_stream, 0)?;
         auxv.push(AuxHeader::new(AT_ENTRY, entry.to_usize()));
 

@@ -18,6 +18,7 @@
 //! directly. VMAs are then created to manage the user part of the address space.
 
 use alloc::{collections::btree_map::BTreeMap, vec::Vec};
+use config::mm::PAGE_SIZE;
 use core::{cmp, ops::Bound};
 
 use arch::{
@@ -114,8 +115,7 @@ impl AddrSpace {
     ///
     /// This function first tries to find a vacant memory region that starts from `start_va`
     /// and has a length of `length`. If such requirement cannot be satisfied, it tries to
-    /// find a vacant memory region elsewhere from `find_from` to `find_to`, and the starting
-    /// address of the region is guaranteed to be larger than `start_va`.
+    /// find a vacant memory region elsewhere from `find_from` to `find_to`.
     ///
     /// The region to be found is always page-aligned.
     ///
@@ -127,7 +127,7 @@ impl AddrSpace {
         find_from: VirtAddr,
         find_to: VirtAddr,
     ) -> Option<VirtAddr> {
-        let length = VirtAddr::new(length).round_up().to_usize();
+        let length = (length + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
         let mem_start = start_va.round_up();
         let mem_end = VirtAddr::new(mem_start.to_usize() + length);
         let vm_areas_lock = self.vm_areas.lock();
@@ -149,8 +149,8 @@ impl AddrSpace {
             }
         }
 
-        // Find a vacant region after `start_va` in the range from `find_from` to `find_to`.
-        let mem_start = cmp::max(find_from, mem_start);
+        // Find a vacant region in the range from `find_from` to `find_to`.
+        let mem_start = find_from.round_up();
         let mem_end = VirtAddr::new(mem_start.to_usize() + length);
         let mut iter = vm_areas_lock
             .iter()

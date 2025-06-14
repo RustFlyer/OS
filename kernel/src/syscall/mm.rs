@@ -75,8 +75,10 @@ pub async fn sys_mmap(
         return Err(SysError::EINVAL);
     }
 
-    task.addr_space()
-        .map_file(file, flags, MappingFlags::from(prot), va, length, offset)
+    let result = task.addr_space()
+        .map_file(file, flags, MappingFlags::from(prot), va, length, offset);
+    log::info!("[sys_mmap] allocated at: {:#x}", result?);
+    result
 }
 
 /// `munmap()` deletes the mappings for the specified address range, and causes further

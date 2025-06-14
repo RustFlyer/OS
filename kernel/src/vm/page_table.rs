@@ -6,7 +6,7 @@
 use alloc::vec::Vec;
 
 use arch::{
-    mm::{fence, switch_pagetable, tlb_shootdown},
+    mm::{fence, tlb_shootdown},
     pte::{PageTableEntry, PteFlags},
 };
 use config::mm::PTE_PER_TABLE;
@@ -526,10 +526,7 @@ impl PageTableMem {
 /// This function must be called after the kernel page table is set up.
 #[cfg(target_arch = "riscv64")]
 pub unsafe fn switch_to_kernel_page_table() {
-    // SAFETY: the boot page table never gets dropped.
-    unsafe {
-        switch_page_table(&KERNEL_PAGE_TABLE.lock());
-    }
+    arch::mm::switch_page_table(KERNEL_PAGE_TABLE.lock().root().to_usize());
 }
 
 /// Switch to the kernel page table.
@@ -550,11 +547,7 @@ pub unsafe fn switch_to_kernel_page_table() {
 /// This function must be called before the current page table is dropped,
 /// or the kernel may lose its memory mappings.
 pub unsafe fn switch_page_table(page_table: &PageTable) {
-    switch_pagetable(page_table.root().to_usize());
-    log::trace!(
-        "Switched to page table at {:#x}",
-        page_table.root().to_usize(),
-    );
+    arch::mm::switch_page_table(page_table.root().to_usize());
 }
 
 /// Prints the lookup process of a virtual address in the specific page table.

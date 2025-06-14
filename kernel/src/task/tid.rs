@@ -41,13 +41,21 @@ pub fn tid_alloc_incr() -> TidHandle {
     }
 }
 
-/// Tid address which may be set by `set_tid_address` syscall.
+/// Attributes which are set by `set_tid_address` syscall, or when calling `clone` syscall
+/// with `CLONE_CHILD_SETTID` or `CLONE_CHILD_CLEARTID` flags.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct TidAddress {
-    /// When set, when spawning a new thread, the kernel sets the thread's tid
-    /// to this address.
+    /// This attribute is set when this thread calls `clone` syscall with
+    /// `CLONE_CHILD_SETTID` flag. If it is set, the kernel will write the child's TID to
+    /// this address before giving control to the child thread. This address should be in
+    /// the child's memory.
     pub set_child_tid: Option<usize>,
-    /// When set, when the thread exits, the kernel sets the thread's tid to
-    /// this address, and wake up a futex waiting on this address.
+
+    /// This attribute is set when this thread calls `clone` syscall with
+    /// `CLONE_CHILD_CLEARTID` flag, or when it calls `set_tid_address` syscall. If it is
+    /// set, the kernel will clear the child's TID (set it to zero) at this address when
+    /// the child thread exits, and wake up a single thread that is waiting on the futex
+    /// at this address.
     pub clear_child_tid: Option<usize>,
 }
 
