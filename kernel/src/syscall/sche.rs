@@ -70,7 +70,7 @@ pub fn sys_sched_getaffinity(pid: usize, cpusetsize: usize, mask: usize) -> Sysc
     }
 
     log::warn!("[sys_sched_getaffinity] pass");
-    Ok(0)
+    Ok(1)
 }
 
 #[repr(i32)]

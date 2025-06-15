@@ -22,6 +22,7 @@ pub fn init_sysfs(root_dentry: Arc<dyn Dentry>) -> SysResult<()> {
     );
     root_dentry.add_child(devices_dentry.clone());
 
+    // /sys/devices/system
     let system_inode = SimpleInode::new(root_dentry.superblock().unwrap());
     system_inode.set_inotype(InodeType::Dir);
     let system_dentry: Arc<dyn Dentry> = SimpleDentry::new(
@@ -35,6 +36,9 @@ pub fn init_sysfs(root_dentry: Arc<dyn Dentry>) -> SysResult<()> {
     );
     devices_dentry.add_child(system_dentry.clone());
 
+    return Ok(());
+
+    // /sys/devices/system/node
     let node_inode = SimpleInode::new(root_dentry.superblock().unwrap());
     node_inode.set_inotype(InodeType::Dir);
     let node_dentry: Arc<dyn Dentry> = SimpleDentry::new(
@@ -45,6 +49,7 @@ pub fn init_sysfs(root_dentry: Arc<dyn Dentry>) -> SysResult<()> {
     log::info!("[init_sysfs] add node_dentry path = {}", node_dentry.path());
     system_dentry.add_child(node_dentry.clone());
 
+    // /sys/devices/system/node/online
     let online_inode = SimpleInode::new(root_dentry.superblock().unwrap());
     online_inode.set_inotype(InodeType::File);
     let online_dentry: Arc<dyn Dentry> = SimpleDentry::new(

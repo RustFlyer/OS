@@ -12,7 +12,7 @@ use super::MEM_INFO;
 
 pub struct MemInfoInode {
     meta: InodeMeta,
-    nodeid: usize,
+    pub(crate) nodeid: usize,
 }
 
 impl MemInfoInode {
