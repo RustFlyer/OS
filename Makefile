@@ -7,10 +7,10 @@
 # Target architecture
 export ARCH = riscv64
 # export ARCH = loongarch64
-export COMPLIB = musl
-# export COMPLIB = glibc
-
+export TESTCASE_LIBC = musl
+# export TESTCASE_LIBC = glibc
 export SUBMIT = false
+
 
 # Docker image name for development environment
 # Kernel package/output name
@@ -61,10 +61,10 @@ FS_IMG := $(FS_IMG_DIR)/$(ARCH)-sdcard.img
 
 ifeq ($(ARCH),riscv64)
 	QEMU_ARGS := -m 1G
-	QEMU_ARGS += -machine virt 
-	QEMU_ARGS += -nographic 
-	QEMU_ARGS += -bios $(BOOTLOADER) 
-	QEMU_ARGS += -kernel $(KERNEL_ELF) 
+	QEMU_ARGS += -machine virt
+	QEMU_ARGS += -nographic
+	QEMU_ARGS += -bios $(BOOTLOADER)
+	QEMU_ARGS += -kernel $(KERNEL_ELF)
 	QEMU_ARGS += -smp $(SMP)
 	QEMU_ARGS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
 	QEMU_ARGS += -device virtio-blk-device,drive=x0
@@ -84,11 +84,11 @@ ifeq ($(ARCH),loongarch64)
 	QEMU_ARGS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
 	QEMU_ARGS += -device virtio-blk-pci,drive=x0
 	QEMU_ARGS += -no-reboot
-# QEMU_ARGS += -device virtio-net-pci,netdev=net0 
+# QEMU_ARGS += -device virtio-net-pci,netdev=net0
 # QEMU_ARGS += -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555
 	QEMU_ARGS += -rtc base=utc
 # QEMU_ARGS += -drive file=disk-la.img,if=none,format=raw,id=x1
-# QEMU_ARGS += -device virtio-blk-pci,drive=x1 
+# QEMU_ARGS += -device virtio-blk-pci,drive=x1
 
 	QEMU_ARGS += -dtb loongarch.dtb
 # QEMU_ARGS += -bios uefi_bios.bin
@@ -112,7 +112,7 @@ $(KERNEL_ASM): $(KERNEL_ELF)
 	@$(OBJDUMP) $(DISASM_ARGS) $(KERNEL_ELF) > $(KERNEL_ASM)
 	@echo "Updated: $(KERNEL_ASM)"
 
- 
+
 PHONY += build2docker
 build2docker:
 	@docker build -t ${DOCKER_NAME} .
@@ -122,10 +122,11 @@ PHONY += docker
 docker:
 	@docker run --privileged --rm -it --network="host" -v ${PWD}:/mnt -w /mnt ${DOCKER_NAME} bash
 
- 
+
 PHONY += env
 env:
 	@(cargo install --list | grep "cargo-binutils" > /dev/null 2>&1) || cargo install cargo-binutils
+
 
 PHONY += kernel
 kernel:
@@ -133,10 +134,11 @@ kernel:
 	@cd kernel && make build
 	@echo "Updated: $(KERNEL_ELF)"
 
+
 PHONY += build
 build: user kernel
 
- 
+
 PHONY += run
 run: build
 	@echo $(QEMU_ARGS)
@@ -148,12 +150,12 @@ clean:
 	@cargo clean
 	@rm -rf $(TARGET_DIR)/*
 
- 
+
 PHONY += disasm
 disasm: $(KERNEL_ASM)
 	@cat $(KERNEL_ASM) | $(PAGER)
 
- 
+
 PHONY += gdbserver
 gdbserver: all0
 	@$(QEMU) $(QEMU_ARGS) -s -S
@@ -190,14 +192,14 @@ fs-img: user
 	@sudo mount -t ext4 -o loop $(FS_IMG) emnt
 	@sudo cp -r $(USER_ELFS) emnt/
 
-	-sudo cp -r testcase/$(ARCH)/$(COMPLIB)/basic/* emnt/
-	-sudo cp -r testcase/$(ARCH)/$(COMPLIB)/busybox/* emnt/
-	-sudo cp -r testcase/$(ARCH)/$(COMPLIB)/lua/* emnt/
-	-sudo cp -r testcase/$(ARCH)/$(COMPLIB)/libc-test/* emnt/
-	-sudo cp -r testcase/$(ARCH)/$(COMPLIB)/iozone/* emnt/
-	-sudo cp -r testcase/$(ARCH)/$(COMPLIB)/iperf/* emnt/
-	-sudo cp -r testcase/$(ARCH)/$(COMPLIB)/netperf/* emnt/
-	-sudo cp -r testcase/$(ARCH)/$(COMPLIB)/libcbench/* emnt/
+	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/basic/* emnt/
+	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/busybox/* emnt/
+	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/lua/* emnt/
+	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/libc-test/* emnt/
+	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/iozone/* emnt/
+	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/iperf/* emnt/
+	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/netperf/* emnt/
+	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/libcbench/* emnt/
 
 	@sudo cp -r img-data/common/* emnt/
 	@sudo cp -r img-data/$(ARCH)/* emnt/
@@ -206,6 +208,7 @@ fs-img: user
 	@sudo rm -rf emnt
 	@echo "building fs-img finished"
 	@echo "Attention: cp error may be ignored"
+
 
 PHONY += fs-img-submit
 fs-img-submit-rv: user
@@ -227,6 +230,7 @@ fs-img-submit-rv: user
 	@echo "building fs-img-submit finished"
 	@echo "Attention: cp error may be ignored"
 
+
 PHONY += fs-img-submit-la
 fs-img-submit-la: user
 	@echo "building fs-img-submit-la ext4..."
@@ -247,14 +251,12 @@ fs-img-submit-la: user
 	@echo "building fs-img-submit-la finished"
 	@echo "Attention: cp error may be ignored"
 
+
 PHONY += all
 all:
 	@rm -rf vendor
 	@tar xvf submit/vendor-rv.tar.gz
 
-	@rm -rf .cargo
-	@mkdir .cargo
-	@cp submit/config-rv.toml .cargo/config.toml
 	@make user kernel LOG=
 	@cp target/riscv64gc-unknown-none-elf/debug/kernel kernel-rv
 	@make fs-img-submit-rv MODE=release ARCH=riscv64 LOG=debug
@@ -263,41 +265,33 @@ all:
 	@rm -rf vendor/
 	@tar xvf submit/vendor-la.tar.gz
 
-	@rm -rf .cargo
-	@mkdir .cargo
-	@cp submit/config-la.toml .cargo/config.toml
 	@make user kernel LOG=
 	@cp target/loongarch64-unknown-none/debug/kernel kernel-la
 	@make fs-img-submit-la MODE=release ARCH=loongarch64 LOG=
 	@cp fsimg/loongarch64-sdcard.img disk-la.img
 
-PHONY += dkernel
-dkernel:
-	@rm -rf .cargo
-	@mkdir .cargo
-	@cp submit/config-rv.toml .cargo/config.toml
-	@make user   ARCH=riscv64  
-	@make kernel ARCH=riscv64  
+
+PHONY += rkernel
+rkernel:
+	@make user   ARCH=riscv64
+	@make kernel ARCH=riscv64
 	@cp target/riscv64gc-unknown-none-elf/debug/kernel kernel-rv
 	@qemu-system-riscv64 -machine virt -kernel kernel-rv -m 128 -nographic -smp 1 -bios default -drive file=sdcard-rv.img,if=none,format=raw,id=x0 \
                     -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -no-reboot -device virtio-net-device,netdev=net -netdev user,id=net \
-                    -rtc base=utc 
+                    -rtc base=utc
 # -drive file=disk-rv.img,if=none,format=raw,id=x1 -device virtio-blk-device,drive=x1,bus=virtio-mmio-bus.1
+
 
 PHONY += lkernel
 lkernel:
-	@rm -rf .cargo
-	@mkdir .cargo
-	@cp submit/config-la.toml .cargo/config.toml
-	@make user   ARCH=loongarch64  
-	@make kernel ARCH=loongarch64  
+	@make user   ARCH=loongarch64
+	@make kernel ARCH=loongarch64
 	@cp target/loongarch64-unknown-none/debug/kernel kernel-la
-	@qemu-system-loongarch64 -kernel kernel-la -m 1G -nographic -smp 1 -drive file=sdcard-la.img,if=none,format=raw,id=x0  \
+	@qemu-system-loongarch64 -kernel kernel-la -m 1G -nographic -smp 1 -drive file=sdcard-la.img,if=none,format=raw,id=x0 \
                         -device virtio-blk-pci,drive=x0 -no-reboot  -device virtio-net-pci,netdev=net0 \
-                        -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555  \
-                        -rtc base=utc 
+                        -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555 \
+                        -rtc base=utc
 # -drive file=disk-la.img,if=none,format=raw,id=x1 -device virtio-blk-pci,drive=x1
-
 
 
 .PHONY: $(PHONY)

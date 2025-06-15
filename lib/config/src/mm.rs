@@ -118,7 +118,7 @@ pub const USER_INTERP_BASE: usize = 0x0000_0020_0000_0000;
 /// Start of mmap space in user space
 pub const MMAP_START: usize = 0x0000_0010_0000_0000;
 /// End of mmap space in user space
-pub const MMAP_END: usize = 0x0000_0020_0000_0000;
+pub const MMAP_END: usize = USER_END;
 
 /// Position of the stack of a user process in the virtual address space
 pub const USER_STACK_UPPER: usize = 0x0000_003f_ffff_f000;

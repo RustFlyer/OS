@@ -1,12 +1,15 @@
 use core::arch::naked_asm;
 
-use arch::mm::tlb_fill;
-use loongArch64::register::estat::{self, Exception, Interrupt, Trap};
 use loongArch64::register::{
-    badv, ecfg, era, prmd, pwch, pwcl, stlbps, ticlr, tlbidx, tlbrehi, tlbrentry,
+    badv::{self, Badv},
+    ecfg,
+    era::{self, Era},
+    estat::{self, Exception, Interrupt, Trap},
+    prmd, pwch, pwcl, stlbps, ticlr, tlbidx, tlbrehi, tlbrentry,
 };
 
 use arch::{
+    mm::tlb_fill,
     time::{get_time_duration, set_nx_timer_irq},
     trap::TIMER_IRQ,
 };
@@ -14,14 +17,17 @@ use mm::address::{VirtAddr, VirtPageNum};
 use systype::memory_flags::MappingFlags;
 use timer::TIMER_MANAGER;
 
-use crate::processor::current_hart;
-use crate::task::{Task, TaskState};
-use crate::trap::load_trap_handler;
-use crate::vm::user_ptr::UserReadPtr;
+use crate::{
+    processor::current_hart,
+    task::{Task, TaskState},
+    trap::load_trap_handler,
+    vm::user_ptr::UserReadPtr,
+};
 
-#[unsafe(no_mangle)]
 pub fn trap_handler(task: &Task) {
     let estat = estat::read();
+    let badv = badv::read();
+    let era = era::read();
 
     unsafe { load_trap_handler() };
 
@@ -30,7 +36,7 @@ pub fn trap_handler(task: &Task) {
     TIMER_MANAGER.check(current);
 
     match estat.cause() {
-        Trap::Exception(e) => user_exception_handler(task, e),
+        Trap::Exception(e) => user_exception_handler(task, e, badv, era),
         Trap::Interrupt(i) => user_interrupt_handler(task, i),
         other_cause => {
             log::error!("Unknown trap cause: {:?}", other_cause);
@@ -39,7 +45,8 @@ pub fn trap_handler(task: &Task) {
 }
 
 /// Handler for user exceptions
-pub fn user_exception_handler(task: &Task, e: Exception) {
+pub fn user_exception_handler(task: &Task, e: Exception, badv: Badv, era: Era) {
+    log::trace!("Handling user exception {:?} for task {}", e, task.tid());
     match e {
         Exception::Syscall => {
             task.set_is_syscall(true);
@@ -56,8 +63,9 @@ pub fn user_exception_handler(task: &Task, e: Exception) {
                 Exception::StorePageFault | Exception::PageModifyFault => MappingFlags::W,
                 _ => unreachable!(),
             };
-            let fault_addr = VirtAddr::new(badv::read().vaddr());
             let addr_space = task.addr_space();
+            let fault_addr = VirtAddr::new(badv.vaddr());
+            let inst_addr = era.pc();
             match addr_space.handle_page_fault(fault_addr, access) {
                 Ok(()) => {
                     // Fill the TLB if the page fault is resolved successfully.
@@ -79,14 +87,14 @@ pub fn user_exception_handler(task: &Task, e: Exception) {
                         fault_addr.to_usize(),
                         access,
                         e.as_str(),
-                        era::read().pc()
+                        inst_addr
                     );
                     task.set_state(TaskState::Zombie);
                 }
             }
         }
         Exception::InstructionNotExist => {
-            let inst_addr = era::read().pc();
+            let inst_addr = era.pc();
             log::warn!("[trap_handler] illegal instruction at {:#x}", inst_addr);
             // TODO: Send SIGILL signal to the task; don't just kill the task
             task.set_state(TaskState::Zombie);
@@ -101,10 +109,7 @@ pub fn user_exception_handler(task: &Task, e: Exception) {
 pub fn user_interrupt_handler(task: &Task, i: Interrupt) {
     match i {
         Interrupt::Timer => {
-            // log::debug!("user time interrupt");
             ticlr::clear_timer_interrupt();
-
-            // If the executor does not have other tasks, no need to yield
             if task.timer_mut().schedule_time_out()
                 && executor::has_waiting_task_alone(current_hart().id)
             {
@@ -173,16 +178,8 @@ pub unsafe extern "C" fn tlb_refill() {
     unsafe {
         naked_asm!(
             "
-            .equ LA_CSR_PGDL,          0x19    /* Page table base address when VA[47] = 0 */
-            .equ LA_CSR_PGDH,          0x1a    /* Page table base address when VA[47] = 1 */
-            .equ LA_CSR_PGD,           0x1b    /* Page table base */
-            .equ LA_CSR_TLBRENTRY,     0x88    /* TLB refill exception entry */
-            .equ LA_CSR_TLBRBADV,      0x89    /* TLB refill badvaddr */
-            .equ LA_CSR_TLBRERA,       0x8a    /* TLB refill ERA */
-            .equ LA_CSR_TLBRSAVE,      0x8b    /* KScratch for TLB refill exception */
-            .equ LA_CSR_TLBRELO0,      0x8c    /* TLB refill entrylo0 */
-            .equ LA_CSR_TLBRELO1,      0x8d    /* TLB refill entrylo1 */
-            .equ LA_CSR_TLBREHI,       0x8e    /* TLB refill entryhi */
+            .equ LA_CSR_PGD,           0x1b
+            .equ LA_CSR_TLBRSAVE,      0x8b
             .balign 4096
                 csrwr   $t0, LA_CSR_TLBRSAVE
                 csrrd   $t0, LA_CSR_PGD

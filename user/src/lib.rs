@@ -109,17 +109,17 @@ pub fn mmap(
     length: usize,
     prot: i32,
     flags: i32,
-    fd: usize,
+    fd: isize,
     offset: usize,
-) -> isize {
+) -> usize {
     sys_mmap(
         addr as usize,
         length,
         prot as usize,
         flags as usize,
-        fd,
+        fd as usize,
         offset,
-    )
+    ) as usize
 }
 
 pub fn open(dirfd: i32, pathname: &str, flags: OpenFlags, mode: InodeMode) -> isize {
@@ -153,11 +153,11 @@ pub fn mkdir(path: &str) -> isize {
 //************ task ***************/
 pub fn exit(exit_code: i32) -> ! {
     sys_exit(exit_code);
-    loop {}
+    panic!("sys_exit should not return");
 }
 pub fn exit_group(exit_code: i32) -> ! {
     sys_exit_group(exit_code);
-    loop {}
+    panic!("sys_exit_group should not return");
 }
 pub fn yield_() -> isize {
     sys_yield()
@@ -251,7 +251,10 @@ pub struct TimeVal {
 }
 
 pub fn gettimeofday(time_val: &mut TimeVal) -> isize {
-    sys_gettimeofday(time_val as *mut TimeVal as *mut usize, 0 as *mut usize)
+    sys_gettimeofday(
+        time_val as *mut TimeVal as *mut usize,
+        core::ptr::null_mut::<usize>(),
+    )
 }
 
 pub fn nanosleep(req: &TimeSpec, rem: &mut TimeSpec) -> isize {
@@ -400,11 +403,11 @@ pub mod sig {
         pub const SIGMAX: Sig = Sig(64); // Maximum signal
 
         pub fn from_i32(signum: i32) -> Sig {
-            Sig(signum as i32)
+            Sig(signum)
         }
 
         pub fn is_valid(&self) -> bool {
-            self.0 >= 0 && self.0 < 1024 as i32
+            self.0 >= 0 && self.0 < 1024
         }
 
         pub fn raw(&self) -> usize {

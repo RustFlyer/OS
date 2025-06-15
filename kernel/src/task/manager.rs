@@ -30,15 +30,19 @@ impl TaskManager {
 
     pub fn add_task(&self, task: &Arc<Task>) {
         self.0.lock().insert(task.tid(), Arc::downgrade(task));
-        log::debug!("[add_task] {}", task.tid());
-        // let _ = self.for_each(|t| {
-        //     Ok(log::debug!(
-        //         "thread {}, name: {}, state: {:?}",
-        //         t.tid(),
-        //         t.get_name(),
-        //         t.get_state()
-        //     ))
-        // });
+
+        log::debug!("Add task {}", task.tid());
+        log::debug!("Task list:");
+        let _ = self.for_each(|t| {
+            log::debug!(
+                "thread {}, name: {}, state: {:?}, page table at {:#x}",
+                t.tid(),
+                t.get_name(),
+                t.get_state(),
+                t.addr_space().page_table.root().to_usize(),
+            );
+            Ok(())
+        });
     }
 
     pub fn remove_task(&self, tid: Tid) {

@@ -6,7 +6,7 @@ use crate::pte::PageTableEntry;
 
 /// Switches the current page table being used by the MMU to the one
 /// at the given physical page number `root`.
-pub fn switch_pagetable(root: usize) {
+pub fn switch_page_table(root: usize) {
     pgdl::set_base(root << 12);
     tlb_flush_all_except_global();
 }
