@@ -2,15 +2,16 @@ ifeq ($(MODE), release)
 	MODE_ARG = --release
 endif
 
-PHONY := all
-all: build
-
-PHONY += env
-env:
-	@(cargo install --list | grep "cargo-binutils" > /dev/null 2>&1) || cargo install cargo-binutils
+ifeq ($(ARCH), riscv64)
+	CARGO_ARGS = --target riscv64gc-unknown-none-elf
+else ifeq ($(ARCH), loongarch64)
+	CARGO_ARGS = --target loongarch64-unknown-none
+else
+	$(error Unsupported architecture: $(ARCH). Supported architectures are riscv64 and loongarch64.)
+endif
 
 PHONY += build
 build:
-	@cargo build $(MODE_ARG) --offline
+	@cargo build $(MODE_ARG) $(CARGO_ARGS) --offline
 
 .PHONY: $(PHONY)
