@@ -1,10 +1,11 @@
-/target
-/vendor
-.vscode
-/fsimg
+/.vscode/
+/target/
+/vendor/
+/fsimg/
 kernel-la
 kernel-rv
 disk-rv.img
 disk-la.img
 sdcard-rv.img
 sdcard-la.img
+linkapp.asm
