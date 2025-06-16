@@ -1,5 +1,5 @@
 ifeq ($(MODE), release)
-	MODE_ARG = --release
+	MODE_ARGS = --release
 endif
 
 ifeq ($(ARCH), riscv64)
@@ -12,6 +12,6 @@ endif
 
 PHONY += build
 build:
-	@cargo build $(MODE_ARG) $(CARGO_ARGS) --offline
+	cargo build $(MODE_ARGS) $(CARGO_ARGS) --offline
 
 .PHONY: $(PHONY)

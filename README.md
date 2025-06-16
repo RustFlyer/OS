@@ -69,8 +69,7 @@ Nighthawk OS 是使用 Rust 编写，支持 RISC-V 和 LoongArch 指令集架构
 │  └── src
 │      ├── boot.rs        ---- 启动多cpu 
 │      ├── lang_item.rs   ---- 崩溃处理
-│      ├── linkapp-la.asm ---- 链接内部应用(LoongArch)
-│      ├── linkapp-rv.asm ---- 链接内部应用(RISC-V)
+│      ├── linkapp.asm.tmpl ---- 链接内置用户程序之模板
 │      ├── loader.rs      ---- 加载应用
 │      ├── logging.rs     ---- 日志打印函数
 │      ├── main.rs        ---- 主函数

@@ -1,4 +1,3 @@
-
     .align 3
     .section .data
     .global _num_app
@@ -20,7 +19,7 @@ _app_names:
     .string "time_test"
     .string "add"
     .string "submit"
-    .string "add2"
+    .string "shell"
     .string "file_test"
 
     .section .data
@@ -28,7 +27,7 @@ _app_names:
     .global app_0_end
     .align 3
 app_0_start:
-    .incbin "./target/loongarch64-unknown-none/debug/init_proc-la"
+    .incbin "./target/<cargo-target>/<cargo-profile>/init_proc-<cargo-target-acronym>"
 app_0_end:
 
     .section .data
@@ -36,7 +35,7 @@ app_0_end:
     .global app_1_end
     .align 3
 app_1_start:
-    .incbin "./target/loongarch64-unknown-none/debug/hello_world"
+    .incbin "./target/<cargo-target>/<cargo-profile>/hello_world"
 app_1_end:
 
     .section .data
@@ -44,7 +43,7 @@ app_1_end:
     .global app_2_end
     .align 3
 app_2_start:
-    .incbin "./target/loongarch64-unknown-none/debug/time_test"
+    .incbin "./target/<cargo-target>/<cargo-profile>/time_test"
 app_2_end:
 
     .section .data
@@ -52,7 +51,7 @@ app_2_end:
     .global app_3_end
     .align 3
 app_3_start:
-    .incbin "./target/loongarch64-unknown-none/debug/add"
+    .incbin "./target/<cargo-target>/<cargo-profile>/add"
 app_3_end:
 
     .section .data
@@ -60,7 +59,7 @@ app_3_end:
     .global app_4_end
     .align 3
 app_4_start:
-    .incbin "./target/loongarch64-unknown-none/debug/submit-la"
+    .incbin "./target/<cargo-target>/<cargo-profile>/submit-<cargo-target-acronym>"
 app_4_end:
 
     .section .data
@@ -68,7 +67,7 @@ app_4_end:
     .global app_5_end
     .align 3
 app_5_start:
-    .incbin "./target/loongarch64-unknown-none/debug/add2"
+    .incbin "./target/<cargo-target>/<cargo-profile>/shell"
 app_5_end:
 
     .section .data
@@ -76,5 +75,5 @@ app_5_end:
     .global app_6_end
     .align 3
 app_6_start:
-    .incbin "./target/loongarch64-unknown-none/debug/file_test"
+    .incbin "./target/<cargo-target>/<cargo-profile>/file_test"
 app_6_end:

@@ -1,20 +1,17 @@
-# Building variables
-FEATURES :=
-
-
-CARGO_BUILD_ARGS :=
 ifeq ($(MODE), release)
-	CARGO_BUILD_ARGS += --release
-endif
-ifneq ($(FEATURES), )
-	CARGO_BUILD_ARGS += --features "$(FEATURES)"
+	MODE_ARGS = --release
 endif
 
-# Phony targets
-PHONY :=
+ifeq ($(ARCH), riscv64)
+	CARGO_ARGS = --target riscv64gc-unknown-none-elf
+else ifeq ($(ARCH), loongarch64)
+	CARGO_ARGS = --target loongarch64-unknown-none
+else
+	$(error Unsupported architecture: $(ARCH). Supported architectures are riscv64 and loongarch64.)
+endif
 
 PHONY += build
 build:
-	cargo build $(CARGO_BUILD_ARGS) --offline
+	cargo build $(MODE_ARGS) $(CARGO_ARGS) --offline
 
-.PHONY: build
+.PHONY: $(PHONY)

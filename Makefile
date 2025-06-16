@@ -20,10 +20,10 @@ DOCKER_NAME = os
 PACKAGE_NAME = kernel
 BOOTLOADER = default
 
-ifeq ($(ARCH),riscv64)
-	TARGET = riscv64gc-unknown-none-elf
-else ifeq ($(ARCH),loongarch64)
-	TARGET = loongarch64-unknown-none
+ifeq ($(ARCH), riscv64)
+	export TARGET = riscv64gc-unknown-none-elf
+else ifeq ($(ARCH), loongarch64)
+	export TARGET = loongarch64-unknown-none
 else
 	$(error "Unsupported architecture: $(ARCH).")
 endif
@@ -59,7 +59,7 @@ USER_BINS := $(patsubst $(USER_APPS_DIR)/%.rs, $(TARGET_DIR)/%.bin, $(USER_APPS)
 FS_IMG_DIR := fsimg
 FS_IMG := $(FS_IMG_DIR)/$(ARCH)-sdcard.img
 
-ifeq ($(ARCH),riscv64)
+ifeq ($(ARCH), riscv64)
 	QEMU_ARGS := -m 1G
 	QEMU_ARGS += -machine virt
 	QEMU_ARGS += -nographic
@@ -75,7 +75,7 @@ ifeq ($(ARCH),riscv64)
 	GDB_ARGS = riscv:rv64
 endif
 
-ifeq ($(ARCH),loongarch64)
+ifeq ($(ARCH), loongarch64)
 	QEMU_ARGS := -m 1G
 	QEMU_ARGS += -machine virt 	
 	QEMU_ARGS += -nographic
@@ -109,29 +109,29 @@ all0: $(KERNEL_ELF) $(KERNEL_ASM) $(USER_APPS)
 
 $(KERNEL_ELF): build
 $(KERNEL_ASM): $(KERNEL_ELF)
-	@$(OBJDUMP) $(DISASM_ARGS) $(KERNEL_ELF) > $(KERNEL_ASM)
+	$(OBJDUMP) $(DISASM_ARGS) $(KERNEL_ELF) > $(KERNEL_ASM)
 	@echo "Updated: $(KERNEL_ASM)"
 
 
 PHONY += build2docker
 build2docker:
-	@docker build -t ${DOCKER_NAME} .
+	docker build -t ${DOCKER_NAME} .
 
 
 PHONY += docker
 docker:
-	@docker run --privileged --rm -it --network="host" -v ${PWD}:/mnt -w /mnt ${DOCKER_NAME} bash
+	docker run --privileged --rm -it --network="host" -v ${PWD}:/mnt -w /mnt ${DOCKER_NAME} bash
 
 
 PHONY += env
 env:
-	@(cargo install --list | grep "cargo-binutils" > /dev/null 2>&1) || cargo install cargo-binutils
+	(cargo install --list | grep "cargo-binutils" > /dev/null 2>&1) || cargo install cargo-binutils
 
 
 PHONY += kernel
 kernel:
 	@echo Platform: $(BOARD)
-	@cd kernel && make build
+	cd kernel && make build
 	@echo "Updated: $(KERNEL_ELF)"
 
 
@@ -142,41 +142,41 @@ build: user kernel
 PHONY += run
 run: build
 	@echo $(QEMU_ARGS)
-	@$(QEMU) $(QEMU_ARGS)
+	$(QEMU) $(QEMU_ARGS)
 
 
 PHONY += clean
 clean:
-	@cargo clean
-	@rm -rf $(TARGET_DIR)/*
+	cargo clean
+	rm -rf $(TARGET_DIR)/*
 
 
 PHONY += disasm
 disasm: $(KERNEL_ASM)
-	@cat $(KERNEL_ASM) | $(PAGER)
+	cat $(KERNEL_ASM) | $(PAGER)
 
 
 PHONY += gdbserver
 gdbserver: all0
-	@$(QEMU) $(QEMU_ARGS) -s -S
+	$(QEMU) $(QEMU_ARGS) -s -S
 
 
 PHONY += gdbclient
 gdbclient: all0
-	@$(GDB) -ex 'file $(KERNEL_ELF)' \
+	$(GDB) -ex 'file $(KERNEL_ELF)' \
 			-ex 'set arch $(GDB_ARGS)' \
 			-ex 'target remote localhost:1234'
 
 
 PHONY += run-docker
 run-docker:
-	@docker run --rm -it --network="host" -v ${PWD}:/mnt -w /mnt ${DOCKER_NAME} make run
+	docker run --rm -it --network="host" -v ${PWD}:/mnt -w /mnt ${DOCKER_NAME} make run
 
 
 PHONY += user
 user:
 	@echo "building user..."
-	@cd user && make build
+	cd user && make build
 	@echo "building user finished"
 
 
@@ -184,13 +184,13 @@ PHONY += fs-img
 fs-img: user
 	@echo "building fs-img ext4..."
 	@echo $(FS_IMG)
-	@rm -rf $(FS_IMG)
-	@mkdir -p $(FS_IMG_DIR)
-	@dd if=/dev/zero of=$(FS_IMG) bs=1K count=524288 status=progress
-	@mkfs.ext4 -F $(FS_IMG)
-	@mkdir -p emnt
-	@sudo mount -t ext4 -o loop $(FS_IMG) emnt
-	@sudo cp -r $(USER_ELFS) emnt/
+	rm -rf $(FS_IMG)
+	mkdir -p $(FS_IMG_DIR)
+	dd if=/dev/zero of=$(FS_IMG) bs=1K count=524288 status=progress
+	mkfs.ext4 -F $(FS_IMG)
+	mkdir -p emnt
+	sudo mount -t ext4 -o loop $(FS_IMG) emnt
+	sudo cp -r $(USER_ELFS) emnt/
 
 	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/basic/* emnt/
 	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/busybox/* emnt/
@@ -201,82 +201,75 @@ fs-img: user
 	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/netperf/* emnt/
 	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/libcbench/* emnt/
 
-	@sudo cp -r img-data/common/* emnt/
-	@sudo cp -r img-data/$(ARCH)/* emnt/
-	@sudo chmod -R 755 emnt/
-	@sudo umount emnt
-	@sudo rm -rf emnt
+	sudo cp -r img-data/common/* emnt/
+	sudo cp -r img-data/$(ARCH)/* emnt/
+	sudo chmod -R 755 emnt/
+	sudo umount emnt
+	sudo rm -rf emnt
 	@echo "building fs-img finished"
 	@echo "Attention: cp error may be ignored"
 
 
-PHONY += fs-img-submit
-fs-img-submit-rv: user
-	@echo "building fs-img-submit ext4..."
-	@echo $(FS_IMG)
-	@rm -rf $(FS_IMG)
-	@mkdir -p $(FS_IMG_DIR)
-	@dd if=/dev/zero of=$(FS_IMG) bs=1K count=524288 status=progress
-	@mkfs.ext4 -F $(FS_IMG)
-	@mkdir -p emnt
-	@mount -t ext4 -o loop $(FS_IMG) emnt
-	@cp -r $(USER_ELFS) emnt/
-
-	@cp -r img-data/common/* emnt/
-	@cp -r img-data/riscv64/* emnt/
-	@chmod -R 755 emnt/
-	@umount emnt
-	@rm -rf emnt
-	@echo "building fs-img-submit finished"
-	@echo "Attention: cp error may be ignored"
-
+PHONY += fs-img-submit-rv
+fs-img-submit-rv:
+	@echo "building fs-img-submit-rv ext4..."
+	make fs-img-submit ARCH=riscv64
+	@echo "building fs-img-submit-rv finished"
 
 PHONY += fs-img-submit-la
-fs-img-submit-la: user
+fs-img-submit-la:
 	@echo "building fs-img-submit-la ext4..."
-	@echo $(FS_IMG)
-	@rm -rf $(FS_IMG)
-	@mkdir -p $(FS_IMG_DIR)
-	@dd if=/dev/zero of=$(FS_IMG) bs=1K count=524288 status=progress
-	@mkfs.ext4 -F $(FS_IMG)
-	@mkdir -p emnt
-	@mount -t ext4 -o loop $(FS_IMG) emnt
-	@cp -r $(USER_ELFS) emnt/
-
-	@cp -r img-data/common/* emnt/
-	@cp -r img-data/loongarch64/* emnt/
-	@chmod -R 755 emnt/
-	@umount emnt
-	@rm -rf emnt
+	make fs-img-submit ARCH=loongarch64
 	@echo "building fs-img-submit-la finished"
+
+
+PHONY += fs-img-submit
+fs-img-submit: user
+	@echo $(FS_IMG)
+	rm -rf $(FS_IMG)
+	mkdir -p $(FS_IMG_DIR)
+	dd if=/dev/zero of=$(FS_IMG) bs=1K count=524288 status=progress
+	mkfs.ext4 -F $(FS_IMG)
+	mkdir -p emnt
+	mount -t ext4 -o loop $(FS_IMG) emnt
+	cp -r $(USER_ELFS) emnt/
+	cp -r img-data/common/* emnt/
+	cp -r img-data/$(ARCH)/* emnt/
+	chmod -R 755 emnt/
+	umount emnt
+	rm -rf emnt
 	@echo "Attention: cp error may be ignored"
 
 
 PHONY += all
 all:
-	@rm -rf vendor
-	@tar xvf submit/vendor-rv.tar.gz
+	rm -rf vendor
+	tar xvf submit/vendor-rv.tar.gz
 
-	@make user kernel LOG=
-	@cp target/riscv64gc-unknown-none-elf/debug/kernel kernel-rv
-	@make fs-img-submit-rv MODE=release ARCH=riscv64 LOG=debug
-	@cp fsimg/riscv64-sdcard.img disk-rv.img
+	make user kernel ARCH=riscv64
+	cp $(KERNEL_ELF) kernel-rv
+	make fs-img-submit-rv
+	cp fsimg/riscv64-sdcard.img disk-rv.img
 
-	@rm -rf vendor/
-	@tar xvf submit/vendor-la.tar.gz
+	rm -rf vendor/
+	tar xvf submit/vendor-la.tar.gz
 
-	@make user kernel LOG=
-	@cp target/loongarch64-unknown-none/debug/kernel kernel-la
-	@make fs-img-submit-la MODE=release ARCH=loongarch64 LOG=
-	@cp fsimg/loongarch64-sdcard.img disk-la.img
+	make user kernel ARCH=loongarch64
+	cp $(KERNEL_ELF) kernel-la
+	make fs-img-submit-la
+	cp fsimg/loongarch64-sdcard.img disk-la.img
 
 
 PHONY += rkernel
 rkernel:
-	@make user   ARCH=riscv64
-	@make kernel ARCH=riscv64
-	@cp target/riscv64gc-unknown-none-elf/debug/kernel kernel-rv
-	@qemu-system-riscv64 -machine virt -kernel kernel-rv -m 128 -nographic -smp 1 -bios default -drive file=sdcard-rv.img,if=none,format=raw,id=x0 \
+	make rkernel-build ARCH=riscv64
+
+
+PHONY += rkernel-build
+rkernel-build:
+	make user kernel
+	cp $(KERNEL_ELF) kernel-rv
+	$(QEMU) -machine virt -kernel kernel-rv -m 1G -nographic -smp 1 -bios default -drive file=sdcard-rv.img,if=none,format=raw,id=x0 \
                     -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -no-reboot -device virtio-net-device,netdev=net -netdev user,id=net \
                     -rtc base=utc
 # -drive file=disk-rv.img,if=none,format=raw,id=x1 -device virtio-blk-device,drive=x1,bus=virtio-mmio-bus.1
@@ -284,10 +277,14 @@ rkernel:
 
 PHONY += lkernel
 lkernel:
-	@make user   ARCH=loongarch64
-	@make kernel ARCH=loongarch64
-	@cp target/loongarch64-unknown-none/debug/kernel kernel-la
-	@qemu-system-loongarch64 -kernel kernel-la -m 1G -nographic -smp 1 -drive file=sdcard-la.img,if=none,format=raw,id=x0 \
+	make lkernel-build ARCH=loongarch64
+
+
+PHONY += lkernel-build
+lkernel-build:
+	make user kernel
+	cp $(KERNEL_ELF) kernel-la
+	$(QEMU) -kernel kernel-la -m 1G -nographic -smp 1 -drive file=sdcard-la.img,if=none,format=raw,id=x0 \
                         -device virtio-blk-pci,drive=x0 -no-reboot  -device virtio-net-pci,netdev=net0 \
                         -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555 \
                         -rtc base=utc
