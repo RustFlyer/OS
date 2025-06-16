@@ -288,13 +288,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
 /// The order of the arguments differs between architectures.
 /// - On RISC-V, the order is: flags, stack, parent_tid, tls, child_tid.
 /// - On LoongArch, the order is: flags, stack, parent_tid, child_tid, tls.
-pub fn sys_clone(
-    arg1: usize,
-    arg2: usize,
-    arg3: usize,
-    arg4: usize,
-    arg5: usize,
-) -> SyscallResult {
+pub fn sys_clone(arg1: usize, arg2: usize, arg3: usize, arg4: usize, arg5: usize) -> SyscallResult {
     let (flags, stack, parent_tid, child_tid, tls) = {
         #[cfg(target_arch = "riscv64")]
         {
@@ -872,6 +866,8 @@ pub fn sys_clone3(user_args: usize, size: usize) -> SyscallResult {
         args.child_tid,
         args.exit_signal
     );
+
+    log::info!("[sys_clone3] {:?}", args);
 
     let flags = CloneFlags::from_bits(args.flags & !0xff).ok_or(SysError::EINVAL)?;
     let new_task = task.fork(flags);

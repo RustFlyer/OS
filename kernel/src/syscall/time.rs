@@ -219,6 +219,11 @@ pub async fn sys_clock_nanosleep(
         CLOCK_REALTIME | CLOCK_MONOTONIC => {
             let ts = unsafe { t.read()? };
             let req: Duration = ts.into();
+            log::debug!(
+                "[sys_clock_nanosleep] clockid {} ts: {} ms",
+                clockid,
+                ts.into_ms()
+            );
             let remain = if flags == TIMER_ABSTIME {
                 let current = get_time_duration();
                 if req.le(&current) {

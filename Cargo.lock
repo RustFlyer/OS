@@ -608,6 +608,7 @@ dependencies = [
  "ext4",
  "fat32",
  "log",
+ "mm",
  "mutex",
  "osfuture",
  "spin",
@@ -1019,6 +1020,7 @@ dependencies = [
  "mm",
  "mutex",
  "osfuture",
+ "simdebug",
  "spin",
  "systype",
 ]

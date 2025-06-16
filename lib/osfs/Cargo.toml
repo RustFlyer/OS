@@ -12,6 +12,9 @@ mutex  = { path = "../mutex" }
 osfuture = { path = "../osfuture" }
 systype =  { path = "../systype" }
 vfs    = { path = "../vfs" }
+mm = { path = "../mm" }
+
+
 async-trait = { workspace = true }
 bitflags = { workspace = true }
 crate_interface = { workspace = true }

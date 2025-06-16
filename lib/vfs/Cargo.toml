@@ -10,6 +10,9 @@ mm = { path = "../mm" }
 mutex = { path = "../mutex" }
 osfuture = { path = "../osfuture" }
 systype = { path = "../systype" }
+simdebug = { path = "../simdebug" }
+
+
 async-trait = { workspace = true }
 downcast-rs = { workspace = true }
 elf = { workspace = true }

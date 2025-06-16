@@ -258,6 +258,7 @@ impl dyn File {
     /// Consider change this function to a method of `PageCache` instead of `File`.
     pub async fn read_page(&self, pos: usize) -> SysResult<Arc<Page>> {
         debug_assert!(pos % PAGE_SIZE == 0);
+        simdebug::stop1();
 
         let inode = self.inode();
         let page_cache = inode.page_cache();

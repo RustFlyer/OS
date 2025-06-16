@@ -69,14 +69,15 @@ pub async fn sys_mmap(
         None
     };
 
-    log::info!("[sys_mmap] addr: {addr:#x}, length: {length:#x}, flags: {flags:?}");
+    log::info!("[sys_mmap] addr: {addr:#x}, length: {length:#x}, flags: {flags:?}, fd: {fd}");
 
     if addr == 0 && flags.contains(MmapFlags::MAP_FIXED) {
         return Err(SysError::EINVAL);
     }
 
-    let result = task.addr_space()
-        .map_file(file, flags, MappingFlags::from(prot), va, length, offset);
+    let result =
+        task.addr_space()
+            .map_file(file, flags, MappingFlags::from(prot), va, length, offset);
     log::info!("[sys_mmap] allocated at: {:#x}", result?);
     result
 }

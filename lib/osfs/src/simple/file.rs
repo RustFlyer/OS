@@ -2,6 +2,7 @@ use alloc::boxed::Box;
 use alloc::sync::Arc;
 use async_trait::async_trait;
 use config::mm::PAGE_SIZE;
+use mm::page_cache::page::Page;
 use systype::error::{SysError, SysResult};
 use vfs::{
     dentry::Dentry,
@@ -65,10 +66,23 @@ impl File for SimpleFileFile {
     async fn base_read(&self, mut buf: &mut [u8], pos: usize) -> SysResult<usize> {
         let size = self.size();
         let mut cur_pos = pos;
+
+        let inode = self.inode();
+        let cache = inode.page_cache();
+
         while !buf.is_empty() && cur_pos < size {
             let page_pos = cur_pos / PAGE_SIZE * PAGE_SIZE;
             let page_offset = cur_pos % PAGE_SIZE;
-            let page = self.into_dyn_ref().read_page(page_pos).await?;
+            let page = cache.get_page(page_pos);
+
+            let page = if page.is_none() {
+                let page = Arc::new(Page::build()?);
+                cache.insert_page(page_offset, page.clone());
+                page
+            } else {
+                page.unwrap()
+            };
+
             let len = buf.len().min(size - cur_pos).min(PAGE_SIZE - page_offset);
             buf[0..len].copy_from_slice(&page.as_slice()[page_offset..page_offset + len]);
             cur_pos += len;

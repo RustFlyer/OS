@@ -17,3 +17,13 @@ macro_rules! when_debug {
 pub fn stop() {
     let _a = 1 + 1;
 }
+
+#[unsafe(no_mangle)]
+pub fn stop1() {
+    let _a = 1 + 1;
+}
+
+#[unsafe(no_mangle)]
+pub fn stop2() {
+    let _a = 1 + 1;
+}
