@@ -1,10 +1,11 @@
-//! Module for kernel heap allocator
+//! Module for kernel heap allocator.
 //!
-//! Currently, we use the buddy system allocator for the kernel heap.
+//! Currently, we use the buddy system allocator for the kernel heap and use it to
+//! allocate memory for all kernel objects that require dynamic memory allocation.
 
 use core::{
     alloc::{GlobalAlloc, Layout},
-    ptr::NonNull,
+    ptr::{self, NonNull},
 };
 
 use buddy_system_allocator as buddy;
@@ -12,8 +13,9 @@ use buddy_system_allocator as buddy;
 use config::mm::KERNEL_HEAP_SIZE;
 use mutex::SpinNoIrqLock;
 
-use crate::address::{PhysAddr, VirtAddr};
+use crate::address::VirtAddr;
 
+/// A heap allocator protected by a spin lock.
 struct NoIrqLockedHeap<const ORDER: usize>(SpinNoIrqLock<buddy::Heap<ORDER>>);
 
 impl<const ORDER: usize> NoIrqLockedHeap<ORDER> {
@@ -40,7 +42,7 @@ unsafe impl GlobalAlloc for NoIrqLockedHeap<32> {
             .lock()
             .alloc(layout)
             .ok()
-            .map_or(core::ptr::null_mut(), |allocation| allocation.as_ptr())
+            .map_or(ptr::null_mut(), |allocation| allocation.as_ptr())
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
@@ -48,8 +50,13 @@ unsafe impl GlobalAlloc for NoIrqLockedHeap<32> {
     }
 }
 
-static mut KERNEL_HEAP: [u8; KERNEL_HEAP_SIZE] = [0; KERNEL_HEAP_SIZE];
+#[repr(align(4096))]
+struct HeapMemory([u8; KERNEL_HEAP_SIZE]);
 
+/// Memory space for the kernel heap.
+static mut HEAP_MEMORY: HeapMemory = HeapMemory([0; KERNEL_HEAP_SIZE]);
+
+/// The global heap allocator for the kernel.
 #[global_allocator]
 static HEAP_ALLOCATOR: NoIrqLockedHeap<32> = NoIrqLockedHeap::new();
 
@@ -58,36 +65,24 @@ fn alloc_error_handler(layout: Layout) -> ! {
     panic!("heap allocation error, layout = {:?}", layout)
 }
 
-/// Initializes heap allocator.
+/// Initializes the kernel heap allocator.
 ///
 /// # Safety
-/// - This function should be called only once.
-/// - The caller should ensure that the heap is not being referenced by any other thread.
+/// This function should be called only once before making any heap allocations.
 pub unsafe fn init_heap_allocator() {
-    unsafe {
+    let start_addr = unsafe {
         // SAFETY: we are the only one using the heap
         #[allow(static_mut_refs)]
-        let start_addr = VirtAddr::new(KERNEL_HEAP.as_ptr() as usize).to_usize();
+        VirtAddr::new(HEAP_MEMORY.0.as_ptr() as usize).to_usize()
+    };
 
+    unsafe {
         HEAP_ALLOCATOR.init(start_addr, KERNEL_HEAP_SIZE);
-
-        log::info!(
-            "heap memory: {:#x} - {:#x}",
-            start_addr,
-            start_addr + KERNEL_HEAP_SIZE
-        );
     }
-}
 
-pub fn heap_test() {
-    use alloc::vec::Vec;
-    log::info!("heap test: start");
-    let mut vec = Vec::new();
-    for i in 0..100 {
-        vec.push(i);
-    }
-    let vec_start = vec.as_ptr() as usize;
-    let vec_end = &vec[99] as *const _ as usize;
-    log::info!("heap test: vec from {:#x} - {:#x}", vec_start, vec_end);
-    log::info!("heap test: end");
+    log::info!(
+        "heap memory: {:#x} - {:#x}",
+        start_addr,
+        start_addr + KERNEL_HEAP_SIZE
+    );
 }
