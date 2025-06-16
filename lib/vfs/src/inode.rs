@@ -100,12 +100,26 @@ pub trait Inode: Send + Sync + DowncastSync {
         self.get_meta().inner.lock().state
     }
 
+    fn set_nlink(&self, nlink: usize) {
+        self.get_meta().inner.lock().nlink = nlink;
+    }
+
+    fn set_time(&self, ts: TimeSpec) {
+        self.get_meta().inner.lock().atime = ts;
+        self.get_meta().inner.lock().ctime = ts;
+        self.get_meta().inner.lock().mtime = ts;
+    }
+
     fn set_state(&self, state: InodeState) {
         self.get_meta().inner.lock().state = state;
     }
 
     fn set_inotype(&self, inotype: InodeType) {
         self.get_meta().inner.lock().mode = InodeMode::from_type(inotype);
+    }
+
+    fn set_mode(&self, mode: InodeMode) {
+        self.get_meta().inner.lock().mode = mode;
     }
 
     fn superblock(&self) -> Arc<dyn SuperBlock> {

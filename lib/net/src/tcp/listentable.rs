@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, vec::Vec};
+use alloc::{boxed::Box, sync::Arc, vec::Vec};
 use core::{ops::DerefMut, sync::atomic::Ordering, task::Waker};
 
 use smoltcp::{
@@ -54,10 +54,11 @@ impl ListenTable {
         handles: ShareMutex<Vec<SocketHandle>>,
     ) -> SysResult<()> {
         let port = listen_endpoint.port;
-        log::debug!("[listen] port: {}", port);
+        log::error!("[listen] port: {}", port);
         assert_ne!(port, 0);
         let mut entry = self.tcp[port as usize].lock();
-        if entry.is_none() {
+
+        if entry.is_none() || true {
             *entry = Some(Box::new(ListenTableEntry::new(
                 listen_endpoint,
                 waker,
@@ -68,15 +69,17 @@ impl ListenTable {
             return Err(SysError::EADDRINUSE);
         }
 
-        log::debug!("[listen] {:?}", *entry);
+        log::error!("[listen] {:?}", *entry);
 
         Ok(())
     }
 
     pub fn unlisten(&self, port: u16) {
         log::info!("TCP socket unlisten on {}", port);
-        if let Some(entry) = self.tcp[port as usize].lock().take() {
-            entry.wake()
+        log::info!("TCP socket unlisten on not remove tcp {}", port);
+        // return;
+        if let Some(entry) = self.tcp[port as usize].lock().deref_mut() {
+            entry.waker.wake_by_ref()
         }
     }
 
@@ -87,7 +90,7 @@ impl ListenTable {
             // true
         } else {
             // 因为在listen函数调用时已经将port设为监听状态了，这里应该不会查不到？？
-            log::error!("socket accept() failed: not listen. I think this wouldn't happen !!!");
+            log::error!("socket accept() failed: not listen. port: {port}");
             false
             // Err(SysError::EINVAL)
         }
@@ -99,7 +102,7 @@ impl ListenTable {
         log::debug!("[accept] port: {}", port);
 
         if let Some(entry) = self.tcp[port as usize].lock().deref_mut() {
-            log::debug!("[accept] entry: {:?}", *entry);
+            log::error!("[accept] entry: {:?}", *entry);
             let syn_queue = &mut entry.syn_queue;
             syn_queue.iter().for_each(|&tuple| {
                 log::debug!("[accept] {}, isconnect?{}", tuple, is_connected(tuple))
@@ -178,6 +181,7 @@ impl ListenTable {
         let mut list = self.waiting_ports.lock();
         // log::debug!("[check_after_poll] get list lock");
         while !list.is_empty() {
+            let mut should_remove = false;
             let port = list.pop().unwrap();
             if let Some(entry) = self.tcp[port as usize].lock().deref_mut() {
                 log::debug!("[check_after_poll] port: {}", port);
@@ -211,7 +215,20 @@ impl ListenTable {
                     // });
                     // listen_handles.push(new_handle);
                 }
+
+                log::error!(
+                    "[check_after_poll] port {port} count {}",
+                    Arc::strong_count(&entry.handles)
+                );
+                if Arc::strong_count(&entry.handles) == 1 {
+                    should_remove = true;
+                }
             }
+
+            // if should_remove {
+            //     log::error!("[check_after_poll] remove port {port}");
+            //     *self.tcp[port as usize].lock() = None;
+            // }
         }
     }
 
@@ -235,6 +252,10 @@ impl ListenTable {
             });
         }
     }
+
+    // pub fn remove_entry(&self, port: u16) {
+    //     *self.tcp[port as usize].lock() = None;
+    // }
 }
 
 fn is_connected(handle: SocketHandle) -> bool {

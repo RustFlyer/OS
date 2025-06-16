@@ -224,7 +224,7 @@ impl TcpSocket {
             LISTEN_TABLE.listen(bound_endpoint, waker, self.listen_handles.clone())?;
 
             // log::info!("[TcpSocket::listen] listening on {bound_endpoint:?}");
-            for _ in 0..4 {
+            for _ in 0..24 {
                 let sock_handle = SOCKET_SET.add(SocketSetWrapper::new_tcp_socket());
                 SOCKET_SET.with_socket_mut::<tcp::Socket, _, _>(sock_handle, |sock| {
                     sock.listen(bound_endpoint).unwrap();
@@ -461,7 +461,7 @@ impl TcpSocket {
                 SOCKET_SET.check_poll(timestamp);
                 match ret {
                     Ok(t) => {
-                        log::warn!("[block_on] get out");
+                        // log::warn!("[block_on] get out");
                         return Ok(t);
                     }
                     Err(SysError::EAGAIN) => {

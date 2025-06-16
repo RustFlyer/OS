@@ -12,7 +12,10 @@ use smoltcp::{
 };
 use timer::sleep_ms;
 
-use crate::{SOCKET_SET, poll_interfaces, tcp::SHUT_RDWR};
+use crate::{
+    SOCKET_SET, poll_interfaces,
+    tcp::{LISTEN_TABLE, SHUT_RDWR},
+};
 
 /// A TCP socket that provides POSIX-like APIs.
 ///
@@ -52,22 +55,24 @@ unsafe impl Sync for TcpSocket {}
 
 impl Drop for TcpSocket {
     fn drop(&mut self) {
-        log::info!("[TcpSocket::Drop] ");
+        log::info!("[TcpSocket::Drop]");
         self.shutdown(SHUT_RDWR).ok();
         // Safe because we have mut reference to `self`.
+        // self.listen_handles.lock().clear();
         if let Some(handle) = unsafe { self.handle.get().read() } {
             let mut cnt = 0;
             loop {
                 let is_close = SOCKET_SET.with_socket_mut::<tcp::Socket, _, _>(handle, |sock| {
                     sock.state() == State::Closed
                 });
-                if is_close || cnt > 1000 {
+                if is_close || cnt > 10000 {
                     log::error!("[shutdown] poll cnt is {}", cnt);
                     break;
                 }
                 poll_interfaces();
                 cnt += 1;
             }
+            // LISTEN_TABLE.remove_entry(self.bound_endpoint().unwrap().port);
             SOCKET_SET.remove(handle);
         }
     }

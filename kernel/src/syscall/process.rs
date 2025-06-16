@@ -905,6 +905,7 @@ pub fn sys_clone3(user_args: usize, size: usize) -> SyscallResult {
 }
 
 pub fn sys_setsid() -> SyscallResult {
+    log::debug!("[sys_setsid]");
     let task = current_task();
     Ok(task.pid())
 }

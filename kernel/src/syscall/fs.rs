@@ -85,7 +85,7 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
     // The mode argument specifies the file mode bits be applied when a new file is created.
     // This argument must be supplied when O_CREAT or O_TMPFILE is specified in flags;
     // Note that this mode applies only to future accesses of the newly created file;
-    let _mode = InodeMode::from_bits_truncate(mode);
+    let mode = InodeMode::from_bits_truncate(mode);
 
     let path = {
         let addr_space = task.addr_space();
@@ -95,9 +95,28 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
     };
 
     let name = path.clone();
-    log::info!("[sys_openat] dirfd: {dirfd:#x}, path: {path}, flags: {flags:?}, mode: {_mode:?}");
+    log::info!("[sys_openat] dirfd: {dirfd:#x}, path: {path}, flags: {flags:?}, mode: {mode:?}");
 
     let mut dentry = task.walk_at(AtFd::from(dirfd), path)?;
+
+    if flags.contains(OpenFlags::O_TMPFILE) {
+        let inode = dentry.inode().ok_or(SysError::ENOENT)?;
+        let inode_type = inode.inotype();
+        if flags.contains(OpenFlags::O_DIRECTORY) && !inode_type.is_dir() {
+            return Err(SysError::ENOTDIR);
+        }
+        let t = get_time_duration().as_micros() as u32;
+        let subdentry = dentry.new_neg_child(format!("tmp{}", t).as_str());
+        dentry.create(subdentry.as_ref(), InodeMode::REG)?;
+        let inode = subdentry.inode().ok_or(SysError::ENOENT)?;
+        let file = <dyn File>::open(subdentry)?;
+        file.set_flags(OpenFlags::O_RDWR);
+        log::debug!("[sys_openat] opened tmpfile {:?}", name);
+        inode.set_nlink(0);
+        inode.set_time(get_time_duration().into());
+        inode.set_mode(mode.union(InodeMode::REG));
+        return task.with_mut_fdtable(|ft| ft.alloc(file, flags));
+    }
 
     log::info!("[sys_openat] dentry path: {}", dentry.path());
     // Handle symlinks early here to simplify the logic.
@@ -349,9 +368,10 @@ pub fn sys_fstatat(dirfd: usize, pathname: usize, stat_buf: usize, flags: i32) -
             }
         }
     };
-    log::info!("[sys_fstat_at] dentry path: {}", dentry.path());
+    // log::info!("[sys_fstat_at] dentry path: {}", dentry.path());
     let inode = dentry.inode().ok_or(SysError::ENOENT)?;
     let kstat = Kstat::from_vfs_inode(inode)?;
+    log::info!("[sys_fstat_at] dentry: {:?}", kstat);
     unsafe {
         UserWritePtr::<Kstat>::new(stat_buf, &addr_space).write(kstat)?;
     }

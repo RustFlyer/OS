@@ -1,5 +1,5 @@
-use alloc::boxed::Box;
 use alloc::sync::Arc;
+use alloc::{boxed::Box, string::String};
 use async_trait::async_trait;
 use config::mm::PAGE_SIZE;
 use mm::page_cache::page::Page;
@@ -70,6 +70,8 @@ impl File for SimpleFileFile {
         let inode = self.inode();
         let cache = inode.page_cache();
 
+        log::debug!("[base_read] pos: {}", pos);
+
         while !buf.is_empty() && cur_pos < size {
             let page_pos = cur_pos / PAGE_SIZE * PAGE_SIZE;
             let page_offset = cur_pos % PAGE_SIZE;
@@ -88,22 +90,40 @@ impl File for SimpleFileFile {
             cur_pos += len;
             buf = &mut buf[len..];
         }
-        log::debug!("[base_read] simple file");
+
+        let mut chs = String::new();
+        buf.iter().for_each(|u| chs.push(*u as char));
+        log::debug!("[base_read] output: {chs}");
+
         Ok(cur_pos - pos)
     }
 
     async fn base_write(&self, mut buf: &[u8], offset: usize) -> SysResult<usize> {
         let mut cur_pos = offset;
+
+        let inode = self.inode();
+        let cache = inode.page_cache();
+
+        log::debug!("[base_write] simple file");
+
         while !buf.is_empty() {
             let page_pos = cur_pos / PAGE_SIZE * PAGE_SIZE;
             let page_offset = cur_pos % PAGE_SIZE;
-            let page = self.into_dyn_ref().read_page(page_pos).await?;
+            let page = cache.get_page(page_pos);
+
+            let page = if page.is_none() {
+                let page = Arc::new(Page::build()?);
+                cache.insert_page(page_offset, page.clone());
+                page
+            } else {
+                page.unwrap()
+            };
+
             let len = buf.len().min(PAGE_SIZE - page_offset);
             page.as_mut_slice()[page_offset..page_offset + len].copy_from_slice(&buf[0..len]);
             cur_pos += len;
             buf = &buf[len..];
         }
-        log::debug!("[base_write] simple file");
         Ok(cur_pos - offset)
         // Err(SysError::EISDIR)
     }

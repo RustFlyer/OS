@@ -91,6 +91,7 @@ impl ListenTableEntry {
 
 impl Drop for ListenTableEntry {
     fn drop(&mut self) {
+        log::error!("ListenTableEntry {} dropped", self.listen_endpoint.port);
         for &handle in &self.syn_queue {
             SOCKET_SET.remove(handle);
         }
