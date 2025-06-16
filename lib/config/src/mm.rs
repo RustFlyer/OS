@@ -3,7 +3,7 @@
 /// Start of physical memory
 pub const RAM_START: usize = 0x8000_0000;
 /// Size of physical memory
-pub const RAM_SIZE: usize = 128 * 1024 * 1024;
+pub const RAM_SIZE: usize = 1024 * 1024 * 1024;
 /// End of physical memory
 pub const RAM_END: usize = RAM_START + RAM_SIZE;
 

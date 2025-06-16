@@ -59,7 +59,7 @@ USER_BINS := $(patsubst $(USER_APPS_DIR)/%.rs, $(TARGET_DIR)/%.bin, $(USER_APPS)
 FS_IMG_DIR := fsimg
 FS_IMG := $(FS_IMG_DIR)/$(ARCH)-sdcard.img
 
-ifeq ($(ARCH),riscv64)
+ifeq ($(ARCH), riscv64)
 	QEMU_ARGS := -m 1G
 	QEMU_ARGS += -machine virt
 	QEMU_ARGS += -nographic
@@ -75,7 +75,7 @@ ifeq ($(ARCH),riscv64)
 	GDB_ARGS = riscv:rv64
 endif
 
-ifeq ($(ARCH),loongarch64)
+ifeq ($(ARCH), loongarch64)
 	QEMU_ARGS := -m 1G
 	QEMU_ARGS += -machine virt 	
 	QEMU_ARGS += -nographic
@@ -269,7 +269,7 @@ PHONY += rkernel-build
 rkernel-build:
 	make user kernel
 	cp $(KERNEL_ELF) kernel-rv
-	$(QEMU) -machine virt -kernel kernel-rv -m 128 -nographic -smp 1 -bios default -drive file=sdcard-rv.img,if=none,format=raw,id=x0 \
+	$(QEMU) -machine virt -kernel kernel-rv -m 1G -nographic -smp 1 -bios default -drive file=sdcard-rv.img,if=none,format=raw,id=x0 \
                     -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -no-reboot -device virtio-net-device,netdev=net -netdev user,id=net \
                     -rtc base=utc
 # -drive file=disk-rv.img,if=none,format=raw,id=x1 -device virtio-blk-device,drive=x1,bus=virtio-mmio-bus.1

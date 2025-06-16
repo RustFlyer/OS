@@ -21,7 +21,7 @@
 use alloc::vec::Vec;
 use core::{cell::SyncUnsafeCell, mem::ManuallyDrop};
 
-use bitmap_allocator::{BitAlloc, BitAlloc64K};
+use bitmap_allocator::{BitAlloc, BitAlloc1M};
 
 use config::mm::{PAGE_SIZE, RAM_END, kernel_end_phys};
 use mutex::SpinNoIrqLock;
@@ -33,14 +33,14 @@ use crate::address::{PhysAddr, PhysPageNum, VirtPageNum};
 ///
 /// It is protected by a lock to be used in a multi-threaded environment.
 static FRAME_ALLOCATOR: FrameAllocator = FrameAllocator {
-    allocator: SpinNoIrqLock::new(BitAlloc64K::DEFAULT),
+    allocator: SpinNoIrqLock::new(BitAlloc1M::DEFAULT),
     offset: SyncUnsafeCell::new(0),
 };
 
 /// Frame allocator type.
 struct FrameAllocator {
     /// Bitmap allocator.
-    allocator: SpinNoIrqLock<BitAlloc64K>,
+    allocator: SpinNoIrqLock<BitAlloc1M>,
     /// Offset between PPNs and bit indices.
     offset: SyncUnsafeCell<usize>,
 }
