@@ -11,7 +11,7 @@ use smoltcp::{
 };
 use timer::{TIMER_MANAGER, Timer};
 
-use crate::{PollTimer, SOCKET_SET, device::DeviceWrapper, tcp::LISTEN_TABLE};
+use crate::{PollTimer, device::DeviceWrapper, tcp::LISTEN_TABLE};
 
 type SmolInstant = smoltcp::time::Instant;
 type SmolDuration = smoltcp::time::Duration;

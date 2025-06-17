@@ -30,6 +30,7 @@ use loongArch64::register::{crmd, era, pgdl};
 /// - satp(seen as PGDL in loongArch): a pagetable for mapping virtual address.
 #[derive(Debug, Clone, Copy)]
 pub struct ProcessorPrivilegeState {
+    #[cfg(target_arch = "riscv64")]
     sum_cnt: usize,
 
     sstatus: usize,
@@ -40,6 +41,7 @@ pub struct ProcessorPrivilegeState {
 impl ProcessorPrivilegeState {
     pub const fn new() -> Self {
         Self {
+            #[cfg(target_arch = "riscv64")]
             sum_cnt: 0,
             sstatus: 0,
             sepc: 0,

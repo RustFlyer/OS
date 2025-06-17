@@ -76,4 +76,12 @@ impl Task {
                 .unwrap()
         })
     }
+
+    pub fn get_thread_ustime(&self) -> (Duration, Duration) {
+        self.timer_mut().user_and_system_time()
+    }
+
+    pub fn get_children_ustime(&self) -> (Duration, Duration) {
+        self.timer_mut().child_user_system_time()
+    }
 }

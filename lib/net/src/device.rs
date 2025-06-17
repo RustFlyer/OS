@@ -2,20 +2,17 @@ use core::cell::RefCell;
 
 use alloc::boxed::Box;
 use driver::net::NetDevice;
-use mutex::{ShareMutex, SpinNoIrqLock, new_share_mutex};
 use smoltcp::{
-    iface::SocketSet,
-    phy::{self, Medium},
-    socket::icmp::Endpoint,
+    phy::{self},
     wire::IpEndpoint,
 };
 
 use crate::{
     addr::UNSPECIFIED_ENDPOINT_V4,
     rttoken::{NetRxToken, NetTxToken},
-    tcp::snoop_tcp_packet,
 };
 
+#[allow(unused)]
 pub struct TcpState {
     pub(crate) is_recv_first: bool,
     pub(crate) src_addr: IpEndpoint,

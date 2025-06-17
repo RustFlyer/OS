@@ -38,11 +38,12 @@ fn main() {
     fs::write(&linker_script_dest, link_script).unwrap();
     println!("cargo:rustc-link-arg=-T{}", linker_script_dest.display());
 
-    let linkapp = fs::read_to_string(PathBuf::from(manifest_dir.clone()).join("src/linkapp.asm.tmpl"))
-        .unwrap()
-        .replace("<cargo-target>", &target_triple)
-        .replace("<cargo-profile>", &compile_profile)
-        .replace("<cargo-target-acronym>", target_arch_acronym);
+    let linkapp =
+        fs::read_to_string(PathBuf::from(manifest_dir.clone()).join("src/linkapp.asm.tmpl"))
+            .unwrap()
+            .replace("<cargo-target>", &target_triple)
+            .replace("<cargo-profile>", &compile_profile)
+            .replace("<cargo-target-acronym>", target_arch_acronym);
     let linkapp_dest = PathBuf::from(manifest_dir).join("src/linkapp.asm");
     fs::write(&linkapp_dest, linkapp).unwrap();
 }

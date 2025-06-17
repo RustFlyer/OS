@@ -10,6 +10,7 @@ use lwext4_rust::{
 
 use systype::error::{SysError, SysResult};
 
+#[allow(unused)]
 unsafe extern "C" {
     // Get/set mode
     fn ext4_inode_get_mode(sb: *const ext4_sblock, inode: *mut ext4_inode) -> u32;
@@ -70,6 +71,7 @@ unsafe extern "C" {
 /// operate on inodes.
 pub struct ExtInode;
 
+#[allow(unused)]
 impl ExtInode {
     /// Returns `true` if the inode at the given path exists.
     pub fn exists(path: &CStr, inode_type: InodeTypes) -> SysResult<bool> {

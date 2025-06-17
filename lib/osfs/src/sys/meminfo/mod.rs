@@ -1,7 +1,4 @@
-use alloc::{
-    format,
-    string::{String, ToString},
-};
+use alloc::{format, string::String};
 use mutex::SpinNoIrqLock;
 
 pub mod dentry;

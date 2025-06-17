@@ -173,6 +173,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         MUNLOCK => sys_munlock(args[0], args[1]),
         SCHED_SETAFFINITY => sys_sched_setaffinity(args[0], args[1], args[2]),
         SOCKETPAIR => sys_socketpair(args[0], args[1], args[2], args[3]),
+        GETRUSAGE => sys_getrusage(args[0] as i32, args[1]),
         _ => {
             println!("Syscall not implemented: {}", syscall_no.as_str());
             unimplemented!()

@@ -10,6 +10,7 @@ use config::mm::USER_STACK_SIZE;
 use config::process::CloneFlags;
 use osfs::sys_root_dentry;
 use osfuture::{suspend_now, yield_now};
+use systype::rusage::Rusage;
 use systype::{
     error::{SysError, SyscallResult},
     rlimit::RLimit,
@@ -908,4 +909,51 @@ pub fn sys_setsid() -> SyscallResult {
     log::debug!("[sys_setsid]");
     let task = current_task();
     Ok(task.pid())
+}
+
+#[derive(FromRepr, Clone, Copy, Debug, Eq, PartialEq)]
+#[repr(i32)]
+#[allow(non_camel_case_types)]
+pub enum RusageType {
+    RUSAGE_SELF = 0,
+    RUSAGE_CHILDREN = -1,
+    RUSAGE_THREAD = 1,
+}
+
+pub fn sys_getrusage(who: i32, usage: usize) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+    let mut usageptr = UserWritePtr::<Rusage>::new(usage, &addrspace);
+    let who = RusageType::from_repr(who).ok_or(SysError::EINVAL)?;
+    let mut ret = Rusage::default();
+    log::debug!("[sys_getrusage] who: {who:?}");
+    match who {
+        RusageType::RUSAGE_SELF => {
+            let (total_utime, total_stime) = task.get_process_ustime();
+            ret.utime = total_utime.into();
+            ret.stime = total_stime.into();
+            log::debug!("[sys_getrusage] ret: {ret:?}");
+            unsafe {
+                usageptr.write(ret)?;
+            }
+        }
+        RusageType::RUSAGE_CHILDREN => {
+            let (total_utime, total_stime) = task.get_children_ustime();
+            ret.utime = total_utime.into();
+            ret.stime = total_stime.into();
+            unsafe {
+                usageptr.write(ret)?;
+            }
+        }
+        RusageType::RUSAGE_THREAD => {
+            let (total_utime, total_stime) = task.get_thread_ustime();
+            ret.utime = total_utime.into();
+            ret.stime = total_stime.into();
+            unsafe {
+                usageptr.write(ret)?;
+            }
+        }
+        _ => return Err(SysError::EINVAL),
+    }
+    Ok(0)
 }
