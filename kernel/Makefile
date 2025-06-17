@@ -12,6 +12,7 @@ endif
 
 PHONY += build
 build:
+	touch src/main.rs
 	cargo build $(MODE_ARGS) $(CARGO_ARGS) --offline
 
 .PHONY: $(PHONY)
