@@ -26,10 +26,14 @@ pub mod pselect;
 pub mod simple;
 pub mod sys;
 pub mod tmp;
+pub mod var;
 
 pub use vfs::sys_root_dentry;
 
-use crate::sys::{fs::SysFsType, init_sysfs};
+use crate::{
+    sys::{fs::SysFsType, init_sysfs},
+    var::VarFsType,
+};
 
 pub static FS_MANAGER: SpinNoIrqLock<BTreeMap<String, Arc<dyn FileSystemType>>> =
     SpinNoIrqLock::new(BTreeMap::new());
@@ -62,6 +66,9 @@ pub fn register_dev() {
 
     let tmpfs = TmpFsType::new();
     FS_MANAGER.lock().insert(tmpfs.name(), tmpfs);
+
+    let varfs = VarFsType::new();
+    FS_MANAGER.lock().insert(varfs.name(), varfs);
 
     let sysfs = SysFsType::new();
     FS_MANAGER.lock().insert(sysfs.name(), sysfs);
@@ -113,6 +120,12 @@ pub fn init() {
         .mount("tmp", Some(diskfs_root.clone()), MountFlags::empty(), None)
         .unwrap();
     log::debug!("success mount tmpfs");
+
+    // let varfs = FS_MANAGER.lock().get("varfs").unwrap().clone();
+    // varfs
+    //     .mount("var", Some(diskfs_root.clone()), MountFlags::empty(), None)
+    //     .unwrap();
+    // log::debug!("success mount varfs");
 
     let sysfs = FS_MANAGER.lock().get("sysfs").unwrap().clone();
     let sysfs_dentry = sysfs

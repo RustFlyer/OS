@@ -31,7 +31,7 @@ use osfs::{
 use osfuture::{Select2Futures, SelectOutput};
 use systype::{
     error::{SysError, SysResult, SyscallResult},
-    time::TimeSpec,
+    time::{TimeSpec, TimeValue},
 };
 use timer::{TimedTaskResult, TimeoutFuture};
 use vfs::{
@@ -1535,6 +1535,12 @@ pub async fn sys_pselect6(
     log::debug!("[sys_pselect6] thread: {} call", task.tid());
     log::info!("[sys_pselect6] timeout: {:?}", timeout);
 
+    // if let Some(t) = timeout {
+    //     if t.is_zero() {
+    //         timeout = None;
+    //     }
+    // }
+
     let mut polls = Vec::<FilePollRet>::with_capacity(nfds);
 
     for fd in 0..nfds {
@@ -1594,7 +1600,7 @@ pub async fn sys_pselect6(
             SelectOutput::Output1(time_output) => match time_output {
                 TimedTaskResult::Completed(ret_vec) => ret_vec,
                 TimedTaskResult::Timeout => {
-                    // log::debug!("[sys_pselect6]: timeout");
+                    log::debug!("[sys_pselect6]: timeout");
                     sweep_and_cont();
                     return Ok(0);
                 }
