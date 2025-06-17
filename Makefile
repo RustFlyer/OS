@@ -123,16 +123,9 @@ docker:
 	docker run --privileged --rm -it --network="host" -v ${PWD}:/mnt -w /mnt ${DOCKER_NAME} bash
 
 
-PHONY += env
-env:
-	(cargo install --list | grep "cargo-binutils" > /dev/null 2>&1) || cargo install cargo-binutils
-
-
 PHONY += kernel
 kernel:
-	@echo Platform: $(BOARD)
 	cd kernel && make build
-	@echo "Updated: $(KERNEL_ELF)"
 
 
 PHONY += build
@@ -141,14 +134,15 @@ build: user kernel
 
 PHONY += run
 run: build
-	@echo $(QEMU_ARGS)
 	$(QEMU) $(QEMU_ARGS)
 
 
 PHONY += clean
 clean:
 	cargo clean
-	rm -rf $(TARGET_DIR)/*
+	-rm -rf $(TARGET_DIR)/
+	-rm -rf fsimg/
+	-rm kernel-rv kernel-la
 
 
 PHONY += disasm
@@ -175,9 +169,7 @@ run-docker:
 
 PHONY += user
 user:
-	@echo "building user..."
 	cd user && make build
-	@echo "building user finished"
 
 
 PHONY += fs-img
@@ -261,52 +253,78 @@ all:
 
 
 PHONY += rkernel
-rkernel:
-	make rkernel-build ARCH=riscv64
+rkernel: rkernel-run
 
 
 PHONY += rkernel-build
 rkernel-build:
-	make user kernel
+	make kernel-build ARCH=riscv64
 	cp $(KERNEL_ELF) kernel-rv
-	$(QEMU) -machine virt -kernel kernel-rv -m 1G -nographic -smp 1 -bios default -drive file=sdcard-rv.img,if=none,format=raw,id=x0 \
+
+
+PHONY += rkernel-run
+rkernel-run:
+	make rkernel-run-wrapped ARCH=riscv64
+
+
+PHONY += rkernel-run-wrapped
+rkernel-run-wrapped: rkernel-build
+	$(QEMU) -machine virt -kernel $(KERNEL_ELF) -m 1G -nographic -smp 1 -bios default -drive file=sdcard-rv.img,if=none,format=raw,id=x0 \
                     -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -no-reboot -device virtio-net-device,netdev=net -netdev user,id=net \
                     -rtc base=utc
 # -drive file=disk-rv.img,if=none,format=raw,id=x1 -device virtio-blk-device,drive=x1,bus=virtio-mmio-bus.1
 
 
 PHONY += lkernel
-lkernel:
-	make lkernel-build ARCH=loongarch64
+lkernel: lkernel-run
 
 
 PHONY += lkernel-build
 lkernel-build:
-	make user kernel
+	make kernel-build ARCH=loongarch64
 	cp $(KERNEL_ELF) kernel-la
-	$(QEMU) -kernel kernel-la -m 1G -nographic -smp 1 -drive file=sdcard-la.img,if=none,format=raw,id=x0 \
+
+
+PHONY += lkernel-run
+lkernel-run:
+	make lkernel-run-wrapped ARCH=loongarch64
+
+
+PHONY += lkernel-run-wrapped
+lkernel-run-wrapped: lkernel-build
+	$(QEMU) -kernel $(KERNEL_ELF) -m 1G -nographic -smp 1 -drive file=sdcard-la.img,if=none,format=raw,id=x0 \
                         -device virtio-blk-pci,drive=x0 -no-reboot  -device virtio-net-pci,netdev=net0 \
                         -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555 \
                         -rtc base=utc
 # -drive file=disk-la.img,if=none,format=raw,id=x1 -device virtio-blk-pci,drive=x1
 
-PHONY += debug-rkernel
-debug-rkernel:
-	@make user   ARCH=riscv64
-	@make kernel ARCH=riscv64
-	@cp target/riscv64gc-unknown-none-elf/debug/kernel kernel-rv
-	@qemu-system-riscv64 -machine virt -kernel kernel-rv -m 128 -nographic -smp 1 -bios default -drive file=sdcard-rv.img,if=none,format=raw,id=x0 \
+
+PHONY += kernel-build
+kernel-build:
+	make user kernel
+
+
+PHONY += rkernel-debug
+rkernel-debug: rkernel-build
+	make rkernel-debug-wrapped ARCH=riscv64
+
+
+PHONY += rkernel-debug-wrapped
+rkernel-debug-wrapped: rkernel-build
+	$(QEMU) -machine virt -kernel $(KERNEL_ELF) -m 128 -nographic -smp 1 -bios default -drive file=sdcard-rv.img,if=none,format=raw,id=x0 \
                     -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -no-reboot -device virtio-net-device,netdev=net -netdev user,id=net \
                     -rtc base=utc -s -S
 # -drive file=disk-rv.img,if=none,format=raw,id=x1 -device virtio-blk-device,drive=x1,bus=virtio-mmio-bus.1
 
 
-PHONY += debug-lkernel
-debug-lkernel:
-	@make user   ARCH=loongarch64
-	@make kernel ARCH=loongarch64
-	@cp target/loongarch64-unknown-none/debug/kernel kernel-la
-	@qemu-system-loongarch64 -kernel kernel-la -m 1G -nographic -smp 1 -drive file=sdcard-la.img,if=none,format=raw,id=x0 \
+PHONY += lkernel-debug
+lkernel-debug:
+	make lkernel-debug-wrapped ARCH=loongarch64
+
+
+PHONY += lkernel-debug-wrapped
+lkernel-debug-wrapped: lkernel-build
+	$(QEMU) -kernel $(KERNEL_ELF) -m 1G -nographic -smp 1 -drive file=sdcard-la.img,if=none,format=raw,id=x0 \
                         -device virtio-blk-pci,drive=x0 -no-reboot  -device virtio-net-pci,netdev=net0 \
                         -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555 \
                         -rtc base=utc -s -S

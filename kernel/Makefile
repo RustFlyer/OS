@@ -12,8 +12,7 @@ endif
 
 PHONY += build
 build:
-	@echo "building $(CARGO_ARGS)"
-	@echo "building $(CARGO_CFG_TARGET_ARCH)"
+	touch src/main.rs
 	cargo build $(MODE_ARGS) $(CARGO_ARGS) --offline
 
 .PHONY: $(PHONY)
