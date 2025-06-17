@@ -236,12 +236,13 @@ pub async fn sys_recvfrom(
     addrlen: usize,
 ) -> SyscallResult {
     debug_assert!(flags == 0, "unsupported flags");
-    log::debug!("[sys_recvfrom] socket fd: {sockfd:#x}, src_addr: {src_addr:#x}");
-    log::debug!("[sys_recvfrom] buf: {buf:#x}, len: {len:#x}");
 
     // poll_interfaces();
 
     let task = current_task();
+    let tid = task.tid();
+    log::debug!("[sys_recvfrom] tid: {tid} socket fd: {sockfd:#x}, src_addr: {src_addr:#x}");
+    log::debug!("[sys_recvfrom] buf: {buf:#x}, len: {len:#x}");
     let addrspace = task.addr_space();
     let mut write_ptr = UserWritePtr::<u8>::new(buf, &addrspace);
     let buf = unsafe { write_ptr.try_into_mut_slice(len) }?;
@@ -372,5 +373,19 @@ pub fn sys_socketpair(_domain: usize, _types: usize, _protocol: usize, sv: usize
     unsafe {
         sv.write(pipe)?;
     }
+    Ok(0)
+}
+
+pub fn sys_getpeername(sockfd: usize, addr: usize, addrlen: usize) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+    let socket: Arc<Socket> = task
+        .with_mut_fdtable(|table| table.get_file(sockfd))?
+        .downcast_arc::<Socket>()
+        .map_err(|_| SysError::ENOTSOCK)?;
+
+    let peer_addr = socket.sk.peer_addr()?;
+    log::info!("[sys_getpeername] sockfd: {sockfd}");
+    write_sockaddr(addrspace, addr, addrlen, peer_addr)?;
     Ok(0)
 }

@@ -1627,6 +1627,8 @@ pub async fn sys_pselect6(
         }
     }
 
+    log::debug!("[sys_pselect6] thread: {} exit", task.tid());
+
     Ok(ret)
 }
 

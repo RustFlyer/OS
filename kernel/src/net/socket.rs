@@ -2,12 +2,13 @@ use alloc::boxed::Box;
 use async_trait::async_trait;
 use config::vfs::{OpenFlags, PollEvents};
 use net::{poll_interfaces, tcp::core::TcpSocket, udp::UdpSocket, unix::UnixSocket};
-use osfuture::take_waker;
 use systype::error::SysResult;
 use vfs::{
     file::{File, FileMeta},
     sys_root_dentry,
 };
+
+use crate::processor::current_task;
 
 use super::{SocketType, addr::SaFamily, sock::Sock};
 
@@ -79,6 +80,7 @@ impl File for Socket {
         if buf.len() == 0 {
             return Ok(0);
         }
+        log::warn!("[Socket::File::write_at] begin to send {}", buf.len());
         let bytes = self.sk.sendto(buf, None).await?;
         log::warn!(
             "[Socket::File::write_at] expect to send: {:?} bytes exact: {bytes}",
@@ -108,7 +110,10 @@ impl File for Socket {
             log::warn!("[Socket::bask_poll] PollEvents is hangup");
             res |= PollEvents::HUP;
         }
-        log::info!("[Socket::base_poll] ret events:{res:?} {netstate:?}");
+        log::info!(
+            "[Socket::base_poll] tid: {}, ret events:{res:?} {netstate:?}",
+            current_task().tid()
+        );
         res
     }
 }

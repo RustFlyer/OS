@@ -169,8 +169,9 @@ pub static mut CLOCK_DEVIATION: [Duration; SUPPORT_CLOCK] = [Duration::ZERO; SUP
 /// - 4 = `CLOCK_MONOTONIC_RAW`: The original value of the monotonic clock is not affected by ntp or adjustments.
 /// - 5 = `CLOCK_REALTIME_COARSE`: Rough version of the system clock.
 pub fn sys_clock_gettime(clockid: usize, tp: usize) -> SyscallResult {
-    log::info!("[sys_clock_gettime] clockid: {clockid}, tp address: {tp:#x}");
     let task = current_task();
+    let tid = task.tid();
+    log::info!("[sys_clock_gettime] tid: {tid}, clockid: {clockid}, tp address: {tp:#x}");
     let addr_space = task.addr_space();
     let mut ts_ptr = UserWritePtr::<TimeSpec>::new(tp, &addr_space);
 

@@ -59,6 +59,7 @@ impl TcpSocket {
 
     /// Transmits data in the given buffer.
     pub async fn send(&self, buf: &[u8]) -> SysResult<usize> {
+        log::info!("[TcpSocket::send] begin to send to {:?}", self.peer_addr);
         let shutdown = unsafe { *self.shutdown.get() };
         if shutdown & SEND_SHUTDOWN != 0 {
             log::warn!("[TcpSocket::send] shutdown closed write, send return 0");

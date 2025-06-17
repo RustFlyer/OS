@@ -135,6 +135,10 @@ impl UdpSocket {
     /// - when `remote_addr`(not self.remote_addr) is 0 or unspecified, this function will return EINVAL Error.
     /// - when self.local_addr is none, it will be set as [`UNSPECIFIED_LISTEN_ENDPOINT`].
     pub async fn send_to(&self, buf: &[u8], remote_addr: IpEndpoint) -> SysResult<usize> {
+        log::info!(
+            "[UdpSocket::send_to] {:?} send to {remote_addr:?}",
+            self.local_addr
+        );
         if remote_addr.port == 0 || remote_addr.addr.is_unspecified() {
             return Err(SysError::EINVAL);
         }
@@ -175,8 +179,10 @@ impl UdpSocket {
                 })
             })
             .await?;
-        log::info!("[UdpSocket::send_impl] send {bytes} bytes to {remote_addr:?}");
+        log::info!("[UdpSocket::send_to] send {bytes} bytes to {remote_addr:?}");
+        log::debug!("[UdpSocket::send_to] I'will yield to let another thread to recv");
         yield_now().await;
+        log::debug!("[UdpSocket::send_to] yield return");
 
         Ok(bytes)
     }
@@ -194,6 +200,7 @@ impl UdpSocket {
     /// - when self.local_addr is none, it will be set as [`UNSPECIFIED_LISTEN_ENDPOINT`].
     pub async fn send(&self, buf: &[u8]) -> SysResult<usize> {
         let remote_addr = self.peer_addr()?;
+        log::info!("[UdpSocket::send] begin to send to {remote_addr:?}");
         self.send_to(buf, remote_addr).await
     }
 
@@ -228,7 +235,10 @@ impl UdpSocket {
                         Err(SysError::ENOTCONN)
                     } else {
                         // no more data
-                        log::info!("[recv_impl] no more data, register waker and suspend now");
+                        log::info!(
+                            "[recv_impl] {} no more data, register waker and suspend now",
+                            self.local_addr.read().unwrap()
+                        );
                         socket.register_recv_waker(&waker);
                         Err(SysError::EAGAIN)
                     }
