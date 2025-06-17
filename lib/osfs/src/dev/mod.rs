@@ -19,6 +19,7 @@ pub mod rtc;
 pub mod shm;
 pub mod stdio;
 pub mod tty;
+pub mod urandom;
 pub mod zero;
 
 pub struct DevFsType {

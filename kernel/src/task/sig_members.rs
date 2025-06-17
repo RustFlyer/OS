@@ -68,7 +68,8 @@ impl Task {
 
         let manager = self.sig_manager_mut();
         manager.add(si);
-        if manager.should_wake.contain_signal(si.sig) && (self.is_in_state(TaskState::Interruptable) || self.is_in_state(TaskState::Zombie))
+        if manager.should_wake.contain_signal(si.sig)
+            && (self.is_in_state(TaskState::Interruptable) || self.is_in_state(TaskState::Zombie))
         {
             log::warn!("[Task::recv] tid {} has been woken", self.tid());
             self.wake();

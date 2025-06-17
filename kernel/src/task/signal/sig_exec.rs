@@ -41,12 +41,12 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
     log::debug!("[sig context] TrapContext.sp: {:#x}", cx.user_reg[3]);
     let old_mask = task.get_sig_mask();
 
-    log::debug!(
-        "[sig_exec] task [{}] Handling signal: {:?} {:?}",
-        task.get_name(),
-        si,
-        action
-    );
+    // log::debug!(
+    //     "[sig_exec] task [{}] Handling signal: {:?} {:?}",
+    //     task.get_name(),
+    //     si,
+    //     action
+    // );
 
     if *interrupted && action.flags.contains(SigActionFlag::SA_RESTART) {
         cx.sepc -= 4;
@@ -114,7 +114,7 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
                 fpstate: [0; 66],
             };
             sig_cx.user_reg[0] = cx.sepc;
-            log::debug!("[sig context] sig_cx_ptr: {sig_cx_ptr:?}");
+            // log::debug!("[sig context] sig_cx_ptr: {sig_cx_ptr:?}");
 
             unsafe { sig_cx_ptr.write(sig_cx)? };
 
@@ -177,7 +177,11 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
             //     .enumerate()
             //     .for_each(|(idx, u)| log::debug!("r[{idx:02}]: {:#x}", u));
 
-            log::debug!("sig: {:#x}", task.sig_manager_mut().bitmap.bits());
+            log::debug!(
+                "[sig context] sig: {:#x}, entry: {:#x}",
+                task.sig_manager_mut().bitmap.bits(),
+                entry
+            );
 
             Ok(true)
         }

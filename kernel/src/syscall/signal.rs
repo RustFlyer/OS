@@ -365,11 +365,11 @@ pub async fn sys_sigreturn() -> SyscallResult {
         .iter()
         .enumerate()
         .for_each(|(idx, u)| rs.push_str(format!("r[{idx:02}] = {u:#x}, ").as_str()));
-    log::debug!(
-        "[sys_sigreturn] task: {} ,before trap context: [{:?}]",
-        task.get_name(),
-        rs
-    );
+    // log::debug!(
+    //     "[sys_sigreturn] task: {} ,before trap context: [{:?}]",
+    //     task.get_name(),
+    //     rs
+    // );
     unsafe {
         let sig_cx = sig_cx_ptr.read()?;
         // log::error!("{:?}", sig_cx);
@@ -386,10 +386,12 @@ pub async fn sys_sigreturn() -> SyscallResult {
         .enumerate()
         .for_each(|(idx, u)| rs.push_str(format!("r[{idx:02}] = {u:#x}, ").as_str()));
     log::debug!(
-        "[sys_sigreturn] task: {} ,after trap context: [{:?}]",
+        "[sys_sigreturn] tid: {}, task: {}, after trap context: [{:?}]",
+        task.tid(),
         task.get_name(),
         rs
     );
+    simdebug::stop();
     // log::debug!("sig: {:#x}", task.sig_manager_mut().bitmap.bits());
     // its return value is the a0 before signal interrupt, so that it won't be changed in async_syscall
     // trap_cx.display();
@@ -414,11 +416,12 @@ pub fn sys_rt_sigaction(
     prev_sa: usize,
     sigsetsize: usize,
 ) -> SyscallResult {
+    let task = current_task();
+    let tid = task.tid();
     log::info!(
-        "[sys_rt_sigaction] signum: {signum:?}, new_sa: {new_sa:#x}, prev_sa: {prev_sa:#x}, sigsetsize: {sigsetsize:?}"
+        "[sys_rt_sigaction] tid {tid} signum: {signum:?}, new_sa: {new_sa:#x}, prev_sa: {prev_sa:#x}, sigsetsize: {sigsetsize:?}"
     );
 
-    let task = current_task();
     let addrspace = task.addr_space();
     let signum = Sig::from_i32(signum);
 

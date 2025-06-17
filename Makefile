@@ -5,8 +5,8 @@
 # ======================
 
 # Target architecture
-# export ARCH = riscv64
-export ARCH = loongarch64
+export ARCH = riscv64
+# export ARCH = loongarch64
 export TESTCASE_LIBC = musl
 # export TESTCASE_LIBC = glibc
 export SUBMIT = false
@@ -37,7 +37,7 @@ export SMP = 1
 export BOARD = qemu
 export MODE = debug
 export LOG = trace
-export DEBUG = off
+export DEBUG = 
 
 QEMU = qemu-system-$(ARCH)
 OBJDUMP = rust-objdump --arch-name=$(ARCH)
@@ -271,7 +271,7 @@ rkernel-build:
 	cp $(KERNEL_ELF) kernel-rv
 	$(QEMU) -machine virt -kernel kernel-rv -m 1G -nographic -smp 1 -bios default -drive file=sdcard-rv.img,if=none,format=raw,id=x0 \
                     -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -no-reboot -device virtio-net-device,netdev=net -netdev user,id=net \
-                    -rtc base=utc
+                    -rtc base=utc $(DEBUG)
 # -drive file=disk-rv.img,if=none,format=raw,id=x1 -device virtio-blk-device,drive=x1,bus=virtio-mmio-bus.1
 
 
@@ -287,14 +287,14 @@ lkernel-build:
 	$(QEMU) -kernel kernel-la -m 1G -nographic -smp 1 -drive file=sdcard-la.img,if=none,format=raw,id=x0 \
                         -device virtio-blk-pci,drive=x0 -no-reboot  -device virtio-net-pci,netdev=net0 \
                         -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555 \
-                        -rtc base=utc
+                        -rtc base=utc 
 # -drive file=disk-la.img,if=none,format=raw,id=x1 -device virtio-blk-pci,drive=x1
 
 PHONY += debug-rkernel
 debug-rkernel:
 	@make user   ARCH=riscv64
 	@make kernel ARCH=riscv64
-	@cp target/riscv64gc-unknown-none-elf/debug/kernel kernel-rv
+	@cp target/riscv64gc-unknown-none-elf/$(MODE)/kernel kernel-rv
 	@qemu-system-riscv64 -machine virt -kernel kernel-rv -m 128 -nographic -smp 1 -bios default -drive file=sdcard-rv.img,if=none,format=raw,id=x0 \
                     -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -no-reboot -device virtio-net-device,netdev=net -netdev user,id=net \
                     -rtc base=utc -s -S
@@ -305,7 +305,7 @@ PHONY += debug-lkernel
 debug-lkernel:
 	@make user   ARCH=loongarch64
 	@make kernel ARCH=loongarch64
-	@cp target/loongarch64-unknown-none/debug/kernel kernel-la
+	@cp target/loongarch64-unknown-none/$(MODE)/kernel kernel-la
 	@qemu-system-loongarch64 -kernel kernel-la -m 1G -nographic -smp 1 -drive file=sdcard-la.img,if=none,format=raw,id=x0 \
                         -device virtio-blk-pci,drive=x0 -no-reboot  -device virtio-net-pci,netdev=net0 \
                         -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555 \

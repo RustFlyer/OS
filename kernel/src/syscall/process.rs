@@ -497,7 +497,7 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
                 file.read(&mut buf).await?;
                 // log::debug!("[sys_execve] buf: {:?}", buf);
 
-                let mut firline = String::from_utf8(buf);
+                let firline = String::from_utf8(buf);
                 // log::debug!("[sys_execve] firline: {:?}", firline);
                 if !firline.is_err() && firline.clone().unwrap().starts_with("#!") {
                     let mut firline = firline.unwrap();
