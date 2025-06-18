@@ -74,6 +74,7 @@ impl Task {
             log::warn!("[Task::recv] tid {} has been woken", self.tid());
             self.wake();
         } else {
+            simdebug::stop();
             log::warn!(
                 "[Task::recv] tid {} hasn't been woken or it isn't interruptable or zombie, should_wake {:?}, state {:?}",
                 self.tid(),

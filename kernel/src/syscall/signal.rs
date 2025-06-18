@@ -221,12 +221,16 @@ pub fn sys_kill(pid: isize, sig_code: i32) -> SyscallResult {
                         details: SigDetails::Kill { pid: task.pid() },
                     });
                 }
-                task.with_thread_group(|tg| {
-                    tg.iter().for_each(|t| {
-                        t.set_state(TaskState::Zombie);
-                        t.wake();
+                if sig_code == 9 || sig_code == 15 {
+                    task.with_thread_group(|tg| {
+                        tg.iter().for_each(|t| {
+                            t.set_state(TaskState::Zombie);
+                            t.wake();
+                        });
                     });
-                });
+                } else {
+                    log::warn!("[sys_kill] not SIGKILL or SIGTERM, no operation here");
+                }
             } else {
                 log::error!("[sys_kill] can't find assigned pid.");
                 return Ok(0);
