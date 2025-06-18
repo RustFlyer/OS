@@ -59,7 +59,7 @@ fn main() {
         mkdir("/usr/lib64");
 
         // run_cmd("./busybox ln -s /musl/lib/libc.so /lib/ld-linux-riscv64-lp64.so.1 ");
-        chdir("/glibc");
+        chdir("/musl");
         run_cmd("./busybox cp /musl/lib/* /lib64/");
         run_cmd("./busybox cp /musl/lib/libc.so /lib64/ld-musl-loongarch-lp64d.so.1");
         run_cmd("./busybox cp /glibc/lib/* /lib64/");

@@ -305,7 +305,7 @@ kernel-build:
 
 
 PHONY += rkernel-debug
-rkernel-debug: rkernel-build
+rkernel-debug:
 	make rkernel-debug-wrapped ARCH=riscv64
 
 
