@@ -71,6 +71,12 @@ impl Future for PipeWritePollFuture {
             Poll::Ready(res)
         } else {
             inner.write_waker.push_back(cx.waker().clone());
+            log::debug!(
+                "[PipeReadPollFuture] buffer is full? {:?} {} or {:?} is not OUT, suspend",
+                inner.ring_buffer.is_full(),
+                inner.ring_buffer.len(),
+                self.events
+            );
             Poll::Pending
         }
     }

@@ -134,7 +134,7 @@ impl Task {
         *self.timer_mut() = TaskTimeStat::new();
         unsafe { self.set_elf(elf_file) };
         *self.name_mut() = name;
-        self.with_mut_fdtable(|table| table.close());
+        self.with_mut_fdtable(|table| table.close_cloexec());
         self.with_mut_sig_handler(|handlers| handlers.reset_user_defined());
 
         Ok(())
@@ -484,17 +484,13 @@ impl Task {
             }
         }
 
-        // TODO: Upon _exit(2), all attached shared memory segments are detached from the
-        // process.
         self.with_mut_shm_maps(|maps| {
             for (_, shm_id) in maps.iter() {
                 SHARED_MEMORY_MANAGER.detach(*shm_id, self.pid());
             }
         });
 
-        // TODO: drop most resources here instead of wait4 function parent
-        // called
-        self.with_mut_fdtable(|table| table.close());
+        self.with_mut_fdtable(|table| table.clear());
     }
 
     pub fn proc_status_read(&self) -> String {

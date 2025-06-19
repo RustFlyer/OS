@@ -122,13 +122,26 @@ impl FdTable {
         Ok(self.get(fd)?.file())
     }
 
-    pub fn close(&mut self) {
+    pub fn clear(&mut self) {
+        self.table.clear();
+    }
+
+    pub fn close_cloexec(&mut self) {
+        let mut cnt = 0;
         for slot in self.table.iter_mut() {
             if let Some(fd_info) = slot {
+                // log::debug!(
+                //     "fdinfo ino {} type {:?} fd {} close",
+                //     fd_info.file.inode().get_meta().ino,
+                //     fd_info.file.inode().inotype(),
+                //     cnt
+                // );
+                // log::debug!("fd {} remained: {}", cnt, Arc::strong_count(&fd_info.file));
                 if fd_info.flags().contains(FdFlags::CLOEXEC) {
                     *slot = None;
                 }
             }
+            cnt = cnt + 1;
         }
     }
 
@@ -140,6 +153,11 @@ impl FdTable {
         if self.table[fd].is_none() {
             return Err(SysError::EBADF);
         }
+        log::debug!(
+            "fd {} remained: {}",
+            fd,
+            Arc::strong_count(&self.table[fd].as_ref().unwrap().file)
+        );
         self.table[fd] = None;
         Ok(())
     }

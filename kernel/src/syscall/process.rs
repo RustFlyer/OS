@@ -416,8 +416,8 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
         Ok(args)
     };
 
-    let mut path = read_string(path)?;
-    let mut args = read_string_array(argv)?;
+    let path = read_string(path)?;
+    let args = read_string_array(argv)?;
     let mut envs = read_string_array(envp)?;
 
     if path.is_empty() {

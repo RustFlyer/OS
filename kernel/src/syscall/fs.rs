@@ -1492,6 +1492,8 @@ pub async fn sys_pselect6(
     // let tconvert = make_convert!(TimeSpec);
     // let sconvert = make_convert!(SigSet);
 
+    log::info!("[sys_pselect6] timeout: {:#x}", timeout);
+
     let pconvert = |up: usize| -> SysResult<Option<FdSet>> {
         let mut ptr = UserReadWritePtr::<FdSet>::new(up, &addrspace);
         if ptr.is_null() {
@@ -1526,13 +1528,13 @@ pub async fn sys_pselect6(
     let mut readfds = pconvert(readfds)?;
     let mut writefds = pconvert(writefds)?;
     let mut exceptfds = pconvert(exceptfds)?;
-    let timeout = tconvert(timeout)?;
+    let mut timeout = tconvert(timeout)?;
     let sigmask = sconvert(sigmask)?;
 
+    log::debug!("[sys_pselect6] thread: {} call", task.tid());
     log::info!(
         "[sys_pselect6] readfds: {readfds:?}, writefds: {writefds:?}, exceptfds: {exceptfds:?}"
     );
-    log::debug!("[sys_pselect6] thread: {} call", task.tid());
     log::info!("[sys_pselect6] timeout: {:?}", timeout);
 
     // if let Some(t) = timeout {

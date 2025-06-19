@@ -2,7 +2,7 @@ use alloc::{vec, vec::Vec};
 use core::cmp;
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
-enum RingBufferState {
+pub enum RingBufferState {
     #[default]
     Empty,
     Full,
@@ -12,9 +12,9 @@ enum RingBufferState {
 pub struct RingBuffer {
     arr: Vec<u8>,
     // NOTE: When and only when `head` equals `tail`, `state` can only be `Full` or `Empty`.
-    head: usize,
-    tail: usize,
-    state: RingBufferState,
+    pub(crate) head: usize,
+    pub(crate) tail: usize,
+    pub(crate) state: RingBufferState,
 }
 
 impl RingBuffer {
@@ -37,6 +37,7 @@ impl RingBuffer {
 
     /// Read as much as possible to fill `buf`.
     pub fn read(&mut self, buf: &mut [u8]) -> usize {
+        log::debug!("read state {:?}", self.state);
         if self.state == RingBufferState::Empty || buf.is_empty() {
             return 0;
         }
@@ -64,12 +65,19 @@ impl RingBuffer {
         } else {
             self.state = RingBufferState::Normal;
         }
+        log::debug!(
+            "change state {:?} tail: {}, head: {}",
+            self.state,
+            self.tail,
+            self.head
+        );
 
         ret_len
     }
 
     /// Write as much as possible to fill the ring buffer.
     pub fn write(&mut self, buf: &[u8]) -> usize {
+        log::debug!("write state {:?}", self.state);
         if self.state == RingBufferState::Full || buf.is_empty() {
             return 0;
         }
@@ -97,6 +105,12 @@ impl RingBuffer {
         } else {
             self.state = RingBufferState::Normal;
         }
+        log::debug!(
+            "change state {:?} tail: {}, head: {}",
+            self.state,
+            self.tail,
+            self.head
+        );
 
         ret_len
     }
@@ -131,5 +145,9 @@ impl RingBuffer {
             self.state = RingBufferState::Normal;
         }
         Some(())
+    }
+
+    pub fn len(&self) -> usize {
+        (self.tail + self.arr.len() - self.head) % self.arr.len()
     }
 }

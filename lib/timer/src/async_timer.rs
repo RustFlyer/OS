@@ -55,6 +55,7 @@ impl<F: Future + Send + 'static> Future for TimeoutFuture<F> {
             log::debug!("[TimeoutFuture] Registered new timer");
         }
 
+        log::warn!("timeout waiting");
         Poll::Pending
     }
 }

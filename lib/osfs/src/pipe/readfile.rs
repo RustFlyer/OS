@@ -4,7 +4,10 @@ use async_trait::async_trait;
 use config::vfs::PollEvents;
 use osfuture::take_waker;
 use systype::error::SysResult;
-use vfs::file::{File, FileMeta};
+use vfs::{
+    file::{File, FileMeta},
+    inode::Inode,
+};
 
 use super::read::PipeReadFile;
 use crate::pipe::{inode::PipeInode, read::PipeReadPollFuture};
@@ -20,12 +23,17 @@ impl File for PipeReadFile {
             .inode()
             .downcast_arc::<PipeInode>()
             .unwrap_or_else(|_| unreachable!());
-        // log::info!(
-        //     "[PipeReadFile::base_read_at] read pipe ino {}",
-        //     pipe.get_meta().ino
-        // );
-        let events = PollEvents::IN;
-        let revents = PipeReadPollFuture::new(pipe.clone(), events).await;
+        log::info!(
+            "[PipeReadFile::base_read_at] read pipe ino {} size {}",
+            pipe.get_meta().ino,
+            pipe.get_meta().inner.lock().size
+        );
+        log::debug!(
+            "[PipeReadFile] ringbuffer {:p}",
+            &pipe.inner.lock().ring_buffer
+        );
+
+        let revents = PipeReadPollFuture::new(pipe.clone(), PollEvents::IN).await;
         if revents.contains(PollEvents::HUP) {
             return Ok(0);
         }

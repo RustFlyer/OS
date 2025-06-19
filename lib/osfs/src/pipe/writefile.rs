@@ -23,10 +23,14 @@ impl File for PipeWriteFile {
             .inode()
             .downcast_arc::<PipeInode>()
             .unwrap_or_else(|_| unreachable!());
-        // log::info!(
-        //     "[PipeWriteFile::base_write_at] read pipe ino {}",
-        //     pipe.get_meta().ino
-        // );
+        log::info!(
+            "[PipeWriteFile::base_write_at] write pipe ino {}",
+            pipe.get_meta().ino
+        );
+        log::debug!(
+            "[PipeWriteFile] ringbuffer {:p}",
+            &pipe.inner.lock().ring_buffer
+        );
         let revents = PipeWritePollFuture::new(pipe.clone(), PollEvents::OUT).await;
         if revents.contains(PollEvents::ERR) {
             return Err(SysError::EPIPE);
@@ -37,7 +41,10 @@ impl File for PipeWriteFile {
         if let Some(waker) = inner.read_waker.pop_front() {
             waker.wake();
         }
-        // log::trace!("[Pipe::write] already write buf {buf:?} with data len {len:?}");
+        log::debug!(
+            "[Pipe::write] already write buf {buf:?} with data len {len:?}, now ring buffer is {}",
+            inner.ring_buffer.len()
+        );
         return Ok(len);
     }
 

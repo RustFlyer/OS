@@ -70,6 +70,18 @@ impl Future for PipeReadPollFuture {
                 return Poll::Ready(res);
             }
             inner.read_waker.push_back(cx.waker().clone());
+            log::debug!(
+                "[PipeReadPollFuture] buffer is empty? {:?} {} or {:?} is not IN, state {:?}, suspend",
+                inner.ring_buffer.is_empty(),
+                inner.ring_buffer.len(),
+                self.events,
+                inner.ring_buffer.state,
+            );
+            log::debug!(
+                "[PipeReadPollFuture] buffer head: {}, tail: {}",
+                inner.ring_buffer.head,
+                inner.ring_buffer.tail,
+            );
             Poll::Pending
         }
     }
