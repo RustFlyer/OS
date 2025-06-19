@@ -156,7 +156,7 @@ gdbserver: all0
 
 
 PHONY += gdbclient
-gdbclient: all0
+gdbclient:
 	$(GDB) -ex 'file $(KERNEL_ELF)' \
 			-ex 'set arch $(GDB_ARGS)' \
 			-ex 'target remote localhost:1234'

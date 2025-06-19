@@ -303,6 +303,9 @@ bitflags! {
         const AT_SYMLINK_NOFOLLOW = 0x100;
         /// Follow symbolic link.
         const AT_SYMLINK_FOLLOW = 0x400;
+        /// Don't automount the terminal ("basename") component of pathname.
+        /// Since Linux 3.1 this flag is ignored. Since Linux 4.11 this flag is implied.
+        const AT_NO_AUTOMOUNT = 0x800;
         /// Remove directory instead of file.
         const AT_REMOVEDIR = 0x200;
         /// Empty Path
