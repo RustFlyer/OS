@@ -34,6 +34,7 @@ use crate::{processor::current_task, task::future::spawn_user_task};
 /// - In a single-threaded process, the thread ID is equal to the process ID (PID, as returned by getpid(2)).
 /// - In a multi-threaded process, all threads have the same PID, but each one has a unique TID.
 pub fn sys_gettid() -> SyscallResult {
+    log::info!("[sys_gettid] call");
     Ok(current_task().tid())
 }
 

@@ -1461,9 +1461,9 @@ pub fn sys_ftruncate(fd: usize, length: usize) -> SyscallResult {
 
 pub async fn sys_pselect6(
     nfds: i32,
-    readfds: usize,
-    writefds: usize,
-    exceptfds: usize,
+    readfds1: usize,
+    writefds1: usize,
+    exceptfds1: usize,
     timeout: usize,
     sigmask: usize,
 ) -> SyscallResult {
@@ -1524,11 +1524,24 @@ pub async fn sys_pselect6(
         }
     };
 
+    let writeback = |fdset: Option<FdSet>, addr: usize| -> SysResult<usize> {
+        if fdset.is_none() {
+            return Ok(0);
+        }
+        let fdset = fdset.unwrap();
+        let mut ptr = UserReadWritePtr::<FdSet>::new(addr, &addrspace);
+        log::debug!("fdset: {:?}", fdset);
+        unsafe {
+            ptr.write(fdset)?;
+        }
+        Ok(0)
+    };
+
     let nfds = nfds as usize;
-    let mut readfds = pconvert(readfds)?;
-    let mut writefds = pconvert(writefds)?;
-    let mut exceptfds = pconvert(exceptfds)?;
-    let mut timeout = tconvert(timeout)?;
+    let mut readfds = pconvert(readfds1)?;
+    let mut writefds = pconvert(writefds1)?;
+    let mut exceptfds = pconvert(exceptfds1)?;
+    let timeout = tconvert(timeout)?;
     let sigmask = sconvert(sigmask)?;
 
     log::debug!("[sys_pselect6] thread: {} call", task.tid());
@@ -1539,7 +1552,7 @@ pub async fn sys_pselect6(
 
     // if let Some(t) = timeout {
     //     if t.is_zero() {
-    //         timeout = None;
+    //         return Ok(0);
     //     }
     // }
 
@@ -1604,6 +1617,9 @@ pub async fn sys_pselect6(
                 TimedTaskResult::Timeout => {
                     log::debug!("[sys_pselect6]: timeout");
                     sweep_and_cont();
+                    writeback(readfds, readfds1)?;
+                    writeback(writefds, writefds1)?;
+                    writeback(exceptfds, exceptfds1)?;
                     return Ok(0);
                 }
             },
@@ -1636,6 +1652,9 @@ pub async fn sys_pselect6(
     }
 
     log::debug!("[sys_pselect6] thread: {} exit", task.tid());
+    writeback(readfds, readfds1)?;
+    writeback(writefds, writefds1)?;
+    writeback(exceptfds, exceptfds1)?;
 
     Ok(ret)
 }

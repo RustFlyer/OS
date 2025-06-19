@@ -28,10 +28,6 @@ impl File for PipeReadFile {
             pipe.get_meta().ino,
             pipe.get_meta().inner.lock().size
         );
-        log::debug!(
-            "[PipeReadFile] ringbuffer {:p}",
-            &pipe.inner.lock().ring_buffer
-        );
 
         let revents = PipeReadPollFuture::new(pipe.clone(), PollEvents::IN).await;
         if revents.contains(PollEvents::HUP) {

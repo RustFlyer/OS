@@ -1,5 +1,5 @@
 use alloc::{sync::Arc, vec::Vec};
-use core::fmt::Debug;
+use core::{fmt::Debug, sync::atomic::AtomicBool};
 
 use config::{fs::MAX_FDS, vfs::OpenFlags};
 use systype::{
@@ -22,7 +22,18 @@ pub struct FdInfo {
 pub struct FdTable {
     table: Vec<Option<FdInfo>>,
     rlimit: RLimit,
+    // zombie: AtomicBool,
 }
+
+// impl Clone for FdTable {
+//     fn clone(&self) -> Self {
+//         Self {
+//             table: self.table.clone(),
+//             rlimit: self.rlimit.clone(),
+//             zombie: AtomicBool::new(self.zombie.load(core::sync::atomic::Ordering::Relaxed)),
+//         }
+//     }
+// }
 
 impl FdInfo {
     pub fn new(file: Arc<dyn File>, flags: FdFlags) -> Self {
@@ -65,6 +76,7 @@ impl FdTable {
                 rlim_cur: MAX_FDS,
                 rlim_max: MAX_FDS,
             },
+            // zombie: AtomicBool::new(false),
         }
     }
 
@@ -130,13 +142,17 @@ impl FdTable {
         let mut cnt = 0;
         for slot in self.table.iter_mut() {
             if let Some(fd_info) = slot {
-                // log::debug!(
-                //     "fdinfo ino {} type {:?} fd {} close",
-                //     fd_info.file.inode().get_meta().ino,
-                //     fd_info.file.inode().inotype(),
-                //     cnt
-                // );
-                // log::debug!("fd {} remained: {}", cnt, Arc::strong_count(&fd_info.file));
+                log::debug!(
+                    "fdinfo ino {} type {:?} fd {} close",
+                    fd_info.file.inode().get_meta().ino,
+                    fd_info.file.inode().inotype(),
+                    cnt
+                );
+                log::debug!(
+                    "fd {} remained: {}",
+                    cnt,
+                    Arc::strong_count(&fd_info.file) - 1
+                );
                 if fd_info.flags().contains(FdFlags::CLOEXEC) {
                     *slot = None;
                 }
@@ -156,7 +172,7 @@ impl FdTable {
         log::debug!(
             "fd {} remained: {}",
             fd,
-            Arc::strong_count(&self.table[fd].as_ref().unwrap().file)
+            Arc::strong_count(&self.table[fd].as_ref().unwrap().file) - 1
         );
         self.table[fd] = None;
         Ok(())
@@ -265,7 +281,7 @@ impl FdSet {
 
     pub fn clear(&mut self) {
         for i in 0..self.fds_bits.len() {
-            self.fds_bits[i] = 0;
+            self.fds_bits[i] = 0 as u64;
         }
     }
 
@@ -276,6 +292,7 @@ impl FdSet {
         let idx = fd / 64;
         let bit = fd % 64;
         let mask = 1 << bit;
+        log::debug!("set fd {fd} = mask {mask}");
         self.fds_bits[idx] |= mask;
     }
 

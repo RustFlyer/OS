@@ -5,6 +5,7 @@ use core::{
 
 use alloc::sync::Arc;
 use config::vfs::PollEvents;
+use mutex::SpinNoIrqLock;
 use vfs::{file::FileMeta, inode::Inode};
 
 use crate::simple::dentry::SimpleDentry;
@@ -48,11 +49,16 @@ impl Drop for PipeWriteFile {
 pub(crate) struct PipeWritePollFuture {
     events: PollEvents,
     pipe: Arc<PipeInode>,
+    cnt: SpinNoIrqLock<usize>,
 }
 
 impl PipeWritePollFuture {
     pub fn new(pipe: Arc<PipeInode>, events: PollEvents) -> Self {
-        Self { pipe, events }
+        Self {
+            pipe,
+            events,
+            cnt: SpinNoIrqLock::new(0),
+        }
     }
 }
 
@@ -60,13 +66,16 @@ impl Future for PipeWritePollFuture {
     type Output = PollEvents;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        *self.cnt.lock() += 1;
         let mut inner = self.pipe.inner.lock();
         let mut res = PollEvents::empty();
         if inner.is_read_closed {
             res |= PollEvents::ERR;
             return Poll::Ready(res);
         }
-        if self.events.contains(PollEvents::OUT) && !inner.ring_buffer.is_full() {
+        if (self.events.contains(PollEvents::OUT) && !inner.ring_buffer.is_full())
+            || *self.cnt.lock() >= 2
+        {
             res |= PollEvents::OUT;
             Poll::Ready(res)
         } else {
