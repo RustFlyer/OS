@@ -1,7 +1,6 @@
+use alloc::sync::{Arc, Weak};
 use core::time::Duration;
 
-use alloc::sync::{Arc, Weak};
-use bitflags::bitflags;
 use timer::{IEvent, TimerState};
 
 use super::{

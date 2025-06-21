@@ -256,7 +256,7 @@ impl Task {
             new_share_mutex(self.fdtable_mut().lock().clone())
         };
 
-        let cpus_on = self.cpus_on_mut().clone();
+        let cpus_on = *self.cpus_on_mut();
 
         let name = SyncUnsafeCell::new(name);
         let new = Arc::new(Self::new_fork_clone(

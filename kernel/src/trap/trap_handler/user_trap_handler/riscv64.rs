@@ -18,7 +18,6 @@ use crate::vm::user_ptr::UserReadPtr;
 /// __trap_from_user saved TrapContext, then jump to
 /// the middle of trap_return(), and then return to
 /// task_executor_unit(), which calls this trap_handler() function.
-#[unsafe(no_mangle)]
 pub fn trap_handler(task: &Task) {
     let stval = register::stval::read();
     let cause = register::scause::read().cause();

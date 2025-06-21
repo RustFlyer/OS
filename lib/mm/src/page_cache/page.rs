@@ -42,8 +42,8 @@ pub struct Page {
     /// This is a `SyncUnsafeCell` because we do not care about synchronization
     /// when accessing the page data simultaneously from multiple threads.
     frame: SyncUnsafeCell<FrameTracker>,
-    /// Which mapping this page comes from.
-    mapping: Mapping,
+    // /// Which mapping this page comes from.
+    // mapping: Mapping,
 }
 
 /// The mapping of a page.
@@ -67,7 +67,7 @@ impl Page {
     pub fn build() -> SysResult<Self> {
         Ok(Self {
             frame: SyncUnsafeCell::new(FrameTracker::build()?),
-            mapping: Mapping::Anonymous,
+            // mapping: Mapping::Anonymous,
         })
     }
 

@@ -1,36 +1,34 @@
+use alloc::{string::ToString, sync::Arc};
 use core::{mem, ptr::NonNull};
 
-use alloc::{string::ToString, sync::Arc};
-use config::mm::{DTB_ADDR, KERNEL_MAP_OFFSET};
+use flat_device_tree::{Fdt, node};
+use virtio_drivers::transport::{self, Transport, mmio::MmioTransport};
+
+use config::mm::KERNEL_MAP_OFFSET;
 use driver::{
-    BLOCK_DEVICE, BLOCK_DEVICE2, BlockDevice, CHAR_DEVICE, DeviceType, MmioSerialPort,
+    BLOCK_DEVICE, BlockDevice, CHAR_DEVICE, DeviceType, MmioSerialPort,
     device::{DevId, DeviceMajor, DeviceMeta},
     net::{loopback::LoopbackDev, virtnet::create_virt_net_dev},
     println,
     qemu::{UartDevice, VirtBlkDevice},
 };
-use flat_device_tree::{Fdt, node};
 use mm::address::PhysAddr;
 use net::init_network;
-use virtio_drivers::transport::{self, Transport, mmio::MmioTransport};
 
-use crate::vm::{
-    KERNEL_PAGE_TABLE,
-    iomap::{ioremap, iounmap},
-};
+use crate::vm::iomap::{ioremap, iounmap};
 
 pub fn probe_mmio(device_tree: &Fdt) {
-    let blk = probe_virtio_blk(&device_tree);
+    let blk = probe_virtio_blk(device_tree);
     // BLOCK_DEVICE.call_once(|| blk.unwrap());
 
     let mut buf: [u8; 512] = [0; 512];
     BLOCK_DEVICE.get().unwrap().read(0, &mut buf);
     log::debug!("BLOCK_DEVICE INIT SUCCESS");
 
-    let chardev = probe_char_device(&device_tree);
+    let chardev = probe_char_device(device_tree);
     CHAR_DEVICE.call_once(|| Arc::new(UartDevice::new_from_mmio(chardev.unwrap())));
 
-    init_net(&device_tree);
+    init_net(device_tree);
     println!("CHAR_DEVICE INIT SUCCESS");
 
     log::debug!("probe_test finish");
@@ -165,7 +163,7 @@ pub fn probe_char_device(root: &Fdt) -> Option<MmioSerialPort> {
     log::debug!("[probe_char_device] start");
     let chosen = root.chosen().unwrap();
     // Serial
-    let mut stdout = chosen.stdout().and_then(|n| Some(n.node()));
+    let mut stdout = chosen.stdout().map(|n| n.node());
     if stdout.is_none() {
         log::debug!("Non-standard stdout device, trying to workaround");
         let chosen = root.find_node("/chosen").expect("No chosen node");
@@ -176,12 +174,8 @@ pub fn probe_char_device(root: &Fdt) -> Option<MmioSerialPort> {
                 let bytes = unsafe {
                     core::slice::from_raw_parts_mut((n.value.as_ptr()) as *mut u8, n.value.len())
                 };
-                let mut len = 0;
-                for byte in bytes.iter() {
-                    if *byte == b':' {
-                        return core::str::from_utf8(&n.value[..len]).ok();
-                    }
-                    len += 1;
+                if let Some(pos) = bytes.iter().position(|&byte| byte == b':') {
+                    return core::str::from_utf8(&n.value[..pos]).ok();
                 }
                 core::str::from_utf8(&n.value[..n.value.len() - 1]).ok()
             })

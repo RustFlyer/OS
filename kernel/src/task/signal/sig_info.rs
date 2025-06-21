@@ -105,7 +105,7 @@ impl Sig {
     pub const SIGMAX: Sig = Sig(64); // Maximum signal
 
     pub fn from_i32(signum: i32) -> Sig {
-        Sig(signum as i32)
+        Sig(signum)
     }
 
     pub fn is_valid(&self) -> bool {

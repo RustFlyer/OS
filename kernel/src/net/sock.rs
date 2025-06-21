@@ -28,7 +28,7 @@ impl Sock {
     pub fn bind(&self, sockfd: usize, local_addr: SockAddr) -> SysResult<()> {
         match self {
             Sock::Tcp(tcp) => {
-                let local_addr = local_addr.into_listen_endpoint();
+                let local_addr = local_addr.as_listen_endpoint();
                 let addr = if local_addr.addr.is_none() {
                     UNSPECIFIED_IPV4
                 } else {
@@ -38,7 +38,7 @@ impl Sock {
             }
 
             Sock::Udp(udp) => {
-                let local_addr = local_addr.into_listen_endpoint();
+                let local_addr = local_addr.as_listen_endpoint();
                 if let Some(prev_fd) = udp.check_bind(sockfd, local_addr) {
                     current_task()
                         .with_mut_fdtable(|table| table.dup3_with_flags(prev_fd, sockfd))?;
@@ -61,11 +61,11 @@ impl Sock {
     pub async fn connect(&self, remote_addr: SockAddr) -> SysResult<()> {
         match self {
             Sock::Tcp(tcp) => {
-                let remote_addr = remote_addr.into_endpoint();
+                let remote_addr = remote_addr.as_endpoint();
                 tcp.connect(remote_addr).await
             }
             Sock::Udp(udp) => {
-                let remote_addr = remote_addr.into_endpoint();
+                let remote_addr = remote_addr.as_endpoint();
                 udp.connect(remote_addr)
             }
             Sock::Unix(_unix) => Ok(()),
@@ -104,7 +104,7 @@ impl Sock {
         match self {
             Sock::Tcp(tcp) => tcp.send(buf).await,
             Sock::Udp(udp) => match remote_addr {
-                Some(addr) => udp.send_to(buf, addr.into_endpoint()).await,
+                Some(addr) => udp.send_to(buf, addr.as_endpoint()).await,
                 None => udp.send(buf).await,
             },
             Sock::Unix(_unix) => unimplemented!(),

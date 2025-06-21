@@ -1,7 +1,11 @@
 use crate::CharDevice;
-use config::device::{MMIO_SERIAL_PORT_ADDR, PCI_SERIAL_PORT_ADDR};
 use mutex::SpinNoIrqLock;
-pub use uart_16550::MmioSerialPort;
+use uart_16550::MmioSerialPort;
+
+#[cfg(target_arch = "riscv64")]
+use config::device::MMIO_SERIAL_PORT_ADDR;
+#[cfg(target_arch = "loongarch64")]
+use config::device::PCI_SERIAL_PORT_ADDR;
 
 pub struct UartDevice {
     pub device: SpinNoIrqLock<MmioSerialPort>,
@@ -22,6 +26,12 @@ impl UartDevice {
         Self {
             device: SpinNoIrqLock::new(serialport),
         }
+    }
+}
+
+impl Default for UartDevice {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

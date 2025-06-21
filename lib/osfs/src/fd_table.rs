@@ -82,7 +82,7 @@ impl FdTable {
             .map(|(i, _)| i);
 
         if inner_slot.is_some() {
-            return inner_slot;
+            inner_slot
         } else if inner_slot.is_none() && self.table.len() < self.rlimit.rlim_cur {
             self.table.push(None);
             return Some(self.table.len() - 1);
@@ -189,7 +189,7 @@ impl FdTable {
         let file = self.get_file(old_fd)?;
         let new_fd = self
             .get_available_slot(lower_bound)
-            .ok_or_else(|| SysError::EMFILE)?;
+            .ok_or(SysError::EMFILE)?;
         log::debug!(
             "[dup_with_bound] old fd {}, lowerbound {}, new fd {}",
             old_fd,
@@ -211,6 +211,12 @@ impl FdTable {
     }
 }
 
+impl Default for FdTable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Debug for FdInfo {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(
@@ -228,8 +234,8 @@ impl Debug for FdTable {
             .iter()
             .enumerate()
             .try_for_each(|(i, entry)| match entry {
-                Some(file) => write!(f, "{}: {:?}\n", i, file),
-                None => write!(f, "{}: <closed>\n", i),
+                Some(file) => writeln!(f, "{}: {:?}", i, file),
+                None => writeln!(f, "{}: <closed>", i),
             })
     }
 }

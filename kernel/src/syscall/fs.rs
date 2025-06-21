@@ -31,7 +31,7 @@ use osfs::{
 use osfuture::{Select2Futures, SelectOutput};
 use systype::{
     error::{SysError, SysResult, SyscallResult},
-    time::{TimeSpec, TimeValue},
+    time::TimeSpec,
 };
 use timer::{TimedTaskResult, TimeoutFuture};
 use vfs::{
@@ -1568,11 +1568,7 @@ pub async fn sys_pselect6(
         }
     }
 
-    let old_mask = if let Some(mask) = sigmask {
-        Some(mem::replace(task.sig_mask_mut(), mask))
-    } else {
-        None
-    };
+    let old_mask = sigmask.map(|mask| mem::replace(task.sig_mask_mut(), mask));
 
     task.set_state(TaskState::Interruptable);
     task.set_wake_up_signal(!task.get_sig_mask());
@@ -1739,7 +1735,7 @@ pub fn sys_statx(
 
     #[repr(C)]
     #[derive(Debug)]
-    pub struct STATX {
+    pub struct Statx {
         stx_mask: u32,
         stx_blksize: u32,
         stx_attributes: u64,
@@ -1826,13 +1822,13 @@ pub fn sys_statx(
 
     let dentry = {
         if flags.contains(StatxFlags::EMPTY_PATH) {
-            let dirfd: AtFd = AtFd::from(dirfd);
+            let dirfd: AtFd = dirfd;
             match dirfd {
                 AtFd::FdCwd => Err(SysError::EINVAL)?,
                 AtFd::Normal(fd) => task.with_mut_fdtable(|t| t.get_file(fd))?.dentry(),
             }
         } else {
-            let dentry = task.walk_at(AtFd::from(dirfd), path)?;
+            let dentry = task.walk_at(dirfd, path)?;
             if !flags.contains(StatxFlags::SYMLINK_NOFOLLOW)
                 && !dentry.is_negative()
                 && dentry.inode().unwrap().inotype().is_symlink()
@@ -1854,7 +1850,7 @@ pub fn sys_statx(
         | StatxMask::BLOCKS;
 
     let stat = dentry.inode().ok_or(SysError::ENOENT)?.get_attr()?;
-    let statx = STATX {
+    let statx = Statx {
         stx_mask: nmask.bits(),
         stx_blksize: stat.st_blksize,
         stx_attributes: 0,
@@ -1884,7 +1880,7 @@ pub fn sys_statx(
     // log::debug!("{:?}", statx);
 
     unsafe {
-        UserWritePtr::<STATX>::new(statxbuf, &addrspace).write(statx)?;
+        UserWritePtr::<Statx>::new(statxbuf, &addrspace).write(statx)?;
     }
 
     Ok(0)

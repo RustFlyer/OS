@@ -1,21 +1,18 @@
+use alloc::vec::Vec;
 use core::{
     cell::UnsafeCell,
     sync::atomic::{AtomicBool, AtomicU8},
 };
 
-use alloc::vec::Vec;
-use mutex::{ShareMutex, SpinNoIrqLock};
 use smoltcp::{
     iface::SocketHandle,
     socket::tcp::{self, State},
     wire::IpEndpoint,
 };
-use timer::sleep_ms;
 
-use crate::{
-    SOCKET_SET, poll_interfaces,
-    tcp::{LISTEN_TABLE, SHUT_RDWR},
-};
+use mutex::ShareMutex;
+
+use crate::{SOCKET_SET, poll_interfaces, tcp::SHUT_RDWR};
 
 /// A TCP socket that provides POSIX-like APIs.
 ///

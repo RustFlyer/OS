@@ -22,13 +22,13 @@ pub struct SpinMutex<T: ?Sized, S: MutexSupport> {
 }
 
 // 禁止Mutex跨越await导致死锁或无意义阻塞
-impl<'a, T: ?Sized, S: MutexSupport> !Sync for MutexGuard<'a, T, S> {}
-impl<'a, T: ?Sized, S: MutexSupport> !Send for MutexGuard<'a, T, S> {}
+impl<T: ?Sized, S: MutexSupport> !Sync for MutexGuard<'_, T, S> {}
+impl<T: ?Sized, S: MutexSupport> !Send for MutexGuard<'_, T, S> {}
 
 unsafe impl<T: ?Sized + Send, S: MutexSupport> Sync for SpinMutex<T, S> {}
 unsafe impl<T: ?Sized + Send, S: MutexSupport> Send for SpinMutex<T, S> {}
 
-impl<'a, T, S: MutexSupport> SpinMutex<T, S> {
+impl<T, S: MutexSupport> SpinMutex<T, S> {
     /// Construct a SpinMutex
     pub const fn new(user_data: T) -> Self {
         SpinMutex {
@@ -87,7 +87,7 @@ impl<'a, T, S: MutexSupport> SpinMutex<T, S> {
     }
 }
 
-impl<'a, T: ?Sized, S: MutexSupport> Deref for MutexGuard<'a, T, S> {
+impl<T: ?Sized, S: MutexSupport> Deref for MutexGuard<'_, T, S> {
     type Target = T;
     #[inline(always)]
     fn deref(&self) -> &T {
@@ -95,14 +95,14 @@ impl<'a, T: ?Sized, S: MutexSupport> Deref for MutexGuard<'a, T, S> {
     }
 }
 
-impl<'a, T: ?Sized, S: MutexSupport> DerefMut for MutexGuard<'a, T, S> {
+impl<T: ?Sized, S: MutexSupport> DerefMut for MutexGuard<'_, T, S> {
     #[inline(always)]
     fn deref_mut(&mut self) -> &mut T {
         unsafe { &mut *self.mutex.data.get() }
     }
 }
 
-impl<'a, T: ?Sized, S: MutexSupport> Drop for MutexGuard<'a, T, S> {
+impl<T: ?Sized, S: MutexSupport> Drop for MutexGuard<'_, T, S> {
     /// The dropping of the MutexGuard will release the lock it was created from.
     #[inline(always)]
     fn drop(&mut self) {

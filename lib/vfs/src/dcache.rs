@@ -45,6 +45,12 @@ impl DentryHashMap {
     }
 }
 
+impl Default for DentryHashMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct DentryBucket(Vec<Arc<dyn Dentry>>);
 
 impl DentryBucket {
@@ -73,5 +79,11 @@ impl DentryBucket {
             .iter()
             .find(|ddentry| ddentry.path() == path)
             .cloned()
+    }
+}
+
+impl Default for DentryBucket {
+    fn default() -> Self {
+        Self::new()
     }
 }

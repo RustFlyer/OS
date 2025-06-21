@@ -42,11 +42,7 @@ impl FileSystemType for VarFsType {
         let mount_inode = SimpleInode::new(sb.clone());
         mount_inode.set_inotype(InodeType::from(InodeMode::DIR));
 
-        let parentv = if let Some(p) = parent.clone() {
-            Some(Arc::downgrade(&p))
-        } else {
-            None
-        };
+        let parentv = parent.clone().map(|p| Arc::downgrade(&p));
 
         let mount_dentry = SimpleDentry::new(name, Some(mount_inode), parentv);
         if let Some(parent) = parent {

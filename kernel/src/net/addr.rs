@@ -99,7 +99,7 @@ pub union SockAddr {
 
 impl SockAddr {
     /// You should make sure that `SockAddr` is IpEndpoint
-    pub fn into_endpoint(&self) -> IpEndpoint {
+    pub fn as_endpoint(&self) -> IpEndpoint {
         unsafe {
             match SaFamily::try_from(self.family).unwrap() {
                 SaFamily::AF_INET => IpEndpoint::new(
@@ -115,7 +115,7 @@ impl SockAddr {
         }
     }
 
-    pub fn into_listen_endpoint(&self) -> IpListenEndpoint {
+    pub fn as_listen_endpoint(&self) -> IpListenEndpoint {
         unsafe {
             match SaFamily::try_from(self.family).unwrap() {
                 SaFamily::AF_INET => self.ipv4.into(),
@@ -127,10 +127,10 @@ impl SockAddr {
 
     pub fn from_endpoint(endpoint: IpEndpoint) -> Self {
         match endpoint.addr {
-            IpAddress::Ipv4(v4) => Self {
+            IpAddress::Ipv4(_) => Self {
                 ipv4: endpoint.into(),
             },
-            IpAddress::Ipv6(v6) => Self {
+            IpAddress::Ipv6(_) => Self {
                 ipv6: endpoint.into(),
             },
         }
@@ -158,12 +158,12 @@ impl From<SockAddrIn6> for IpEndpoint {
 impl From<IpEndpoint> for SockAddrIn {
     fn from(v4: IpEndpoint) -> Self {
         if let IpAddress::Ipv4(v4_addr) = v4.addr {
-            return Self {
+            Self {
                 family: SaFamily::AF_INET.into(),
                 port: v4.port.to_be_bytes(),
                 addr: unsafe { core::mem::transmute::<Ipv4Addr, [u8; 4]>(v4_addr) },
                 zero: [0; 8],
-            };
+            }
         } else {
             // this won't happen
             panic!();
@@ -174,13 +174,13 @@ impl From<IpEndpoint> for SockAddrIn {
 impl From<IpEndpoint> for SockAddrIn6 {
     fn from(v6: IpEndpoint) -> Self {
         if let IpAddress::Ipv6(v6_addr) = v6.addr {
-            return Self {
+            Self {
                 family: SaFamily::AF_INET6.into(),
                 port: v6.port.to_be_bytes(),
                 flowinfo: 0,
                 addr: unsafe { core::mem::transmute::<Ipv6Addr, [u8; 16]>(v6_addr) },
                 scope: 0,
-            };
+            }
         } else {
             panic!();
         }
@@ -238,7 +238,7 @@ pub fn read_sockaddr(
             let sockaddr = SockAddr {
                 ipv4: unsafe { *(addr as *const _) },
             };
-            log::debug!("[read_sockaddr] AF_INET: {:?}", sockaddr.into_endpoint());
+            log::debug!("[read_sockaddr] AF_INET: {:?}", sockaddr.as_endpoint());
             Ok(sockaddr)
         }
         SaFamily::AF_INET6 => {
@@ -249,7 +249,7 @@ pub fn read_sockaddr(
             let sockaddr = SockAddr {
                 ipv6: unsafe { *(addr as *const _) },
             };
-            log::debug!("[read_sockaddr] AF_INET6: {:?}", sockaddr.into_endpoint());
+            log::debug!("[read_sockaddr] AF_INET6: {:?}", sockaddr.as_endpoint());
             Ok(sockaddr)
         }
         SaFamily::AF_UNIX => {
