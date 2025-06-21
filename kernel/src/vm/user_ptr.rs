@@ -677,7 +677,7 @@ impl Drop for SumGuard {
     }
 }
 
-unsafe impl<'a, T, M> Send for UserPtr<'a, T, M>
+unsafe impl<T, M> Send for UserPtr<'_, T, M>
 where
     T: Send,
     M: Send + AccessType,

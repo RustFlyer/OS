@@ -31,7 +31,7 @@ use osfs::{
 use osfuture::{Select2Futures, SelectOutput};
 use systype::{
     error::{SysError, SysResult, SyscallResult},
-    time::{TimeSpec, TimeValue},
+    time::TimeSpec,
 };
 use timer::{TimedTaskResult, TimeoutFuture};
 use vfs::{
@@ -335,29 +335,35 @@ pub fn sys_fstatat(dirfd: usize, pathname: usize, stat_buf: usize, flags: i32) -
     let addr_space = task.addr_space();
     let path = UserReadPtr::<u8>::new(pathname, &addr_space).read_c_string(256)?;
     let path = path.into_string().map_err(|_| SysError::EINVAL)?;
+    let flags = AtFlags::from_bits_retain(flags);
 
-    if !(flags == 0
-        || flags == AtFlags::AT_SYMLINK_NOFOLLOW.bits()
-        || flags == AtFlags::AT_EMPTY_PATH.bits())
+    if !(AtFlags::AT_EMPTY_PATH | AtFlags::AT_SYMLINK_NOFOLLOW | AtFlags::AT_NO_AUTOMOUNT)
+        .contains(flags)
     {
-        log::warn!("[sys_fstatat] flags: {flags} is not supported");
+        log::warn!("[sys_fstatat] flags: illegal flags: {flags:?}");
         return Err(SysError::EINVAL);
     }
 
-    let flags = AtFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
-    log::info!("[sys_fstat_at] dirfd: {dirfd:#x}, path: {path}, flags: {flags:?}");
+    log::info!(
+        "[sys_fstat_at] dirfd: {:#x}, path: {}, flags: {:?}",
+        dirfd,
+        if flags.contains(AtFlags::AT_EMPTY_PATH) {
+            "<empty path>"
+        } else {
+            &path
+        },
+        flags
+    );
 
     let dentry = {
-        if flags.contains(AtFlags::AT_EMPTY_PATH) {
-            let dirfd: AtFd = AtFd::from(dirfd);
+        if flags.contains(AtFlags::AT_EMPTY_PATH) && path.is_empty() {
+            let dirfd = AtFd::from(dirfd);
             match dirfd {
                 AtFd::FdCwd => Err(SysError::EINVAL)?,
                 AtFd::Normal(fd) => task.with_mut_fdtable(|t| t.get_file(fd))?.dentry(),
             }
         } else {
-            log::debug!("dentry walk at");
             let dentry = task.walk_at(AtFd::from(dirfd), path)?;
-            log::debug!("dentry walk at");
             if !flags.contains(AtFlags::AT_SYMLINK_NOFOLLOW)
                 && !dentry.is_negative()
                 && dentry.inode().unwrap().inotype().is_symlink()
@@ -403,9 +409,10 @@ pub fn sys_close(fd: usize) -> SyscallResult {
 /// # Tips
 /// - The OpenFlag is the same between old and new fd.
 pub fn sys_dup(fd: usize) -> SyscallResult {
-    // log::info!("[sys_dup] fd: {fd}");
     let task = current_task();
-    task.with_mut_fdtable(|table| table.dup(fd))
+    let result = task.with_mut_fdtable(|table| table.dup(fd))?;
+    log::info!("[sys_dup] new fd: {:?}", result);
+    Ok(result)
 }
 
 /// `dup3()` creates a copy of the file descriptor `oldfd`, using the file descriptor number
@@ -1576,11 +1583,7 @@ pub async fn sys_pselect6(
         }
     }
 
-    let old_mask = if let Some(mask) = sigmask {
-        Some(mem::replace(task.sig_mask_mut(), mask))
-    } else {
-        None
-    };
+    let old_mask = sigmask.map(|mask| mem::replace(task.sig_mask_mut(), mask));
 
     task.set_state(TaskState::Interruptable);
     task.set_wake_up_signal(!task.get_sig_mask());
@@ -1753,7 +1756,7 @@ pub fn sys_statx(
 
     #[repr(C)]
     #[derive(Debug)]
-    pub struct STATX {
+    pub struct Statx {
         stx_mask: u32,
         stx_blksize: u32,
         stx_attributes: u64,
@@ -1840,13 +1843,13 @@ pub fn sys_statx(
 
     let dentry = {
         if flags.contains(StatxFlags::EMPTY_PATH) {
-            let dirfd: AtFd = AtFd::from(dirfd);
+            let dirfd: AtFd = dirfd;
             match dirfd {
                 AtFd::FdCwd => Err(SysError::EINVAL)?,
                 AtFd::Normal(fd) => task.with_mut_fdtable(|t| t.get_file(fd))?.dentry(),
             }
         } else {
-            let dentry = task.walk_at(AtFd::from(dirfd), path)?;
+            let dentry = task.walk_at(dirfd, path)?;
             if !flags.contains(StatxFlags::SYMLINK_NOFOLLOW)
                 && !dentry.is_negative()
                 && dentry.inode().unwrap().inotype().is_symlink()
@@ -1868,7 +1871,7 @@ pub fn sys_statx(
         | StatxMask::BLOCKS;
 
     let stat = dentry.inode().ok_or(SysError::ENOENT)?.get_attr()?;
-    let statx = STATX {
+    let statx = Statx {
         stx_mask: nmask.bits(),
         stx_blksize: stat.st_blksize,
         stx_attributes: 0,
@@ -1898,7 +1901,7 @@ pub fn sys_statx(
     // log::debug!("{:?}", statx);
 
     unsafe {
-        UserWritePtr::<STATX>::new(statxbuf, &addrspace).write(statx)?;
+        UserWritePtr::<Statx>::new(statxbuf, &addrspace).write(statx)?;
     }
 
     Ok(0)

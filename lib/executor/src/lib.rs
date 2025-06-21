@@ -2,7 +2,6 @@
 #![no_main]
 
 extern crate alloc;
-use core::usize;
 
 use alloc::collections::VecDeque;
 use async_task::{Runnable, ScheduleInfo, Task, WithInfo};

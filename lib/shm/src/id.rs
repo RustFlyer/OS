@@ -29,7 +29,7 @@ impl ShmStat {
             atime: 0,
             dtime: 0,
             ctime: get_time_ms() / 1000,
-            cpid: cpid,
+            cpid,
             lpid: 0,
             nattch: 0,
         }

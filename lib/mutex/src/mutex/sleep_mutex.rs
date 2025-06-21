@@ -125,10 +125,10 @@ struct SleepMutexGuard<'a, T: ?Sized, S: MutexSupport> {
     mutex: &'a SleepMutex<T, S>,
 }
 
-unsafe impl<'a, T: ?Sized + Send, S: MutexSupport> Send for SleepMutexGuard<'a, T, S> {}
-unsafe impl<'a, T: ?Sized + Send, S: MutexSupport> Sync for SleepMutexGuard<'a, T, S> {}
+unsafe impl<T: ?Sized + Send, S: MutexSupport> Send for SleepMutexGuard<'_, T, S> {}
+unsafe impl<T: ?Sized + Send, S: MutexSupport> Sync for SleepMutexGuard<'_, T, S> {}
 
-impl<'a, T: ?Sized, S: MutexSupport> Deref for SleepMutexGuard<'a, T, S> {
+impl<T: ?Sized, S: MutexSupport> Deref for SleepMutexGuard<'_, T, S> {
     type Target = T;
     #[inline(always)]
     fn deref(&self) -> &T {
@@ -136,14 +136,14 @@ impl<'a, T: ?Sized, S: MutexSupport> Deref for SleepMutexGuard<'a, T, S> {
     }
 }
 
-impl<'a, T: ?Sized, S: MutexSupport> DerefMut for SleepMutexGuard<'a, T, S> {
+impl<T: ?Sized, S: MutexSupport> DerefMut for SleepMutexGuard<'_, T, S> {
     #[inline(always)]
     fn deref_mut(&mut self) -> &mut T {
         unsafe { &mut *self.mutex.data.get() }
     }
 }
 
-impl<'a, T: ?Sized, S: MutexSupport> Drop for SleepMutexGuard<'a, T, S> {
+impl<T: ?Sized, S: MutexSupport> Drop for SleepMutexGuard<'_, T, S> {
     #[inline]
     fn drop(&mut self) {
         // log::trace!("[SleepMutexGuard::drop] drop...");

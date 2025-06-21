@@ -7,10 +7,10 @@ use user_lib::{exit, println};
 
 #[unsafe(no_mangle)]
 fn main() {
-    let mut a: i32 = 0;
+    let mut _a: i32 = 0;
 
     for i in 0..=30 {
-        a = a + i;
+        _a += i;
         println!("thread orange: {}", i);
     }
 

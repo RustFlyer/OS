@@ -156,7 +156,7 @@ gdbserver: all0
 
 
 PHONY += gdbclient
-gdbclient: all0
+gdbclient:
 	$(GDB) -ex 'file $(KERNEL_ELF)' \
 			-ex 'set arch $(GDB_ARGS)' \
 			-ex 'target remote localhost:1234'
@@ -305,7 +305,7 @@ kernel-build:
 
 
 PHONY += rkernel-debug
-rkernel-debug: rkernel-build
+rkernel-debug:
 	make rkernel-debug-wrapped ARCH=riscv64
 
 

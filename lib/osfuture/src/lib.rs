@@ -146,7 +146,7 @@ pub fn block_on_with_result<T>(fut: impl Future<Output = T>) -> Result<T, ()> {
         match fut.as_mut().poll(&mut cx) {
             Poll::Ready(res) => return Ok(res),
             Poll::Pending => {
-                cnt = cnt + 1;
+                cnt += 1;
                 if cnt > 10000 {
                     return Err(());
                 }

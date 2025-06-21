@@ -4,15 +4,16 @@ pub mod mmio;
 pub mod pci;
 
 #[cfg(target_arch = "riscv64")]
-use crate::vm::iomap::ioremap;
-#[cfg(target_arch = "riscv64")]
 use mmio::*;
 #[cfg(target_arch = "loongarch64")]
 use pci::*;
 
+use flat_device_tree::Fdt;
+
 use config::mm::{DTB_ADDR, KERNEL_MAP_OFFSET};
 
-use flat_device_tree::Fdt;
+#[cfg(target_arch = "riscv64")]
+use crate::vm::iomap::ioremap;
 
 pub fn probe_tree() {
     log::debug!("begin to build dtb");

@@ -500,7 +500,7 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
 
                 let firline = String::from_utf8(buf);
                 // log::debug!("[sys_execve] firline: {:?}", firline);
-                if !firline.is_err() && firline.clone().unwrap().starts_with("#!") {
+                if firline.is_ok() && firline.clone().unwrap().starts_with("#!") {
                     let mut firline = firline.unwrap();
                     firline.remove(0);
                     firline.remove(0);
@@ -803,10 +803,7 @@ pub fn sys_prlimit64(
 
     if !olimit.is_null() {
         let limit = match resource {
-            Resource::STACK => {
-                let rstack = RLimit::one(USER_STACK_SIZE, USER_STACK_SIZE);
-                rstack
-            }
+            Resource::STACK => RLimit::one(USER_STACK_SIZE, USER_STACK_SIZE),
             Resource::NOFILE => task.with_mut_fdtable(|table| table.get_rlimit()),
             r => {
                 log::error!("[sys_prlimit64] old limit {:?} not implemented", r);
@@ -954,7 +951,6 @@ pub fn sys_getrusage(who: i32, usage: usize) -> SyscallResult {
                 usageptr.write(ret)?;
             }
         }
-        _ => return Err(SysError::EINVAL),
     }
     Ok(0)
 }

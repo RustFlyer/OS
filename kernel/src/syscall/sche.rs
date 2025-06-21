@@ -1,5 +1,5 @@
-use alloc::vec::Vec;
 use bitflags::bitflags;
+
 use systype::error::{SysError, SyscallResult};
 
 use crate::{
@@ -127,7 +127,7 @@ pub fn sys_get_mempolicy(
 
     if nodelist_ptr != 0 {
         let ulong_bits = core::mem::size_of::<usize>() * 8;
-        let n_nodemask = (maxnode + ulong_bits - 1) / ulong_bits;
+        let n_nodemask = maxnode.div_ceil(ulong_bits);
         for i in 0..n_nodemask {
             let mut ptr = UserWritePtr::<usize>::new(
                 nodelist_ptr + i * core::mem::size_of::<usize>(),

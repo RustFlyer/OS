@@ -1,7 +1,4 @@
-use core::{mem, ptr::NonNull};
-
 use alloc::{collections::btree_map::BTreeMap, sync::Arc, vec::Vec};
-use virtio_drivers::transport::{self, DeviceType, Transport, mmio::MmioTransport};
 
 use crate::{
     cpu::CPU,

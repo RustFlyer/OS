@@ -126,10 +126,10 @@ struct SleepMutexCasGuard<'a, T: ?Sized, S: MutexSupport> {
     mutex: &'a SleepMutexCas<T, S>,
 }
 
-unsafe impl<'a, T: ?Sized + Send, S: MutexSupport> Send for SleepMutexCasGuard<'a, T, S> {}
-unsafe impl<'a, T: ?Sized + Send, S: MutexSupport> Sync for SleepMutexCasGuard<'a, T, S> {}
+unsafe impl<T: ?Sized + Send, S: MutexSupport> Send for SleepMutexCasGuard<'_, T, S> {}
+unsafe impl<T: ?Sized + Send, S: MutexSupport> Sync for SleepMutexCasGuard<'_, T, S> {}
 
-impl<'a, T: ?Sized, S: MutexSupport> Deref for SleepMutexCasGuard<'a, T, S> {
+impl<T: ?Sized, S: MutexSupport> Deref for SleepMutexCasGuard<'_, T, S> {
     type Target = T;
     #[inline(always)]
     fn deref(&self) -> &T {
@@ -137,14 +137,14 @@ impl<'a, T: ?Sized, S: MutexSupport> Deref for SleepMutexCasGuard<'a, T, S> {
     }
 }
 
-impl<'a, T: ?Sized, S: MutexSupport> DerefMut for SleepMutexCasGuard<'a, T, S> {
+impl<T: ?Sized, S: MutexSupport> DerefMut for SleepMutexCasGuard<'_, T, S> {
     #[inline(always)]
     fn deref_mut(&mut self) -> &mut T {
         unsafe { &mut *self.mutex.data.get() }
     }
 }
 
-impl<'a, T: ?Sized, S: MutexSupport> Drop for SleepMutexCasGuard<'a, T, S> {
+impl<T: ?Sized, S: MutexSupport> Drop for SleepMutexCasGuard<'_, T, S> {
     #[inline]
     fn drop(&mut self) {
         // log::trace!("[SleepMutexCasGuard::drop] drop...");

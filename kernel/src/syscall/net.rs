@@ -64,7 +64,7 @@ pub fn sys_bind(sockfd: usize, addr: usize, addrlen: usize) -> SyscallResult {
         addr
     );
 
-    log::debug!("[sys_bind] local_addr: {:?}", local_addr.into_endpoint());
+    log::debug!("[sys_bind] local_addr: {:?}", local_addr.as_endpoint());
     let socket: Arc<Socket> = task
         .with_mut_fdtable(|table| table.get_file(sockfd))?
         .downcast_arc::<Socket>()
@@ -294,7 +294,7 @@ pub async fn sys_connect(sockfd: usize, addr: usize, addrlen: usize) -> SyscallR
     log::info!(
         "[sys_connect] sockfd {} trys to connect {}",
         sockfd,
-        remote_addr.into_endpoint()
+        remote_addr.as_endpoint()
     );
     socket.sk.connect(remote_addr).await?;
     Ok(0)

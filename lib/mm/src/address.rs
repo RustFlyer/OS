@@ -7,9 +7,11 @@
 use core::fmt::{self, Debug, Formatter};
 
 use config::mm::{
-    KERNEL_MAP_OFFSET, PA_WIDTH_SV39, PAGE_OFFSET_WIDTH, PAGE_SIZE, PPN_WIDTH, USER_END,
-    VA_WIDTH_SV39, VPN_WIDTH,
+    KERNEL_MAP_OFFSET, PA_WIDTH_SV39, PAGE_OFFSET_WIDTH, PAGE_SIZE, PPN_WIDTH, USER_END, VPN_WIDTH,
 };
+
+#[cfg(target_arch = "riscv64")]
+use config::mm::VA_WIDTH_SV39;
 
 /// An address in physical memory defined in Sv39.
 ///

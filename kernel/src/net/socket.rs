@@ -1,5 +1,7 @@
 use alloc::boxed::Box;
+
 use async_trait::async_trait;
+
 use config::vfs::{OpenFlags, PollEvents};
 use net::{poll_interfaces, tcp::core::TcpSocket, udp::UdpSocket, unix::UnixSocket};
 use systype::error::SysResult;
@@ -8,9 +10,8 @@ use vfs::{
     sys_root_dentry,
 };
 
-use crate::processor::current_task;
-
 use super::{SocketType, addr::SaFamily, sock::Sock};
+use crate::processor::current_task;
 
 /// Socket is for user, Sock is for kernel.
 pub struct Socket {
@@ -64,8 +65,8 @@ impl File for Socket {
         &self.meta
     }
 
-    async fn base_read(&self, buf: &mut [u8], pos: usize) -> SysResult<usize> {
-        if buf.len() == 0 {
+    async fn base_read(&self, buf: &mut [u8], _pos: usize) -> SysResult<usize> {
+        if buf.is_empty() {
             return Ok(0);
         }
         let bytes = self.sk.recvfrom(buf).await.map(|e| e.0)?;
@@ -76,8 +77,8 @@ impl File for Socket {
         Ok(bytes)
     }
 
-    async fn base_write(&self, buf: &[u8], pos: usize) -> SysResult<usize> {
-        if buf.len() == 0 {
+    async fn base_write(&self, buf: &[u8], _pos: usize) -> SysResult<usize> {
+        if buf.is_empty() {
             return Ok(0);
         }
         log::warn!("[Socket::File::write_at] begin to send {}", buf.len());

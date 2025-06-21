@@ -58,7 +58,7 @@ impl ListenTable {
         assert_ne!(port, 0);
         let mut entry = self.tcp[port as usize].lock();
 
-        if entry.is_none() || true {
+        if entry.is_none() {
             *entry = Some(Box::new(ListenTableEntry::new(
                 listen_endpoint,
                 waker,
@@ -183,7 +183,7 @@ impl ListenTable {
         while !list.is_empty() {
             let mut should_remove = false;
             let port = list.pop().unwrap();
-            if let Some(entry) = self.tcp[port as usize].lock().deref_mut() {
+            if let Some(entry) = self.tcp[port].lock().deref_mut() {
                 log::debug!("[check_after_poll] port: {}", port);
                 let mut listen_handles = entry.handles.lock();
                 let mut ret = None;
@@ -256,6 +256,12 @@ impl ListenTable {
     // pub fn remove_entry(&self, port: u16) {
     //     *self.tcp[port as usize].lock() = None;
     // }
+}
+
+impl Default for ListenTable {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 fn is_connected(handle: SocketHandle) -> bool {
