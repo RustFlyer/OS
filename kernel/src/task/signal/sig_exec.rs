@@ -3,14 +3,13 @@ use core::arch::global_asm;
 
 use systype::error::SysResult;
 
+use super::sig_info::Sig;
 use crate::task::{
     Task, TaskState,
     sig_members::{ActionType, SigActionFlag, SigContext},
     signal::sig_info::{SigInfo, SigSet},
 };
 use crate::vm::user_ptr::UserWritePtr;
-
-use super::sig_info::Sig;
 
 #[cfg(target_arch = "riscv64")]
 global_asm!(include_str!("riscv64_sigreturn_trampoline.asm"));

@@ -1,3 +1,5 @@
+use core::iter;
+
 use config::process::INIT_PROC_ID;
 use osfuture::suspend_now;
 use systype::{
@@ -8,7 +10,7 @@ use systype::{
 use crate::{
     processor::current_task,
     task::{
-        TaskState,
+        Task, TaskState,
         futex::{
             FutexAddr, FutexHashKey, FutexOp, FutexWaiter, futex_manager, single_futex_manager,
         },
@@ -18,7 +20,7 @@ use crate::{
     },
     vm::user_ptr::{UserReadPtr, UserWritePtr},
 };
-use alloc::string::String;
+use alloc::{boxed::Box, string::String, sync::Arc};
 
 /// futex - fast user-space locking
 ///
@@ -188,75 +190,91 @@ pub async fn sys_futex(
 ///
 /// TODO: broadcast(to process group) when pid <= 0; permission check when sig_code == 0; i32 or u32
 pub fn sys_kill(pid: isize, sig_code: i32) -> SyscallResult {
-    log::debug!(
-        "[sys_kill] try to send sig_code {} to pid {}",
+    log::info!(
+        "[sys_kill] pid: {:}, sig_code: {:}, current task pid: {}",
+        pid,
         sig_code,
-        pid
+        current_task().pid()
     );
-    // TASK_MANAGER.for_each(|task| {
-    //     log::error!("[sys_kill] existing task's pid: {}", task.tid());
-    //     Ok(())
-    // })?;
+
     let sig = Sig::from_i32(sig_code);
     if sig.raw() != 0 && !sig.is_valid() {
         log::warn!("invalid sig_code: {:}", sig_code);
         return Err(SysError::EINTR);
     }
 
-    match pid {
-        _ if pid > 0 => {
-            log::info!("[sys_kill] Send {sig_code} to {pid}");
-            if let Some(task) = TASK_MANAGER.get_task(pid as usize) {
-                log::debug!(
-                    "[sys_kill] thread {} name {} gets killed",
-                    task.tid(),
-                    task.get_name()
-                );
-                if !task.is_process() {
-                    log::warn!(
-                        "[sys_kill] the specified pid {} exists but is not a process",
-                        pid
-                    );
-                    return Err(SysError::ESRCH);
+    // Find all target processes and put them in an iterator.
+    let curr_pid = current_task().pid();
+    let process_list_lock = TASK_MANAGER.inner().lock();
+    let mut target_processes = {
+        let boxed_iter: Box<dyn Iterator<Item = Arc<Task>>> = match pid {
+            p if p > 0 => {
+                let task = process_list_lock
+                    .get(&(p as usize))
+                    .and_then(|t| t.upgrade())
+                    .filter(|t| t.is_process());
+                if let Some(task) = task {
+                    Box::new(iter::once(task))
+                } else {
+                    Box::new(iter::empty())
                 }
-                task.receive_siginfo(SigInfo {
+            }
+            0 => {
+                // TODO: Send the signal to every process in the process group of the calling process.
+                Box::new(iter::empty())
+            }
+            -1 => Box::new(
+                process_list_lock
+                    .values()
+                    .filter_map(|t| t.upgrade())
+                    .filter(|t| t.is_process() && t.pid() != curr_pid),
+            ),
+            _ => {
+                // TODO: Send the signal to every process in the process group whose PGID is -pid.
+                Box::new(iter::empty())
+            }
+        };
+        boxed_iter.peekable()
+    };
+    if target_processes.peek().is_none() {
+        log::error!("[sys_kill] no target process found for pid: {}", pid);
+        return Err(SysError::ESRCH);
+    }
+
+    /// Check if the process has permission to send signals.
+    ///
+    /// The current implementation provides only a basic check.
+    fn check_permission(process: &Arc<Task>) -> bool {
+        process.pid() != INIT_PROC_ID
+    }
+
+    // Find all target processes that the current task has permission to send signals to.
+    let mut processes_to_kill = target_processes.filter(check_permission).peekable();
+    if processes_to_kill.peek().is_none() {
+        log::error!(
+            "[sys_kill] no permission to send the signal to any of the target processes, pid: {}",
+            pid
+        );
+        return Err(SysError::EPERM);
+    }
+
+    // Send the signal.
+    for process in processes_to_kill {
+        process.with_thread_group(|tg| {
+            for thread in tg.iter() {
+                log::info!(
+                    "[sys_kill] send signal {:?} to thread {} in process {}",
+                    sig,
+                    thread.tid(),
+                    process.pid(),
+                );
+                thread.receive_siginfo(SigInfo {
                     sig,
                     code: SigInfo::USER,
-                    details: SigDetails::Kill { pid: task.pid() },
+                    details: SigDetails::Kill { pid: process.pid() },
                 });
-                if sig == Sig::SIGKILL || sig == Sig::SIGTERM {
-                    task.with_thread_group(|tg| {
-                        tg.iter().for_each(|t| {
-                            t.set_state(TaskState::Zombie);
-                            t.wake();
-                        });
-                    });
-                }
-            } else {
-                log::error!(
-                    "[sys_kill] the specified pid {} is not an existing task ID",
-                    pid
-                );
-                return Err(SysError::ESRCH);
             }
-        }
-
-        -1 => {
-            TASK_MANAGER.for_each(|task| {
-                if task.pid() != INIT_PROC_ID && task.is_process() && sig.raw() != 0 {
-                    task.receive_siginfo(SigInfo {
-                        sig,
-                        code: SigInfo::USER,
-                        details: SigDetails::Kill { pid: task.pid() },
-                    });
-                }
-                Ok(())
-            })?;
-        }
-
-        _ => {
-            todo!()
-        }
+        });
     }
     Ok(0)
 }

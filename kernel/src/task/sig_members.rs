@@ -68,16 +68,22 @@ impl Task {
 
         let manager = self.sig_manager_mut();
         manager.add(si);
-        if manager.should_wake.contain_signal(si.sig)
-            && (self.is_in_state(TaskState::Interruptable) || self.is_in_state(TaskState::Zombie))
+
+        if (si.sig == Sig::SIGKILL || si.sig == Sig::SIGSTOP)
+            || (manager.should_wake.contain_signal(si.sig)
+                && self.is_in_state(TaskState::Interruptable))
         {
-            log::warn!("[Task::recv] tid {} has been woken", self.tid());
+            log::warn!(
+                "[Task::recv] tid {} is awoken by signal {}",
+                self.tid(),
+                si.sig
+            );
             self.wake();
         } else {
-            simdebug::stop();
             log::warn!(
-                "[Task::recv] tid {} hasn't been woken or it isn't interruptable or zombie, should_wake {:?}, state {:?}",
+                "[Task::recv] tid {} received signal {}, but it isn't interruptable, should_wake {:?}, state {:?}",
                 self.tid(),
+                si.sig,
                 manager.should_wake,
                 self.get_state()
             );
@@ -141,7 +147,7 @@ impl SigManager {
         Self {
             queue: VecDeque::new(),
             bitmap: SigSet::empty(),
-            should_wake: SigSet::empty(),
+            should_wake: SigSet::from_bits_retain(SigSet::SIGKILL.bits() | SigSet::SIGSTOP.bits()),
         }
     }
 

@@ -61,11 +61,10 @@ impl TaskManager {
     }
 
     pub fn get_task(&self, tid: Tid) -> Option<Arc<Task>> {
-        if let Some(task) = self.0.lock().get(&tid) {
-            task.upgrade()
-        } else {
-            None
-        }
+        self.0
+            .lock()
+            .get(&tid)
+            .and_then(|weak_task| weak_task.upgrade())
     }
 
     pub fn for_each(&self, f: impl Fn(&Arc<Task>) -> SysResult<()>) -> SysResult<()> {
@@ -73,6 +72,10 @@ impl TaskManager {
             f(&task.upgrade().unwrap())?
         }
         Ok(())
+    }
+
+    pub fn inner(&self) -> &SpinNoIrqLock<BTreeMap<Tid, Weak<Task>>> {
+        &self.0
     }
 }
 
