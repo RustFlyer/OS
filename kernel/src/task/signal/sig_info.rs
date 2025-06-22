@@ -104,12 +104,19 @@ impl Sig {
     pub const SIGLEGACYMAX: Sig = Sig(32); // Legacy maximum signal
     pub const SIGMAX: Sig = Sig(64); // Maximum signal
 
+    /// Creates a new `Sig` from a signal number.
+    ///
+    /// `signum` must be a valid signal number, or 0 as a placeholder value.
     pub fn from_i32(signum: i32) -> Sig {
+        debug_assert!(signum >= 0 && signum < NSIG as i32, "Invalid signal number: {}", signum);
         Sig(signum)
     }
 
+    /// Returns true if the signal is a valid signal number.
+    ///
+    /// Note that 0 is not a valid signal number, but is often used as a placeholder.
     pub fn is_valid(&self) -> bool {
-        self.0 >= 0 && self.0 < NSIG as i32
+        self.0 > 0 && self.0 < NSIG as i32
     }
 
     pub fn raw(&self) -> usize {
@@ -223,6 +230,9 @@ impl SigSet {
     }
 
     pub fn contain_signal(&self, sig: Sig) -> bool {
+        if sig.0 == 0 {
+            simdebug::stop();
+        }
         self.contains(SigSet::from_bits(1 << sig.index()).unwrap())
     }
 

@@ -198,8 +198,8 @@ pub fn sys_kill(pid: isize, sig_code: i32) -> SyscallResult {
     //     Ok(())
     // })?;
     let sig = Sig::from_i32(sig_code);
-    if !sig.is_valid() {
-        log::error!("invalid sig_code: {:}", sig_code);
+    if sig.raw() != 0 && !sig.is_valid() {
+        log::warn!("invalid sig_code: {:}", sig_code);
         return Err(SysError::EINTR);
     }
 
@@ -213,27 +213,31 @@ pub fn sys_kill(pid: isize, sig_code: i32) -> SyscallResult {
                     task.get_name()
                 );
                 if !task.is_process() {
+                    log::warn!(
+                        "[sys_kill] the specified pid {} exists but is not a process",
+                        pid
+                    );
                     return Err(SysError::ESRCH);
-                } else {
-                    task.receive_siginfo(SigInfo {
-                        sig,
-                        code: SigInfo::USER,
-                        details: SigDetails::Kill { pid: task.pid() },
-                    });
                 }
-                if sig_code == 9 || sig_code == 15 {
+                task.receive_siginfo(SigInfo {
+                    sig,
+                    code: SigInfo::USER,
+                    details: SigDetails::Kill { pid: task.pid() },
+                });
+                if sig == Sig::SIGKILL || sig == Sig::SIGTERM {
                     task.with_thread_group(|tg| {
                         tg.iter().for_each(|t| {
                             t.set_state(TaskState::Zombie);
                             t.wake();
                         });
                     });
-                } else {
-                    log::warn!("[sys_kill] not SIGKILL or SIGTERM, no operation here");
                 }
             } else {
-                log::error!("[sys_kill] can't find assigned pid.");
-                return Ok(0);
+                log::error!(
+                    "[sys_kill] the specified pid {} is not an existing task ID",
+                    pid
+                );
+                return Err(SysError::ESRCH);
             }
         }
 

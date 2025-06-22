@@ -192,6 +192,7 @@ impl Task {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn new_fork_clone(
         tid: TidHandle,
         process: Option<Weak<Task>>,
