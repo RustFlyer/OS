@@ -378,3 +378,8 @@ pub fn sys_munlock(addr: usize, len: usize) -> SyscallResult {
     log::warn!("[sys_munlock] swap page mechanism not implemented");
     Ok(0)
 }
+
+pub fn sys_msync(addr: usize, len: usize, flags: usize) -> SyscallResult {
+    log::warn!("[sys_msync] swap page mechanism not implemented");
+    Ok(0)
+}

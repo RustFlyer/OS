@@ -171,6 +171,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         CLOCK_GETRES => sys_clock_getres(args[0], args[1]),
         MLOCK => sys_mlock(args[0], args[1]),
         MUNLOCK => sys_munlock(args[0], args[1]),
+        MSYNC => sys_msync(args[0], args[1], args[2]),
         SCHED_SETAFFINITY => sys_sched_setaffinity(args[0], args[1], args[2]),
         SOCKETPAIR => sys_socketpair(args[0], args[1], args[2], args[3]),
         GETRUSAGE => sys_getrusage(args[0] as i32, args[1]),

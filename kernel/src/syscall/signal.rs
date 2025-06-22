@@ -188,7 +188,7 @@ pub async fn sys_futex(
 /// - If pid = -1, then sig is sent to every process for which the calling
 ///   process has permission to send signals, except for process 1 (init)
 ///
-/// TODO: broadcast(to process group) when pid <= 0; permission check when sig_code == 0; i32 or u32
+/// TODO: broadcast signal to process group when pid <= 0 or pid == 0
 pub fn sys_kill(pid: isize, sig_code: i32) -> SyscallResult {
     log::info!(
         "[sys_kill] pid: {:}, sig_code: {:}, current task pid: {}",
@@ -256,6 +256,12 @@ pub fn sys_kill(pid: isize, sig_code: i32) -> SyscallResult {
             pid
         );
         return Err(SysError::EPERM);
+    }
+
+    if sig.raw() == 0 {
+        // If sig_code is 0, we only check if the process exists and has permission.
+        log::info!("[sys_kill] sig_code is 0, only check if process exists and has permission");
+        return Ok(0);
     }
 
     // Send the signal.
