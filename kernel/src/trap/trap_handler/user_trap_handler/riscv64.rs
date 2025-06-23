@@ -10,6 +10,7 @@ use systype::memory_flags::MappingFlags;
 use timer::TIMER_MANAGER;
 
 use crate::processor::current_hart;
+use crate::task::signal::sig_info::{Sig, SigDetails, SigInfo};
 use crate::task::{Task, TaskState};
 use crate::trap::load_trap_handler;
 use crate::vm::user_ptr::UserReadPtr;
@@ -55,7 +56,6 @@ pub fn user_exception_handler(task: &Task, e: Exception, stval: usize) {
             let fault_addr = VirtAddr::new(stval);
             let addr_space = task.addr_space();
             if let Err(e) = addr_space.handle_page_fault(fault_addr, access) {
-                // TODO: Send SIGSEGV to the task
                 log::error!(
                     "[user_exception_handler] task [{}] {} unsolved page fault at {:#x}, \
                     access: {:?}, error: {:?}, bad instruction at {:#x}",
@@ -66,13 +66,24 @@ pub fn user_exception_handler(task: &Task, e: Exception, stval: usize) {
                     e.as_str(),
                     stval
                 );
-                task.set_state(TaskState::Zombie);
+                task.receive_siginfo(SigInfo {
+                    sig: Sig::SIGSEGV,
+                    code: SigInfo::USER,
+                    details: SigDetails::Kill {
+                        pid: task.get_pgid(),
+                    },
+                });
             }
         }
         Exception::IllegalInstruction => {
-            log::warn!("[trap_handler] illegal instruction at {:#x}", stval);
-            // TODO: Send SIGILL signal to the task; don't just kill the task
-            task.set_state(TaskState::Zombie);
+            log::error!("[trap_handler] illegal instruction at {:#x}", stval);
+            task.receive_siginfo(SigInfo {
+                sig: Sig::SIGILL,
+                code: SigInfo::USER,
+                details: SigDetails::Kill {
+                    pid: task.get_pgid(),
+                },
+            });
         }
         e => {
             log::error!("Unknown user exception: {:?}", e);

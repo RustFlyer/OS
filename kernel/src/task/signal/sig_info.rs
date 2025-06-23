@@ -230,9 +230,6 @@ impl SigSet {
     }
 
     pub fn contain_signal(&self, sig: Sig) -> bool {
-        if sig.0 == 0 {
-            simdebug::stop();
-        }
         self.contains(SigSet::from_bits(1 << sig.index()).unwrap())
     }
 
