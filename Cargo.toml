@@ -2,6 +2,9 @@
 members = ["kernel", "lib/*", "user"]
 resolver = "2"
 
+[profile.release]
+debug=true
+
 [workspace.dependencies]
 async-task = { version = "4.7", default-features = false }
 async-trait = "0.1"

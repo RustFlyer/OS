@@ -147,7 +147,7 @@ impl SigManager {
         Self {
             queue: VecDeque::new(),
             bitmap: SigSet::empty(),
-            should_wake: SigSet::from_bits_retain(SigSet::SIGKILL.bits() | SigSet::SIGSTOP.bits()),
+            should_wake: SigSet::SIGKILL.union(SigSet::SIGSTOP),
         }
     }
 

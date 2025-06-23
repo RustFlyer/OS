@@ -19,7 +19,10 @@ use timer::TIMER_MANAGER;
 
 use crate::{
     processor::current_hart,
-    task::{Task, TaskState},
+    task::{
+        Task, TaskState,
+        signal::sig_info::{Sig, SigDetails, SigInfo},
+    },
     trap::load_trap_handler,
     vm::user_ptr::UserReadPtr,
 };
@@ -80,7 +83,6 @@ pub fn user_exception_handler(task: &Task, e: Exception, badv: Badv, era: Era) {
                     tlb_fill(pte0, pte1);
                 }
                 Err(e) => {
-                    // TODO: Send SIGSEGV to the task
                     log::error!(
                         "[user_exception_handler] unsolved page fault at {:#x}, \
                     access: {:?}, error: {:?}, bad instruction at {:#x}",
@@ -89,15 +91,26 @@ pub fn user_exception_handler(task: &Task, e: Exception, badv: Badv, era: Era) {
                         e.as_str(),
                         inst_addr
                     );
-                    task.set_state(TaskState::Zombie);
+                    task.receive_siginfo(SigInfo {
+                        sig: Sig::SIGSEGV,
+                        code: SigInfo::USER,
+                        details: SigDetails::Kill {
+                            pid: task.get_pgid(),
+                        },
+                    });
                 }
             }
         }
         Exception::InstructionNotExist => {
             let inst_addr = era.pc();
-            log::warn!("[trap_handler] illegal instruction at {:#x}", inst_addr);
-            // TODO: Send SIGILL signal to the task; don't just kill the task
-            task.set_state(TaskState::Zombie);
+            log::error!("[trap_handler] illegal instruction at {:#x}", inst_addr);
+            task.receive_siginfo(SigInfo {
+                sig: Sig::SIGILL,
+                code: SigInfo::USER,
+                details: SigDetails::Kill {
+                    pid: task.get_pgid(),
+                },
+            });
         }
         _ => {
             log::error!("Unknown user exception: {:?}", e);
