@@ -182,6 +182,7 @@ pub fn sys_clock_gettime(clockid: usize, tp: usize) -> SyscallResult {
     match clockid {
         CLOCK_REALTIME | CLOCK_MONOTONIC | CLOCK_REALTIME_COARSE => {
             let current = get_time_duration();
+            // let current = get_time_duration() * 4;
             unsafe {
                 ts_ptr.write((CLOCK_DEVIATION[clockid] + current).into())?;
             }

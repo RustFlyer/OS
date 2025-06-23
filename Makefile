@@ -192,6 +192,7 @@ fs-img: user
 	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/iperf/* emnt/
 	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/netperf/* emnt/
 	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/libcbench/* emnt/
+	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/lmbench/* emnt/
 
 	sudo cp -r img-data/common/* emnt/
 	sudo cp -r img-data/$(ARCH)/* emnt/

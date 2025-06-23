@@ -74,7 +74,7 @@ impl Future for PipeWritePollFuture {
             return Poll::Ready(res);
         }
         if (self.events.contains(PollEvents::OUT) && !inner.ring_buffer.is_full())
-            || *self.cnt.lock() >= 2
+        // || *self.cnt.lock() >= 2
         {
             res |= PollEvents::OUT;
             Poll::Ready(res)

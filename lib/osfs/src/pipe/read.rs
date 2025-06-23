@@ -72,7 +72,8 @@ impl Future for PipeReadPollFuture {
             res |= PollEvents::IN;
             Poll::Ready(res)
         } else {
-            if inner.is_write_closed || *self.cnt.lock() >= 2 {
+            if inner.is_write_closed {
+                // || *self.cnt.lock() >= 2 {
                 res |= PollEvents::HUP;
                 return Poll::Ready(res);
             }
