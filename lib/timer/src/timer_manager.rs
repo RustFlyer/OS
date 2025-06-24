@@ -1,6 +1,6 @@
+use alloc::collections::BinaryHeap;
 use core::{cmp::Reverse, time::Duration};
 
-use alloc::collections::BinaryHeap;
 use mutex::SpinNoIrqLock;
 
 use crate::{Timer, TimerState};
@@ -42,5 +42,11 @@ impl TimerManager {
                 }
             }
         }
+    }
+}
+
+impl Default for TimerManager {
+    fn default() -> Self {
+        Self::new()
     }
 }

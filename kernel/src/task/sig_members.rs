@@ -69,23 +69,23 @@ impl Task {
         let manager = self.sig_manager_mut();
         manager.add(si);
 
+        log::warn!("[Task::recv] tid {} received signal {}", self.tid(), si.sig,);
+
         if (si.sig == Sig::SIGKILL || si.sig == Sig::SIGSTOP)
             || (manager.should_wake.contain_signal(si.sig)
                 && self.is_in_state(TaskState::Interruptable))
         {
-            log::warn!(
-                "[Task::recv] tid {} is awoken by signal {}",
+            log::info!(
+                "[Task::recv] tid {} received signal {}, waking up",
                 self.tid(),
                 si.sig
             );
             self.wake();
         } else {
-            log::warn!(
-                "[Task::recv] tid {} received signal {}, but it isn't interruptable, should_wake {:?}, state {:?}",
+            log::info!(
+                "[Task::recv] tid {} received signal {}, but not waking up",
                 self.tid(),
-                si.sig,
-                manager.should_wake,
-                self.get_state()
+                si.sig
             );
         }
     }
@@ -277,7 +277,7 @@ impl SigHandlers {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ActionType {
     Ignore,
     Kill,

@@ -48,7 +48,8 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
     // );
 
     log::info!(
-        "[sig_exec] task [{}] Handling signal: {:?} {:?}",
+        "[sig_exec] task {} [{}] Handling signal: {:?} {:?}",
+        task.tid(),
         task.get_name(),
         si.sig,
         action

@@ -277,25 +277,36 @@ pub async fn sys_clock_nanosleep(
 /// };
 /// ```
 pub fn sys_setitimer(which: usize, new_itimeval: usize, old_itimeval: usize) -> SyscallResult {
+    log::info!(
+        "[sys_setitimer] which: {}, new_itimeval at {:#x}, old_itimeval at {:#x}",
+        which,
+        new_itimeval,
+        old_itimeval
+    );
+
     let task = current_task();
     let addrspace = task.addr_space();
+    let mut old_itimeval_ptr = UserWritePtr::<ITimerVal>::new(old_itimeval, &addrspace);
+    let mut new_itimeval_ptr = UserReadPtr::<ITimerVal>::new(new_itimeval, &addrspace);
 
-    let mut old_itimeval = UserWritePtr::<ITimerVal>::new(old_itimeval, &addrspace);
-    let mut new_itimeval = UserReadPtr::<ITimerVal>::new(new_itimeval, &addrspace);
+    let new_itimeval = unsafe { new_itimeval_ptr.read() }?;
 
-    let nitimeval = unsafe { new_itimeval.read() }?;
-    log::debug!("[sys_setitimer] new itimer: {:?}", nitimeval);
+    log::info!(
+        "[sys_setitimer] new_itimeval: it_interval = {:?}, it_value = {:?}",
+        new_itimeval.it_interval,
+        new_itimeval.it_value
+    );
 
-    if !nitimeval.is_valid() {
+    if !new_itimeval.is_valid() {
         return Err(SysError::EINVAL);
     }
-    let timerid = timeid_alloc();
 
+    let timerid = timeid_alloc();
     match which {
         CLOCK_REALTIME => {
-            let (old, interval) = task.with_mut_itimers(|itimers| {
+            let (old_itimeval, expire) = task.with_mut_itimers(|itimers| {
                 let itimer = &mut itimers[which];
-                let old = ITimerVal {
+                let old_itimeval = ITimerVal {
                     it_interval: itimer.interval.into(),
                     it_value: itimer
                         .next_expire
@@ -303,30 +314,35 @@ pub fn sys_setitimer(which: usize, new_itimeval: usize, old_itimeval: usize) -> 
                         .into(),
                 };
 
+                // Updating the itimer ID will disable the previous timer if it exists.
+                // A better solution is to remove the timer from the timer manager.
                 itimer.id = timerid.0;
-                itimer.interval = nitimeval.it_interval.into();
+                itimer.interval = new_itimeval.it_interval.into();
 
-                if nitimeval.it_value.is_zero() {
+                log::info!("[sys_setitimer] task {}: itimer id is set to {}", task.pid(), itimer.id);
+
+                if new_itimeval.it_value.is_zero() {
                     itimer.next_expire = Duration::ZERO;
-                    (old, Duration::ZERO)
+                    (old_itimeval, Duration::ZERO)
                 } else {
-                    itimer.next_expire = get_time_duration() + nitimeval.it_value.into();
-                    (old, nitimeval.it_value.into())
+                    itimer.next_expire = get_time_duration() + new_itimeval.it_value.into();
+                    (old_itimeval, new_itimeval.it_value.into())
                 }
             });
 
-            if !nitimeval.it_value.is_zero() {
+            if !expire.is_zero() {
+                log::info!("[sys_setitimer] add a new timer with id {}", timerid.0);
                 let rtimer = RealITimer {
                     task: Arc::downgrade(&task),
                     id: timerid.0,
                 };
-                let mut timer = Timer::new(get_time_duration() + interval);
+                let mut timer = Timer::new(get_time_duration() + expire);
                 timer.set_callback(Arc::new(rtimer));
                 TIMER_MANAGER.add_timer(timer);
             }
 
-            if !old_itimeval.is_null() {
-                unsafe { old_itimeval.write(old)? };
+            if !old_itimeval_ptr.is_null() {
+                unsafe { old_itimeval_ptr.write(old_itimeval)? };
             }
         }
         _ => {

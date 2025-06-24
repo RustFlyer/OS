@@ -1,10 +1,10 @@
-use id_allocator::{IdAllocator, VecIdAllocator};
 use lazy_static::lazy_static;
+
 use mutex::SpinNoIrqLock;
 
 lazy_static! {
-    static ref TIMERID_ALLOCATOR: SpinNoIrqLock<VecIdAllocator> =
-        SpinNoIrqLock::new(VecIdAllocator::new(0, usize::MAX));
+    static ref TIMERID_ALLOCATOR: SpinNoIrqLock<IncreasingAllocator> =
+        SpinNoIrqLock::new(IncreasingAllocator::new());
 }
 
 #[derive(Debug)]
@@ -12,15 +12,28 @@ pub struct TimerHandle(pub usize);
 
 impl Drop for TimerHandle {
     fn drop(&mut self) {
-        unsafe { TIMERID_ALLOCATOR.lock().dealloc(self.0) };
+        // No-op: IDs are not reused in this simple allocator
     }
 }
 
-/// `timeid_alloc()` can look for an unused id from 0
-/// and allocate it for a new timer.
-pub fn timeid_alloc() -> TimerHandle {
-    match TIMERID_ALLOCATOR.lock().alloc() {
-        Some(tid) => TimerHandle(tid),
-        None => panic!("no more TIDs available"),
+struct IncreasingAllocator {
+    next_id: usize,
+}
+
+impl IncreasingAllocator {
+    pub fn new() -> Self {
+        Self { next_id: 0 }
     }
+
+    pub fn alloc(&mut self) -> usize {
+        let id = self.next_id;
+        self.next_id = self.next_id.wrapping_add(1);
+        id
+    }
+}
+
+/// `timeid_alloc()` allocates a new id by incrementing the last id.
+pub fn timeid_alloc() -> TimerHandle {
+    let tid = TIMERID_ALLOCATOR.lock().alloc();
+    TimerHandle(tid)
 }

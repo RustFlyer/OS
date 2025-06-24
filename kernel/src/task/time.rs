@@ -18,7 +18,7 @@ impl IEvent for RealITimer {
     fn callback(self: Arc<Self>) -> TimerState {
         if let Some(task) = self.task.upgrade() {
             task.with_mut_itimers(|itimers| {
-                log::debug!("[RealITimer] IEvent is called");
+                log::debug!("[RealITimer] IEvent is called on timer id: {}", self.id);
                 let real = &mut itimers[0];
 
                 if real.id != self.id {
