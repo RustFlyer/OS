@@ -48,6 +48,55 @@ fn run_cmd(cmd: &str) {
     }
 }
 
+fn parse_args(argstring: &str) -> Vec<String> {
+    let mut args = Vec::new();
+    let mut current = String::new();
+    let mut in_quotes = false;
+    let mut quote_char = '\0';
+    let mut chars = argstring.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        match c {
+            '"' | '\'' => {
+                if !in_quotes {
+                    in_quotes = true;
+                    quote_char = c;
+                } else if quote_char == c {
+                    in_quotes = false;
+                } else {
+                    current.push(c);
+                }
+            }
+            '\\' => {
+                if let Some(&next_c) = chars.peek() {
+                    if in_quotes && next_c == quote_char {
+                        current.push(next_c);
+                        chars.next();
+                    } else if next_c == '\\' {
+                        current.push('\\');
+                        chars.next();
+                    } else {
+                        current.push(c);
+                    }
+                } else {
+                    current.push(c);
+                }
+            }
+            ' ' | '\t' if !in_quotes => {
+                if !current.is_empty() {
+                    args.push(current.clone());
+                    current.clear();
+                }
+            }
+            _ => current.push(c),
+        }
+    }
+    if !current.is_empty() {
+        args.push(current);
+    }
+    args
+}
+
 #[unsafe(no_mangle)]
 fn main() {
     let mut i = 0;
@@ -92,30 +141,7 @@ fn main() {
 
             let argstring = easy_cmd(argstring);
 
-            let raws: Vec<String> = argstring.split(' ').map(|s| s.to_string()).collect();
-            let mut args: Vec<String> = Vec::new();
-
-            let mut tmp: String = String::new();
-            let mut is_close = 0;
-
-            for raw in raws {
-                let mut raw = raw.clone();
-                if raw.starts_with('"') {
-                    is_close += 1;
-                    raw.remove(0);
-                }
-                if raw.ends_with('"') {
-                    is_close -= 1;
-                    raw.remove(raw.len() - 1);
-                }
-                tmp = tmp + &raw;
-                if is_close == 0 {
-                    args.push(tmp.clone());
-                    tmp.clear();
-                } else {
-                    tmp = tmp + " ";
-                }
-            }
+            let args: Vec<String> = parse_args(&argstring);
 
             println!("app path is [{}] with len [{}]", apppath, bptr);
 
