@@ -239,18 +239,18 @@ all:
 	rm -rf vendor
 	tar xvf submit/vendor-rv.tar.gz
 
-	make user kernel ARCH=riscv64
-	cp $(KERNEL_ELF) kernel-rv
-	make fs-img-submit-rv
-	cp fsimg/riscv64-sdcard.img disk-rv.img
+	make build ARCH=riscv64 LOG= MODE=release
+	cp target/riscv64gc-unknown-none-elf/release/kernel kernel-rv
+# make fs-img-submit-rv
+# cp fsimg/riscv64-sdcard.img disk-rv.img
 
 	rm -rf vendor/
 	tar xvf submit/vendor-la.tar.gz
 
-	make user kernel ARCH=loongarch64
-	cp $(KERNEL_ELF) kernel-la
-	make fs-img-submit-la
-	cp fsimg/loongarch64-sdcard.img disk-la.img
+	make build ARCH=loongarch64 LOG= MODE=release
+	cp target/loongarch64-unknown-none/release/kernel kernel-la
+# make fs-img-submit-la
+# cp fsimg/loongarch64-sdcard.img disk-la.img
 
 
 PHONY += rkernel
@@ -330,6 +330,11 @@ lkernel-debug-wrapped: lkernel-build
                         -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555 \
                         -rtc base=utc -s -S
 # -drive file=disk-la.img,if=none,format=raw,id=x1 -device virtio-blk-pci,drive=x1
+
+submit-test-rv:
+	qemu-system-riscv64 -machine virt -kernel kernel-rv -m 1G -nographic -smp 1 -bios default -drive file=sdcard-rv.img,if=none,format=raw,id=x0 \
+                    -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -no-reboot -device virtio-net-device,netdev=net -netdev user,id=net \
+                    -rtc base=utc
 
 .PHONY: $(PHONY)
 

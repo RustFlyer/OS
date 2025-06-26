@@ -53,7 +53,7 @@ pub fn sys_getpid() -> SyscallResult {
 ///   This contrasts with the kernel thread ID (TID), which is unique for each thread.
 pub fn sys_getppid() -> SyscallResult {
     let r = current_task().ppid();
-    log::info!("[sys_getppid] ppid: {r:?}");
+    // log::info!("[sys_getppid] ppid: {r:?}");
     Ok(r)
 }
 
@@ -117,6 +117,10 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
         p => WaitFor::PGid(p as PGid),
     };
     log::info!("[sys_wait4] target: {target:?}, option: {option:?}");
+    log::error!(
+        "[sys_wait4] existing task number: {}",
+        TASK_MANAGER.how_many_tasks()
+    );
 
     // get the child for recycle according to the target
     // NOTE: recycle no more than one child per `sys_wait4`
@@ -924,7 +928,7 @@ pub fn sys_getrusage(who: i32, usage: usize) -> SyscallResult {
     let mut usageptr = UserWritePtr::<Rusage>::new(usage, &addrspace);
     let who = RusageType::from_repr(who).ok_or(SysError::EINVAL)?;
     let mut ret = Rusage::default();
-    log::debug!("[sys_getrusage] who: {who:?}");
+    log::debug!("[sys_getrusage] thread: {}, who: {who:?}", task.tid());
     match who {
         RusageType::RUSAGE_SELF => {
             let (total_utime, total_stime) = task.get_process_ustime();

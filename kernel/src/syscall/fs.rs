@@ -1623,6 +1623,7 @@ pub async fn sys_pselect6(
                     writeback(readfds, readfds1)?;
                     writeback(writefds, writefds1)?;
                     writeback(exceptfds, exceptfds1)?;
+                    osfuture::yield_now().await;
                     return Ok(0);
                 }
             },
@@ -1898,7 +1899,7 @@ pub fn sys_statx(
         __spare2: [0; 12],
     };
 
-    // log::debug!("{:?}", statx);
+    // log::warn!("{:?}", statx);
 
     unsafe {
         UserWritePtr::<Statx>::new(statxbuf, &addrspace).write(statx)?;

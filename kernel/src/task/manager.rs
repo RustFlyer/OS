@@ -77,6 +77,10 @@ impl TaskManager {
     pub fn inner(&self) -> &SpinNoIrqLock<BTreeMap<Tid, Weak<Task>>> {
         &self.0
     }
+
+    pub fn how_many_tasks(&self) -> usize {
+        self.0.lock().len()
+    }
 }
 
 /// add task to the global Task Manager

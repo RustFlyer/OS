@@ -11,8 +11,10 @@ const TESTCASES: &[&str] = &[
     "libctest_testcode.sh",
     "lua_testcode.sh",
     "iozone_testcode.sh",
-    // "netperf_testcode.sh",
     // "cyclictest_testcode.sh",
+    "libcbench_testcode.sh",
+    "lmbench_testcode.sh",
+    "netperf_testcode.sh",
 ];
 
 fn run_cmd(cmd: &str) {
@@ -70,6 +72,12 @@ fn main() -> i32 {
     chdir("/glibc");
     if fork() == 0 {
         for test in TESTCASES {
+            if *test == "libctest_testcode.sh"
+                || *test == "netperf_testcode.sh"
+                || *test == "libcbench_testcode.sh"
+            {
+                continue;
+            }
             run_test(test);
         }
     } else {

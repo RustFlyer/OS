@@ -84,8 +84,9 @@ pub fn user_exception_handler(task: &Task, e: Exception, badv: Badv, era: Era) {
                 }
                 Err(e) => {
                     log::error!(
-                        "[user_exception_handler] unsolved page fault at {:#x}, \
+                        "[user_exception_handler] tid: {}, unsolved page fault at {:#x}, \
                     access: {:?}, error: {:?}, bad instruction at {:#x}",
+                        task.tid(),
                         fault_addr.to_usize(),
                         access,
                         e.as_str(),
@@ -98,6 +99,16 @@ pub fn user_exception_handler(task: &Task, e: Exception, badv: Badv, era: Era) {
                             pid: task.get_pgid(),
                         },
                     });
+                    if fault_addr.to_usize() == 0xffffffff0 {
+                        loop {}
+                        task.receive_siginfo(SigInfo {
+                            sig: Sig::SIGKILL,
+                            code: SigInfo::USER,
+                            details: SigDetails::Kill {
+                                pid: task.get_pgid(),
+                            },
+                        });
+                    }
                 }
             }
         }

@@ -374,13 +374,15 @@ impl Task {
                     .write(0)
                     .is_ok()
             } {
-                let key = FutexHashKey::new_share_key(address, &self.addr_space()).unwrap();
-                let _ = futex_manager(false, 0xffffffff).wake(&key, 1);
-                let _ = futex_manager(true, 0xffffffff).wake(&key, 1);
+                if let Ok(key) = FutexHashKey::new_share_key(address, &self.addr_space()) {
+                    let _ = futex_manager(false, 0xffffffff).wake(&key, 1);
+                    let _ = futex_manager(true, 0xffffffff).wake(&key, 1);
+                }
 
-                let key = FutexHashKey::new_private_key(address, self.addr_space()).unwrap();
-                let _ = futex_manager(false, 0xffffffff).wake(&key, 1);
-                let _ = futex_manager(true, 0xffffffff).wake(&key, 1);
+                if let Ok(key) = FutexHashKey::new_private_key(address, self.addr_space()) {
+                    let _ = futex_manager(false, 0xffffffff).wake(&key, 1);
+                    let _ = futex_manager(true, 0xffffffff).wake(&key, 1);
+                }
             }
         }
 

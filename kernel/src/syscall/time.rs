@@ -179,12 +179,18 @@ pub fn sys_clock_gettime(clockid: usize, tp: usize) -> SyscallResult {
         return Ok(0);
     }
 
+    // for _i in 0..1000 {
+    //     simdebug::stop();
+    // }
+
     match clockid {
         CLOCK_REALTIME | CLOCK_MONOTONIC | CLOCK_REALTIME_COARSE => {
             let current = get_time_duration();
             // let current = get_time_duration() * 4;
             unsafe {
-                ts_ptr.write((CLOCK_DEVIATION[clockid] + current).into())?;
+                let ts: TimeSpec = (CLOCK_DEVIATION[clockid] + current).into();
+                log::info!("[sys_clock_gettime] ts: {ts:?}");
+                ts_ptr.write(ts)?;
             }
         }
         CLOCK_PROCESS_CPUTIME_ID => {
@@ -319,7 +325,11 @@ pub fn sys_setitimer(which: usize, new_itimeval: usize, old_itimeval: usize) -> 
                 itimer.id = timerid.0;
                 itimer.interval = new_itimeval.it_interval.into();
 
-                log::info!("[sys_setitimer] task {}: itimer id is set to {}", task.pid(), itimer.id);
+                log::info!(
+                    "[sys_setitimer] task {}: itimer id is set to {}",
+                    task.pid(),
+                    itimer.id
+                );
 
                 if new_itimeval.it_value.is_zero() {
                     itimer.next_expire = Duration::ZERO;
