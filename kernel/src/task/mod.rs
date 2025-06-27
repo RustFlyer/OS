@@ -28,8 +28,8 @@ use vfs::file::File;
 use crate::loader::get_app_data_by_name;
 
 pub fn init() {
-    init_proc_by_insert();
-    // submit_init_by_insert();
+    // init_proc_by_insert();
+    submit_init_by_insert();
     // init_proc();
     // submit_init();
     // timer_init();
