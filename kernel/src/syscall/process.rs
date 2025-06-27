@@ -878,7 +878,9 @@ pub fn sys_clone3(user_args: usize, size: usize) -> SyscallResult {
     let new_tid = new_task.tid();
 
     if args.stack != 0 {
-        new_task.trap_context_mut().set_user_sp(args.stack as usize);
+        new_task
+            .trap_context_mut()
+            .set_user_sp(args.stack as usize + USER_STACK_SIZE);
     }
 
     if flags.contains(CloneFlags::PARENT_SETTID) && args.parent_tid != 0 {

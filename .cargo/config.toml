@@ -32,6 +32,5 @@ git = "https://github.com/adong660/rust-elf.git"
 branch = "no-std-elfstream"
 replace-with = "vendored-sources"
 
-
 [source.vendored-sources]
 directory = "vendor"

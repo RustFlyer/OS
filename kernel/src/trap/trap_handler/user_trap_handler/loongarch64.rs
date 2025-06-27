@@ -99,16 +99,6 @@ pub fn user_exception_handler(task: &Task, e: Exception, badv: Badv, era: Era) {
                             pid: task.get_pgid(),
                         },
                     });
-                    if fault_addr.to_usize() == 0xffffffff0 {
-                        loop {}
-                        task.receive_siginfo(SigInfo {
-                            sig: Sig::SIGKILL,
-                            code: SigInfo::USER,
-                            details: SigDetails::Kill {
-                                pid: task.get_pgid(),
-                            },
-                        });
-                    }
                 }
             }
         }

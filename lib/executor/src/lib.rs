@@ -25,12 +25,14 @@ lazy_static! {
 #[derive(Debug)]
 pub struct TaskLine {
     tasks: SpinNoIrqLock<VecDeque<Runnable>>,
+    pritasks: SpinNoIrqLock<VecDeque<Runnable>>,
 }
 
 impl TaskLine {
     pub const fn new() -> Self {
         Self {
             tasks: SpinNoIrqLock::new(VecDeque::new()),
+            pritasks: SpinNoIrqLock::new(VecDeque::new()),
         }
     }
 
@@ -38,16 +40,19 @@ impl TaskLine {
         self.tasks.lock().push_back(task);
     }
 
-    pub fn push_front(&self, task: Runnable) {
-        self.tasks.lock().push_front(task);
+    pub fn push_prio(&self, task: Runnable) {
+        self.pritasks.lock().push_back(task);
     }
 
     pub fn fetch(&self) -> Option<Runnable> {
+        if let Some(task) = self.fetch_prio() {
+            return Some(task);
+        }
         self.tasks.lock().pop_front()
     }
 
-    pub fn fetch_front(&self) -> Option<Runnable> {
-        self.tasks.lock().pop_back()
+    pub fn fetch_prio(&self) -> Option<Runnable> {
+        self.pritasks.lock().pop_front()
     }
 
     pub fn length(&self) -> usize {
@@ -78,7 +83,7 @@ pub fn push_in_available_line(runnable: Runnable, info: ScheduleInfo) {
         if info.woken_while_running {
             HART_TASKS_LINES[available_line_id].push(runnable);
         } else {
-            HART_TASKS_LINES[available_line_id].push_front(runnable);
+            HART_TASKS_LINES[available_line_id].push_prio(runnable);
         }
     }
 }
@@ -96,9 +101,7 @@ where
         // }
         push_in_available_line(runnable, info);
     };
-    // log::debug!("[executor::spawn] call asynctask spawn");
     let (runnable, handle) = async_task::spawn(future, WithInfo(schedule));
-    // log::debug!("[executor::spawn] call asynctask spawn success");
     (runnable, handle)
 }
 
@@ -120,12 +123,6 @@ pub fn task_run_always() {
 
 pub fn task_run_once() {
     if let Some(task) = TASKLINE.fetch() {
-        task.run();
-    }
-}
-
-pub fn task_run_once_front() {
-    if let Some(task) = TASKLINE.fetch_front() {
         task.run();
     }
 }

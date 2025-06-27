@@ -29,7 +29,7 @@ use crate::{task::mask::CpuMask, trap::trap_context::TrapContext, vm::addr_space
 ///
 /// - Running: When the task is running, in task_executor_unit loop
 /// - Zombie:  When the task exits and wait for the initproc to recycle it
-/// - Waiting: When the waiting syscall reaches, the task will be set and suspended
+/// - WaitForRecycle: When the task exits, it waits for its parent to recycle
 /// - Sleeping: As Waiting. The difference is that its waiting time is longer
 /// - Interruptable: When the task is waiting for an long-time event such as I/O
 /// - UnInterruptable: As Interruptable. The difference is that it can not be interrupted by signal
