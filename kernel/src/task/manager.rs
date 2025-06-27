@@ -32,17 +32,17 @@ impl TaskManager {
         self.0.lock().insert(task.tid(), Arc::downgrade(task));
 
         log::debug!("Add task {}", task.tid());
-        log::debug!("Task list:");
-        let _ = self.for_each(|t| {
-            log::debug!(
-                "thread {}, name: {}, state: {:?}, page table at {:#x}",
-                t.tid(),
-                t.get_name(),
-                t.get_state(),
-                t.addr_space().page_table.root().to_usize(),
-            );
-            Ok(())
-        });
+        // log::debug!("Task list:");
+        // let _ = self.for_each(|t| {
+        //     log::debug!(
+        //         "thread {}, name: {}, state: {:?}, page table at {:#x}",
+        //         t.tid(),
+        //         t.get_name(),
+        //         t.get_state(),
+        //         t.addr_space().page_table.root().to_usize(),
+        //     );
+        //     Ok(())
+        // });
     }
 
     pub fn remove_task(&self, tid: Tid) {

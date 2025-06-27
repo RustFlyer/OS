@@ -127,6 +127,11 @@ pub fn user_interrupt_handler(task: &Task, i: Interrupt) {
             if task.timer_mut().schedule_time_out()
                 && executor::has_waiting_task_alone(current_hart().id)
             {
+                log::trace!(
+                    "[trap_handler] task {} yield, contain signal: {:?}",
+                    task.tid(),
+                    task.sig_manager_mut().bitmap.bits()
+                );
                 task.set_is_yield(true);
             }
         }

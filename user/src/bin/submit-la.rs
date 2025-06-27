@@ -53,13 +53,7 @@ fn main() -> i32 {
     run_cmd("./busybox cp /glibc/busybox /");
     run_cmd("./busybox --install -s /bin");
 
-    chdir("/musl");
-    if fork() == 0 {
-        for test in TESTCASES {
-            run_test(test);
-        }
-        exit(0);
-    } else {
+    if fork() != 0 {
         loop {
             let mut exit_code: i32 = 0;
             let pid = wait(&mut exit_code);
@@ -69,25 +63,18 @@ fn main() -> i32 {
         }
     }
 
-    chdir("/glibc");
-    if fork() == 0 {
-        for test in TESTCASES {
-            if *test == "libctest_testcode.sh"
-                || *test == "netperf_testcode.sh"
-                || *test == "libcbench_testcode.sh"
-            {
-                continue;
-            }
-            run_test(test);
-        }
-    } else {
-        loop {
-            let mut exit_code: i32 = 0;
-            let pid = wait(&mut exit_code);
-            if pid < 0 {
-                break;
-            }
-        }
+    chdir("/musl");
+    for test in TESTCASES {
+        run_test(test);
     }
-    0
+
+    chdir("/glibc");
+    for test in TESTCASES {
+        if *test == "libctest_testcode.sh" || *test == "netperf_testcode.sh" {
+            continue;
+        }
+        run_test(test);
+    }
+
+    exit(114514);
 }

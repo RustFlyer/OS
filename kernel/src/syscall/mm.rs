@@ -138,7 +138,7 @@ pub fn sys_mprotect(addr: usize, len: usize, prot: i32) -> SyscallResult {
 /// also available on several other implementations. (Note, though, that madvise() is not
 /// specified in POSIX.) Subsequently, a number of Linux-specific advice values have been added.
 pub fn sys_madvise(add: usize, length: usize, _advice: usize) -> SyscallResult {
-    log::error!("[sys_madvise] not implemented add: {add:#x}, length: {length:#x}");
+    log::warn!("[sys_madvise] not implemented add: {add:#x}, length: {length:#x}");
     Ok(0)
 }
 

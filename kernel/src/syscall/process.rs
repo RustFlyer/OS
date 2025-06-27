@@ -61,6 +61,9 @@ pub fn sys_getppid() -> SyscallResult {
 /// reparenting child processes or sending SIGCHLD to the parent process are performed
 /// only if this is the last thread in the thread group.
 pub fn sys_exit(status: i32) -> SyscallResult {
+    if status == 114514 {
+        panic!("114514!");
+    }
     let task = current_task();
     task.set_state(TaskState::Zombie);
     if task.is_process() {

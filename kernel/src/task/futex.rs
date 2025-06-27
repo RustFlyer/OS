@@ -145,6 +145,8 @@ impl FutexManager {
                     break;
                 }
             }
+            log::warn!("[futex_wake] {} success", n);
+
             Ok(n)
         } else {
             // log::error!("can not find key {key:?}");

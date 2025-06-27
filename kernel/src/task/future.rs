@@ -176,6 +176,7 @@ pub async fn task_executor_unit(task: Arc<Task>) {
         TIMER_MANAGER.check(get_time_duration());
 
         if task.is_yield() {
+            log::trace!("task{} yield", task.tid());
             yield_now().await;
             task.set_is_yield(false);
         }
