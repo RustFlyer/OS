@@ -423,7 +423,7 @@ pub async fn sys_sigreturn() -> SyscallResult {
         task.get_name(),
         rs
     );
-    simdebug::stop();
+    // simdebug::stop();
     // log::debug!("sig: {:#x}", task.sig_manager_mut().bitmap.bits());
     // its return value is the a0 before signal interrupt, so that it won't be changed in async_syscall
     // trap_cx.display();

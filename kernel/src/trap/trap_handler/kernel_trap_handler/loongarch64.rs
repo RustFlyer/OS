@@ -48,6 +48,11 @@ fn trap_panic() -> ! {
         pgdl::read().raw(),
         pgdh::read().raw(),
     );
+    crate::vm::trace_page_table_lookup(
+        mm::address::PhysPageNum::new(pgdl::read().raw() >> 12),
+        mm::address::VirtAddr::new(badv::read().vaddr()),
+    );
     log::error!("{}", msg);
+    simdebug::stop();
     panic!("{}", msg);
 }

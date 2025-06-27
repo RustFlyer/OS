@@ -1,3 +1,4 @@
+use mm::address::{PhysPageNum, VirtAddr};
 use riscv::{ExceptionNumber, InterruptNumber};
 use riscv::{
     interrupt::{Exception, Interrupt, Trap},

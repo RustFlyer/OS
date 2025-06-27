@@ -168,17 +168,28 @@ pub async fn task_executor_unit(task: Arc<Task>) {
         }
 
         // handle user trap, not for kernel trap. Therefore, there should not
-        // be some instructions with risks between trap_return and trap_handle.
+        // be some instructions with risks between trap_return and trap_handler.
         trap::trap_handler(&task);
 
         let mut interrupted = async_syscall(&task).await;
 
         TIMER_MANAGER.check(get_time_duration());
 
-        if task.is_yield() {
-            log::trace!("task{} yield", task.tid());
+        // if task.is_yield() {
+        //     yield_now().await;
+        //     task.set_is_yield(false);
+        // }
+
+        if task.timer_mut().schedule_time_out()
+            && executor::has_waiting_task_alone(current_hart().id)
+        {
+            log::error!(
+                "[user_trap_handler] task {} [{}] should yield, contain signal: {:?}",
+                task.tid(),
+                task.get_name(),
+                task.sig_manager_mut().bitmap.bits()
+            );
             yield_now().await;
-            task.set_is_yield(false);
         }
 
         match task.get_state() {

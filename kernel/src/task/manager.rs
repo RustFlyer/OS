@@ -32,17 +32,19 @@ impl TaskManager {
         self.0.lock().insert(task.tid(), Arc::downgrade(task));
 
         log::debug!("Add task {}", task.tid());
-        // log::debug!("Task list:");
-        // let _ = self.for_each(|t| {
-        //     log::debug!(
-        //         "thread {}, name: {}, state: {:?}, page table at {:#x}",
-        //         t.tid(),
-        //         t.get_name(),
-        //         t.get_state(),
-        //         t.addr_space().page_table.root().to_usize(),
-        //     );
-        //     Ok(())
-        // });
+        log::debug!("Task list:");
+        let _ = self.for_each(|t| {
+            let t = t.tid();
+            // simdebug::stop();
+            // log::debug!(
+            //     "thread {}, name: {}, state: {:?}, page table at {:#x}",
+            //     t.tid(),
+            //     t.get_name(),
+            //     t.get_state(),
+            //     t.addr_space().page_table.root().to_usize(),
+            // );
+            Ok(())
+        });
     }
 
     pub fn remove_task(&self, tid: Tid) {
@@ -68,8 +70,11 @@ impl TaskManager {
     }
 
     pub fn for_each(&self, f: impl Fn(&Arc<Task>) -> SysResult<()>) -> SysResult<()> {
-        for task in self.0.lock().values() {
-            f(&task.upgrade().unwrap())?
+        let tasks = self.0.lock();
+        for task in tasks.values() {
+            if let Some(task) = task.upgrade() {
+                f(&task)?
+            }
         }
         Ok(())
     }

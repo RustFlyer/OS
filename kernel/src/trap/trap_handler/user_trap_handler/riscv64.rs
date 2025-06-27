@@ -95,18 +95,6 @@ pub fn user_interrupt_handler(task: &Task, i: Interrupt) {
     match i {
         Interrupt::SupervisorTimer => {
             set_nx_timer_irq();
-
-            // If the executor does not have other tasks, no need to yield.
-            // if task.timer_mut().schedule_time_out()
-            // && executor::has_waiting_task_alone(current_hart().id)
-            {
-                log::trace!(
-                    "[trap_handler] task {} yield, contain signal: {:?}",
-                    task.tid(),
-                    task.sig_manager_mut().bitmap.bits()
-                );
-                task.set_is_yield(true);
-            }
         }
         Interrupt::SupervisorExternal => {
             log::info!("[kernel] receive externel interrupt");

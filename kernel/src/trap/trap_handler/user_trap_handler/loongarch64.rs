@@ -124,16 +124,16 @@ pub fn user_interrupt_handler(task: &Task, i: Interrupt) {
     match i {
         Interrupt::Timer => {
             ticlr::clear_timer_interrupt();
-            if task.timer_mut().schedule_time_out()
-                && executor::has_waiting_task_alone(current_hart().id)
-            {
-                log::trace!(
-                    "[trap_handler] task {} yield, contain signal: {:?}",
-                    task.tid(),
-                    task.sig_manager_mut().bitmap.bits()
-                );
-                task.set_is_yield(true);
-            }
+            // if task.timer_mut().schedule_time_out()
+            //     && executor::has_waiting_task_alone(current_hart().id)
+            // {
+            //     log::trace!(
+            //         "[trap_handler] task {} yield, contain signal: {:?}",
+            //         task.tid(),
+            //         task.sig_manager_mut().bitmap.bits()
+            //     );
+            //     task.set_is_yield(true);
+            // }
         }
         _ => panic!("Unknown user interrupt: {:?}", i),
     }

@@ -566,7 +566,7 @@ pub fn trace_page_table_lookup(root: PhysPageNum, va: VirtAddr) {
             index * size_of::<PageTableEntry>(),
             entry
         );
-        if entry.bits() != 0 {
+        if entry.bits() == 0 {
             return;
         }
         ppn = entry.ppn();

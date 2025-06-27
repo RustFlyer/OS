@@ -31,6 +31,28 @@ impl TimeSpec {
     pub fn into_ms(&self) -> usize {
         self.tv_sec * 1_000 + self.tv_nsec / 1_000_000
     }
+
+    pub fn from_us(us: usize) -> Self {
+        Self {
+            tv_sec: us / 1_000_000,
+            tv_nsec: (us % 1_000_000) * 1_000,
+        }
+    }
+
+    pub fn into_us(&self) -> usize {
+        self.tv_sec * 1_000_000 + self.tv_nsec / 1_000
+    }
+
+    pub fn from_ns(ns: usize) -> Self {
+        Self {
+            tv_sec: ns / Self::NANO_PER_SEC,
+            tv_nsec: ns % Self::NANO_PER_SEC,
+        }
+    }
+
+    pub fn into_ns(&self) -> usize {
+        self.tv_sec * Self::NANO_PER_SEC + self.tv_nsec
+    }
 }
 
 impl TimeValue for TimeSpec {
