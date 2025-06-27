@@ -59,6 +59,10 @@ impl Hart {
         self.task.clone().unwrap()
     }
 
+    pub fn try_get_task(&self) -> Option<Arc<Task>> {
+        self.task.clone()
+    }
+
     pub fn is_task_exist(&self) -> bool {
         self.task.is_some()
     }

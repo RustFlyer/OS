@@ -319,7 +319,11 @@ pub fn sys_setitimer(which: usize, new_itimeval: usize, old_itimeval: usize) -> 
                 itimer.id = timerid.0;
                 itimer.interval = new_itimeval.it_interval.into();
 
-                log::info!("[sys_setitimer] task {}: itimer id is set to {}", task.pid(), itimer.id);
+                log::info!(
+                    "[sys_setitimer] task {}: itimer id is set to {}",
+                    task.pid(),
+                    itimer.id
+                );
 
                 if new_itimeval.it_value.is_zero() {
                     itimer.next_expire = Duration::ZERO;

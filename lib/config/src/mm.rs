@@ -86,7 +86,7 @@ pub const KERNEL_MAP_OFFSET: usize = KERNEL_START - KERNEL_START_PHYS;
 /// Size of kernel stack
 pub const KERNEL_STACK_SIZE: usize = 64 * 1024;
 /// Size of kernel heap
-pub const KERNEL_HEAP_SIZE: usize = 128 * 1024 * 1024;
+pub const KERNEL_HEAP_SIZE: usize = 256 * 1024 * 1024;
 
 /// Address width
 pub const ADDRESS_WIDTH: usize = 64;
