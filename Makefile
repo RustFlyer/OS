@@ -236,6 +236,10 @@ fs-img-submit: user
 
 PHONY += all
 all:
+	rm -r .cargo
+	mkdir .cargo
+	cp submit/config.toml .cargo/
+
 	rm -rf vendor
 	tar xf submit/vendor.tar.gz
 
