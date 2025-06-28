@@ -108,6 +108,7 @@ fn main() {
         chdir("musl");
         run_cmd("./busybox cp /musl/lib/* /lib/");
         run_cmd("./busybox cp /musl/lib/libc.so /lib/ld-musl-riscv64-sf.so.1");
+        run_cmd("./busybox cp /musl/lib/libc.so /lib/ld-musl-riscv64.so.1");
         run_cmd("./busybox cp /glibc/lib/* /lib/");
         run_cmd("./busybox cp /glibc/lib/libc.so /lib/libc.so.6");
         run_cmd("./busybox cp /glibc/lib/libm.so /lib/libm.so.6");
