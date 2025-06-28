@@ -57,15 +57,15 @@ impl Dentry for SimpleDentry {
         let name = dentry.name();
         log::debug!("[simple::base_lookup] name: {}", name);
         let child = self.get_child(name).ok_or(SysError::ENOENT)?;
-        let sb = self.superblock().ok_or(SysError::ENOTDIR)?;
-        let inode = SimpleInode::new(sb);
-        inode.set_inotype(InodeType::File);
-        child.set_inode(inode);
+        // let sb = self.superblock().ok_or(SysError::ENOTDIR)?;
+        // let inode = SimpleInode::new(sb);
+        // inode.set_inotype(InodeType::File);
+        // child.set_inode(inode);
 
-        log::debug!(
-            "[simple::base_lookup] inotype: {:?}",
-            child.inode().unwrap().inotype()
-        );
+        // log::debug!(
+        //     "[simple::base_lookup] inotype: {:?}",
+        //     child.inode().unwrap().inotype()
+        // );
 
         Ok(())
     }
