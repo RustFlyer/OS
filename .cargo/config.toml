@@ -1,6 +1,9 @@
 [build]
 target = ["riscv64gc-unknown-none-elf", "loongarch64-unknown-none"]
 
+[net]
+offline = true
+
 [source.crates-io]
 replace-with = "vendored-sources"
 

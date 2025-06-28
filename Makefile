@@ -237,7 +237,7 @@ fs-img-submit: user
 PHONY += all
 all:
 	rm -rf vendor
-	tar xf submit/vendor-rv.tar.gz
+	tar xf submit/vendor.tar.gz
 
 	make build ARCH=riscv64 LOG= MODE=release
 	cp target/riscv64gc-unknown-none-elf/release/kernel kernel-rv
@@ -245,7 +245,7 @@ all:
 # cp fsimg/riscv64-sdcard.img disk-rv.img
 
 	rm -rf vendor/
-	tar xf submit/vendor-la.tar.gz
+	tar xf submit/vendor.tar.gz
 
 	make build ARCH=loongarch64 LOG= MODE=release
 	cp target/loongarch64-unknown-none/release/kernel kernel-la
