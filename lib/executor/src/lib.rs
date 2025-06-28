@@ -56,7 +56,8 @@ impl TaskLine {
     }
 
     pub fn length(&self) -> usize {
-        self.tasks.lock().len() + self.pritasks.lock().len()
+        self.tasks.lock().len()
+        // + self.pritasks.lock().len()
     }
 }
 
