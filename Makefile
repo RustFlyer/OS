@@ -236,11 +236,11 @@ fs-img-submit: user
 
 PHONY += all
 all:
-	rm -r .cargo
-	mkdir .cargo
+	-rm -r .cargo
+	-mkdir .cargo
 	cp submit/config.toml .cargo/
 
-	rm -rf vendor
+	-rm -rf vendor
 	tar xf submit/vendor.tar.gz
 
 	make build ARCH=riscv64 LOG= MODE=release
@@ -248,7 +248,7 @@ all:
 # make fs-img-submit-rv
 # cp fsimg/riscv64-sdcard.img disk-rv.img
 
-	rm -rf vendor/
+	-rm -rf vendor/
 	tar xf submit/vendor.tar.gz
 
 	make build ARCH=loongarch64 LOG= MODE=release
