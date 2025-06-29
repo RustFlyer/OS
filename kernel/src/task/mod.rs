@@ -15,7 +15,7 @@ pub mod time_stat;
 pub mod timeid;
 
 use arch::time::get_time_duration;
-use config::inode::InodeMode;
+use config::{inode::InodeMode, vfs::OpenFlags};
 use future::spawn_kernel_task;
 use net::poll_interfaces;
 use osfuture::{block_on, yield_now};
@@ -52,6 +52,7 @@ pub fn init_proc_by_insert() {
     let _ = root.create(dentry.as_ref(), InodeMode::REG);
 
     let file = <dyn File>::open(dentry).unwrap();
+    file.set_flags(OpenFlags::O_RDWR);
     let initproc_u8 = get_app_data_by_name("init_proc").unwrap();
     let _ = block_on(async { file.write(initproc_u8).await });
     let _ = file.seek(config::vfs::SeekFrom::Start(0));
@@ -74,6 +75,7 @@ pub fn submit_init_by_insert() {
     let _ = root.create(dentry.as_ref(), InodeMode::REG);
 
     let file = <dyn File>::open(dentry).unwrap();
+    file.set_flags(OpenFlags::O_RDWR);
     let initproc_u8 = get_app_data_by_name("submit").unwrap();
     let _ = block_on(async { file.write(initproc_u8).await });
     let _ = file.seek(config::vfs::SeekFrom::Start(0));

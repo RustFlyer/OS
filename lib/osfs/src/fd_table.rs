@@ -1,5 +1,5 @@
 use alloc::{sync::Arc, vec::Vec};
-use core::{fmt::Debug, sync::atomic::AtomicBool};
+use core::fmt::Debug;
 
 use config::{fs::MAX_FDS, vfs::OpenFlags};
 use systype::{

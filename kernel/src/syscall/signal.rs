@@ -209,6 +209,7 @@ pub fn sys_kill(pid: isize, sig_code: i32) -> SyscallResult {
     let mut target_processes = {
         let boxed_iter: Box<dyn Iterator<Item = Arc<Task>>> = match pid {
             p if p > 0 => {
+                // The process with specific PID.
                 let task = process_list_lock
                     .get(&(p as usize))
                     .and_then(|t| t.upgrade())
@@ -220,18 +221,35 @@ pub fn sys_kill(pid: isize, sig_code: i32) -> SyscallResult {
                 }
             }
             0 => {
-                // TODO: Send the signal to every process in the process group of the calling process.
-                Box::new(iter::empty())
+                // Every process in the process group of the calling process.
+                Box::new(
+                    process_list_lock
+                        .values()
+                        .filter_map(|t| t.upgrade())
+                        .filter(|t| {
+                            let pgid = current_task().get_pgid();
+                            t.is_process() && t.get_pgid() == pgid
+                        }),
+                )
             }
             -1 => Box::new(
+                // Every process without the calling process itself.
                 process_list_lock
                     .values()
                     .filter_map(|t| t.upgrade())
                     .filter(|t| t.is_process() && t.pid() != curr_pid),
             ),
             _ => {
-                // TODO: Send the signal to every process in the process group whose PGID is -pid.
-                Box::new(iter::empty())
+                // Every process in the process group whose PGID is -pid.
+                Box::new(
+                    process_list_lock
+                        .values()
+                        .filter_map(|t| t.upgrade())
+                        .filter(|t| {
+                            let pgid = -pid as usize;
+                            t.is_process() && t.get_pgid() == pgid
+                        }),
+                )
             }
         };
         boxed_iter.peekable()

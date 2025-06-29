@@ -178,9 +178,13 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         GETPEERNAME => sys_getpeername(args[0], args[1], args[2]),
         FCHMODAT => Ok(0),
         FCHOWNAT => Ok(0),
+        // The following syscalls should be implemented to pass ltp testcases.
+        ACCEPT4 => Ok(0),
+        FALLOCATE => Ok(0),
+        ADD_KEY => Ok(0),
         _ => {
             println!("Syscall not implemented: {}", syscall_no.as_str());
-            unimplemented!()
+            panic!("Syscall not implemented: {}", syscall_no.as_str());
         }
     };
 

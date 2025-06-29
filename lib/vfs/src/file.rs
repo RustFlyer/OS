@@ -314,6 +314,10 @@ impl dyn File {
     ///
     /// Returns the number of bytes written.
     pub async fn write(&self, buf: &[u8]) -> SysResult<usize> {
+        if !self.flags().writable() {
+            log::error!("flags: {:?}", self.flags());
+            return Err(SysError::EBADF);
+        }
         if self.flags().contains(OpenFlags::O_APPEND) {
             self.set_pos(self.size());
         }
@@ -323,7 +327,7 @@ impl dyn File {
         let position = self.pos();
 
         if position > size && inode.inotype() == InodeType::File {
-            todo!("Holes are not supported yet");
+            unimplemented!("Holes are not supported yet");
         }
 
         let bytes_written = match inode.inotype() {

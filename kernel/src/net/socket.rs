@@ -4,7 +4,7 @@ use async_trait::async_trait;
 
 use config::vfs::{OpenFlags, PollEvents};
 use net::{poll_interfaces, tcp::core::TcpSocket, udp::UdpSocket, unix::UnixSocket};
-use systype::error::SysResult;
+use systype::error::{SysError, SysResult};
 use vfs::{
     file::{File, FileMeta},
     sys_root_dentry,
@@ -27,13 +27,18 @@ unsafe impl Sync for Socket {}
 unsafe impl Send for Socket {}
 
 impl Socket {
-    pub fn new(domain: SaFamily, types: SocketType, nonblock: bool) -> Self {
+    pub fn new(domain: SaFamily, types: SocketType, nonblock: bool) -> SysResult<Self> {
         let sk = match domain {
             SaFamily::AF_UNIX => Sock::Unix(UnixSocket {}),
             SaFamily::AF_INET | SaFamily::AF_INET6 => match types {
                 SocketType::STREAM => Sock::Tcp(TcpSocket::new_v4()),
                 SocketType::DGRAM => Sock::Udp(UdpSocket::new()),
-                _ => unimplemented!(),
+                _ => {
+                    log::error!(
+                        "[Socket::new] Unsupported socket type: {types:?} for domain: {domain:?}"
+                    );
+                    return Err(SysError::EPROTONOSUPPORT);
+                }
             },
         };
         let flags = if nonblock {
@@ -45,7 +50,7 @@ impl Socket {
         let meta = FileMeta::new(sys_root_dentry());
         *meta.flags.lock() = flags;
 
-        Self { types, sk, meta }
+        Ok(Self { types, sk, meta })
     }
 
     pub fn from_another(another: &Self, sk: Sock) -> Self {

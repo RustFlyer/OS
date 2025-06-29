@@ -143,8 +143,11 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
     let inode = dentry.inode().unwrap();
     let inode_type = inode.inotype();
 
-    if flags.contains(OpenFlags::O_DIRECTORY) && !inode_type.is_dir() {
+    if !inode_type.is_dir() && flags.contains(OpenFlags::O_DIRECTORY) {
         return Err(SysError::ENOTDIR);
+    }
+    if inode_type.is_dir() && flags.writable() {
+        return Err(SysError::EISDIR);
     }
 
     let file = <dyn File>::open(dentry)?;
