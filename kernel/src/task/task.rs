@@ -2,12 +2,14 @@ use alloc::{
     collections::BTreeMap,
     string::String,
     sync::{Arc, Weak},
+    vec::Vec,
 };
 use core::{
     cell::SyncUnsafeCell,
     sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering},
     task::Waker,
 };
+use timer::Timer;
 
 use mm::address::VirtAddr;
 use mutex::{ShareMutex, SpinNoIrqLock, new_share_mutex};
@@ -137,6 +139,9 @@ pub struct Task {
     // task should use relative path with cwd.
     cwd: ShareMutex<Arc<dyn Dentry>>,
 
+    // root dentry
+    root: ShareMutex<Arc<dyn Dentry>>,
+
     // elf refers to the elf-file in disk and the task is running
     // with loading elf-file datas.
     elf: SyncUnsafeCell<Arc<dyn File>>,
@@ -157,6 +162,8 @@ pub struct Task {
 
     /// Mask of CPUs allowed for the task.
     cpus_on: SyncUnsafeCell<CpuMask>,
+
+    timers: ShareMutex<Vec<Option<Timer>>>,
 
     // name, used for debug
     name: SyncUnsafeCell<String>,
@@ -198,6 +205,7 @@ impl Task {
             tid_address: SyncUnsafeCell::new(TidAddress::new()),
             fd_table: new_share_mutex(FdTable::new()),
             cwd: new_share_mutex(sys_root_dentry()),
+            root: new_share_mutex(sys_root_dentry()),
             elf: SyncUnsafeCell::new(elf_file),
             is_syscall: AtomicBool::new(false),
             is_yield: AtomicBool::new(false),
@@ -209,6 +217,7 @@ impl Task {
             pdeathsig: AtomicU32::new(0),
 
             cpus_on: SyncUnsafeCell::new(CpuMask::CPU0),
+            timers: new_share_mutex(Vec::new()),
             name: SyncUnsafeCell::new(name),
         }
     }
@@ -244,6 +253,7 @@ impl Task {
         tid_address: SyncUnsafeCell<TidAddress>,
         fd_table: ShareMutex<FdTable>,
         cwd: ShareMutex<Arc<dyn Dentry>>,
+        root: ShareMutex<Arc<dyn Dentry>>,
         elf: SyncUnsafeCell<Arc<dyn File>>,
 
         itimers: ShareMutex<[ITimer; 3]>,
@@ -282,6 +292,7 @@ impl Task {
             tid_address,
             fd_table,
             cwd,
+            root,
             elf,
             is_syscall: AtomicBool::new(false),
             is_yield: AtomicBool::new(false),
@@ -293,6 +304,7 @@ impl Task {
             pdeathsig: AtomicU32::new(0),
 
             cpus_on,
+            timers: new_share_mutex(Vec::new()),
             name,
         }
     }
@@ -451,12 +463,20 @@ impl Task {
         self.cwd.lock().clone()
     }
 
+    pub fn root_mut(&self) -> Arc<dyn Dentry> {
+        self.root.lock().clone()
+    }
+
     pub fn fdtable_mut(&self) -> ShareMutex<FdTable> {
         self.fd_table.clone()
     }
 
     pub fn thread_group_mut(&self) -> ShareMutex<ThreadGroup> {
         self.threadgroup.clone()
+    }
+
+    pub fn timers_mut(&self) -> ShareMutex<Vec<Option<Timer>>> {
+        self.timers.clone()
     }
 
     pub fn get_waker(&self) -> Waker {
@@ -486,6 +506,10 @@ impl Task {
 
     pub fn cwd(&self) -> ShareMutex<Arc<dyn Dentry>> {
         self.cwd.clone()
+    }
+
+    pub fn root(&self) -> ShareMutex<Arc<dyn Dentry>> {
+        self.root.clone()
     }
 
     pub fn get_sig_mask(&self) -> SigSet {

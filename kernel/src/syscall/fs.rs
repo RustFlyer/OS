@@ -2020,6 +2020,14 @@ pub fn sys_fchownat(
         (inner.uid, inner.gid)
     };
 
+    log::debug!(
+        "chown: owner={:#x}, group={:#x}, old_uid={}, old_gid={}",
+        owner,
+        group,
+        old_uid,
+        old_gid
+    );
+
     let mut changed = false;
     if owner != u32::MAX && owner != old_uid {
         inode.set_uid(owner);

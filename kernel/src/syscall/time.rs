@@ -3,16 +3,19 @@ use core::time::Duration;
 use mutex::SpinNoIrqLock;
 
 use arch::time::{get_time_duration, get_time_ms, get_time_us};
-use osfuture::{Select2Futures, SelectOutput};
+use osfuture::{Select2Futures, SelectOutput, yield_now};
 use systype::{
     error::{SysError, SyscallResult},
     time::{ITimerVal, TMS, TimeSpec, TimeVal, TimeValue},
 };
-use timer::{TIMER_MANAGER, Timer};
+use timer::{TIMER_MANAGER, Timer, TimerState};
 
 use crate::{
     processor::current_task,
-    task::{TaskState, sig_members::IntrBySignalFuture, time::RealITimer, timeid::timeid_alloc},
+    task::{
+        TaskState, sig_members::IntrBySignalFuture, signal::sig_exec::SigEvent, time::RealITimer,
+        timeid::timeid_alloc,
+    },
     vm::user_ptr::{UserReadPtr, UserWritePtr},
 };
 
@@ -153,8 +156,11 @@ pub const CLOCK_MONOTONIC: usize = 1;
 pub const CLOCK_PROCESS_CPUTIME_ID: usize = 2;
 /// `CLOCK_THREAD_CPUTIME_ID` is used to measure the CPU time consumed by the calling thread
 pub const CLOCK_THREAD_CPUTIME_ID: usize = 3;
+pub const CLOCK_MONOTONIC_RAW: usize = 4;
 /// `CLOCK_REALTIME_COARSE` is Rough version of the system clock.
 pub const CLOCK_REALTIME_COARSE: usize = 5;
+pub const CLOCK_BOOTTIME: usize = 6;
+pub const CLOCK_REALTIME_ALARM: usize = 7;
 
 pub static mut CLOCK_DEVIATION: [Duration; SUPPORT_CLOCK] = [Duration::ZERO; SUPPORT_CLOCK];
 
@@ -180,10 +186,6 @@ pub fn sys_clock_gettime(clockid: usize, tp: usize) -> SyscallResult {
         return Ok(0);
     }
 
-    // for _i in 0..1000 {
-    //     simdebug::stop();
-    // }
-
     match clockid {
         CLOCK_REALTIME | CLOCK_MONOTONIC | CLOCK_REALTIME_COARSE => {
             let current = get_time_duration();
@@ -203,6 +205,28 @@ pub fn sys_clock_gettime(clockid: usize, tp: usize) -> SyscallResult {
         CLOCK_THREAD_CPUTIME_ID => unsafe {
             ts_ptr.write(task.timer_mut().cpu_time().into())?;
         },
+        CLOCK_MONOTONIC_RAW => {
+            let current = get_time_duration();
+            unsafe {
+                let ts: TimeSpec = current.into();
+                ts_ptr.write(ts)?;
+            }
+        }
+        CLOCK_BOOTTIME => {
+            let current = get_time_duration();
+            unsafe {
+                let ts: TimeSpec = current.into();
+                ts_ptr.write(ts)?;
+            }
+        }
+        CLOCK_REALTIME_ALARM => {
+            let current = get_time_duration();
+            unsafe {
+                let ts: TimeSpec = current.into();
+                ts_ptr.write(ts)?;
+            }
+        }
+
         _ => {
             log::error!("[sys_clock_gettime] unsupported clockid{}", clockid);
             return Err(SysError::EINTR);
@@ -254,6 +278,30 @@ pub async fn sys_clock_nanosleep(
                 Err(SysError::EINTR)
             }
         }
+        CLOCK_THREAD_CPUTIME_ID => {
+            let ts = unsafe { t.read()? };
+            let req: Duration = ts.into();
+
+            let start = task.get_process_cputime();
+            let target = if flags == TIMER_ABSTIME {
+                req
+            } else {
+                start + req
+            };
+
+            while task.get_process_cputime() < target {
+                let mut i = 0;
+                loop {
+                    i = i + 1;
+                    if i > 100000 {
+                        break;
+                    }
+                }
+                yield_now().await;
+            }
+            Ok(0)
+        }
+
         _ => {
             log::error!("[sys_clock_nanosleep] unsupported clockid {}", clockid);
             Err(SysError::EINVAL)
@@ -547,4 +595,222 @@ pub fn sys_adjtimex(user_timex: usize) -> SyscallResult {
         0
     };
     Ok(ret)
+}
+
+pub fn sys_clock_adjtime(clockid: usize, user_timex: usize) -> SyscallResult {
+    pub const CLOCK_REALTIME: usize = 0;
+
+    if clockid != CLOCK_REALTIME {
+        return Err(SysError::EINVAL);
+    }
+
+    let task = current_task();
+    let addrspace = task.addr_space();
+    let mut timex_ptr = UserWritePtr::<Timex>::new(user_timex, &addrspace);
+
+    let mut user_tm = if !timex_ptr.is_null() {
+        let mut read_ptr = UserReadPtr::<Timex>::new(user_timex, &addrspace);
+        unsafe { read_ptr.read()? }
+    } else {
+        Timex::default()
+    };
+
+    let mut sys_tm = SYSTEM_TIMEX.lock();
+
+    // modes
+    pub const ADJ_OFFSET: i32 = 0x0001;
+    pub const ADJ_FREQUENCY: i32 = 0x0002;
+    pub const ADJ_MAXERROR: i32 = 0x0004;
+    pub const ADJ_ESTERROR: i32 = 0x0008;
+    pub const ADJ_STATUS: i32 = 0x0010;
+    pub const ADJ_TIMECONST: i32 = 0x0020;
+    pub const ADJ_SETOFFSET: i32 = 0x0100;
+    pub const ADJ_TAI: i32 = 0x0080;
+
+    // status
+    pub const STA_PLL: i32 = 0x0001;
+    pub const STA_PPSFREQ: i32 = 0x0002;
+    pub const STA_PPSTIME: i32 = 0x0004;
+    pub const STA_FLL: i32 = 0x0008;
+    pub const STA_INS: i32 = 0x0010;
+    pub const STA_DEL: i32 = 0x0020;
+    pub const STA_UNSYNC: i32 = 0x0040;
+    pub const STA_FREQHOLD: i32 = 0x0080;
+    pub const STA_NANO: i32 = 0x2000;
+
+    if user_tm.modes & ADJ_OFFSET != 0 {
+        sys_tm.offset = user_tm.offset;
+    }
+    if user_tm.modes & ADJ_FREQUENCY != 0 {
+        sys_tm.freq = user_tm.freq;
+    }
+    if user_tm.modes & ADJ_MAXERROR != 0 {
+        sys_tm.maxerror = user_tm.maxerror;
+    }
+    if user_tm.modes & ADJ_ESTERROR != 0 {
+        sys_tm.esterror = user_tm.esterror;
+    }
+    if user_tm.modes & ADJ_STATUS != 0 {
+        sys_tm.status = user_tm.status;
+    }
+    if user_tm.modes & ADJ_TIMECONST != 0 {
+        sys_tm.constant = user_tm.constant;
+    }
+    if user_tm.modes & ADJ_TAI != 0 {
+        sys_tm.tai = user_tm.tai;
+    }
+
+    // update time
+    let now = get_time_duration();
+    sys_tm.time = now.into();
+
+    user_tm = *sys_tm;
+
+    if !timex_ptr.is_null() {
+        unsafe {
+            timex_ptr.write(user_tm)?;
+        }
+    }
+
+    // return: 0 sync, 1 unsync, val < 0 means error
+    let ret = if sys_tm.status & STA_UNSYNC != 0 {
+        1
+    } else {
+        0
+    };
+    Ok(ret)
+}
+
+pub fn sys_clock_settime(clockid: usize, tp: usize) -> SyscallResult {
+    if clockid == CLOCK_PROCESS_CPUTIME_ID
+        || clockid == CLOCK_THREAD_CPUTIME_ID
+        || clockid == CLOCK_MONOTONIC
+    {
+        log::error!(
+            "[sys_clock_settime] The clockid {} specified in a call to clock_settime() is not a settable clock.",
+            clockid
+        );
+        return Err(SysError::EINVAL);
+    }
+    let task = current_task();
+    let addrspace = task.addr_space();
+    let mut tp = UserReadPtr::<TimeSpec>::new(tp, &addrspace);
+    let tp = unsafe { tp.read() }?;
+    if !tp.is_valid() {
+        return Err(SysError::EINVAL);
+    }
+    match clockid {
+        CLOCK_REALTIME => {
+            if tp.into_ms() < get_time_ms() {
+                log::error!(
+                    "[sys_clock_settime] attempted to set the time to a value less than the current value of the CLOCK_MONOTONIC clock."
+                );
+                return Err(SysError::EINVAL);
+            }
+            unsafe {
+                CLOCK_DEVIATION[clockid] = Duration::from(tp) - get_time_duration();
+            }
+        }
+        _ => {
+            log::error!("[sys_clock_gettime] unsupported clockid{}", clockid);
+            return Err(SysError::EINVAL);
+        }
+    }
+    Ok(0)
+}
+
+pub const SIGEV_NONE: i32 = 0;
+pub const SIGEV_SIGNAL: i32 = 1;
+pub const SIGEV_THREAD: i32 = 2;
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct Sigevent {
+    pub sigev_notify: i32,
+    pub sigev_signo: i32,
+    pub sigev_value: usize,
+}
+
+pub fn sys_timer_create(clockid: usize, sevp_ptr: usize, timerid_ptr: usize) -> SyscallResult {
+    if clockid != CLOCK_REALTIME && clockid != CLOCK_MONOTONIC {
+        return Err(SysError::EINVAL);
+    }
+
+    let task = current_task();
+    let addr_space = task.addr_space();
+
+    let sevp = if sevp_ptr != 0 {
+        let mut sevp_ptr = UserReadPtr::<Sigevent>::new(sevp_ptr, &addr_space);
+        Some(unsafe { sevp_ptr.read()? })
+    } else {
+        None
+    };
+
+    let lock = task.timers_mut();
+    let mut timers = lock.lock();
+    let mut timer = Timer::new(Duration::from_secs(u64::MAX));
+    timer.signal = sevp.and_then(|sev| {
+        if sev.sigev_notify == SIGEV_SIGNAL {
+            timer.set_callback(Arc::new(SigEvent {
+                tid: task.tid(),
+                sig: sev.sigev_signo,
+            }));
+            Some((sev.sigev_signo, sev.sigev_value))
+        } else {
+            None
+        }
+    });
+
+    let id = timers.iter().position(|t| t.is_none()).unwrap_or_else(|| {
+        timers.push(None);
+        timers.len() - 1
+    });
+    timers[id] = Some(timer);
+
+    let mut id_ptr = UserWritePtr::<i32>::new(timerid_ptr, &addr_space);
+    unsafe {
+        id_ptr.write(id as i32)?;
+    }
+
+    Ok(0)
+}
+
+pub fn sys_timer_settime(
+    timerid: usize,
+    flags: usize,
+    new_value_ptr: usize,
+    old_value_ptr: usize,
+) -> SyscallResult {
+    #[repr(C)]
+    #[derive(Debug, Clone, Copy)]
+    pub struct Itimerspec {
+        pub it_interval: TimeSpec,
+        pub it_value: TimeSpec,
+    }
+
+    let task = current_task();
+    let addr_space = task.addr_space();
+
+    let lock = task.timers_mut();
+    let mut timers = lock.lock();
+    let timer = timers
+        .get_mut(timerid)
+        .and_then(|t| t.as_mut())
+        .ok_or(SysError::EINVAL)?;
+
+    let mut new_value = UserReadPtr::<Itimerspec>::new(new_value_ptr, &addr_space);
+    let new_value = unsafe { new_value.read()? };
+
+    let now = get_time_duration();
+    let first = Duration::from(new_value.it_value);
+    let interval = Duration::from(new_value.it_interval);
+
+    timer.expire = now + first;
+    timer.periodic = interval != Duration::ZERO;
+    timer.period = if timer.periodic { Some(interval) } else { None };
+    timer.state = TimerState::Active;
+
+    TIMER_MANAGER.add_timer(timer.clone());
+
+    Ok(0)
 }

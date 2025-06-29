@@ -1,13 +1,15 @@
 use alloc::sync::Arc;
 use core::arch::global_asm;
+use timer::{IEvent, TimerState};
 
 use systype::error::SysResult;
 
 use super::sig_info::Sig;
 use crate::task::{
     Task, TaskState,
+    manager::TASK_MANAGER,
     sig_members::{ActionType, SigActionFlag, SigContext},
-    signal::sig_info::{SigInfo, SigSet},
+    signal::sig_info::{SigDetails, SigInfo, SigSet},
 };
 use crate::vm::user_ptr::UserWritePtr;
 
@@ -236,4 +238,23 @@ fn cont(task: &Arc<Task>, sig: Sig) {
         }
     });
     task.notify_parent(SigInfo::CLD_CONTINUED, sig);
+}
+
+#[derive(Debug)]
+pub struct SigEvent {
+    pub tid: usize,
+    pub sig: i32,
+}
+
+impl IEvent for SigEvent {
+    fn callback(self: Arc<Self>) -> TimerState {
+        if let Some(task) = TASK_MANAGER.get_task(self.tid) {
+            task.receive_siginfo(SigInfo {
+                sig: Sig::from_i32(self.sig),
+                code: SigInfo::USER,
+                details: SigDetails::Kill { pid: task.pid() },
+            });
+        }
+        TimerState::Cancelled
+    }
 }

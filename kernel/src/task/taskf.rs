@@ -195,6 +195,7 @@ impl Task {
         let uid: Arc<mutex::spin_mutex::SpinMutex<usize, mutex::SpinNoIrq>> =
             new_share_mutex(self.uid());
         let cwd;
+        let root;
         let itimers;
 
         let elf = SyncUnsafeCell::new(unsafe { self.elf() });
@@ -210,6 +211,7 @@ impl Task {
             parent = (*self.parent_mut()).clone();
             pgid = (*self.pgid_mut()).clone();
             cwd = self.cwd();
+            root = self.root();
             itimers = new_share_mutex(self.with_mut_itimers(|t| *t));
 
             shm_maps = (*self.shm_maps_mut()).clone();
@@ -229,6 +231,7 @@ impl Task {
                 SHARED_MEMORY_MANAGER.attach(*shm_id, tid.0);
             }
             cwd = new_share_mutex(self.cwd_mut());
+            root = new_share_mutex(self.root_mut());
             itimers = new_share_mutex([ITimer::default(); 3]);
 
             name += "(fork)";
@@ -287,6 +290,7 @@ impl Task {
             SyncUnsafeCell::new(TidAddress::new()),
             fd_table,
             cwd,
+            root,
             elf,
             itimers,
             caps,
@@ -343,7 +347,7 @@ impl Task {
     /// See [`Path::walk`] for more details on what errors may be returned.
     pub fn walk_at(&self, dirfd: AtFd, path: String) -> SysResult<Arc<dyn Dentry>> {
         let base_dir = if path.starts_with("/") {
-            sys_root_dentry()
+            self.root_mut()
         } else {
             match dirfd {
                 AtFd::FdCwd => self.cwd_mut(),

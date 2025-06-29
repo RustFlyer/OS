@@ -54,6 +54,11 @@ impl Dentry for SimpleDentry {
         Ok(())
     }
 
+    fn base_symlink(&self, _dentry: &dyn Dentry, _target: &str) -> SysResult<()> {
+        log::error!("[base_symlink] not implemented");
+        Ok(())
+    }
+
     fn base_link(&self, _dentry: &dyn Dentry, _old_dentry: &dyn Dentry) -> SysResult<()> {
         todo!()
     }

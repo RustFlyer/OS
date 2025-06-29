@@ -7,5 +7,6 @@ pub mod inode;
 pub mod mm;
 pub mod process;
 pub mod sbi;
+pub mod sig;
 pub mod time;
 pub mod vfs;

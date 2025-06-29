@@ -21,13 +21,10 @@ use process::*;
 use sche::*;
 use signal::*;
 use systype::error::SysError;
-use time::{
-    sys_clock_gettime, sys_clock_nanosleep, sys_getitimer, sys_gettimeofday, sys_nanosleep,
-    sys_setitimer, sys_times,
-};
-use user::{sys_getgid, sys_getuid};
+use time::*;
+use user::*;
 
-use crate::syscall::time::{sys_adjtimex, sys_clock_getres};
+use crate::syscall::time::{sys_adjtimex, sys_clock_adjtime, sys_clock_getres, sys_clock_settime};
 
 pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
     let Some(syscall_no) = SyscallNo::from_repr(syscall_no) else {
@@ -35,7 +32,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         panic!("Syscall number not included: {syscall_no}");
     };
 
-    if 1 == 0 {
+    if 1 == 1 {
         log::warn!(
             "task {} call [{}]",
             crate::processor::current_task().tid(),
@@ -197,6 +194,13 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         CAPSET => sys_capset(args[0], args[1]),
         PRCTL => sys_prctl(args[0], args[1], args[2], args[3], args[4]),
         RT_SIGSUSPEND => sys_rt_sigsuspend(args[0]).await,
+        SETRESGID => Ok(0),
+        SETRESUID => Ok(0),
+        CHROOT => sys_chroot(args[0]),
+        CLOCK_ADJTIME => sys_clock_adjtime(args[0], args[1]),
+        CLOCK_SETTIME => sys_clock_settime(args[0], args[1]),
+        TIMER_CREATE => sys_timer_create(args[0], args[1], args[2]),
+        TIMER_SETTIME => sys_timer_settime(args[0], args[1], args[2], args[3]),
         _ => {
             println!("Syscall not implemented: {}", syscall_no.as_str());
             panic!("Syscall not implemented: {}", syscall_no.as_str());

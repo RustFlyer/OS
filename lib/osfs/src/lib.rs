@@ -16,9 +16,12 @@ use systype::error::{SysError, SysResult};
 use tmp::TmpFsType;
 use vfs::{SYS_ROOT_DENTRY, file::File, fstype::FileSystemType};
 
+use etc::*;
+
 extern crate alloc;
 
 pub mod dev;
+pub mod etc;
 pub mod fd_table;
 pub mod pipe;
 pub mod proc;
@@ -31,6 +34,7 @@ pub mod var;
 pub use vfs::sys_root_dentry;
 
 use crate::{
+    etc::fs::EtcFsType,
     sys::{fs::SysFsType, init_sysfs},
     var::VarFsType,
 };
@@ -72,6 +76,9 @@ pub fn register_dev() {
 
     let sysfs = SysFsType::new();
     FS_MANAGER.lock().insert(sysfs.name(), sysfs);
+
+    let etcfs = EtcFsType::new();
+    FS_MANAGER.lock().insert(etcfs.name(), etcfs);
 }
 
 pub fn init() {
@@ -133,6 +140,13 @@ pub fn init() {
         .unwrap();
     init_sysfs(sysfs_dentry).unwrap();
     log::debug!("success mount sysfs");
+
+    let etcfs = FS_MANAGER.lock().get("etcfs").unwrap().clone();
+    let etcfs_dentry = etcfs
+        .mount("etc", Some(diskfs_root.clone()), MountFlags::empty(), None)
+        .unwrap();
+    init_etcfs(etcfs_dentry).unwrap();
+    log::debug!("success mount etcfs");
 
     SYS_ROOT_DENTRY.call_once(|| diskfs_root);
     log::debug!("success init disk root");

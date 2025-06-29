@@ -14,11 +14,12 @@ pub enum TimerState {
 
 #[derive(Clone, Debug)]
 pub struct Timer {
-    pub(crate) expire: Duration,
-    pub(crate) callback: Option<Arc<dyn IEvent>>,
-    pub(crate) state: TimerState,
-    pub(crate) periodic: bool,
-    pub(crate) period: Option<Duration>,
+    pub expire: Duration,
+    pub callback: Option<Arc<dyn IEvent>>,
+    pub state: TimerState,
+    pub periodic: bool,
+    pub period: Option<Duration>,
+    pub signal: Option<(i32, usize)>,
 }
 
 impl Ord for Timer {
@@ -49,6 +50,7 @@ impl Timer {
             state: TimerState::Active,
             periodic: false,
             period: None,
+            signal: None,
         }
     }
 
@@ -59,6 +61,7 @@ impl Timer {
             state: TimerState::Active,
             periodic: true,
             period: Some(period),
+            signal: None,
         }
     }
 
