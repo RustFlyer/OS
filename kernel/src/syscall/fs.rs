@@ -2015,13 +2015,28 @@ pub fn sys_fchownat(
 
     let inode = dentry.inode().ok_or(SysError::ENOENT)?;
 
-    if owner != u32::MAX {
+    let (old_uid, old_gid) = {
+        let inner = inode.get_meta().inner.lock();
+        (inner.uid, inner.gid)
+    };
+
+    let mut changed = false;
+    if owner != u32::MAX && owner != old_uid {
         inode.set_uid(owner);
+        changed = true;
     }
-
-    if group != u32::MAX {
+    if group != u32::MAX && group != old_gid {
         inode.set_gid(group);
+        changed = true;
     }
 
+    if changed {
+        let mut mode = inode.get_meta().inner.lock().mode;
+
+        mode.remove(InodeMode::SET_UID);
+        mode.remove(InodeMode::SET_GID);
+
+        inode.set_mode(mode);
+    }
     Ok(0)
 }

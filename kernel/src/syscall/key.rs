@@ -128,8 +128,8 @@ pub fn sys_add_key(
     let payload: &[u8] = if plen == 0 {
         &[]
     } else {
-        if payload_ptr == 0 {
-            log::error!("[sys_add_key] double null");
+        if payload_ptr_ptr.is_null() {
+            log::error!("[sys_add_key] plen = {plen} when payload_ptr is null");
             return Err(SysError::EINVAL);
         }
         unsafe { payload_ptr_ptr.try_into_slice(plen) }?

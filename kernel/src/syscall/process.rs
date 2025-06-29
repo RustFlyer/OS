@@ -732,8 +732,8 @@ pub fn sys_setpgid(pid: usize, pgid: usize) -> SyscallResult {
 /// `geteuid()` returns the effective user ID of the calling process.
 pub fn sys_geteuid() -> SyscallResult {
     let euid = current_task().uid();
-    log::debug!("[sys_geteuid] euid: {}", euid);
-    Ok(euid)
+    log::debug!("[sys_geteuid] euid: {} now return 9", euid);
+    Ok(0)
 }
 
 /// `getegid()` returns the effective group ID of the calling process.

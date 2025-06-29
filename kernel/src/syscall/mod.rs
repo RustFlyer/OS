@@ -35,7 +35,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         panic!("Syscall number not included: {syscall_no}");
     };
 
-    if 1 == 1 {
+    if 1 == 0 {
         log::warn!(
             "task {} call [{}]",
             crate::processor::current_task().tid(),
