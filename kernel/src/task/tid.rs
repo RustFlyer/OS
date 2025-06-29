@@ -13,6 +13,7 @@ lazy_static! {
 pub type Tid = usize;
 pub type Pid = usize;
 pub type PGid = usize;
+pub type Uid = usize;
 
 #[derive(Debug)]
 pub struct TidHandle(pub Tid);

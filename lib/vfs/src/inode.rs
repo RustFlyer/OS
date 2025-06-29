@@ -40,6 +40,10 @@ pub struct InodeMetaInner {
     pub ctime: TimeSpec,
     /// State of the inode.
     pub state: InodeState,
+    /// uid of the inode.
+    pub uid: u32,
+    /// gid of the inode.
+    pub gid: u32,
 }
 
 impl InodeMeta {
@@ -57,6 +61,8 @@ impl InodeMeta {
                 mtime: TimeSpec::default(),
                 ctime: TimeSpec::default(),
                 state: InodeState::Uninit,
+                uid: 0,
+                gid: 0,
             }),
         }
     }
@@ -120,6 +126,14 @@ pub trait Inode: Send + Sync + DowncastSync {
 
     fn set_mode(&self, mode: InodeMode) {
         self.get_meta().inner.lock().mode = mode;
+    }
+
+    fn set_uid(&self, uid: u32) {
+        self.get_meta().inner.lock().uid = uid;
+    }
+
+    fn set_gid(&self, gid: u32) {
+        self.get_meta().inner.lock().gid = gid;
     }
 
     fn superblock(&self) -> Arc<dyn SuperBlock> {

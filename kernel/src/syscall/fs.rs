@@ -97,6 +97,12 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
     let name = path.clone();
     log::info!("[sys_openat] dirfd: {dirfd:#x}, path: {path}, flags: {flags:?}, mode: {mode:?}");
 
+    // DEBUG
+    if name.contains("cgroup") {
+        log::error!("not support cgroup");
+        return Err(SysError::EINVAL);
+    }
+
     let mut dentry = task.walk_at(AtFd::from(dirfd), path)?;
 
     if flags.contains(OpenFlags::O_TMPFILE) {
@@ -435,7 +441,9 @@ pub fn sys_dup3(oldfd: usize, newfd: usize, flags: i32) -> SyscallResult {
         return Err(SysError::EINVAL);
     }
     let task = current_task();
-    let flags = OpenFlags::from_bits_truncate(flags);
+
+    let file = task.with_mut_fdtable(|table| table.get_file(oldfd))?;
+    let flags = OpenFlags::from_bits_truncate(flags).union(file.flags());
 
     log::info!("[sys_dup3] oldfd: {oldfd}, newfd: {newfd}, flags: {flags:?}");
 
@@ -469,6 +477,7 @@ pub async fn sys_mkdirat(dirfd: usize, pathname: usize, mode: u32) -> SyscallRes
 
     let parent = dentry.parent().ok_or(SysError::ENOENT)?;
     let mode = InodeMode::from_bits_truncate(mode).union(InodeMode::DIR);
+    // let mode = InodeMode::DIR;
     parent.mkdir(dentry.as_ref(), mode)?;
     Ok(0)
 }
@@ -491,6 +500,11 @@ pub async fn sys_chdir(path: usize) -> SyscallResult {
     log::info!("[sys_chdir] path: {path}");
 
     let dentry = task.walk_at(AtFd::FdCwd, path)?;
+    log::info!(
+        "[sys_chdir] dentry inotype: {:?}",
+        dentry.inode().ok_or(SysError::ENOENT)?.inotype()
+    );
+
     if !dentry.inode().ok_or(SysError::ENOENT)?.inotype().is_dir() {
         return Err(SysError::ENOTDIR);
     }
@@ -1142,6 +1156,7 @@ pub async fn sys_ppoll(fds: usize, nfds: usize, tmo_p: usize, sigmask: usize) ->
     };
 
     task.set_state(TaskState::Interruptable);
+    task.set_wake_up_signal(!*task.sig_mask_mut());
     let ret_vec = if let Some(timeout) = time_out {
         match TimeoutFuture::new(timeout, poll_future).await {
             TimedTaskResult::Completed(ret_vec) => ret_vec,
@@ -1151,7 +1166,14 @@ pub async fn sys_ppoll(fds: usize, nfds: usize, tmo_p: usize, sigmask: usize) ->
             }
         }
     } else {
-        poll_future.await
+        let intr_future = IntrBySignalFuture {
+            task: task.clone(),
+            mask: *task.sig_mask_mut(),
+        };
+        match Select2Futures::new(poll_future, intr_future).await {
+            SelectOutput::Output1(ret_vec) => ret_vec,
+            SelectOutput::Output2(_) => return Err(SysError::EINTR),
+        }
     };
 
     task.set_state(TaskState::Running);
@@ -1907,6 +1929,98 @@ pub fn sys_statx(
 
     unsafe {
         UserWritePtr::<Statx>::new(statxbuf, &addrspace).write(statx)?;
+    }
+
+    Ok(0)
+}
+
+pub fn sys_fchmodat(dirfd: isize, pathname_ptr: usize, mode: u32, flags: u32) -> SyscallResult {
+    let task = current_task();
+    let addr_space = task.addr_space();
+    let pathname = UserReadPtr::<u8>::new(pathname_ptr, &addr_space).read_c_string(4096)?;
+    let pathname = pathname.into_string().map_err(|_| SysError::EINVAL)?;
+
+    let flags = AtFlags::from_bits_retain(flags as i32);
+
+    // if !task.can_chmod(&file) {
+    //     return Err(SysError::EPERM);
+    // }
+
+    let dentry = {
+        if flags.contains(AtFlags::AT_EMPTY_PATH) && pathname.is_empty() {
+            let dirfd = AtFd::from(dirfd);
+            match dirfd {
+                AtFd::FdCwd => Err(SysError::EINVAL)?,
+                AtFd::Normal(fd) => task.with_mut_fdtable(|t| t.get_file(fd))?.dentry(),
+            }
+        } else {
+            let dentry = task.walk_at(AtFd::from(dirfd), pathname)?;
+            if !flags.contains(AtFlags::AT_SYMLINK_NOFOLLOW)
+                && !dentry.is_negative()
+                && dentry.inode().unwrap().inotype().is_symlink()
+            {
+                Path::resolve_symlink_through(dentry)?
+            } else {
+                dentry
+            }
+        }
+    };
+
+    let inode = dentry.inode().ok_or(SysError::ENOENT)?;
+
+    let rmode = inode.get_meta().inner.lock().mode;
+
+    dentry.inode().ok_or(SysError::ENOENT)?.set_mode(
+        rmode
+            .intersection(!InodeMode::S_PERM)
+            .union(InodeMode::from_bits_retain(mode)),
+    );
+
+    Ok(0)
+}
+
+pub fn sys_fchownat(
+    dirfd: isize,
+    pathname_ptr: usize,
+    owner: u32,
+    group: u32,
+    flags: u32,
+) -> SyscallResult {
+    let task = current_task();
+    let addr_space = task.addr_space();
+    let pathname = UserReadPtr::<u8>::new(pathname_ptr, &addr_space).read_c_string(4096)?;
+    let pathname = pathname.into_string().map_err(|_| SysError::EINVAL)?;
+
+    let flags = AtFlags::from_bits_retain(flags as i32);
+
+    let dentry = {
+        if flags.contains(AtFlags::AT_EMPTY_PATH) && pathname.is_empty() {
+            let dirfd = AtFd::from(dirfd);
+            match dirfd {
+                AtFd::FdCwd => Err(SysError::EINVAL)?,
+                AtFd::Normal(fd) => task.with_mut_fdtable(|t| t.get_file(fd))?.dentry(),
+            }
+        } else {
+            let dentry = task.walk_at(AtFd::from(dirfd), pathname)?;
+            if !flags.contains(AtFlags::AT_SYMLINK_NOFOLLOW)
+                && !dentry.is_negative()
+                && dentry.inode().unwrap().inotype().is_symlink()
+            {
+                Path::resolve_symlink_through(dentry)?
+            } else {
+                dentry
+            }
+        }
+    };
+
+    let inode = dentry.inode().ok_or(SysError::ENOENT)?;
+
+    if owner != u32::MAX {
+        inode.set_uid(owner);
+    }
+
+    if group != u32::MAX {
+        inode.set_gid(group);
     }
 
     Ok(0)

@@ -44,7 +44,12 @@ impl Dentry for SimpleDentry {
     fn base_create(&self, dentry: &dyn Dentry, mode: InodeMode) -> SysResult<()> {
         let sb = self.superblock().ok_or(SysError::ENOTDIR)?;
         let inode = SimpleInode::new(sb);
+        log::debug!("[simple::base_create] set mode: {:?}", mode);
         inode.set_inotype(InodeType::from(mode));
+        log::debug!(
+            "[simple::base_create] set type: {:?}",
+            InodeType::from(mode)
+        );
         dentry.set_inode(inode);
         Ok(())
     }

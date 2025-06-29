@@ -438,9 +438,11 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
         return Err(SysError::ENOENT);
     }
 
-    envs.push(String::from(
-        r#"PATH=/:/bin:/sbin:/usr/bin:/usr/local/bin:/usr/local/sbin:"#,
-    ));
+    // DEBUG
+    if path.contains("cgroup") {
+        log::error!("not support cgroup");
+        return Err(SysError::EINVAL);
+    }
 
     // let mut busybox_prefix = String::from("bin");
 
@@ -491,6 +493,14 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
             dentry
         }
     };
+
+    let filepath = dentry.path();
+    let expath = filepath.rsplitn(2, '/').nth(1).unwrap_or("");
+    let argpath = format!(
+        "PATH={}:/bin:/sbin:/usr/bin:/usr/local/bin:/usr/local/sbin:ltp/testcases/bin:",
+        expath
+    );
+    envs.push(String::from(argpath));
 
     log::info!("[sys_execve]: open file {}", dentry.path());
     let file = <dyn File>::open(dentry)?;
@@ -669,7 +679,9 @@ pub fn sys_setgid(gid: usize) -> SyscallResult {
 /// and then setuid(1000) returns to a regular user to continue working stably
 /// and enhance security.
 pub fn sys_setuid(uid: usize) -> SyscallResult {
-    log::error!("[sys_setuid] unimplemented, uid: {uid}");
+    log::debug!("[sys_setuid]  uid: {uid}");
+    let task = current_task();
+    *task.uid_lock().lock() = uid;
     Ok(0)
 }
 
@@ -719,10 +731,12 @@ pub fn sys_setpgid(pid: usize, pgid: usize) -> SyscallResult {
 
 /// `geteuid()` returns the effective user ID of the calling process.
 pub fn sys_geteuid() -> SyscallResult {
-    Ok(0)
+    let euid = current_task().uid();
+    log::debug!("[sys_geteuid] euid: {}", euid);
+    Ok(euid)
 }
 
-/// `getegid()` returns the effective user ID of the calling process.
+/// `getegid()` returns the effective group ID of the calling process.
 pub fn sys_getegid() -> SyscallResult {
     log::error!("[getegid] unimplemented call");
     Ok(0)
@@ -975,7 +989,6 @@ pub const _LINUX_CAPABILITY_VERSION_3: u32 = 0x20080522;
 pub const CAPABILITY_U32S_1: usize = 1;
 pub const CAPABILITY_U32S_2: usize = 2;
 pub const CAPABILITY_U32S_3: usize = 2;
-
 pub fn sys_capget(hdrp: usize, datap: usize) -> SyscallResult {
     let task = current_task();
     let addrspace = task.addr_space();
@@ -984,17 +997,34 @@ pub fn sys_capget(hdrp: usize, datap: usize) -> SyscallResult {
     let hdr = unsafe { hdr_ptr.read()? };
 
     log::debug!("[sys_capget] hdr: {hdr:?}");
+
+    let mut hdr_write_ptr = UserWritePtr::<CapUserHeader>::new(hdrp, &addrspace);
+
     let u32s = match hdr.version {
         _LINUX_CAPABILITY_VERSION_1 => CAPABILITY_U32S_1,
         _LINUX_CAPABILITY_VERSION_2 | _LINUX_CAPABILITY_VERSION_3 => CAPABILITY_U32S_2,
-        _ => return Err(SysError::EINVAL),
+        _ => {
+            let mut new_hdr = hdr;
+            new_hdr.version = _LINUX_CAPABILITY_VERSION_3;
+            unsafe {
+                hdr_write_ptr.write(new_hdr)?;
+            }
+            return Err(SysError::EINVAL);
+        }
     };
 
-    if hdr.pid != 0 && hdr.pid != task.pid() as i32 {
-        return Err(SysError::EPERM);
+    if hdr.pid < -1 {
+        return Err(SysError::EINVAL);
+    }
+    let target_pid = if hdr.pid == 0 || hdr.pid == -1 {
+        task.pid() as i32
+    } else {
+        hdr.pid
+    };
+    if target_pid != task.pid() as i32 {
+        return Err(SysError::ESRCH);
     }
 
-    let mut hdr_write_ptr = UserWritePtr::<CapUserHeader>::new(hdrp, &addrspace);
     unsafe {
         hdr_write_ptr.write(hdr)?;
     }

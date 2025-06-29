@@ -192,6 +192,8 @@ impl Task {
         let parent;
         let children;
         let pgid;
+        let uid: Arc<mutex::spin_mutex::SpinMutex<usize, mutex::SpinNoIrq>> =
+            new_share_mutex(self.uid());
         let cwd;
         let itimers;
 
@@ -275,6 +277,7 @@ impl Task {
             parent,
             children,
             pgid,
+            uid,
             SpinNoIrqLock::new(0),
             sig_mask,
             sig_handlers,

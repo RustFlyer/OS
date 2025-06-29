@@ -314,7 +314,7 @@ impl dyn File {
     /// Returns the number of bytes written.
     pub async fn write(&self, buf: &[u8]) -> SysResult<usize> {
         if !self.flags().writable() {
-            log::error!("flags: {:?}", self.flags());
+            log::error!("path: {}, flags: {:?}", self.dentry().path(), self.flags());
             return Err(SysError::EBADF);
         }
         if self.flags().contains(OpenFlags::O_APPEND) {

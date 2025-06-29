@@ -35,6 +35,7 @@ bitflags! {
         /// Socket
         const SOCKET = 0o140000;
 
+        const S_PERM  = 0o7777;
         /// Set-user-ID on execution.
         const SET_UID = 0o4000;
         /// Set-group-ID on execution.

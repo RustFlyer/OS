@@ -1,6 +1,6 @@
 use alloc::{string::String, sync::Arc, vec::Vec};
 use hashbrown::HashMap;
-use mutex::SpinNoIrqLock;
+use mutex::{SpinNoIrqLock, new_share_mutex};
 use spin::lazy::Lazy;
 use systype::error::{SysError, SyscallResult};
 
@@ -71,9 +71,25 @@ static KEYRING_TABLE: Lazy<SpinNoIrqLock<HashMap<u64, Arc<SpinNoIrqLock<KeyRing>
     Lazy::new(|| SpinNoIrqLock::new(HashMap::new()));
 
 fn find_keyring_by_serial(serial: usize) -> Result<Arc<SpinNoIrqLock<KeyRing>>, SysError> {
-    let table = KEYRING_TABLE.lock();
-    let arc = table.get(&(serial as u64)).ok_or(SysError::EINVAL)?;
+    let mut table = KEYRING_TABLE.lock();
+    let ret = table.get(&(serial as u64));
+    let arc = if ret.is_some() {
+        ret.unwrap()
+    } else {
+        table.insert(serial as u64, new_share_mutex(KeyRing::new()));
+        table.get(&(serial as u64)).unwrap()
+    };
     Ok(arc.clone())
+}
+
+fn parse_uid_keyring(desc: &str) -> Option<(bool, u32)> {
+    if let Some(rest) = desc.strip_prefix("_uid.") {
+        rest.parse::<u32>().ok().map(|uid| (false, uid))
+    } else if let Some(rest) = desc.strip_prefix("_uid_ses.") {
+        rest.parse::<u32>().ok().map(|uid| (true, uid))
+    } else {
+        None
+    }
 }
 
 pub fn sys_add_key(
@@ -92,14 +108,40 @@ pub fn sys_add_key(
     let key_type = key_type.into_string().map_err(|_| SysError::EINVAL)?;
     let description = description.into_string().map_err(|_| SysError::EINVAL)?;
 
-    let mut payload_ptr = UserReadPtr::<u8>::new(payload_ptr, &addr_space);
-    let payload = unsafe { payload_ptr.try_into_slice(plen) }?;
+    if key_type == "keyring" {
+        if let Some((_is_ses, uid)) = parse_uid_keyring(&description) {
+            let current_uid = task.uid();
+            let is_root = current_uid == 0;
+            if !is_root && uid != current_uid as u32 {
+                return Err(SysError::EPERM);
+            }
+        }
+    }
+
+    log::debug!(
+        "[sys_add_key] read payload {:#x} plen: {}",
+        payload_ptr,
+        plen
+    );
+
+    let mut payload_ptr_ptr = UserReadPtr::<u8>::new(payload_ptr, &addr_space);
+    let payload: &[u8] = if plen == 0 {
+        &[]
+    } else {
+        if payload_ptr == 0 {
+            log::error!("[sys_add_key] double null");
+            return Err(SysError::EINVAL);
+        }
+        unsafe { payload_ptr_ptr.try_into_slice(plen) }?
+    };
 
     let ring = find_keyring_by_serial(keyring_serial)?;
+    log::debug!("[sys_add_key] add in");
 
     let key_type = KeyType::from_str(&key_type).ok_or(SysError::EINVAL)?;
     let key_id = ring.lock().add_key(key_type, &description, payload);
 
+    log::debug!("[sys_add_key] success");
     Ok(key_id as usize)
 }
 
@@ -110,15 +152,49 @@ pub fn sys_keyctl(
     arg4: usize,
     arg5: usize,
 ) -> SyscallResult {
+    pub const KEYCTL_GET_KEYRING_ID: usize = 0;
+
+    pub const KEY_SPEC_THREAD_KEYRING: isize = -1;
+    pub const KEY_SPEC_PROCESS_KEYRING: isize = -2;
+    pub const KEY_SPEC_SESSION_KEYRING: isize = -3;
+    pub const KEY_SPEC_USER_KEYRING: isize = -4;
+    pub const KEY_SPEC_USER_SESSION_KEYRING: isize = -5;
+
     pub const KEYCTL_SEARCH: usize = 3;
     pub const KEYCTL_READ: usize = 11;
 
+    log::debug!("[sys_keyctl] operation: {}", operation);
     match operation {
+        KEYCTL_GET_KEYRING_ID => {
+            let idtype = arg2 as isize;
+            let create = arg3 != 0;
+            let task = current_task();
+            let uid = task.uid();
+            log::debug!("[sys_keyctl] idtype: {}, create: {}", idtype, create);
+
+            let serial = match idtype {
+                KEY_SPEC_PROCESS_KEYRING => task.pid() as u64,
+                KEY_SPEC_USER_KEYRING => 0x10000000 + (uid as u64),
+                KEY_SPEC_USER_SESSION_KEYRING => 0x20000000 + (uid as u64),
+                _ => return Err(SysError::EINVAL),
+            };
+
+            // if none and create == 1, then create
+            let mut table = KEYRING_TABLE.lock();
+            if !table.contains_key(&serial) {
+                if create {
+                    table.insert(serial, Arc::new(SpinNoIrqLock::new(KeyRing::new())));
+                } else {
+                    return Ok(0);
+                }
+            }
+            Ok(serial as usize)
+        }
         KEYCTL_SEARCH => {
             // arg2: keyring_serial
             // arg3: type_ptr (C string)
             // arg4: description_ptr (C string)
-            // arg5: dest_keyring_serial (可选，简化可忽略)
+            // arg5: dest_keyring_serial (可选)
             let keyring_serial = arg2;
             let type_ptr = arg3;
             let desc_ptr = arg4;
@@ -151,7 +227,6 @@ pub fn sys_keyctl(
             let buffer_ptr = arg3;
             let buffer_len = arg4;
 
-            // 在所有 keyring 里查找 key
             let table = KEYRING_TABLE.lock();
             let key = table
                 .values()

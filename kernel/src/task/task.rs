@@ -24,7 +24,7 @@ use super::{
     time_stat::TaskTimeStat,
 };
 use crate::{
-    task::{cap::Capabilities, mask::CpuMask},
+    task::{cap::Capabilities, mask::CpuMask, tid::Uid},
     trap::trap_context::TrapContext,
     vm::addr_space::AddrSpace,
 };
@@ -98,6 +98,8 @@ pub struct Task {
 
     // pgid is the id of a process group if existed.
     pgid: ShareMutex<PGid>,
+
+    uid: ShareMutex<Uid>,
 
     // when task exits, it will set exit_code and wait for
     // parent task to clean it and receive exit_code.
@@ -185,6 +187,7 @@ impl Task {
             parent: new_share_mutex(None),
             children: new_share_mutex(BTreeMap::new()),
             pgid: new_share_mutex(pgid),
+            uid: new_share_mutex(0),
             exit_code: SpinNoIrqLock::new(0),
             sig_manager: SyncUnsafeCell::new(SigManager::new()),
             sig_mask: SyncUnsafeCell::new(SigSet::empty()),
@@ -229,6 +232,7 @@ impl Task {
         children: ShareMutex<BTreeMap<Tid, Arc<Task>>>,
 
         pgid: ShareMutex<PGid>,
+        uid: ShareMutex<Uid>,
         exit_code: SpinNoIrqLock<i32>,
 
         sig_mask: SyncUnsafeCell<SigSet>,
@@ -266,6 +270,7 @@ impl Task {
             children,
 
             pgid,
+            uid,
             exit_code,
 
             sig_mask,
@@ -302,6 +307,14 @@ impl Task {
     /// Returns its process tid or its own tid if it's a process.
     pub fn pid(self: &Arc<Self>) -> Pid {
         self.process().tid()
+    }
+
+    pub fn uid(&self) -> Uid {
+        *self.uid.lock()
+    }
+
+    pub fn uid_lock(&self) -> ShareMutex<Uid> {
+        self.uid.clone()
     }
 
     pub fn process(self: &Arc<Self>) -> Arc<Task> {

@@ -35,7 +35,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         panic!("Syscall number not included: {syscall_no}");
     };
 
-    if 1 == 0 {
+    if 1 == 1 {
         log::warn!(
             "task {} call [{}]",
             crate::processor::current_task().tid(),
@@ -179,8 +179,14 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         SOCKETPAIR => sys_socketpair(args[0], args[1], args[2], args[3]),
         GETRUSAGE => sys_getrusage(args[0] as i32, args[1]),
         GETPEERNAME => sys_getpeername(args[0], args[1], args[2]),
-        FCHMODAT => Ok(0),
-        FCHOWNAT => Ok(0),
+        FCHMODAT => sys_fchmodat(args[0] as isize, args[1], args[2] as u32, args[3] as u32),
+        FCHOWNAT => sys_fchownat(
+            args[0] as isize,
+            args[1],
+            args[2] as u32,
+            args[3] as u32,
+            args[4] as u32,
+        ),
         ACCEPT4 => sys_accept4(args[0], args[1], args[2], args[3]).await,
         ADDKEY => sys_add_key(args[0], args[1], args[2], args[3], args[4]),
         KEYCTL => sys_keyctl(args[0], args[1], args[2], args[3], args[4]),

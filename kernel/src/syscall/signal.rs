@@ -1,4 +1,4 @@
-use core::iter;
+use core::{iter, time::Duration};
 
 use config::process::INIT_PROC_ID;
 use osfuture::suspend_now;
@@ -6,6 +6,7 @@ use systype::{
     error::{SysError, SyscallResult},
     time::{TimeSpec, TimeValue},
 };
+use timer::{TIMER_MANAGER, Timer};
 
 use crate::{
     processor::current_task,
@@ -714,9 +715,24 @@ pub async fn sys_rt_sigsuspend(mask: usize) -> SyscallResult {
             Ok(())
         }
     })?;
+
+    // DEBUG
+    {
+        let mut timer = Timer::new(Duration::from_secs(1));
+        timer.set_waker_callback(task.get_waker());
+        TIMER_MANAGER.add_timer(timer);
+    }
+
     task.set_state(TaskState::Interruptable);
     suspend_now().await;
     *task.sig_mask_mut() = oldmask;
     task.set_state(TaskState::Running);
+
+    // DEBUG
+    {
+        task.set_state(TaskState::Zombie);
+        log::error!("zombie");
+    }
+
     Err(SysError::EINTR)
 }

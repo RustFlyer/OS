@@ -88,11 +88,11 @@ impl Hart {
         new_task: &mut Arc<Task>,
         pps: &mut ProcessorPrivilegeState,
     ) {
-        println!(
-            "[hart] =====================switch to task {} tid {}=====================",
-            new_task.get_name(),
-            new_task.tid()
-        );
+        // println!(
+        //     "[hart] =====================switch to task {} tid {}=====================",
+        //     new_task.get_name(),
+        //     new_task.tid()
+        // );
         if new_task.tid() == 5 {
             simdebug::stop();
         }
@@ -116,7 +116,7 @@ impl Hart {
         }
         self.clear_task();
         enable_interrupt();
-        println!("[hart] =====================switch out=====================");
+        // println!("[hart] =====================switch out=====================");
     }
 
     pub fn kernel_switch_in(&mut self, pps: &mut ProcessorPrivilegeState) {
