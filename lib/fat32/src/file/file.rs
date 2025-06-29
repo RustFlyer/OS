@@ -18,7 +18,7 @@ pub struct FatFileFile {
 impl FatFileFile {
     pub fn new(dentry: Arc<FatDentry>, inode: Arc<FatFileInode>) -> Arc<Self> {
         Arc::new(Self {
-            meta: FileMeta::new(dentry.clone()),
+            meta: FileMeta::new(dentry),
             file: inode.file.clone(),
         })
     }

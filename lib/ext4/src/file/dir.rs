@@ -17,7 +17,7 @@ unsafe impl Sync for ExtDirFile {}
 impl ExtDirFile {
     pub fn new(dentry: Arc<ExtDentry>, inode: Arc<ExtDirInode>) -> Arc<Self> {
         Arc::new(Self {
-            meta: FileMeta::new(dentry.clone()),
+            meta: FileMeta::new(dentry),
             dir: inode.dir.clone(),
         })
     }

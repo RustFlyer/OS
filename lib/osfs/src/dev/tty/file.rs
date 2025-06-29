@@ -1,6 +1,7 @@
 use alloc::sync::Arc;
 
 use async_trait::async_trait;
+use config::vfs::OpenFlags;
 use mutex::SpinNoIrqLock;
 use systype::error::{SysResult, SyscallResult};
 use vfs::{
@@ -22,9 +23,12 @@ pub struct TtyFile {
 
 impl TtyFile {
     pub fn new(dentry: Arc<dyn Dentry>) -> Arc<Self> {
+        let file_meta = FileMeta::new(dentry);
+        *file_meta.flags.lock() = OpenFlags::O_RDWR;
+
         Arc::new(Self {
             // buf: SpinNoIrqLock::new(QueueBuffer::new()),
-            meta: FileMeta::new(dentry),
+            meta: file_meta,
             inner: SpinNoIrqLock::new(TtyInner {
                 fg_pgid: 1,
                 win_size: WinSize::new(),
@@ -54,8 +58,8 @@ impl File for TtyFile {
         let termios = self.inner.lock().termios;
         if termios.is_icrnl() {
             for i in 0..rlen {
-                if buf[i] == '\r' as u8 {
-                    buf[i] = '\n' as u8;
+                if buf[i] == b'\r' {
+                    buf[i] = b'\n';
                 }
             }
         }

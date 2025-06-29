@@ -375,6 +375,7 @@ impl Task {
         unsafe { Arc::clone(&*self.addr_space.get()) }
     }
 
+    #[allow(clippy::mut_from_ref)]
     pub fn capability(&self) -> &mut Capabilities {
         unsafe { &mut *self.caps.get() }
     }

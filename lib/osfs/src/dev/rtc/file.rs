@@ -2,6 +2,7 @@ use alloc::sync::Arc;
 
 use async_trait::async_trait;
 
+use config::vfs::OpenFlags;
 use systype::error::SyscallResult;
 use vfs::{
     dentry::Dentry,
@@ -16,9 +17,9 @@ pub struct RtcFile {
 
 impl RtcFile {
     pub fn new(dentry: Arc<dyn Dentry>) -> Arc<Self> {
-        Arc::new(Self {
-            meta: FileMeta::new(dentry),
-        })
+        let file_meta = FileMeta::new(dentry);
+        *file_meta.flags.lock() = OpenFlags::O_RDWR;
+        Arc::new(Self { meta: file_meta })
     }
 }
 
