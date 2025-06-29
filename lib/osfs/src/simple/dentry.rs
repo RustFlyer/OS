@@ -99,6 +99,14 @@ impl Dentry for SimpleDentry {
             .map(|_| ())
     }
 
+    fn base_rmdir(&self, dentry: &dyn Dentry) -> SysResult<()> {
+        if !dentry.get_meta().children.lock().is_empty() {
+            return Err(SysError::ENOTEMPTY);
+        }
+        self.remove_child(dentry).unwrap();
+        Ok(())
+    }
+
     fn base_rename(
         &self,
         _dentry: &dyn Dentry,

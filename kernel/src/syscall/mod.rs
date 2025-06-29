@@ -29,7 +29,7 @@ use crate::syscall::time::sys_clock_getres;
 pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
     let Some(syscall_no) = SyscallNo::from_repr(syscall_no) else {
         log::error!("Syscall number not included: {syscall_no}");
-        unimplemented!()
+        panic!("Syscall number not included: {syscall_no}");
     };
 
     if 1 == 0 {

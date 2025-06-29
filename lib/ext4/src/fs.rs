@@ -38,7 +38,6 @@ impl FileSystemType for ExtFsType {
         dev: Option<Arc<dyn driver::BlockDevice>>,
     ) -> SysResult<Arc<dyn Dentry>> {
         assert!(dev.is_some());
-        log::debug!("[base_mount] run");
         let meta = SuperBlockMeta::new(dev, self.clone());
         let superblock = ExtSuperBlock::new(meta);
         let root_dir = ExtDir::open(CString::new("/").unwrap().as_c_str())?;

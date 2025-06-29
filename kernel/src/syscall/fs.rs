@@ -530,7 +530,7 @@ pub async fn sys_unlinkat(dirfd: usize, pathname: usize, flags: i32) -> SyscallR
     }
 
     let dentry = task.walk_at(AtFd::from(dirfd), path)?;
-    let parent = dentry.parent().expect("can not remove root directory");
+    let parent = dentry.parent().ok_or(SysError::EBUSY)?;
     let is_dir = dentry.inode().ok_or(SysError::ENOENT)?.inotype().is_dir();
 
     if flags.contains(AtFlags::AT_REMOVEDIR) {
@@ -538,11 +538,10 @@ pub async fn sys_unlinkat(dirfd: usize, pathname: usize, flags: i32) -> SyscallR
             return Err(SysError::ENOTDIR);
         }
         parent.rmdir(dentry.as_ref())?;
-    } else if is_dir {
-        return Err(SysError::EISDIR);
-    }
-
-    if !is_dir {
+    } else {
+        if is_dir {
+            return Err(SysError::EISDIR);
+        }
         parent.unlink(dentry.as_ref())?;
     }
     Ok(0)
