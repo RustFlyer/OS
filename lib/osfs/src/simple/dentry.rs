@@ -75,11 +75,6 @@ impl Dentry for SimpleDentry {
     //     Self::new(name, self.inode(), Some(Arc::downgrade(&self.into_dyn())))
     // }
 
-    fn base_rmdir(&self, _dentry: &dyn Dentry) -> SysResult<()> {
-        self.unset_inode();
-        Ok(())
-    }
-
     fn base_new_neg_child(self: Arc<Self>, name: &str) -> Arc<dyn Dentry> {
         let this = self as Arc<dyn Dentry>;
         let dentry =
@@ -103,6 +98,14 @@ impl Dentry for SimpleDentry {
             .remove_child(dentry)
             .ok_or(SysError::ENOENT)
             .map(|_| ())
+    }
+
+    fn base_rmdir(&self, dentry: &dyn Dentry) -> SysResult<()> {
+        if !dentry.get_meta().children.lock().is_empty() {
+            return Err(SysError::ENOTEMPTY);
+        }
+        self.remove_child(dentry).unwrap();
+        Ok(())
     }
 
     fn base_rename(

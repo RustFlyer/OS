@@ -20,7 +20,7 @@ use super::{
     addr_space::AddrSpace,
     vm_area::{VmArea, VmaFlags},
 };
-use crate::{processor::current_task, vm::user_ptr::UserWritePtr};
+use crate::vm::user_ptr::UserWritePtr;
 
 impl AddrSpace {
     /// Loads an ELF executable into given address space.

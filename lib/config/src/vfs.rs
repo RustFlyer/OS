@@ -85,8 +85,8 @@ impl OpenFlags {
 
     /// A file `open`ed with this flags can be written.
     pub fn writable(&self) -> bool {
-        // Not being read-only means it is writable.
-        !self.contains(Self::O_RDONLY)
+        // Being read-write or write-only means it is writable.
+        self.contains(Self::O_RDWR) || self.contains(Self::O_WRONLY)
     }
 
     /// Returns the access mode of the file.

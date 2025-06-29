@@ -121,7 +121,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
         p => WaitFor::PGid(p as PGid),
     };
     log::info!("[sys_wait4] target: {target:?}, option: {option:?}");
-    log::error!(
+    log::info!(
         "[sys_wait4] existing task number: {}",
         TASK_MANAGER.how_many_tasks()
     );
@@ -669,7 +669,7 @@ pub fn sys_setgid(gid: usize) -> SyscallResult {
 /// and then setuid(1000) returns to a regular user to continue working stably
 /// and enhance security.
 pub fn sys_setuid(uid: usize) -> SyscallResult {
-    log::error!("[sys_setuid] unimplemented call uid: {uid}");
+    log::error!("[sys_setuid] unimplemented, uid: {uid}");
     Ok(0)
 }
 

@@ -102,6 +102,8 @@ pub enum SysError {
     ENINODE = 40,
     /// Socket operation on non-socket
     ENOTSOCK = 88,
+    /// Protocol not supported
+    EPROTONOSUPPORT = 93,
     /// Unsupported
     EOPNOTSUPP = 95,
     /// Socket address is already in use
@@ -171,6 +173,7 @@ impl SysError {
             ENOTEMPTY => "Directory not empty",
             ENINODE => "Inode is null",
             ENOTSOCK => "Socket operation on non-socket",
+            EPROTONOSUPPORT => "Protocol not supported",
             EOPNOTSUPP => "Unsupported",
             EADDRINUSE => "Address already in use",
             EADDRNOTAVAIL => "Address not available",
