@@ -63,6 +63,7 @@ const SYSCALL_RT_SIGACTION: usize = 134;
 const SYSCALL_RT_SIGPROCMASK: usize = 135;
 const SYSCALL_RT_SIGTIMEDWAIT: usize = 137;
 const SYSCALL_RT_SIGRETURN: usize = 139;
+const SYSCALL_SETUID: usize = 146;
 const SYSCALL_TIMES: usize = 153;
 const SYSCALL_SETPGID: usize = 154;
 const SYSCALL_GETPGID: usize = 155;
@@ -358,3 +359,4 @@ syscall!(
 );
 syscall!(sys_nanosleep, SYSCALL_NANOSLEEP, *const usize, *mut usize);
 syscall!(sys_sleep, SYSCALL_NANOSLEEP, *const usize);
+syscall!(sys_setuid, SYSCALL_SETUID, usize);

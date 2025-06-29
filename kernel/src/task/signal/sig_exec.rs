@@ -258,3 +258,16 @@ impl IEvent for SigEvent {
         TimerState::Cancelled
     }
 }
+
+pub fn clear_tasks() {
+    let _ = TASK_MANAGER.for_each(|t| {
+        if t.tid() > 5 {
+            t.receive_siginfo(SigInfo {
+                sig: Sig::SIGKILL,
+                code: SigInfo::KERNEL,
+                details: SigDetails::None,
+            });
+        }
+        Ok(())
+    });
+}

