@@ -128,32 +128,54 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
 
     // get the child for recycle according to the target
     // NOTE: recycle no more than one child per `sys_wait4`
-    let child_for_recycle = {
-        let children = task.children_mut().lock();
-        if children.is_empty() {
-            log::info!("[sys_wait4] task [{}] fail: no child", task.get_name());
-            return Err(SysError::ECHILD);
-        }
-        match target {
-            WaitFor::AnyChild => children
-                .values()
-                .find(|c| c.is_in_state(TaskState::WaitForRecycle)),
-            WaitFor::Pid(pid) => {
-                if let Some(child) = children.get(&pid) {
-                    if child.is_in_state(TaskState::WaitForRecycle) {
-                        Some(child)
-                    } else {
-                        None
-                    }
-                } else {
-                    log::info!("[sys_wait4] fail: no child with pid {pid}");
-                    return Err(SysError::ECHILD);
-                }
+    let child_for_recycle = match target {
+        WaitFor::AnyChild => {
+            let children = task.children_mut().lock();
+            if children.is_empty() {
+                log::info!("[sys_wait4] task [{}] fail: no child", task.get_name());
+                return Err(SysError::ECHILD);
             }
-            WaitFor::PGid(_) => unimplemented!(),
-            WaitFor::AnyChildInGroup => unimplemented!(),
+            children
+                .values()
+                .find(|c| c.is_in_state(TaskState::WaitForRecycle))
+                .cloned()
         }
-        .cloned()
+        WaitFor::Pid(pid) => {
+            let children = task.children_mut().lock();
+            if children.is_empty() {
+                log::info!("[sys_wait4] task [{}] fail: no child", task.get_name());
+                return Err(SysError::ECHILD);
+            }
+            if let Some(child) = children.get(&pid) {
+                if child.is_in_state(TaskState::WaitForRecycle) {
+                    Some(child.clone())
+                } else {
+                    None
+                }
+            } else {
+                log::info!("[sys_wait4] fail: no child with pid {pid}");
+                return Err(SysError::ECHILD);
+            }
+        }
+        WaitFor::PGid(_) => unimplemented!(),
+        WaitFor::AnyChildInGroup => {
+            let pgid = task.get_pgid();
+            let mut result = None;
+            for process in PROCESS_GROUP_MANAGER
+                .get_group(pgid)
+                .ok_or_else(|| SysError::ESRCH)?
+                .into_iter()
+                .filter_map(|t| t.upgrade())
+                .filter(|t| t.is_process()) 
+                {
+                    let children = process.children_mut().lock();
+                    if let Some(child) = children.values().find(|c| c.is_in_state(TaskState::WaitForRecycle)) {
+                        result = Some(child.clone());
+                        break;
+                    }
+                }
+            result
+        },
     };
 
     if let Some(child_for_recycle) = child_for_recycle {
