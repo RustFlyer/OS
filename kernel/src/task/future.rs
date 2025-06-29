@@ -162,6 +162,7 @@ pub async fn task_executor_unit(task: Arc<Task>) {
         match task.get_state() {
             TaskState::Zombie => break,
             TaskState::Sleeping => {
+                task.set_state(TaskState::Interruptable);
                 suspend_now().await;
             }
             _ => {}
@@ -183,12 +184,12 @@ pub async fn task_executor_unit(task: Arc<Task>) {
         if task.timer_mut().schedule_time_out()
             && executor::has_waiting_task_alone(current_hart().id)
         {
-            // log::error!(
-            //     "[user_trap_handler] task {} [{}] should yield, contain signal: {:?}",
-            //     task.tid(),
-            //     task.get_name(),
-            //     task.sig_manager_mut().bitmap.bits()
-            // );
+            log::debug!(
+                "[user_trap_handler] task {} [{}] should yield, contain signal: {:?}",
+                task.tid(),
+                task.get_name(),
+                task.sig_manager_mut().bitmap.bits()
+            );
             yield_now().await;
         }
 

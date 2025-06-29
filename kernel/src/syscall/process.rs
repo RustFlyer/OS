@@ -192,10 +192,10 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
         Ok(0)
     } else {
         // 3. if there is no child for recycle and WNOHANG option is not set, wait for SIGCHLD from target
-        log::info!("[sys_wait4] task [{}] suspend for sigchld", task.get_name());
         let (child_tid, exit_code, child_utime, child_stime) = loop {
             task.set_state(TaskState::Interruptable);
             task.set_wake_up_signal(!task.get_sig_mask() | SigSet::SIGCHLD);
+            log::info!("[sys_wait4] task [{}] suspend for sigchld", task.get_name());
             suspend_now().await;
             // wake up from suspend for any reason(may not be SIGCHLD)
             task.set_state(TaskState::Running);
@@ -1034,6 +1034,35 @@ pub fn sys_capset(hdrp: usize, datap: usize) -> SyscallResult {
     let mut data_ptr = UserReadPtr::<CapUserData>::new(datap, &addrspace);
     let caps = &mut task.capability();
     let slice = unsafe { data_ptr.try_into_slice(u32s) }?;
+
+    // 1. 检查 effective 必须是 new permitted 的子集
+    for i in 0..u32s {
+        let data = slice[i];
+        if data.effective & !data.permitted != 0 {
+            log::error!("[sys_capset] return EINVAL (effective not subset of permitted)");
+            return Err(SysError::EINVAL);
+        }
+    }
+
+    // 2. 检查 new permitted 只能是 old permitted 的子集（只能降权）
+    for i in 0..u32s {
+        let data = slice[i];
+        if data.permitted & !caps.permitted[i] != 0 {
+            log::error!("[sys_capset] return EPERM (permitted not subset of old permitted)");
+            return Err(SysError::EPERM);
+        }
+    }
+
+    // 3. 检查 new inheritable 只能是 (old inheritable | new permitted) 的子集
+    for i in 0..u32s {
+        let data = slice[i];
+        if data.inheritable & !(caps.inheritable[i] | data.permitted) != 0 {
+            log::error!(
+                "[sys_capset] return EPERM (inheritable not subset of old_inheritable | new_permitted)"
+            );
+            return Err(SysError::EPERM);
+        }
+    }
 
     for i in 0..u32s {
         let data = slice[i];

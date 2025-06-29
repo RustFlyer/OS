@@ -1118,7 +1118,7 @@ pub async fn sys_ppoll(fds: usize, nfds: usize, tmo_p: usize, sigmask: usize) ->
     let addrspace = task.addr_space();
 
     let mut poll_fds = unsafe { UserReadPtr::<PollFd>::new(fds, &addrspace).read_array(nfds)? };
-    // log::debug!("[sys_ppoll] fds: {:?}", fds);
+    log::debug!("[sys_ppoll] fds: {:?}", fds);
 
     let time_out = if tmo_p == 0 {
         None
@@ -1141,6 +1141,7 @@ pub async fn sys_ppoll(fds: usize, nfds: usize, tmo_p: usize, sigmask: usize) ->
         ready_cnt: 0,
     };
 
+    task.set_state(TaskState::Interruptable);
     let ret_vec = if let Some(timeout) = time_out {
         match TimeoutFuture::new(timeout, poll_future).await {
             TimedTaskResult::Completed(ret_vec) => ret_vec,
@@ -1153,6 +1154,7 @@ pub async fn sys_ppoll(fds: usize, nfds: usize, tmo_p: usize, sigmask: usize) ->
         poll_future.await
     };
 
+    task.set_state(TaskState::Running);
     let ret = ret_vec.len();
     for (i, result) in ret_vec {
         poll_fds[i].revents |= result.bits();

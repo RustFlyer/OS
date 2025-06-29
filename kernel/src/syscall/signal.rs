@@ -566,7 +566,7 @@ pub fn sys_rt_sigmask(
         unsafe {
             let input = input_mask.read()?;
             log::debug!("[sys_rt_sigmask] task {} input:{input:#x}", task.get_name());
-            // log::warn!("[sys_rt_sigmask] how: {how:#x}");
+            log::warn!("[sys_rt_sigmask] how: {how:#x}");
 
             match how {
                 SIGBLOCK => {
@@ -696,4 +696,27 @@ pub async fn sys_rt_sigtimedwait(set: usize, info: usize, timeout: usize) -> Sys
         log::info!("[sys_rt_sigtimedwait] I'm woken by timeout");
         Err(SysError::EAGAIN)
     }
+}
+
+pub async fn sys_rt_sigsuspend(mask: usize) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+    let mut mask = UserReadPtr::<SigSet>::new(mask, &addrspace);
+    let mut mask = unsafe { mask.read() }?;
+    mask.remove(SigSet::SIGKILL | SigSet::SIGSTOP);
+    let oldmask = core::mem::replace(task.sig_mask_mut(), mask);
+    let invoke_signal = task.with_mut_sig_handler(|handlers| handlers.bitmap());
+    task.with_mut_sig_manager(|pending| {
+        if pending.has_expect_signals(mask | invoke_signal) {
+            Err(SysError::EINTR)
+        } else {
+            pending.should_wake = mask | invoke_signal;
+            Ok(())
+        }
+    })?;
+    task.set_state(TaskState::Interruptable);
+    suspend_now().await;
+    *task.sig_mask_mut() = oldmask;
+    task.set_state(TaskState::Running);
+    Err(SysError::EINTR)
 }

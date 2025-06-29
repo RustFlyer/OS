@@ -1,5 +1,8 @@
 use alloc::sync::Arc;
-use config::inode::{InodeMode, InodeType};
+use config::{
+    inode::{InodeMode, InodeType},
+    vfs::OpenFlags,
+};
 use exe::{dentry::ExeDentry, inode::ExeInode};
 use meminfo::{dentry::MemInfoDentry, inode::MemInfoInode};
 use mounts::{dentry::MountsDentry, inode::MountsInode};
@@ -37,11 +40,7 @@ pub fn init_procfs(root_dentry: Arc<dyn Dentry>) -> SysResult<()> {
 
     // /proc/mounts
     let mounts_inode = MountsInode::new(root_dentry.superblock().unwrap());
-    let mounts_dentry = MountsDentry::new(
-        "mounts",
-        Some(mounts_inode),
-        Some(Arc::downgrade(&root_dentry)),
-    );
+    let mounts_dentry = MountsDentry::new(Some(mounts_inode), Some(Arc::downgrade(&root_dentry)));
     root_dentry.add_child(mounts_dentry);
 
     // /proc/sys
@@ -52,26 +51,35 @@ pub fn init_procfs(root_dentry: Arc<dyn Dentry>) -> SysResult<()> {
     root_dentry.add_child(sys_dentry.clone());
     log::info!("[init_procfs] add sys_dentry path = {}", sys_dentry.path());
 
-    let kernel_dentry = SimpleDentry::new("kernel", None, Some(Arc::downgrade(&sys_dentry)));
-    sys_dentry.mkdir(kernel_dentry.into_dyn_ref(), InodeMode::DIR)?;
+    // /proc/sys/kernel
+    let kernel_inode = SimpleInode::new(root_dentry.superblock().unwrap());
+    kernel_inode.set_inotype(InodeType::Dir);
+    let kernel_dentry = SimpleDentry::new(
+        "kernel",
+        Some(kernel_inode),
+        Some(Arc::downgrade(&sys_dentry)),
+    );
+
+    sys_dentry.add_child(kernel_dentry.clone());
     log::info!(
         "[init_procfs] add kernel_dentry path = {}",
         kernel_dentry.path()
     );
 
-    // let pid_max_dentry = SimpleDentry::new(
-    //     "pid_max",
-    //     None,
-    //     Some(Arc::downgrade(&kernel_dentry.clone().into_dyn())),
-    // );
-    // kernel_dentry
-    //     .into_dyn()
-    //     .create(pid_max_dentry.into_dyn_ref(), InodeMode::REG)?;
-    // log::info!("[init_procfs] add pid_max_dentry");
-
-    // let pid_max_file = pid_max_dentry.base_open()?;
-
-    // block_on(async { pid_max_file.write("32768\0".as_bytes()).await })?;
+    // /proc/sys/kernel/pid_max
+    let pid_max_dentry = SimpleDentry::new(
+        "pid_max",
+        None,
+        Some(Arc::downgrade(&kernel_dentry.clone().into_dyn())),
+    );
+    kernel_dentry.add_child(pid_max_dentry.clone());
+    kernel_dentry
+        .into_dyn()
+        .create(pid_max_dentry.into_dyn_ref(), InodeMode::REG)?;
+    log::info!("[init_procfs] add pid_max_dentry");
+    let pid_max_file = pid_max_dentry.base_open()?;
+    pid_max_file.set_flags(OpenFlags::O_WRONLY);
+    osfuture::block_on(async { pid_max_file.write("32768\0".as_bytes()).await })?;
 
     // /proc/cpuinfo
     let cpuinfo_inode = SimpleInode::new(root_dentry.superblock().unwrap());
@@ -106,6 +114,16 @@ pub fn init_procfs(root_dentry: Arc<dyn Dentry>) -> SysResult<()> {
         status_dentry.path()
     );
     self_dentry.add_child(status_dentry);
+
+    // /proc/self/mounts
+    let mounts_inode = MountsInode::new(root_dentry.superblock().unwrap());
+    let mounts_dentry: Arc<dyn Dentry> =
+        MountsDentry::new(Some(mounts_inode), Some(Arc::downgrade(&self_dentry)));
+    log::info!(
+        "[init_procfs] add mounts_dentry path = {}",
+        mounts_dentry.path()
+    );
+    self_dentry.add_child(mounts_dentry);
 
     Ok(())
 }

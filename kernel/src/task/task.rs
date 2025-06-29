@@ -199,7 +199,7 @@ impl Task {
             is_syscall: AtomicBool::new(false),
             is_yield: AtomicBool::new(false),
             itimers: new_share_mutex([ITimer::default(); 3]),
-            caps: SyncUnsafeCell::new(Capabilities::default()),
+            caps: SyncUnsafeCell::new(Capabilities::new()),
 
             dumpable: AtomicBool::new(false),
             no_new_privs: AtomicBool::new(false),

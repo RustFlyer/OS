@@ -26,3 +26,15 @@ pub struct Capabilities {
     pub permitted: [u32; 2],
     pub inheritable: [u32; 2],
 }
+
+impl Capabilities {
+    pub fn new() -> Self {
+        let all_caps = [u32::MAX, u32::MAX];
+
+        Self {
+            effective: all_caps,
+            permitted: all_caps,
+            inheritable: [0, 0],
+        }
+    }
+}

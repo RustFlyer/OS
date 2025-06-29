@@ -13,13 +13,9 @@ pub struct MountsDentry {
 }
 
 impl MountsDentry {
-    pub fn new(
-        name: &str,
-        inode: Option<Arc<dyn Inode>>,
-        parent: Option<Weak<dyn Dentry>>,
-    ) -> Arc<Self> {
+    pub fn new(inode: Option<Arc<dyn Inode>>, parent: Option<Weak<dyn Dentry>>) -> Arc<Self> {
         Arc::new(Self {
-            meta: DentryMeta::new(name, inode, parent),
+            meta: DentryMeta::new("mounts", inode, parent),
         })
     }
 }

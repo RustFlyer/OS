@@ -190,6 +190,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         CAPGET => sys_capget(args[0], args[1]),
         CAPSET => sys_capset(args[0], args[1]),
         PRCTL => sys_prctl(args[0], args[1], args[2], args[3], args[4]),
+        RT_SIGSUSPEND => sys_rt_sigsuspend(args[0]).await,
         _ => {
             println!("Syscall not implemented: {}", syscall_no.as_str());
             panic!("Syscall not implemented: {}", syscall_no.as_str());

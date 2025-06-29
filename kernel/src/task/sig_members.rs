@@ -83,9 +83,10 @@ impl Task {
             self.wake();
         } else {
             log::info!(
-                "[Task::recv] tid {} received signal {}, but not waking up",
+                "[Task::recv] tid {} received signal {}, but not waking up, in state {:?}",
                 self.tid(),
-                si.sig
+                si.sig,
+                self.get_state()
             );
         }
     }
