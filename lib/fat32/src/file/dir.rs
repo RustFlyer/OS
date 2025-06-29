@@ -24,7 +24,7 @@ pub struct FatDirFile {
 impl FatDirFile {
     pub fn new(dentry: Arc<FatDentry>, inode: Arc<FatDirInode>) -> Arc<Self> {
         Arc::new(Self {
-            meta: FileMeta::new(dentry.clone()),
+            meta: FileMeta::new(dentry),
             dir: inode.dir.clone(),
             iter_cache: new_share_mutex(inode.dir.lock().iter()),
         })

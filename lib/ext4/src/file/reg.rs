@@ -18,7 +18,7 @@ pub struct ExtRegFile {
 impl ExtRegFile {
     pub fn new(dentry: Arc<ExtDentry>, inode: Arc<ExtFileInode>) -> Arc<Self> {
         Arc::new(Self {
-            meta: FileMeta::new(dentry.clone()),
+            meta: FileMeta::new(dentry),
             file: inode.file.clone(),
         })
     }

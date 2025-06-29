@@ -11,7 +11,7 @@ use file::TtyFile;
 use inode::TtyInode;
 use spin::Once;
 use systype::error::SysResult;
-use vfs::{dentry::Dentry, file::File, path::Path};
+use vfs::{dentry::Dentry, path::Path};
 
 pub use ioctl::TtyIoctlCmd;
 
@@ -34,7 +34,6 @@ pub fn init() -> SysResult<()> {
     let tty_inode = TtyInode::new(sb.clone().unwrap());
     tty_dentry.set_inode(tty_inode);
     let tty_file = TtyFile::new(tty_dentry.clone());
-    tty_file.set_flags(OpenFlags::O_RDWR);
 
     TTY.call_once(|| tty_file);
     log::debug!("success init tty");

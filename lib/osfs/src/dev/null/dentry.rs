@@ -1,4 +1,5 @@
 use alloc::sync::{Arc, Weak};
+use config::vfs::OpenFlags;
 use systype::error::SysResult;
 use vfs::{
     dentry::{Dentry, DentryMeta},
@@ -30,9 +31,9 @@ impl Dentry for NullDentry {
     }
 
     fn base_open(self: Arc<Self>) -> SysResult<Arc<dyn File>> {
-        Ok(Arc::new(NullFile {
-            meta: FileMeta::new(self),
-        }))
+        let file_meta = FileMeta::new(self);
+        *file_meta.flags.lock() = OpenFlags::O_RDWR;
+        Ok(Arc::new(NullFile { meta: file_meta }))
     }
 
     fn base_create(&self, _dentry: &dyn Dentry, _mode: config::inode::InodeMode) -> SysResult<()> {

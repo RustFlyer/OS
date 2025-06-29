@@ -20,6 +20,7 @@ impl PipeWriteFile {
     pub fn new(inode: Arc<dyn Inode>) -> Arc<Self> {
         let dentry = SimpleDentry::new("w", Some(inode), None);
         let meta = FileMeta::new(dentry);
+        *meta.flags.lock() = config::vfs::OpenFlags::O_WRONLY;
         Arc::new(Self { meta })
     }
 }

@@ -16,7 +16,7 @@ unsafe impl Sync for ExtLinkFile {}
 impl ExtLinkFile {
     pub fn new(dentry: Arc<ExtDentry>, _inode: Arc<ExtLinkInode>) -> Arc<Self> {
         Arc::new(Self {
-            meta: FileMeta::new(dentry.clone()),
+            meta: FileMeta::new(dentry),
         })
     }
 }

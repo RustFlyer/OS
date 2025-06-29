@@ -4,7 +4,7 @@ use core::{
 };
 
 use alloc::sync::Arc;
-use config::vfs::PollEvents;
+use config::vfs::{OpenFlags, PollEvents};
 use mutex::SpinNoIrqLock;
 use vfs::{file::FileMeta, inode::Inode};
 
@@ -20,6 +20,7 @@ impl PipeReadFile {
     pub fn new(inode: Arc<PipeInode>) -> Arc<Self> {
         let dentry = SimpleDentry::new("r", Some(inode), None);
         let meta = FileMeta::new(dentry);
+        *meta.flags.lock() = OpenFlags::O_RDONLY;
         Arc::new(Self { meta })
     }
 }
