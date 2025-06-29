@@ -5,7 +5,7 @@ use alloc::{
 };
 use core::{
     cell::SyncUnsafeCell,
-    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+    sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering},
     task::Waker,
 };
 
@@ -23,7 +23,11 @@ use super::{
     tid::{Tid, TidHandle, tid_alloc},
     time_stat::TaskTimeStat,
 };
-use crate::{task::mask::CpuMask, trap::trap_context::TrapContext, vm::addr_space::AddrSpace};
+use crate::{
+    task::{cap::Capabilities, mask::CpuMask},
+    trap::trap_context::TrapContext,
+    vm::addr_space::AddrSpace,
+};
 
 /// State of Task
 ///
@@ -141,6 +145,14 @@ pub struct Task {
 
     itimers: ShareMutex<[ITimer; 3]>,
 
+    caps: SyncUnsafeCell<Capabilities>,
+
+    pub dumpable: AtomicBool,
+
+    pub no_new_privs: AtomicBool,
+
+    pub pdeathsig: AtomicU32,
+
     /// Mask of CPUs allowed for the task.
     cpus_on: SyncUnsafeCell<CpuMask>,
 
@@ -187,6 +199,12 @@ impl Task {
             is_syscall: AtomicBool::new(false),
             is_yield: AtomicBool::new(false),
             itimers: new_share_mutex([ITimer::default(); 3]),
+            caps: SyncUnsafeCell::new(Capabilities::default()),
+
+            dumpable: AtomicBool::new(false),
+            no_new_privs: AtomicBool::new(false),
+            pdeathsig: AtomicU32::new(0),
+
             cpus_on: SyncUnsafeCell::new(CpuMask::CPU0),
             name: SyncUnsafeCell::new(name),
         }
@@ -225,6 +243,7 @@ impl Task {
         elf: SyncUnsafeCell<Arc<dyn File>>,
 
         itimers: ShareMutex<[ITimer; 3]>,
+        caps: SyncUnsafeCell<Capabilities>,
 
         cpus_on: SyncUnsafeCell<CpuMask>,
 
@@ -262,6 +281,12 @@ impl Task {
             is_syscall: AtomicBool::new(false),
             is_yield: AtomicBool::new(false),
             itimers,
+            caps,
+
+            dumpable: AtomicBool::new(false),
+            no_new_privs: AtomicBool::new(false),
+            pdeathsig: AtomicU32::new(0),
+
             cpus_on,
             name,
         }
@@ -323,6 +348,10 @@ impl Task {
 
     pub fn addr_space(&self) -> Arc<AddrSpace> {
         unsafe { Arc::clone(&*self.addr_space.get()) }
+    }
+
+    pub fn capability(&self) -> &mut Capabilities {
+        unsafe { &mut *self.caps.get() }
     }
 
     pub fn shm_maps_mut(&self) -> &ShareMutex<BTreeMap<VirtAddr, usize>> {

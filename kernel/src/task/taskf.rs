@@ -243,6 +243,8 @@ impl Task {
         let sig_stack = SyncUnsafeCell::new(None);
         let sig_cx_ptr = AtomicUsize::new(0);
 
+        let caps = SyncUnsafeCell::new(self.capability().clone());
+
         let addr_space = if cloneflags.contains(CloneFlags::VM) {
             self.addr_space()
         } else {
@@ -284,6 +286,7 @@ impl Task {
             cwd,
             elf,
             itimers,
+            caps,
             SyncUnsafeCell::new(cpus_on),
             name,
         ));

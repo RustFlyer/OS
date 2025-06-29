@@ -1,5 +1,6 @@
 use alloc::sync::Arc;
 use core::time::Duration;
+use mutex::SpinNoIrqLock;
 
 use arch::time::{get_time_duration, get_time_ms, get_time_us};
 use osfuture::{Select2Futures, SelectOutput};
@@ -412,4 +413,138 @@ pub fn sys_clock_getres(_clockid: usize, res: usize) -> SyscallResult {
         }
     }
     Ok(0)
+}
+
+#[repr(C)]
+#[derive(Debug, Default, Clone, Copy)]
+pub struct Timex {
+    pub modes: i32,
+    pub offset: i64,
+    pub freq: i64,
+    pub maxerror: i64,
+    pub esterror: i64,
+    pub status: i32,
+    pub constant: i64,
+    pub precision: i64,
+    pub tolerance: i64,
+    pub time: TimeVal,
+    pub tick: i64,
+    pub ppsfreq: i64,
+    pub jitter: i64,
+    pub shift: i32,
+    pub stabil: i64,
+    pub jitcnt: i64,
+    pub calcnt: i64,
+    pub errcnt: i64,
+    pub stbcnt: i64,
+    pub tai: i32,
+    // Linux struct timex has padding for future expansion, you can add:
+    // _filler: [i32; 11],
+}
+
+impl Timex {
+    pub const fn new() -> Self {
+        Timex {
+            modes: 0,
+            offset: 0,
+            freq: 0,
+            maxerror: 0,
+            esterror: 0,
+            status: 0,
+            constant: 0,
+            precision: 0,
+            tolerance: 0,
+            time: TimeVal::new(0, 0),
+            tick: 0,
+            ppsfreq: 0,
+            jitter: 0,
+            shift: 0,
+            stabil: 0,
+            jitcnt: 0,
+            calcnt: 0,
+            errcnt: 0,
+            stbcnt: 0,
+            tai: 0,
+        }
+    }
+}
+
+pub static SYSTEM_TIMEX: SpinNoIrqLock<Timex> = SpinNoIrqLock::new(Timex::new());
+
+pub fn sys_adjtimex(user_timex: usize) -> SyscallResult {
+    // modes
+    pub const ADJ_OFFSET: i32 = 0x0001;
+    pub const ADJ_FREQUENCY: i32 = 0x0002;
+    pub const ADJ_MAXERROR: i32 = 0x0004;
+    pub const ADJ_ESTERROR: i32 = 0x0008;
+    pub const ADJ_STATUS: i32 = 0x0010;
+    pub const ADJ_TIMECONST: i32 = 0x0020;
+    pub const ADJ_SETOFFSET: i32 = 0x0100;
+    pub const ADJ_TAI: i32 = 0x0080;
+
+    // status
+    pub const STA_PLL: i32 = 0x0001;
+    pub const STA_PPSFREQ: i32 = 0x0002;
+    pub const STA_PPSTIME: i32 = 0x0004;
+    pub const STA_FLL: i32 = 0x0008;
+    pub const STA_INS: i32 = 0x0010;
+    pub const STA_DEL: i32 = 0x0020;
+    pub const STA_UNSYNC: i32 = 0x0040;
+    pub const STA_FREQHOLD: i32 = 0x0080;
+    pub const STA_NANO: i32 = 0x2000;
+
+    let task = current_task();
+    let addrspace = task.addr_space();
+    let mut timex_ptr = UserWritePtr::<Timex>::new(user_timex, &addrspace);
+
+    let mut user_tm = if !timex_ptr.is_null() {
+        let mut read_ptr = UserReadPtr::<Timex>::new(user_timex, &addrspace);
+        unsafe { read_ptr.read()? }
+    } else {
+        Timex::default()
+    };
+
+    let mut sys_tm = SYSTEM_TIMEX.lock();
+
+    if user_tm.modes & ADJ_OFFSET != 0 {
+        sys_tm.offset = user_tm.offset;
+    }
+    if user_tm.modes & ADJ_FREQUENCY != 0 {
+        sys_tm.freq = user_tm.freq;
+    }
+    if user_tm.modes & ADJ_MAXERROR != 0 {
+        sys_tm.maxerror = user_tm.maxerror;
+    }
+    if user_tm.modes & ADJ_ESTERROR != 0 {
+        sys_tm.esterror = user_tm.esterror;
+    }
+    if user_tm.modes & ADJ_STATUS != 0 {
+        sys_tm.status = user_tm.status;
+    }
+    if user_tm.modes & ADJ_TIMECONST != 0 {
+        sys_tm.constant = user_tm.constant;
+    }
+    if user_tm.modes & ADJ_TAI != 0 {
+        sys_tm.tai = user_tm.tai;
+    }
+
+    // update time
+    let now = get_time_duration();
+    sys_tm.time = now.into();
+
+    user_tm = *sys_tm;
+
+    if !timex_ptr.is_null() {
+        unsafe {
+            timex_ptr.write(user_tm)?;
+        }
+    }
+
+    // return: 0 sync, 1 unsynx=c, val < 0 means error
+    let ret = if sys_tm.status & STA_UNSYNC != 0 {
+        1
+    } else {
+        0
+    };
+    Ok(ret)
 }

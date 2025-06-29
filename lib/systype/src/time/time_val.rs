@@ -14,7 +14,7 @@ pub struct TimeVal {
 impl TimeVal {
     pub const MICRO_PER_SEC: usize = 1_000_000;
 
-    pub fn new(sec: usize, usec: usize) -> Self {
+    pub const fn new(sec: usize, usec: usize) -> Self {
         Self {
             tv_sec: sec,
             tv_usec: usec,

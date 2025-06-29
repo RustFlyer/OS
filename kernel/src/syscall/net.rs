@@ -22,9 +22,9 @@ pub const NONBLOCK: i32 = 0x800;
 pub const CLOEXEC: i32 = 0x80000;
 
 pub fn sys_socket(domain: usize, types: i32, protocal: usize) -> SyscallResult {
-    if domain == 1 {
+    if domain == 1 || (domain != 1 && types > 2) {
         log::error!("not support unix socket");
-        return Err(SysError::EFAULT);
+        return Err(SysError::ENOSYS);
     }
     let domain = SaFamily::try_from(domain as u16)?;
     log::info!("[sys_socket] new socket {domain:?} {types:#x} protocal:{protocal:#x}");
@@ -320,8 +320,8 @@ pub async fn sys_accept(sockfd: usize, addr: usize, addrlen: usize) -> SyscallRe
         addr
     );
 
-    let socket: Arc<Socket> = task
-        .with_mut_fdtable(|table| table.get_file(sockfd))?
+    let socket = task.with_mut_fdtable(|table| table.get_file(sockfd))?;
+    let socket = socket
         .downcast_arc::<Socket>()
         .map_err(|_| SysError::ENOTSOCK)?;
 
@@ -388,4 +388,58 @@ pub fn sys_getpeername(sockfd: usize, addr: usize, addrlen: usize) -> SyscallRes
     log::info!("[sys_getpeername] sockfd: {sockfd}");
     write_sockaddr(addrspace, addr, addrlen, peer_addr)?;
     Ok(0)
+}
+
+/// The accept4() system call accepts an incoming connection on a listening
+/// stream socket referred to by the file descriptor `sockfd`.
+/// The behavior is like sys_accept, but the new socket can be made non-blocking
+/// or close-on-exec atomically, based on the `flags` argument.
+pub async fn sys_accept4(
+    sockfd: usize,
+    addr: usize,
+    addrlen: usize,
+    flags: usize,
+) -> SyscallResult {
+    pub const SOCK_NONBLOCK: usize = 0x800;
+    pub const SOCK_CLOEXEC: usize = 0x80000;
+    let task = current_task();
+    let addrspace = task.addr_space();
+    log::debug!(
+        "[sys_accept4]tid: {} sockfd: {} addr: {:#x} flags: {:#x}",
+        task.tid(),
+        sockfd,
+        addr,
+        flags
+    );
+
+    let supported_flags = SOCK_NONBLOCK | SOCK_CLOEXEC;
+    if flags & !supported_flags != 0 {
+        return Err(SysError::EINVAL);
+    }
+
+    let socket: Arc<Socket> = task
+        .with_mut_fdtable(|table| table.get_file(sockfd))?
+        .downcast_arc::<Socket>()
+        .map_err(|_| SysError::ENOTSOCK)?;
+
+    task.set_state(TaskState::Interruptable);
+    task.set_wake_up_signal(!task.get_sig_mask());
+    let new_sk = socket.sk.accept().await?;
+    task.set_state(TaskState::Running);
+
+    let peer_addr = new_sk.peer_addr()?;
+    let peer_addr = SockAddr::from_endpoint(peer_addr);
+    write_sockaddr(addrspace, addr, addrlen, peer_addr)?;
+
+    let mut open_flags = OpenFlags::empty();
+    if flags & SOCK_NONBLOCK != 0 {
+        open_flags |= OpenFlags::O_NONBLOCK;
+    }
+    if flags & SOCK_CLOEXEC != 0 {
+        open_flags |= OpenFlags::O_CLOEXEC;
+    }
+
+    let new_socket = Arc::new(Socket::from_another(&socket, Sock::Tcp(new_sk)));
+    let fd = task.with_mut_fdtable(|table| table.alloc(new_socket, open_flags))?;
+    Ok(fd)
 }

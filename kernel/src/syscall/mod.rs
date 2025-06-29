@@ -1,5 +1,6 @@
 mod consts;
 mod fs;
+mod key;
 mod misc;
 mod mm;
 mod net;
@@ -12,19 +13,21 @@ mod user;
 use consts::SyscallNo::{self, *};
 use driver::println;
 use fs::*;
+use key::*;
 use misc::{sys_getrandom, sys_sysinfo, sys_syslog, sys_uname};
 use mm::*;
 use net::*;
 use process::*;
 use sche::*;
 use signal::*;
+use systype::error::SysError;
 use time::{
     sys_clock_gettime, sys_clock_nanosleep, sys_getitimer, sys_gettimeofday, sys_nanosleep,
     sys_setitimer, sys_times,
 };
 use user::{sys_getgid, sys_getuid};
 
-use crate::syscall::time::sys_clock_getres;
+use crate::syscall::time::{sys_adjtimex, sys_clock_getres};
 
 pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
     let Some(syscall_no) = SyscallNo::from_repr(syscall_no) else {
@@ -178,6 +181,15 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         GETPEERNAME => sys_getpeername(args[0], args[1], args[2]),
         FCHMODAT => Ok(0),
         FCHOWNAT => Ok(0),
+        ACCEPT4 => sys_accept4(args[0], args[1], args[2], args[3]).await,
+        ADDKEY => sys_add_key(args[0], args[1], args[2], args[3], args[4]),
+        KEYCTL => sys_keyctl(args[0], args[1], args[2], args[3], args[4]),
+        ADJTIMEX => sys_adjtimex(args[0]),
+        BPF => Err(SysError::ENOSYS),
+        FALLOCATE => Ok(0),
+        CAPGET => sys_capget(args[0], args[1]),
+        CAPSET => sys_capset(args[0], args[1]),
+        PRCTL => sys_prctl(args[0], args[1], args[2], args[3], args[4]),
         _ => {
             println!("Syscall not implemented: {}", syscall_no.as_str());
             unimplemented!()

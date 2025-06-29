@@ -57,6 +57,7 @@ impl Dentry for SimpleDentry {
         let name = dentry.name();
         log::debug!("[simple::base_lookup] name: {}", name);
         let child = self.get_child(name).ok_or(SysError::ENOENT)?;
+
         // let sb = self.superblock().ok_or(SysError::ENOTDIR)?;
         // let inode = SimpleInode::new(sb);
         // inode.set_inotype(InodeType::File);
@@ -73,6 +74,11 @@ impl Dentry for SimpleDentry {
     // fn base_new_neg_child(self: Arc<Self>, name: &str) -> Arc<dyn Dentry> {
     //     Self::new(name, self.inode(), Some(Arc::downgrade(&self.into_dyn())))
     // }
+
+    fn base_rmdir(&self, _dentry: &dyn Dentry) -> SysResult<()> {
+        self.unset_inode();
+        Ok(())
+    }
 
     fn base_new_neg_child(self: Arc<Self>, name: &str) -> Arc<dyn Dentry> {
         let this = self as Arc<dyn Dentry>;

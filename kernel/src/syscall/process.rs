@@ -18,6 +18,7 @@ use systype::{
 use vfs::file::File;
 use vfs::path::Path;
 
+use crate::task::cap::{CapUserData, CapUserHeader};
 use crate::task::{
     TaskState,
     manager::TASK_MANAGER,
@@ -239,7 +240,10 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
                 }
             } else {
                 log::info!("[sys_wait4] return SysError::EINTR");
-                log::info!("[sys_wait4] pending signals: {:?}", task.sig_manager_mut().queue);
+                log::info!(
+                    "[sys_wait4] pending signals: {:?}",
+                    task.sig_manager_mut().queue
+                );
                 return Err(SysError::EINTR);
             }
         };
@@ -963,4 +967,145 @@ pub fn sys_getrusage(who: i32, usage: usize) -> SyscallResult {
         }
     }
     Ok(0)
+}
+
+pub const _LINUX_CAPABILITY_VERSION_1: u32 = 0x19980330;
+pub const _LINUX_CAPABILITY_VERSION_2: u32 = 0x20071026;
+pub const _LINUX_CAPABILITY_VERSION_3: u32 = 0x20080522;
+pub const CAPABILITY_U32S_1: usize = 1;
+pub const CAPABILITY_U32S_2: usize = 2;
+pub const CAPABILITY_U32S_3: usize = 2;
+
+pub fn sys_capget(hdrp: usize, datap: usize) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+
+    let mut hdr_ptr = UserReadPtr::<CapUserHeader>::new(hdrp, &addrspace);
+    let hdr = unsafe { hdr_ptr.read()? };
+
+    log::debug!("[sys_capget] hdr: {hdr:?}");
+    let u32s = match hdr.version {
+        _LINUX_CAPABILITY_VERSION_1 => CAPABILITY_U32S_1,
+        _LINUX_CAPABILITY_VERSION_2 | _LINUX_CAPABILITY_VERSION_3 => CAPABILITY_U32S_2,
+        _ => return Err(SysError::EINVAL),
+    };
+
+    if hdr.pid != 0 && hdr.pid != task.pid() as i32 {
+        return Err(SysError::EPERM);
+    }
+
+    let mut hdr_write_ptr = UserWritePtr::<CapUserHeader>::new(hdrp, &addrspace);
+    unsafe {
+        hdr_write_ptr.write(hdr)?;
+    }
+
+    let mut data_ptr = UserWritePtr::<CapUserData>::new(datap, &addrspace);
+    let caps = &task.capability();
+    let slice = unsafe { data_ptr.try_into_mut_slice(u32s) }?;
+    for i in 0..u32s {
+        let data = CapUserData {
+            effective: caps.effective[i],
+            permitted: caps.permitted[i],
+            inheritable: caps.inheritable[i],
+        };
+        slice[i] = data;
+    }
+    Ok(0)
+}
+
+pub fn sys_capset(hdrp: usize, datap: usize) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+
+    let mut hdr_ptr = UserReadPtr::<CapUserHeader>::new(hdrp, &addrspace);
+    let hdr = unsafe { hdr_ptr.read()? };
+
+    log::debug!("[sys_capset] hdr: {hdr:?}");
+    let u32s = match hdr.version {
+        _LINUX_CAPABILITY_VERSION_1 => CAPABILITY_U32S_1,
+        _LINUX_CAPABILITY_VERSION_2 | _LINUX_CAPABILITY_VERSION_3 => CAPABILITY_U32S_2,
+        _ => return Err(SysError::EINVAL),
+    };
+
+    if hdr.pid != 0 && hdr.pid != task.pid() as i32 {
+        return Err(SysError::EPERM);
+    }
+
+    let mut data_ptr = UserReadPtr::<CapUserData>::new(datap, &addrspace);
+    let caps = &mut task.capability();
+    let slice = unsafe { data_ptr.try_into_slice(u32s) }?;
+
+    for i in 0..u32s {
+        let data = slice[i];
+        caps.effective[i] = data.effective;
+        caps.permitted[i] = data.permitted;
+        caps.inheritable[i] = data.inheritable;
+    }
+
+    Ok(0)
+}
+
+pub fn sys_prctl(
+    option: usize,
+    arg2: usize,
+    arg3: usize,
+    arg4: usize,
+    arg5: usize,
+) -> SyscallResult {
+    use core::sync::atomic::Ordering::Relaxed;
+    pub const PR_SET_NAME: usize = 15;
+    pub const PR_GET_NAME: usize = 16;
+    pub const PR_SET_DUMPABLE: usize = 4;
+    pub const PR_GET_DUMPABLE: usize = 3;
+    pub const PR_SET_NO_NEW_PRIVS: usize = 38;
+    pub const PR_GET_NO_NEW_PRIVS: usize = 39;
+    pub const PR_SET_PDEATHSIG: usize = 1;
+    pub const PR_GET_PDEATHSIG: usize = 2;
+
+    let task = current_task();
+    let addrspace = task.addr_space();
+
+    log::debug!("[sys_prctl] option: {}", option);
+
+    match option {
+        PR_SET_NAME => {
+            let mut name_ptr = UserReadPtr::<u8>::new(arg2, &addrspace);
+            let name = unsafe { name_ptr.try_into_slice(16)? };
+            *task.name_mut() = String::from_utf8(name.to_vec()).unwrap();
+            Ok(0)
+        }
+        PR_GET_NAME => {
+            let mut name_ptr = UserWritePtr::<u8>::new(arg2, &addrspace);
+            let name = task.get_name();
+            unsafe {
+                name_ptr.write_array(name.as_bytes())?;
+            }
+            Ok(0)
+        }
+        PR_SET_DUMPABLE => {
+            // arg2: 0/1
+            task.dumpable.store(arg2 != 0, Relaxed);
+            Ok(0)
+        }
+        PR_GET_DUMPABLE => Ok(task.dumpable.load(Relaxed) as usize),
+        PR_SET_NO_NEW_PRIVS => {
+            // arg2: 0/1
+            task.no_new_privs.store(arg2 != 0, Relaxed);
+            Ok(0)
+        }
+        PR_GET_NO_NEW_PRIVS => Ok(task.no_new_privs.load(Relaxed) as usize),
+        PR_SET_PDEATHSIG => {
+            // arg2: signal id
+            task.pdeathsig.store(arg2 as u32, Relaxed);
+            Ok(0)
+        }
+        PR_GET_PDEATHSIG => {
+            let mut sig_ptr = UserWritePtr::<u32>::new(arg2, &addrspace);
+            unsafe {
+                sig_ptr.write(task.pdeathsig.load(Relaxed))?;
+            }
+            Ok(0)
+        }
+        _ => Err(SysError::EINVAL),
+    }
 }
