@@ -108,7 +108,7 @@ Nighthawk OS 是使用 Rust 编写，支持 RISC-V 和 LoongArch 指令集架构
 │  ├── systype            ---- 系统错误类型   Adapted from Phoenix
 │  ├── timer              ---- 定时器
 │  └── vfs                ---- 虚拟文件系统
-├──user
+├──user                                      
 │  ├── Cargo.toml
 │  ├── Makefile
 │  └── src
@@ -118,7 +118,7 @@ Nighthawk OS 是使用 Rust 编写，支持 RISC-V 和 LoongArch 指令集架构
 │      ├── lang_items.rs  ---- panic实现
 │      ├── lib.rs         ---- 库函数
 │      ├── linker.ld      ---- 链接规则
-│      └── syscall.rs     ---- 系统调用对接
+│      └── syscall.rs     ---- 系统调用对接   Adapted from Phoenix
 ├── vendor                ---- 第三方库目录
 ├── target                ---- 编译产出目录
 ├── Cargo.lock
