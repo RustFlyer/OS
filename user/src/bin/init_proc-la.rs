@@ -15,6 +15,26 @@ use alloc::{
     vec::Vec,
 };
 
+pub static CMD_HELP: &str = r#"NighthawkOS Quick Command Guide:
+  ls /bin          Look up basic commands
+
+  a  or basic      Run all basic tests (busybox sh run-all.sh)
+  b  or busybox0   Run busybox test (busybox sh busybox_testcode.sh)
+  c  or lua        Run Lua test (busybox sh lua_testcode.sh)
+  d  or iozone     Run iozone test (busybox sh iozone_testcode.sh)
+  e  or libctest   Run libc test (busybox sh libctest_testcode.sh)
+  f  or unixbench  Run UnixBench test (busybox sh unixbench_testcode.sh)
+  g  or iperf      Run iperf network test (busybox sh iperf_testcode.sh)
+  h  or netperf    Run netperf network test (busybox sh netperf_testcode.sh)
+
+  r7 <arg>         Run static program test (runtest.exe -w entry-static.exe <arg>)
+  rd <arg>         Run dynamic program test (runtest.exe -w entry-dynamic.exe <arg>)
+  ltp <case>       Run LTP single test case (ltp/testcases/bin/<case>)
+
+Type the corresponding command to quickly run the related test.
+ATTENTION: you should make sure that relevant file exists in your sdcard!
+"#;
+
 pub fn easy_cmd(s: String) -> String {
     let str = s.as_str();
     match str {
@@ -134,6 +154,7 @@ fn main() {
         run_cmd("./busybox --install -s /bin");
         println!("loading user lib: 100%");
         println!("loading user lib: complete!");
+        println!("{}", CMD_HELP);
 
         let fd = open(0, "/dev/tty", OpenFlags::O_WRONLY, InodeMode::CHAR);
         if fd != 2 {
@@ -159,12 +180,17 @@ fn main() {
                 }
             }
 
+            if bptr == 0 {
+                continue;
+            }
+
             let buf_slice = &buf[..bptr];
             let apppath = core::str::from_utf8(&buf_slice).unwrap();
             let argstring = apppath.to_string();
-
             let argstring = easy_cmd(argstring);
             let args: Vec<String> = parse_args(&argstring);
+
+            println!("{}", argstring);
 
             let args: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
 

@@ -1,5 +1,6 @@
 #![no_std]
 #![allow(unused)]
+#![allow(unknown_lints)]
 
 use alloc::sync::Arc;
 use core::{
