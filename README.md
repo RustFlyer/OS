@@ -97,15 +97,15 @@ Nighthawk OS 是使用 Rust 编写，支持 RISC-V 和 LoongArch 指令集架构
 │  ├── id_allocator       ---- id分配器
 │  ├── logger             ---- 日志输出
 │  ├── mm                 ---- 内存管理
-│  ├── mutex              ---- 互斥锁        Adapted from Titanix
-│  ├── net                ---- 网络模块      Adapted from Phoenix & Arceos
+│  ├── mutex              ---- 互斥锁         
+│  ├── net                ---- 网络模块      
 │  ├── osfs               ---- 操作系统文件系统接口
 │  ├── osfuture           ---- 异步支持
-│  ├── polyhal-macro      ---- 架构抽象代码宏 Adapted from Polyhal
+│  ├── polyhal-macro      ---- 架构抽象代码宏  
 │  ├── pps                ---- cpu特权寄存器存储
 │  ├── shm                ---- 共享内存
 │  ├── simdebug           ---- 简单的调试支持
-│  ├── systype            ---- 系统错误类型   Adapted from Phoenix
+│  ├── systype            ---- 系统错误类型    
 │  ├── timer              ---- 定时器
 │  └── vfs                ---- 虚拟文件系统
 ├──user                                      
@@ -118,7 +118,7 @@ Nighthawk OS 是使用 Rust 编写，支持 RISC-V 和 LoongArch 指令集架构
 │      ├── lang_items.rs  ---- panic实现
 │      ├── lib.rs         ---- 库函数
 │      ├── linker.ld      ---- 链接规则
-│      └── syscall.rs     ---- 系统调用对接   Adapted from Phoenix
+│      └── syscall.rs     ---- 系统调用对接    
 ├── vendor                ---- 第三方库目录
 ├── target                ---- 编译产出目录
 ├── Cargo.lock
@@ -140,9 +140,10 @@ Nighthawk OS 是使用 Rust 编写，支持 RISC-V 和 LoongArch 指令集架构
 
 ## 参考
 
-- [PhoenixOS](https://github.com/oscomp/first-prize-osk2024-phoenix)
-- [TitanixOS](https://gitlab.eduxiji.net/202318123101314/oskernel2023-Titanix)
-- [MinotaurOS](https://github.com/oscomp/first-prize-osk2024-minotauros)
-- [rcore-os/arceos](https://github.com/rcore-os/arceos)
-- [rcore-os/rCore](https://github.com/rcore-os/rCore)
+- [PhoenixOS](https://github.com/oscomp/first-prize-osk2024-phoenix): 网络, 进程通信
+- [TitanixOS](https://gitlab.eduxiji.net/202318123101314/oskernel2023-Titanix): 锁
+- [MinotaurOS](https://github.com/oscomp/first-prize-osk2024-minotauros): 异步协程调度
+- [rcore-os/rCore](https://github.com/rcore-os/rCore): 用户态程序
+- [polyhal](https://github.com/Byte-OS/polyhal): 多架构设计
+- [PhoenixOS](https://github.com/oscomp/first-prize-osk2024-phoenix)、 [MankorOS](https://gitlab.eduxiji.net/MankorOS/OSKernel2023-MankorOS): 设计文档
 

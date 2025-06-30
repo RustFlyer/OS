@@ -71,9 +71,11 @@ impl Task {
 
         log::warn!("[Task::recv] tid {} received signal {}", self.tid(), si.sig,);
 
-        if matches!(si.sig, Sig::SIGKILL | Sig::SIGSTOP | Sig::SIGCONT | Sig::SIGCHLD)
-            || (manager.should_wake.contain_signal(si.sig)
-                && self.get_state() == TaskState::Interruptable)
+        if matches!(
+            si.sig,
+            Sig::SIGKILL | Sig::SIGSTOP | Sig::SIGCONT | Sig::SIGCHLD
+        ) || (manager.should_wake.contain_signal(si.sig)
+            && self.get_state() == TaskState::Interruptible)
         {
             log::info!(
                 "[Task::recv] tid {} received signal {}, waking up",

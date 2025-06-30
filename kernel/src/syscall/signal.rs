@@ -128,7 +128,7 @@ pub async fn sys_futex(
             let new_waker = FutexWaiter::new(&task);
             futex_manager(is_multi_group, val3).add_waiter(&key, new_waker)?;
 
-            task.set_state(TaskState::Interruptable);
+            task.set_state(TaskState::Interruptible);
             let wake_up_signal = !*task.sig_mask_mut();
             task.set_wake_up_signal(wake_up_signal);
             if timeout != 0 {
@@ -151,7 +151,7 @@ pub async fn sys_futex(
                 return Err(SysError::EINTR);
             }
 
-            if task.is_in_state(TaskState::Interruptable) {
+            if task.is_in_state(TaskState::Interruptible) {
                 task.set_state(TaskState::Running);
             }
             Ok(0)
@@ -671,7 +671,7 @@ pub async fn sys_rt_sigtimedwait(set: usize, info: usize, timeout: usize) -> Sys
         return Ok(sig.raw());
     }
 
-    task.set_state(TaskState::Interruptable);
+    task.set_state(TaskState::Interruptible);
     if !timeout.is_null() {
         let timeout = unsafe { timeout.read()? };
         if !timeout.is_valid() {
@@ -723,7 +723,7 @@ pub async fn sys_rt_sigsuspend(mask: usize) -> SyscallResult {
         TIMER_MANAGER.add_timer(timer);
     }
 
-    task.set_state(TaskState::Interruptable);
+    task.set_state(TaskState::Interruptible);
     suspend_now().await;
     *task.sig_mask_mut() = oldmask;
     task.set_state(TaskState::Running);

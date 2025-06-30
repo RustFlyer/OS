@@ -218,7 +218,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
     } else {
         // 3. if there is no child for recycle and WNOHANG option is not set, wait for SIGCHLD from target
         let (child_tid, exit_code, child_utime, child_stime) = loop {
-            task.set_state(TaskState::Interruptable);
+            task.set_state(TaskState::Interruptible);
             task.set_wake_up_signal(!task.get_sig_mask() | SigSet::SIGCHLD);
             log::info!("[sys_wait4] task [{}] suspend for sigchld", task.get_name());
             suspend_now().await;

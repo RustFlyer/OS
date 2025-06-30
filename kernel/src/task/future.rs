@@ -162,7 +162,7 @@ pub async fn task_executor_unit(task: Arc<Task>) {
         match task.get_state() {
             TaskState::Zombie => break,
             TaskState::Sleeping => {
-                task.set_state(TaskState::Interruptable);
+                task.set_state(TaskState::Interruptible);
                 suspend_now().await;
             }
             _ => {}
@@ -196,7 +196,7 @@ pub async fn task_executor_unit(task: Arc<Task>) {
         match task.get_state() {
             TaskState::Zombie => break,
             TaskState::Sleeping => {
-                task.set_state(TaskState::Interruptable);
+                task.set_state(TaskState::Interruptible);
                 suspend_now().await;
             }
             _ => {}
@@ -209,7 +209,7 @@ pub async fn task_executor_unit(task: Arc<Task>) {
         match task.get_state() {
             TaskState::Zombie => break,
             TaskState::Sleeping => {
-                task.set_state(TaskState::Interruptable);
+                task.set_state(TaskState::Interruptible);
                 suspend_now().await;
             }
             _ => {}

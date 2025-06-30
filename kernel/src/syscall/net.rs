@@ -200,7 +200,7 @@ pub async fn sys_sendto(
         .downcast_arc::<Socket>()
         .map_err(|_| SysError::ENOTSOCK)?;
 
-    task.set_state(TaskState::Interruptable);
+    task.set_state(TaskState::Interruptible);
 
     let bytes = match socket.types {
         SocketType::STREAM => {
@@ -254,7 +254,7 @@ pub async fn sys_recvfrom(
 
     let mut temp = vec![0; len];
 
-    task.set_state(TaskState::Interruptable);
+    task.set_state(TaskState::Interruptible);
     let (bytes, remote_addr) = socket.sk.recvfrom(&mut temp).await?;
     task.set_state(TaskState::Running);
 
@@ -325,7 +325,7 @@ pub async fn sys_accept(sockfd: usize, addr: usize, addrlen: usize) -> SyscallRe
         .downcast_arc::<Socket>()
         .map_err(|_| SysError::ENOTSOCK)?;
 
-    task.set_state(TaskState::Interruptable);
+    task.set_state(TaskState::Interruptible);
     task.set_wake_up_signal(!task.get_sig_mask());
     let new_sk = socket.sk.accept().await?;
     task.set_state(TaskState::Running);
@@ -422,7 +422,7 @@ pub async fn sys_accept4(
         .downcast_arc::<Socket>()
         .map_err(|_| SysError::ENOTSOCK)?;
 
-    task.set_state(TaskState::Interruptable);
+    task.set_state(TaskState::Interruptible);
     task.set_wake_up_signal(!task.get_sig_mask());
     let new_sk = socket.sk.accept().await?;
     task.set_state(TaskState::Running);

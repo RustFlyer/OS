@@ -1155,7 +1155,7 @@ pub async fn sys_ppoll(fds: usize, nfds: usize, tmo_p: usize, sigmask: usize) ->
         ready_cnt: 0,
     };
 
-    task.set_state(TaskState::Interruptable);
+    task.set_state(TaskState::Interruptible);
     task.set_wake_up_signal(!*task.sig_mask_mut());
     let ret_vec = if let Some(timeout) = time_out {
         match TimeoutFuture::new(timeout, poll_future).await {
@@ -1611,7 +1611,7 @@ pub async fn sys_pselect6(
 
     let old_mask = sigmask.map(|mask| mem::replace(task.sig_mask_mut(), mask));
 
-    task.set_state(TaskState::Interruptable);
+    task.set_state(TaskState::Interruptible);
     task.set_wake_up_signal(!task.get_sig_mask());
 
     let intr_future = IntrBySignalFuture::new(task.clone(), task.get_sig_mask());

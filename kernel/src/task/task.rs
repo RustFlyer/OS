@@ -37,16 +37,16 @@ use crate::{
 /// - Zombie:  When the task exits and wait for the initproc to recycle it
 /// - WaitForRecycle: When the task exits, it waits for its parent to recycle
 /// - Sleeping: As Waiting. The difference is that its waiting time is longer
-/// - Interruptable: When the task is waiting for an long-time event such as I/O
-/// - UnInterruptable: As Interruptable. The difference is that it can not be interrupted by signal
+/// - Interruptible: When the task is waiting for an long-time event such as I/O
+/// - UnInterruptible: As Interruptible. The difference is that it can not be interrupted by signal
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TaskState {
     Running,
     Zombie,
     WaitForRecycle,
     Sleeping,
-    Interruptable,
-    UnInterruptable,
+    Interruptible,
+    UnInterruptible,
 }
 
 pub struct Task {

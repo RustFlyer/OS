@@ -117,7 +117,7 @@ pub async fn sys_nanosleep(req: usize, rem: usize) -> SyscallResult {
         unsafe { req_read.read()? }
     };
 
-    task.set_state(TaskState::Interruptable);
+    task.set_state(TaskState::Interruptible);
     task.set_wake_up_signal(!*task.sig_mask_mut());
     let intr_future = IntrBySignalFuture {
         task: task.clone(),
