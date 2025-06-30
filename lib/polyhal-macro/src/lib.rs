@@ -1,3 +1,4 @@
+/// Adapted from Polyhal
 mod percpu;
 
 use proc_macro::TokenStream;

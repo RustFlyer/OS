@@ -25,15 +25,15 @@ Nighthawk OS 是使用 Rust 编写，支持 RISC-V 和 LoongArch 指令集架构
   <img src="./docs/assets/Nighthawk-design.jpg" alt="Nighthawk内核架构" width="450"/>
 </div>
 
-### 项目参考
+### 项目说明
 
-<!--  [Nighthawk-初赛文档](./Nighthawk-初赛文档.pdf) -->
+<!--  [Nighthawk-初赛文档](./初赛文档.pdf) -->
 
-初赛文档：
+[Nighthawk-初赛文档](./NighthawkOS初赛文档.pdf)
 
-初赛PPT：
+[Nighthawk-初赛幻灯片](./NighthawkOS初赛幻灯片.pptx)
 
-[初赛展示视频](https://pan.baidu.com/s/1VokWbcV22oiYtDVE2q8Nyg) 提取码: rqs5
+[Nighthawk-初赛展示视频](https://pan.baidu.com/s/1VokWbcV22oiYtDVE2q8Nyg) 提取码: rqs5
 
 ## 运行方式
 
@@ -96,14 +96,14 @@ Nighthawk OS 是使用 Rust 编写，支持 RISC-V 和 LoongArch 指令集架构
 │  ├── logger             ---- 日志输出
 │  ├── mm                 ---- 内存管理
 │  ├── mutex              ---- 互斥锁
-│  ├── net                ---- 网络模块
+│  ├── net                ---- 网络模块      Adapted from Phoenix & Arceos
 │  ├── osfs               ---- 操作系统文件系统接口
 │  ├── osfuture           ---- 异步支持
-│  ├── polyhal-macro      ---- 架构抽象代码宏
+│  ├── polyhal-macro      ---- 架构抽象代码宏 Adapted from Polyhal
 │  ├── pps                ---- cpu特权寄存器存储
 │  ├── shm                ---- 共享内存
 │  ├── simdebug           ---- 简单的调试支持
-│  ├── systype            ---- 系统错误类型
+│  ├── systype            ---- 系统错误类型   Adapted from Phoenix
 │  ├── timer              ---- 定时器
 │  └── vfs                ---- 虚拟文件系统
 ├──user
