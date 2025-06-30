@@ -69,13 +69,11 @@ fn main() -> i32 {
             continue;
         }
         run_test(test);
-        setuid(114514);
     }
 
     chdir("/musl");
     for test in TESTCASES {
         run_test(test);
-        setuid(114514);
     }
     run_test("ltp_testcode.sh");
 

@@ -704,9 +704,9 @@ pub fn sys_setgid(gid: usize) -> SyscallResult {
 /// and then setuid(1000) returns to a regular user to continue working stably
 /// and enhance security.
 pub fn sys_setuid(uid: usize) -> SyscallResult {
-    if uid == 114514 {
-        crate::task::signal::sig_exec::clear_tasks();
-    }
+    // if uid == 114514 {
+    //     crate::task::signal::sig_exec::clear_tasks();
+    // }
 
     log::debug!("[sys_setuid]  uid: {uid}");
     let task = current_task();

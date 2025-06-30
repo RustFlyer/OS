@@ -1,3 +1,4 @@
+/// Refer to Phoenix
 use alloc::{string::ToString, sync::Arc};
 use core::{mem, ptr::NonNull};
 
@@ -95,7 +96,6 @@ pub fn probe_virtio_blk(root: &Fdt) -> Option<Arc<VirtBlkDevice>> {
             let mmio_base_paddr = PhysAddr::new(reg.starting_address as usize);
             let mmio_size = reg.size?;
             let irq_no = node.property("interrupts").and_then(|i| i.as_usize());
-
             log::debug!("[probe_virtio_blk] irq_no :{:?}", irq_no);
 
             ioremap(mmio_base_paddr.to_usize(), mmio_size).expect("can not ioremap");
@@ -110,12 +110,7 @@ pub fn probe_virtio_blk(root: &Fdt) -> Option<Arc<VirtBlkDevice>> {
                     "[probe_virtio_blk] created a new block device: {:?}",
                     dev.clone().unwrap().block_size()
                 );
-
                 BLOCK_DEVICE.call_once(|| dev.unwrap());
-                // if !isdev {
-                //     BLOCK_DEVICE2.call_once(|| dev.unwrap());
-                // } else {
-                // }
                 isdev = true;
                 continue;
             }
@@ -188,11 +183,7 @@ pub fn probe_char_device(root: &Fdt) -> Option<MmioSerialPort> {
     }
     if stdout.is_none() {
         log::debug!("Unable to parse /chosen, choosing first serial device");
-        stdout = root.find_compatible(&[
-            "ns16550a",
-            "snps,dw-apb-uart", // C910, VF2
-            "sifive,uart0",     // sifive_u QEMU (FU540)
-        ])
+        stdout = root.find_compatible(&["ns16550a", "snps,dw-apb-uart", "sifive,uart0"])
     }
     let stdout = stdout.expect("Still unable to get stdout device");
     log::debug!("Stdout: {}", stdout.name);
@@ -214,9 +205,6 @@ fn probe_serial_console(stdout: &node::FdtNode) -> MmioSerialPort {
     let first_compatible = stdout.compatible().unwrap().first().unwrap();
     match first_compatible {
         "ns16550a" | "snps,dw-apb-uart" => {
-            // VisionFive 2 (FU740)
-            // virt QEMU
-
             let mut reg_io_width = 1;
             if let Some(reg_io_width_raw) = stdout.property("reg-io-width") {
                 reg_io_width = reg_io_width_raw
@@ -244,11 +232,9 @@ fn probe_serial_console(stdout: &node::FdtNode) -> MmioSerialPort {
 
 pub fn init_net(root: &Fdt) {
     log::info!("[init_net] can't find qemu virtio-net.");
-
     return init_network(LoopbackDev::new(), true);
 
     let netmeta = probe_virtio_net(root);
-
     if let Some(net_meta) = netmeta {
         let transport = probe_mmio_device(
             PhysAddr::new(net_meta.mmio_base).to_va_kernel().to_usize() as *mut u8,
