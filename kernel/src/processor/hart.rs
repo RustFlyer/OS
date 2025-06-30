@@ -132,14 +132,6 @@ impl Hart {
         core::mem::swap(self.get_mut_pps(), pps);
         enable_interrupt();
     }
-
-    pub fn preempt_switch_in(&mut self) {
-        todo!()
-    }
-
-    pub fn preempt_switch_out(&mut self) {
-        todo!()
-    }
 }
 
 pub fn get_hart(hart_id: usize) -> &'static mut Hart {

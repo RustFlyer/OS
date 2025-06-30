@@ -19,15 +19,15 @@ Nighthawk OS 是使用 Rust 编写，支持 RISC-V 和 LoongArch 指令集架构
 - 进程管理：统一的进程线程抽象，方便内核管理的同时增强进程与线程对于POSIX的兼容性。
 - 内存管理：实现基本的内存管理功能。使用懒分配和 Copy-on-Write 优化策略。支持共享内存区域映射，便于高效的进程间通信和资源共享。
 - 文件系统：基于 Linux 设计的虚拟文件系统。实现页缓存加速文件读写，实现 Dentry 缓存加速路径查找。支持 FAT32（基于 rust-fatfs）和 Ext4（基于 lwext4-rust）等主流文件系统。
-- 进程通信：实现了符合POSIX标准的信号系统，支持用户自定义信号处理例程；实现了共享内存通信，适配内核其他异步功能。
+- 进程通信：复用一部分Phoenix的代码，实现了符合POSIX标准的信号系统，支持用户自定义信号处理例程；实现了共享内存通信，适配内核其他异步功能。
 - 设备驱动：支持设备树解析，自动化设备发现与配置。实现 PLIC 支持，异步处理中断事件，提升外设响应速度。
-- 网络模块：复用一部分Phoenix的代码，并在此基础上进行优化。模块化设计，支持灵活扩展Udp，Tcp等多种网络协议。异步事件处理框架与多核调度协同工作，确保网络通信在复杂应用场景下高效可靠。
+- 网络模块：复用一部分Phoenix和Arceos的代码，并在此基础上进行优化。模块化设计，支持灵活扩展Udp，Tcp等多种网络协议。异步事件处理框架与多核调度协同工作，确保网络通信在复杂应用场景下高效可靠。
 
 <div align="center">
   <img src="./docs/assets/Nighthawk-design.jpg" alt="Nighthawk内核架构" width="450"/>
 </div>
 
-### 项目说明
+### 项目文档
 
 <!--  [Nighthawk-初赛文档](./初赛文档.pdf) -->
 
@@ -97,7 +97,7 @@ Nighthawk OS 是使用 Rust 编写，支持 RISC-V 和 LoongArch 指令集架构
 │  ├── id_allocator       ---- id分配器
 │  ├── logger             ---- 日志输出
 │  ├── mm                 ---- 内存管理
-│  ├── mutex              ---- 互斥锁
+│  ├── mutex              ---- 互斥锁        Adapted from Titanix
 │  ├── net                ---- 网络模块      Adapted from Phoenix & Arceos
 │  ├── osfs               ---- 操作系统文件系统接口
 │  ├── osfuture           ---- 异步支持
