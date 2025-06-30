@@ -1,4 +1,4 @@
-// This module is adapted from Phoenix OS, largely rewritten to improve
+// This module is adapted from Phoenix OS, mostly rewritten to improve
 // readability and safety.
 
 //! Module for validating and accessing addresses in user address space.

@@ -4,7 +4,7 @@ use alloc::{ffi::CString, string::String, sync::Arc, vec::Vec};
 
 use aux::*;
 use config::{
-    mm::{USER_END, USER_INTERP_BASE, USER_STACK_LOWER, USER_STACK_UPPER},
+    mm::{USER_END, USER_HEAP_SIZE, USER_INTERP_BASE, USER_STACK_LOWER, USER_STACK_UPPER},
     vfs::SeekFrom,
 };
 use elf::{self, ElfStream, ParseError as ElfParseError, endian::LittleEndian, file::FileHeader};
@@ -337,7 +337,7 @@ impl AddrSpace {
 
     /// Maps a heap into the address space.
     pub fn map_heap(&self) -> SysResult<()> {
-        let length = 1 << 20; // 1 MiB
+        let length = USER_HEAP_SIZE;
         let start = self
             .find_vacant_memory(
                 VirtAddr::new(0),

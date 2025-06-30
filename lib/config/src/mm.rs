@@ -118,12 +118,15 @@ pub const USER_INTERP_BASE: usize = 0x0000_0020_0000_0000;
 /// Start of mmap space in user space
 pub const MMAP_START: usize = 0x0000_0010_0000_0000;
 /// End of mmap space in user space
-pub const MMAP_END: usize = USER_END;
+pub const MMAP_END: usize = 0x0000_0030_0000_0000;
 
 /// Position of the stack of a user process in the virtual address space
 pub const USER_STACK_UPPER: usize = 0x0000_003f_ffff_f000;
 pub const USER_STACK_SIZE: usize = 8 * 1024 * 1024;
 pub const USER_STACK_LOWER: usize = USER_STACK_UPPER - USER_STACK_SIZE;
+
+/// Size of the user heap
+pub const USER_HEAP_SIZE: usize = 1024 * 1024;
 
 /// boot hart start address
 pub const HART_START_ADDR: usize = 0x80200000;
