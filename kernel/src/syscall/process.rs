@@ -121,10 +121,10 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
         p => WaitFor::PGid(p as PGid),
     };
     log::info!("[sys_wait4] target: {target:?}, option: {option:?}");
-    log::error!(
-        "[sys_wait4] existing task number: {}",
-        TASK_MANAGER.how_many_tasks()
-    );
+    // log::info!(
+    //     "[sys_wait4] existing task number: {}",
+    //     TASK_MANAGER.how_many_tasks()
+    // );
 
     // get the child for recycle according to the target
     // NOTE: recycle no more than one child per `sys_wait4`

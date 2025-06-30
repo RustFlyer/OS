@@ -42,6 +42,7 @@ impl KeyRing {
             next_id: 1,
         }
     }
+
     pub fn add_key(
         &mut self,
         key_type: KeyType,
@@ -59,6 +60,7 @@ impl KeyRing {
         self.keys.insert(id, key);
         id
     }
+
     pub fn get_key(&self, id: u64) -> Option<&Key> {
         self.keys.get(&id)
     }
@@ -194,7 +196,7 @@ pub fn sys_keyctl(
             // arg2: keyring_serial
             // arg3: type_ptr (C string)
             // arg4: description_ptr (C string)
-            // arg5: dest_keyring_serial (可选)
+            // arg5: dest_keyring_serial (selected)
             let keyring_serial = arg2;
             let type_ptr = arg3;
             let desc_ptr = arg4;

@@ -1,5 +1,6 @@
 #![no_std]
 #![no_main]
+#![allow(unused)]
 // #![feature(riscv_ext_intrinsics)]
 
 pub mod hart;

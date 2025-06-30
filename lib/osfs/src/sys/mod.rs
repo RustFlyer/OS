@@ -12,6 +12,7 @@ pub mod fs;
 pub mod meminfo;
 pub mod superblock;
 
+#[allow(unused)]
 pub fn init_sysfs(root_dentry: Arc<dyn Dentry>) -> SysResult<()> {
     let devices_inode = SimpleInode::new(root_dentry.superblock().unwrap());
     devices_inode.set_inotype(InodeType::Dir);

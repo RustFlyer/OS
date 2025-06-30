@@ -66,7 +66,7 @@ impl Dentry for SimpleDentry {
     fn base_lookup(&self, dentry: &dyn Dentry) -> SysResult<()> {
         let name = dentry.name();
         log::debug!("[simple::base_lookup] name: {}", name);
-        let child = self.get_child(name).ok_or(SysError::ENOENT)?;
+        let _ = self.get_child(name).ok_or(SysError::ENOENT)?;
 
         // let sb = self.superblock().ok_or(SysError::ENOTDIR)?;
         // let inode = SimpleInode::new(sb);

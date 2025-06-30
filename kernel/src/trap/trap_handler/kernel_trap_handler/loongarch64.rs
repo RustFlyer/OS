@@ -53,6 +53,5 @@ fn trap_panic() -> ! {
         mm::address::VirtAddr::new(badv::read().vaddr()),
     );
     log::error!("{}", msg);
-    simdebug::stop();
     panic!("{}", msg);
 }

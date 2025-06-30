@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, sync::Arc};
+use alloc::sync::Arc;
 use arch::time::get_time_duration;
 use core::task::Waker;
 use core::time::Duration;

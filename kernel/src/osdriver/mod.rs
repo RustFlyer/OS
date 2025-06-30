@@ -43,7 +43,7 @@ pub fn probe_tree() {
 
     #[cfg(target_arch = "loongarch64")]
     {
-        probe_pci(&device_tree);
         driver::init();
+        probe_pci(&device_tree);
     }
 }

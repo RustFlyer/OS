@@ -4,7 +4,7 @@
 extern crate alloc;
 extern crate user_lib;
 
-use user_lib::{console::getchar, execve, exit, fork, print, println, sleep, waitpid};
+use user_lib::{console::getchar, execve, exit, fork, print, println, waitpid};
 
 use alloc::{
     format,

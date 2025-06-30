@@ -93,9 +93,6 @@ impl Hart {
         //     new_task.get_name(),
         //     new_task.tid()
         // );
-        if new_task.tid() == 5 {
-            simdebug::stop();
-        }
         disable_interrupt();
         pps.auto_sum(); // `pps` is the user task's PPS which is to be enabled.
         core::mem::swap(self.get_mut_pps(), pps);

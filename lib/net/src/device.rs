@@ -43,7 +43,7 @@ impl DeviceWrapper {
             state: TcpState::new(),
         }
     }
-    pub fn clear_state(&mut self) {
+    pub fn _clear_state(&mut self) {
         self.state.is_recv_first = false;
     }
 }

@@ -1,4 +1,6 @@
 #![no_std]
+#![allow(unused)]
+#![allow(unknown_lints)]
 
 use alloc::sync::Arc;
 use core::{
@@ -59,8 +61,9 @@ pub fn init() {
     // init_block_device();
     init_char_device();
 
-    let buf = "hello char dev\n";
-    CHAR_DEVICE.get().unwrap().write(buf.as_bytes());
+    // let buf = "hello char dev\n";
+    // CHAR_DEVICE.get().unwrap().write(buf.as_bytes());
+    println!("[CHAR_DEVICE] INIT SUCCESS");
 }
 
 fn init_block_device() {
