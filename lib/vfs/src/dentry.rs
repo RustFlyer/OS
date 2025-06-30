@@ -348,6 +348,7 @@ impl dyn Dentry {
     ///
     /// `self` must be a valid directory. `dentry` must be a valid dentry and a child of
     /// `self`. After this call, `dentry` will become invalid. `dentry` must be a directory.
+    #[allow(deprecated)]
     #[deprecated(note = "This function is not expected to be used in any syscall")]
     pub fn rmdir_recur(&self, dentry: &dyn Dentry) -> SysResult<()> {
         debug_assert!(!self.is_negative());

@@ -16,7 +16,7 @@ impl File for NullFile {
         &self.meta
     }
 
-    async fn base_read(&self, buf: &mut [u8], _pos: usize) -> SysResult<usize> {
+    async fn base_read(&self, _buf: &mut [u8], _pos: usize) -> SysResult<usize> {
         Ok(0)
     }
 

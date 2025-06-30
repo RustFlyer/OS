@@ -18,14 +18,12 @@ use buddy_system_allocator::LockedHeap;
 use config::{inode::InodeMode, vfs::OpenFlags};
 pub use error::SyscallErr;
 // use sig::{Sig, SigAction};
-use strum::FromRepr;
 use syscall::*;
 
 // const USER_HEAP_SIZE: usize = 16384;
 const USER_HEAP_SIZE: usize = 0x32000;
 
 // Note that heap space is allocated in .data segment
-// TODO: can we change to dynamically allocate by invoking sys_sbrk?
 static mut HEAP_SPACE: [u8; USER_HEAP_SIZE] = [0; USER_HEAP_SIZE];
 
 #[global_allocator]

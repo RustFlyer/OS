@@ -8,6 +8,7 @@ use spin::Mutex;
 ///
 /// # Note
 /// I don't know why the address is in the `0x9xxx_...` range, which has MAT = 1.
+#[allow(unknown_lints)]
 #[cfg(not(board = "2k1000"))]
 const UART_ADDR: usize = 0x9000_0000_1fe0_01e0;
 
@@ -16,6 +17,7 @@ const UART_ADDR: usize = 0x9000_0000_1fe0_01e0;
 /// This is `serial@0x1fe20000` in the device tree.
 ///
 /// See https://github.com/LoongsonLab/oscomp-documents/blob/main/platforms.md
+#[allow(unknown_lints)]
 #[cfg(board = "2k1000")]
 const UART_ADDR: usize = 0x8000_0000_1fe2_0000;
 

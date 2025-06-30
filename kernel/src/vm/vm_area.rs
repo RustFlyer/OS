@@ -1081,8 +1081,8 @@ impl AnonymousArea {
         // log::error!("[AnonymousArea] fault_addr: {:?}", fault_addr);
 
         if flags.contains(VmaFlags::SHARED) {
-            log::error!("unimplemented Handling a page fault in a shared anonymous VMA");
-            return Err(SysError::ENOMEM);
+            // log::error!("unimplemented Handling a page fault in a shared anonymous VMA");
+            // return Err(SysError::ENOMEM);
             unimplemented!("Handling a page fault in a shared anonymous VMA");
         }
 

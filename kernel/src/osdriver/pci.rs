@@ -6,7 +6,7 @@ use config::mm::KERNEL_MAP_OFFSET;
 use driver::hal::VirtHalImpl;
 use driver::net::loopback::LoopbackDev;
 use driver::qemu::VirtBlkDevice;
-use driver::{BLOCK_DEVICE, BlockDevice};
+use driver::{BLOCK_DEVICE, BlockDevice, println};
 use flat_device_tree::Fdt;
 use flat_device_tree::node::FdtNode;
 use flat_device_tree::standard_nodes::Compatible;
@@ -87,29 +87,14 @@ pub fn probe_virtio_blk_pci(pci_root: &mut PciRoot<MmioCam>) -> Option<Arc<VirtB
 }
 
 fn virtio_device(transport: impl Transport) {
-    match transport.device_type() {
-        // DeviceType::Block => virtio_blk(transport),
-        // DeviceType::GPU => virtio_gpu(transport),
-        // DeviceType::Network => virtio_net(transport),
-        // DeviceType::Console => virtio_console(transport),
-        // DeviceType::Socket => match virtio_socket(transport) {
-        //     Ok(()) => info!("virtio-socket test finished successfully"),
-        //     Err(e) => error!("virtio-socket test finished with error '{e:?}'"),
-        // },
-        // DeviceType::EntropySource => virtio_rng(transport),
-        t => log::warn!("Unrecognized virtio device: {:?}", t),
-    }
+    panic!("[virtio_device] Mmio not supported");
 }
 
 fn virtio_device_pci(transport: PciTransport) {
     match transport.device_type() {
         DeviceType::Block => virtio_blk_pci(transport),
         DeviceType::Console => virtio_console_pci(transport),
-        // DeviceType::Socket => match virtio_socket(transport) {
-        //     Ok(()) => info!("virtio-socket test finished successfully"),
-        //     Err(e) => error!("virtio-socket test finished with error '{e:?}'"),
-        // },
-        // DeviceType::EntropySource => virtio_rng(transport),
+        DeviceType::Socket => log::warn!("[virtio_device_pci] Socket: not implemented"),
         t => log::warn!("Unrecognized virtio device: {:?}", t),
     }
 }
@@ -117,6 +102,7 @@ fn virtio_device_pci(transport: PciTransport) {
 fn virtio_blk_pci(transport: PciTransport) {
     BLOCK_DEVICE.call_once(|| Arc::new(VirtBlkDevice::new_from_pci(transport)));
     log::info!("virtio-blk test finished");
+    println!("[BLOCK_DEVICE] INIT SUCCESS");
 }
 
 fn virtio_console_pci(transport: PciTransport) {
@@ -131,6 +117,7 @@ fn virtio_console_pci(transport: PciTransport) {
     let c = console.recv(true).expect("Failed to read from console");
     log::info!("Read {:?}", c);
     log::info!("virtio-console test finished");
+    println!("[CONSOLE_DEVICE] INIT SUCCESS");
 }
 
 pub fn probe_pci<'a>(fdt: &'a Fdt<'a>) {
@@ -183,6 +170,7 @@ pub fn probe_pci<'a>(fdt: &'a Fdt<'a>) {
     }
 
     init_network(LoopbackDev::new(), true);
+    println!("[NET_DEVICE] INIT SUCCESS");
 }
 
 pub fn enumerate_pci(pci_node: FdtNode, cam: Cam) {

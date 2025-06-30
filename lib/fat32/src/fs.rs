@@ -8,7 +8,7 @@ use vfs::{
     superblock::{SuperBlock, SuperBlockMeta},
 };
 
-use crate::{FatFs, dentry::FatDentry, inode::dir::FatDirInode, superblock::FatSuperBlock};
+use crate::{dentry::FatDentry, inode::dir::FatDirInode, superblock::FatSuperBlock};
 
 pub struct FatFsType {
     meta: FileSystemTypeMeta,

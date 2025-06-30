@@ -8,6 +8,7 @@ use vfs::superblock::{SuperBlock, SuperBlockMeta};
 
 use crate::disk::Disk;
 
+#[allow(unused)]
 pub struct ExtSuperBlock {
     meta: SuperBlockMeta,
     inner: Ext4BlockWrapper<Disk>,
@@ -37,7 +38,7 @@ impl SuperBlock for ExtSuperBlock {
         todo!()
     }
 
-    fn sync_fs(&self, wait: isize) -> SysResult<()> {
+    fn sync_fs(&self, _wait: isize) -> SysResult<()> {
         todo!()
     }
 }

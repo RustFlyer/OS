@@ -3,16 +3,11 @@
 
 extern crate user_lib;
 
-use core::{
-    ffi::CStr,
-    ptr::{self, null},
-};
-
 use config::{
     inode::InodeMode,
-    vfs::{AtFd, AtFlags, OpenFlags},
+    vfs::{AtFlags, OpenFlags},
 };
-use user_lib::{execve, exit, fork, lseek, open, println, read, sleep, write, yield_};
+use user_lib::{execve, exit, lseek, open, println, read, write};
 
 #[unsafe(no_mangle)]
 fn main() {

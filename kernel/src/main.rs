@@ -5,6 +5,7 @@
 #![feature(sync_unsafe_cell)]
 #![allow(clippy::module_inception)]
 #![allow(dead_code)]
+#![allow(unused)]
 
 mod boot;
 mod entry;
@@ -23,6 +24,7 @@ use core::ptr;
 
 use arch::mm::fence;
 use config::mm::{DTB_END, DTB_START};
+use driver::println;
 use mm::{self, frame, heap};
 use processor::hart;
 
@@ -31,6 +33,18 @@ extern crate alloc;
 
 static mut INITIALIZED: bool = false;
 
+pub static NIGHTHAWK_OS_BANNER: &str = r#"
+  _   _ _       _     _   _                    _     ____   _____ 
+ | \ | (_)     | |   | | | |                  | |   / __ \ / ____|
+ |  \| |_  __ _| |__ | |_| |__   __ ___      _| | _| |  | | (___  
+ | . ` | |/ _` | '_ \| __| '_ \ / _` \ \ /\ / / |/ / |  | |\___ \ 
+ | |\  | | (_| | | | | |_| | | | (_| |\ V  V /|   <| |__| |____) |
+ |_| \_|_|\__, |_| |_|\__|_| |_|\__,_| \_/\_/ |_|\_\\____/|_____/ 
+           __/ |                                                  
+          |___/                                                   
+             NighthawkOS
+"#;
+
 pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
     executor::init(hart_id);
 
@@ -38,6 +52,7 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
     if unsafe { !INITIALIZED } {
         /* Initialize logger */
         logger::init();
+
         log::info!("hart {}: initializing kernel", hart_id);
         log::info!("dtb_addr: {:#x}", dtb_addr);
 
@@ -100,15 +115,21 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         log::info!("====== kernel memory layout end ======");
 
         osdriver::probe_tree();
+        println!("[PROBE_DEV_TREE] INIT SUCCESS");
+
         log::info!("hart {}: initialized driver", hart_id);
 
         osfs::init();
         log::info!("hart {}: initialized FS success", hart_id);
+        println!("[FILE_SYSTEM] INIT SUCCESS");
 
         // boot::start_harts(hart_id);
         loader::init();
 
         task::init();
+        println!("[USER_APP] INIT SUCCESS");
+        println!("[HART {}] INIT SUCCESS", hart_id);
+        println!("{}", NIGHTHAWK_OS_BANNER);
     } else {
         log::info!("hart {}: enabling page table", hart_id);
         // SAFETY: Only after the first hart has initialized the heap allocator and page table,
@@ -116,6 +137,7 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         unsafe {
             vm::switch_to_kernel_page_table();
         }
+        println!("[HART {}] INIT SUCCESS", hart_id);
     }
 
     #[cfg(target_arch = "loongarch64")]

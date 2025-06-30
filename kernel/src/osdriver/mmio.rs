@@ -21,15 +21,18 @@ pub fn probe_mmio(device_tree: &Fdt) {
     let blk = probe_virtio_blk(device_tree);
     // BLOCK_DEVICE.call_once(|| blk.unwrap());
 
-    let mut buf: [u8; 512] = [0; 512];
-    BLOCK_DEVICE.get().unwrap().read(0, &mut buf);
-    log::debug!("BLOCK_DEVICE INIT SUCCESS");
-
     let chardev = probe_char_device(device_tree);
     CHAR_DEVICE.call_once(|| Arc::new(UartDevice::new_from_mmio(chardev.unwrap())));
 
+    println!("[CHAR_DEVICE] INIT SUCCESS");
+
+    let mut buf: [u8; 512] = [0; 512];
+    BLOCK_DEVICE.get().unwrap().read(0, &mut buf);
+    log::debug!("BLOCK_DEVICE INIT SUCCESS");
+    println!("[BLOCK_DEVICE] INIT SUCCESS");
+
     init_net(device_tree);
-    println!("CHAR_DEVICE INIT SUCCESS");
+    println!("[NET_DEVICE] INIT SUCCESS");
 
     log::debug!("probe_test finish");
 }

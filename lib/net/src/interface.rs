@@ -3,7 +3,7 @@ use core::{ops::DerefMut, time::Duration};
 use alloc::{boxed::Box, sync::Arc, vec::Vec};
 use arch::time::{get_time_duration, get_time_us};
 use driver::net::NetDevice;
-use mutex::{ShareMutex, SpinNoIrqLock, new_share_mutex};
+use mutex::{ShareMutex, SpinNoIrqLock};
 use smoltcp::{
     iface::{Config, Interface, SocketSet},
     phy::Medium,
@@ -172,7 +172,7 @@ impl InterfaceWrapper {
         // Self::check_device_tcpstate(self.dev.lock().deref_mut(), &mut sockets);
     }
 
-    pub(crate) fn check_device_tcpstate(dev: &mut DeviceWrapper, sockets: &mut SocketSet) {
+    pub(crate) fn _check_device_tcpstate(dev: &mut DeviceWrapper, _sockets: &mut SocketSet) {
         let is_tcp_first = dev.state.is_recv_first;
         if !is_tcp_first {
             return;
@@ -180,7 +180,7 @@ impl InterfaceWrapper {
         let src_addr = dev.state.src_addr;
         let dst_addr = dev.state.dst_addr;
         LISTEN_TABLE.incoming_tcp_packet(src_addr, dst_addr);
-        dev.clear_state();
+        dev._clear_state();
     }
 
     pub(crate) fn bench_test(&self) {

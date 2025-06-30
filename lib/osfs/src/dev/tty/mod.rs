@@ -5,7 +5,6 @@ pub mod ioctl;
 // pub mod queuebuffer;
 
 use alloc::{string::String, sync::Arc};
-use config::vfs::OpenFlags;
 use dentry::TtyDentry;
 use file::TtyFile;
 use inode::TtyInode;

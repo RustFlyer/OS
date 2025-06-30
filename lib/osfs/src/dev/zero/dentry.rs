@@ -36,27 +36,27 @@ impl Dentry for ZeroDentry {
         Ok(Arc::new(ZeroFile { meta: file_meta }))
     }
 
-    fn base_create(&self, dentry: &dyn Dentry, mode: config::inode::InodeMode) -> SysResult<()> {
+    fn base_create(&self, _dentry: &dyn Dentry, _mode: config::inode::InodeMode) -> SysResult<()> {
         todo!()
     }
 
-    fn base_link(&self, dentry: &dyn Dentry, old_dentry: &dyn Dentry) -> SysResult<()> {
+    fn base_link(&self, _dentry: &dyn Dentry, _old_dentry: &dyn Dentry) -> SysResult<()> {
         todo!()
     }
 
-    fn base_lookup(&self, dentry: &dyn Dentry) -> SysResult<()> {
+    fn base_lookup(&self, _dentry: &dyn Dentry) -> SysResult<()> {
         todo!()
     }
 
-    fn base_new_neg_child(self: Arc<Self>, name: &str) -> Arc<dyn Dentry> {
+    fn base_new_neg_child(self: Arc<Self>, _name: &str) -> Arc<dyn Dentry> {
         todo!()
     }
 
     fn base_rename(
         &self,
-        dentry: &dyn Dentry,
-        new_dir: &dyn Dentry,
-        new_dentry: &dyn Dentry,
+        _dentry: &dyn Dentry,
+        _new_dir: &dyn Dentry,
+        _new_dentry: &dyn Dentry,
     ) -> SysResult<()> {
         todo!()
     }
@@ -73,7 +73,7 @@ impl Dentry for ZeroDentry {
         todo!()
     }
 
-    fn base_unlink(&self, dentry: &dyn Dentry) -> SysResult<()> {
+    fn base_unlink(&self, _dentry: &dyn Dentry) -> SysResult<()> {
         todo!()
     }
 }

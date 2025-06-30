@@ -4,8 +4,9 @@
 extern crate alloc;
 extern crate user_lib;
 
+use config::{inode::InodeMode, vfs::OpenFlags};
 use user_lib::{
-    chdir, console::getchar, execve, exit, fork, mkdir, print, println, sleep, waitpid,
+    chdir, close, console::getchar, dup, execve, exit, fork, mkdir, open, print, println, waitpid,
 };
 
 use alloc::{
@@ -34,6 +35,11 @@ pub fn easy_cmd(s: String) -> String {
             let args: Vec<&str> = sf.split(" ").collect();
             let arg = args.get(1).unwrap();
             format!("runtest.exe -w entry-dynamic.exe {}", arg).to_string()
+        }
+        sf if sf.starts_with("ltp ") => {
+            let args: Vec<&str> = sf.split(" ").collect();
+            let arg = args.get(1).unwrap();
+            format!("ltp/testcases/bin/{}", arg).to_string()
         }
         _ => s,
     }
@@ -105,16 +111,34 @@ fn main() {
         mkdir("/bin");
         mkdir("/lib");
 
+        close(2);
+
         chdir("musl");
         run_cmd("./busybox cp /musl/lib/* /lib/");
+        println!("loading user lib: 20%");
+
         run_cmd("./busybox cp /musl/lib/libc.so /lib/ld-musl-riscv64-sf.so.1");
         run_cmd("./busybox cp /musl/lib/libc.so /lib/ld-musl-riscv64.so.1");
+        println!("loading user lib: 40%");
+
         run_cmd("./busybox cp /glibc/lib/* /lib/");
         run_cmd("./busybox cp /glibc/lib/libc.so /lib/libc.so.6");
+        println!("loading user lib: 60%");
+
         run_cmd("./busybox cp /glibc/lib/libm.so /lib/libm.so.6");
         run_cmd("./busybox cp /glibc/busybox /bin/");
+        println!("loading user lib: 80%");
+
         run_cmd("./busybox cp /glibc/busybox /");
         run_cmd("./busybox --install -s /bin");
+        println!("loading user lib: 100%");
+        println!("loading user lib: complete!");
+
+        let fd = open(0, "/dev/tty", OpenFlags::O_WRONLY, InodeMode::CHAR);
+        if fd != 2 {
+            dup(fd as usize);
+            close(fd as usize);
+        }
 
         loop {
             println!("please input app name:");
@@ -142,7 +166,7 @@ fn main() {
 
             let args: Vec<String> = parse_args(&argstring);
 
-            println!("app path is [{}] with len [{}]", apppath, bptr);
+            // println!("app path is [{}] with len [{}]", apppath, bptr);
 
             let args: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
 
@@ -166,6 +190,10 @@ fn main() {
             let pid = fork();
             if pid == 0 {
                 execve(args[0], &args[0..], &[]);
+                let bin = format!("/bin/{}", args[0]);
+                execve(&bin, &args[0..], &[]);
+                println!("{}: not found", args[0]);
+
                 exit(0);
             }
             waitpid(pid, &mut exitcode);
