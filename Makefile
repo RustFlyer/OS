@@ -90,7 +90,7 @@ ifeq ($(ARCH), loongarch64)
 # QEMU_ARGS += -drive file=disk-la.img,if=none,format=raw,id=x1
 # QEMU_ARGS += -device virtio-blk-pci,drive=x1
 
-	QEMU_ARGS += -dtb loongarch.dtb
+# QEMU_ARGS += -dtb loongarch.dtb
 # QEMU_ARGS += -bios uefi_bios.bin
 # QEMU_ARGS += -vga none
 # QEMU_ARGS += -D qemu.log -d guest_errors,unimp,in_asm
