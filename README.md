@@ -12,6 +12,8 @@ Nighthawk OS 是使用 Rust 编写，支持 RISC-V 和 LoongArch 指令集架构
 
 ![初赛排行榜](./docs/assets/leaderboard.jpeg)
 
+截止初赛结束还剩6小时，位于排行榜第七。
+
 ### 功能介绍
 - 无栈协程：基于rust的future机制实现的无栈进程切换，能够在进程之间快速地切换调度，多核间以M:N调度算法对进程调度，充分发挥多核优势。
 - 进程管理：统一的进程线程抽象，方便内核管理的同时增强进程与线程对于POSIX的兼容性。
@@ -29,11 +31,11 @@ Nighthawk OS 是使用 Rust 编写，支持 RISC-V 和 LoongArch 指令集架构
 
 <!--  [Nighthawk-初赛文档](./初赛文档.pdf) -->
 
-[Nighthawk-初赛文档](./NighthawkOS初赛文档.pdf)
+- [Nighthawk-初赛文档](./NighthawkOS初赛文档.pdf)
 
-[Nighthawk-初赛幻灯片](./NighthawkOS初赛幻灯片.pptx)
+- [Nighthawk-初赛幻灯片](./NighthawkOS初赛幻灯片.pptx)
 
-[Nighthawk-初赛展示视频](https://pan.baidu.com/s/1VokWbcV22oiYtDVE2q8Nyg) 提取码: rqs5
+- [Nighthawk-初赛展示视频](https://pan.baidu.com/s/1VokWbcV22oiYtDVE2q8Nyg) 提取码: rqs5
 
 ## 运行方式
 
