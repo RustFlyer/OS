@@ -38,7 +38,7 @@ ATTENTION: you should make sure that relevant file exists in your sdcard!
 pub fn easy_cmd(s: String) -> String {
     let str = s.as_str();
     match str {
-        "a" | "basic" => "busybox sh run-all.sh".to_string(),
+        "a" | "basic" => "busybox sh basic_testcode.sh".to_string(),
         "b" | "busybox0" => "busybox sh busybox_testcode.sh".to_string(),
         "c" | "lua" => "busybox sh lua_testcode.sh".to_string(),
         "d" | "iozone" => "busybox sh iozone_testcode.sh".to_string(),

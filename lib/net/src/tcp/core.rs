@@ -45,6 +45,7 @@ pub struct TcpSocket {
     /// Indicates whether the socket is in non-blocking mode, using an atomic
     /// boolean for thread-safe access.
     pub(crate) nonblock: AtomicBool,
+    /// Just used to pass to ListenTable when listening
     pub(crate) listen_handles: ShareMutex<Vec<SocketHandle>>,
 }
 
