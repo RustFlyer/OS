@@ -1,4 +1,4 @@
-// This Module is adapted from Phoenix OS with a few modifications.
+// This Module is adapted from Phoenix OS, modified to support more functionalities.
 
 //! Module for managing allocatable frames (physical pages).
 //!
