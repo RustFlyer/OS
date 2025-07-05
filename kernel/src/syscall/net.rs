@@ -22,7 +22,7 @@ pub const NONBLOCK: i32 = 0x800;
 pub const CLOEXEC: i32 = 0x80000;
 
 pub fn sys_socket(domain: usize, types: i32, protocal: usize) -> SyscallResult {
-    if domain == 1 || (domain != 1 && types > 2) {
+    if domain == 1 {
         log::error!("not support unix socket");
         return Err(SysError::ENOSYS);
     }
