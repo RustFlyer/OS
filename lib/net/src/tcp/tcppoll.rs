@@ -59,14 +59,6 @@ impl TcpSocket {
             }
         });
 
-        // if writable {
-        //     log::debug!("[poll_connect] incoming_tcp_packet");
-        //     let local = unsafe { *self.local_addr.get() };
-        //     let peer = unsafe { *self.peer_addr.get() };
-        //     let mut sockets = SOCKET_SET.0.lock();
-        //     LISTEN_TABLE.incoming_tcp_packet(local, peer, &mut sockets);
-        // }
-
         NetPollState {
             readable: false,
             writable,
@@ -74,16 +66,22 @@ impl TcpSocket {
         }
     }
 
+    /// Polls the status of a connected TCP stream socket.
+    ///
+    /// Returns a `NetPollState` indicating whether the socket is readable or writable.
+    /// - `readable` is true if the socket is closed for receiving (so reads won't block)
+    ///   or if there is data available to read.
+    /// - `writable` is true if the socket is closed for sending (so writes won't block)
+    ///   or if the socket can accept more data to send.
+    /// Registers the current waker if the socket is not currently readable or writable.
     pub(crate) async fn poll_stream(&self) -> NetPollState {
         log::debug!("[poll_stream] {:?}", unsafe { self.handle.get().read() });
         // SAFETY: `self.handle` should be initialized in a connected socket.
         let handle = unsafe { self.handle.get().read().unwrap() };
         let waker = take_waker().await;
         SOCKET_SET.with_socket_mut::<tcp::Socket, _, _>(handle, |socket| {
-            // readable 本质上是是否应该继续阻塞，因此为 true 时的条件可以理解为：
-            // 1. 套接字已经关闭接收：在这种情况下，即使没有新数据到达，读取操作也不会阻塞，
-            //    因为读取会立即返回
-            // 2. 套接字中有数据可读：这是最常见的可读情况，表示可以从套接字中读取到数据
+            // `readable` is true if the socket is closed for receiving or has data to read.
+            // `writable` is true if the socket is closed for sending or can send more data.
             let readable = !socket.may_recv() || socket.can_recv();
             let writable = !socket.may_send() || socket.can_send();
             if !readable {
@@ -100,19 +98,18 @@ impl TcpSocket {
         })
     }
 
+    /// Polls the status of a listening TCP socket.
+    ///
+    /// Returns a `NetPollState` indicating whether the socket is ready to accept a new connection.
+    /// - `readable` is true if there is a pending connection that can be accepted.
+    /// - `writable` is always false for a listener.
+    /// - `hangup` is always false for a listener.
     pub(crate) fn poll_listener(&self) -> NetPollState {
         log::debug!("[poll_listener] {:?}", unsafe { self.handle.get().read() });
         // SAFETY: `self.local_addr` should be initialized in a listening socket.
 
         let local_addr = unsafe { self.local_addr.get().read() };
         let readable = LISTEN_TABLE.can_accept(local_addr.port);
-
-        // let listen_handles = self.listen_handles.lock();
-        // let readable = listen_handles.iter().any(|&handle| {
-        //     SOCKET_SET.with_socket_mut::<tcp::Socket, _, _>(handle, |sock| {
-        //         sock.state() == tcp::State::Established
-        //     })
-        // });
 
         NetPollState {
             readable,
@@ -121,6 +118,11 @@ impl TcpSocket {
         }
     }
 
+    /// Polls the status of a closed TCP socket.
+    ///
+    /// Returns a `NetPollState` indicating whether the socket is readable (always true),
+    /// writable (always false), and whether a hangup has occurred (true if the socket is in
+    /// a TCP closing state such as CloseWait, FinWait2, or TimeWait).
     pub(crate) fn poll_closed(&self) -> NetPollState {
         log::debug!("[poll_closed]");
         use tcp::State::*;

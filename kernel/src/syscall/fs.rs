@@ -1071,6 +1071,7 @@ impl Future for PollFuture<'_> {
             }
         }
         if this.ready_cnt > 0 {
+            log::debug!("[PollFuture] ready: {}", this.ready_cnt);
             Poll::Ready(ret_vec)
         } else {
             Poll::Pending
@@ -1132,7 +1133,6 @@ pub async fn sys_ppoll(fds: usize, nfds: usize, tmo_p: usize, sigmask: usize) ->
     let addrspace = task.addr_space();
 
     let mut poll_fds = unsafe { UserReadPtr::<PollFd>::new(fds, &addrspace).read_array(nfds)? };
-    log::debug!("[sys_ppoll] fds: {:?}", fds);
 
     let time_out = if tmo_p == 0 {
         None
@@ -1140,6 +1140,11 @@ pub async fn sys_ppoll(fds: usize, nfds: usize, tmo_p: usize, sigmask: usize) ->
         let timespec = unsafe { UserReadPtr::<TimeSpec>::new(tmo_p, &addrspace).read()? };
         Some(Duration::from_micros(timespec.into_ms() as u64))
     };
+    log::debug!(
+        "[sys_ppoll] poll_fds: {:?}, nfds: {nfds}, timeout: {:?}",
+        poll_fds,
+        time_out
+    );
 
     let mut futures = Vec::<Async<PollEvents>>::with_capacity(nfds);
     for poll_fd in poll_fds.iter() {

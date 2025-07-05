@@ -46,6 +46,9 @@ pub(crate) fn has_signal() -> bool {
     call_interface!(HasSignalIf::has_signal())
 }
 
+/// use in tcp handshake
+///
+/// wake listening socket and add remote port as entry in ListenTable
 pub fn snoop_tcp_packet(
     buf: &[u8],
     is_ethernet: bool,
