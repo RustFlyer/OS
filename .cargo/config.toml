@@ -1,39 +1,39 @@
 [build]
 target = ["riscv64gc-unknown-none-elf", "loongarch64-unknown-none"]
 
-[net]
-offline = true
+# [net]
+# offline = true
 
-[source.crates-io]
-replace-with = "vendored-sources"
+# [source.crates-io]
+# replace-with = "vendored-sources"
 
-[source."git+https://github.com/EchudeT/lwext4_rust.git?rev=d546"]
-git = "https://github.com/EchudeT/lwext4_rust.git"
-rev = "d546"
-replace-with = "vendored-sources"
+# [source."git+https://github.com/EchudeT/lwext4_rust.git?rev=d546"]
+# git = "https://github.com/EchudeT/lwext4_rust.git"
+# rev = "d546"
+# replace-with = "vendored-sources"
 
-[source."git+https://github.com/EchudeT/printf-compat.git"]
-git = "https://github.com/EchudeT/printf-compat.git"
-replace-with = "vendored-sources"
+# [source."git+https://github.com/EchudeT/printf-compat.git"]
+# git = "https://github.com/EchudeT/printf-compat.git"
+# replace-with = "vendored-sources"
 
-[source."git+https://github.com/EchudeT/rust-fatfs.git?rev=e656"]
-git = "https://github.com/EchudeT/rust-fatfs.git"
-rev = "e656"
-replace-with = "vendored-sources"
+# [source."git+https://github.com/EchudeT/rust-fatfs.git?rev=e656"]
+# git = "https://github.com/EchudeT/rust-fatfs.git"
+# rev = "e656"
+# replace-with = "vendored-sources"
 
-[source."git+https://github.com/EchudeT/smoltcp.git"]
-git = "https://github.com/EchudeT/smoltcp.git"
-replace-with = "vendored-sources"
+# [source."git+https://github.com/EchudeT/smoltcp.git"]
+# git = "https://github.com/EchudeT/smoltcp.git"
+# replace-with = "vendored-sources"
 
-[source."git+https://github.com/adong660/loongArch64?branch=main"]
-git = "https://github.com/adong660/loongArch64"
-branch = "main"
-replace-with = "vendored-sources"
+# [source."git+https://github.com/adong660/loongArch64?branch=main"]
+# git = "https://github.com/adong660/loongArch64"
+# branch = "main"
+# replace-with = "vendored-sources"
 
-[source."git+https://github.com/adong660/rust-elf.git?branch=no-std-elfstream"]
-git = "https://github.com/adong660/rust-elf.git"
-branch = "no-std-elfstream"
-replace-with = "vendored-sources"
+# [source."git+https://github.com/adong660/rust-elf.git?branch=no-std-elfstream"]
+# git = "https://github.com/adong660/rust-elf.git"
+# branch = "no-std-elfstream"
+# replace-with = "vendored-sources"
 
-[source.vendored-sources]
-directory = "vendor"
+# [source.vendored-sources]
+# directory = "vendor"

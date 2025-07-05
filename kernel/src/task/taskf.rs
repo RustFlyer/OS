@@ -192,8 +192,7 @@ impl Task {
         let parent;
         let children;
         let pgid;
-        let uid: Arc<mutex::spin_mutex::SpinMutex<usize, mutex::SpinNoIrq>> =
-            new_share_mutex(self.uid());
+        let uid = new_share_mutex(self.uid());
         let cwd;
         let root;
         let itimers;
@@ -298,11 +297,10 @@ impl Task {
             name,
         ));
 
-        new.with_thread_group(|tg| tg.push(new.clone()));
-
         if !cloneflags.contains(CloneFlags::THREAD) {
             self.add_child(new.clone());
         }
+        new.with_thread_group(|tg| tg.push(new.clone()));
 
         if new.is_process() {
             PROCESS_GROUP_MANAGER.add_process(new.get_pgid(), &new);

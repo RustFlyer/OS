@@ -257,6 +257,10 @@ pub fn sys_kill(pid: isize, sig_code: i32) -> SyscallResult {
     };
     if target_processes.peek().is_none() {
         log::error!("[sys_kill] no target process found for pid: {}", pid);
+        process_list_lock
+            .values()
+            .filter_map(|t| t.upgrade())
+            .for_each(|t| log::error!("exist: {}, pgid: {}", t.tid(), t.get_pgid()));
         return Err(SysError::ESRCH);
     }
 

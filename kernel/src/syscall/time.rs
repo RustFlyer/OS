@@ -116,6 +116,9 @@ pub async fn sys_nanosleep(req: usize, rem: usize) -> SyscallResult {
         }
         unsafe { req_read.read()? }
     };
+    if req_time.tv_nsec >= 1_000_000_000 {
+        return Err(SysError::EINVAL);
+    }
 
     task.set_state(TaskState::Interruptible);
     task.set_wake_up_signal(!*task.sig_mask_mut());
@@ -129,6 +132,7 @@ pub async fn sys_nanosleep(req: usize, rem: usize) -> SyscallResult {
         SelectOutput::Output1(ret) => Ok(ret),
         SelectOutput::Output2(_) => Err(SysError::EINTR),
     }?;
+    task.set_state(TaskState::Running);
 
     if remain.is_zero() {
         log::debug!("[sys_nanosleep] sleep enough {}", get_time_ms());
@@ -230,14 +234,14 @@ pub fn sys_clock_gettime(clockid: usize, tp: usize) -> SyscallResult {
             }
         }
         CLOCK_MONOTONIC_NEW => {
-            let current = get_time_duration(); // 仿照 MONOTONIC
+            let current = get_time_duration();
             unsafe {
                 let ts: TimeSpec = (CLOCK_DEVIATION[CLOCK_MONOTONIC] + current).into();
                 ts_ptr.write(ts)?;
             }
         }
         CLOCK_REALTIME_COARSE_NEW => {
-            let current = get_time_duration(); // 仿照 REALTIME_COARSE
+            let current = get_time_duration();
             unsafe {
                 let ts: TimeSpec = (CLOCK_DEVIATION[CLOCK_REALTIME_COARSE] + current).into();
                 ts_ptr.write(ts)?;
@@ -267,12 +271,20 @@ pub async fn sys_clock_nanosleep(
     match clockid {
         CLOCK_REALTIME | CLOCK_MONOTONIC => {
             let ts = unsafe { t.read()? };
+            // log::error!("[CLOCK_REALTIME] ts: {:?}", ts);
+            if ts.tv_nsec >= 1_000_000_000 {
+                return Err(SysError::EINVAL);
+            }
+
             let req: Duration = ts.into();
             log::debug!(
                 "[sys_clock_nanosleep] clockid {} ts: {} ms",
                 clockid,
                 ts.into_ms()
             );
+
+            task.set_state(TaskState::Interruptible);
+            task.set_wake_up_signal(!*task.sig_mask_mut());
             let remain = if flags == TIMER_ABSTIME {
                 let current = get_time_duration();
                 if req.le(&current) {
@@ -283,21 +295,25 @@ pub async fn sys_clock_nanosleep(
             } else {
                 task.suspend_timeout(req).await
             };
+            task.set_state(TaskState::Running);
+
             if remain.is_zero() {
+                log::error!("[CLOCK_REALTIME] remain.is_zero");
                 Ok(0)
             } else {
-                if !rem.is_null() {
-                    unsafe {
-                        rem.write(remain.into())?;
-                    }
-                }
+                unsafe { rem.write(remain.into()) }?;
                 Err(SysError::EINTR)
             }
         }
         CLOCK_THREAD_CPUTIME_ID => {
-            let ts = unsafe { t.read()? };
-            let req: Duration = ts.into();
+            return Err(SysError::EOPNOTSUPP);
 
+            let ts = unsafe { t.read()? };
+            // log::error!("ts: {:?}", ts);
+            if ts.tv_nsec >= 1_000_000_000 {
+                return Err(SysError::EINVAL);
+            }
+            let req: Duration = ts.into();
             let start = task.get_process_cputime();
             let target = if flags == TIMER_ABSTIME {
                 req
@@ -305,6 +321,7 @@ pub async fn sys_clock_nanosleep(
                 start + req
             };
 
+            log::error!("[sys_clock_nanosleep] loop in");
             while task.get_process_cputime() < target {
                 let mut i = 0;
                 loop {
@@ -313,8 +330,9 @@ pub async fn sys_clock_nanosleep(
                         break;
                     }
                 }
-                yield_now().await;
+                // yield_now().await;
             }
+            log::error!("[sys_clock_nanosleep] loop out");
             Ok(0)
         }
 

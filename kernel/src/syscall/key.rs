@@ -1,4 +1,8 @@
-use alloc::{string::String, sync::Arc, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
+};
 use hashbrown::HashMap;
 use mutex::{SpinNoIrqLock, new_share_mutex};
 use spin::lazy::Lazy;
@@ -13,12 +17,28 @@ use crate::{
 pub enum KeyType {
     User,
     Ring,
+    Logon,
+    BigKey,
+    Asymmetric,
+    CifsIdmap,
+    CifsSpnego,
+    Pkcs7Test,
+    Rxrpc,
+    RxrpcS,
 }
 impl KeyType {
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
             "user" => Some(KeyType::User),
             "keyring" => Some(KeyType::Ring),
+            "logon" => Some(KeyType::Logon),
+            "big_key" => Some(KeyType::BigKey),
+            "asymmetric" => Some(KeyType::Asymmetric),
+            "cifs.idmap" => Some(KeyType::CifsIdmap),
+            "cifs.spnego" => Some(KeyType::CifsSpnego),
+            "pkcs7_test" => Some(KeyType::Pkcs7Test),
+            "rxrpc" => Some(KeyType::Rxrpc),
+            "rxrpc_s" => Some(KeyType::RxrpcS),
             _ => None,
         }
     }
@@ -110,7 +130,9 @@ pub fn sys_add_key(
     let key_type = key_type.into_string().map_err(|_| SysError::EINVAL)?;
     let description = description.into_string().map_err(|_| SysError::EINVAL)?;
 
-    if key_type == "keyring" {
+    let key_type = KeyType::from_str(&key_type).ok_or(SysError::EINVAL)?;
+
+    if key_type == KeyType::Ring {
         if let Some((_is_ses, uid)) = parse_uid_keyring(&description) {
             let current_uid = task.uid();
             let is_root = current_uid == 0;
@@ -118,6 +140,17 @@ pub fn sys_add_key(
                 return Err(SysError::EPERM);
             }
         }
+    }
+
+    let max_len = match key_type {
+        KeyType::Ring => 0,
+        KeyType::User | KeyType::Logon => 32767,
+        KeyType::BigKey => 1048575,
+        _ => usize::MAX,
+    };
+
+    if plen > max_len {
+        return Err(SysError::EINVAL);
     }
 
     log::debug!(
@@ -131,8 +164,8 @@ pub fn sys_add_key(
         &[]
     } else {
         if payload_ptr_ptr.is_null() {
-            log::error!("[sys_add_key] plen = {plen} when payload_ptr is null");
-            return Err(SysError::EINVAL);
+            // log::error!("[sys_add_key] plen = {plen} when payload_ptr is null");
+            return Err(SysError::EFAULT);
         }
         unsafe { payload_ptr_ptr.try_into_slice(plen) }?
     };
@@ -140,7 +173,6 @@ pub fn sys_add_key(
     let ring = find_keyring_by_serial(keyring_serial)?;
     log::debug!("[sys_add_key] add in");
 
-    let key_type = KeyType::from_str(&key_type).ok_or(SysError::EINVAL)?;
     let key_id = ring.lock().add_key(key_type, &description, payload);
 
     log::debug!("[sys_add_key] success");
@@ -162,6 +194,7 @@ pub fn sys_keyctl(
     pub const KEY_SPEC_USER_KEYRING: isize = -4;
     pub const KEY_SPEC_USER_SESSION_KEYRING: isize = -5;
 
+    pub const KEYCTL_JOIN_SESSION_KEYRING: usize = 1;
     pub const KEYCTL_SEARCH: usize = 3;
     pub const KEYCTL_READ: usize = 11;
 
@@ -189,6 +222,25 @@ pub fn sys_keyctl(
                 } else {
                     return Ok(0);
                 }
+            }
+            Ok(serial as usize)
+        }
+        KEYCTL_JOIN_SESSION_KEYRING => {
+            let task = current_task();
+            let addr_space = task.addr_space();
+            let name = if arg2 == 0 {
+                "_ses".to_string()
+            } else {
+                let mut name_ptr = UserReadPtr::<u8>::new(arg2, &addr_space);
+                name_ptr
+                    .read_c_string(256)?
+                    .into_string()
+                    .map_err(|_| SysError::EINVAL)?
+            };
+            let serial = 0x20000000 + (task.uid() as u64);
+            let mut table = KEYRING_TABLE.lock();
+            if !table.contains_key(&serial) {
+                table.insert(serial, Arc::new(SpinNoIrqLock::new(KeyRing::new())));
             }
             Ok(serial as usize)
         }

@@ -742,18 +742,18 @@ pub fn sys_getpgid(pid: usize) -> SyscallResult {
 /// and the session ID of that group must match the session ID of the joining process.
 pub fn sys_setpgid(pid: usize, pgid: usize) -> SyscallResult {
     let task = if pid != 0 {
-        TASK_MANAGER.get_task(pid).ok_or(SysError::ENOMEM)?
+        TASK_MANAGER.get_task(pid).ok_or(SysError::ESRCH)?
     } else {
         current_task()
     };
 
-    let pgid = if pgid == 0 {
-        task.process().get_pgid()
+    if pgid == 0 {
+        PROCESS_GROUP_MANAGER.add_group(&task);
+    } else if PROCESS_GROUP_MANAGER.get_group(pgid).is_none() {
+        PROCESS_GROUP_MANAGER.add_group(&task);
     } else {
-        pgid
-    };
-
-    *task.pgid_mut().lock() = pgid;
+        PROCESS_GROUP_MANAGER.add_process(pgid, &task);
+    }
 
     Ok(0)
 }

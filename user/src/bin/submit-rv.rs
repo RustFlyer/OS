@@ -1,8 +1,8 @@
 #![no_std]
 #![no_main]
-
 extern crate user_lib;
 
+#[allow(unused_imports)]
 use user_lib::{chdir, execve, exit, fork, mkdir, println, setuid, wait, waitpid};
 
 const TESTCASES: &[&str] = &[

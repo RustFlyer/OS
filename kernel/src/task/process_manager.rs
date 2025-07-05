@@ -40,12 +40,12 @@ impl ProcessGroupManager {
     /// adds a process in a existed group.
     pub fn add_process(&self, pgid: PGid, process: &Arc<Task>) {
         if !process.is_process() {
-            log::warn!("[ProcessGroupManager::add_process] try adding task that is not a process");
+            log::error!("[ProcessGroupManager::add_process] try adding task that is not a process");
             return;
         }
         process.set_pgid(pgid);
         let mut inner = self.0.lock();
-        log::info!("pgid is [{}]", pgid);
+        log::info!("tid: {}, pgid: {}", process.tid(), pgid);
         let vec = inner.get_mut(&pgid).unwrap();
         vec.push(Arc::downgrade(process));
     }
