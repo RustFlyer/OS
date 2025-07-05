@@ -47,6 +47,12 @@ impl ListenTable {
         self.tcp[port as usize].lock().is_none()
     }
 
+    /// A tcp socket uses this function to listen and build listening entry. Then the tcp
+    /// socket will suspend until the waker in entry wake it in `syn_wake`(the waker is
+    /// called only that the tcp handshake packet is recv by the socket and then `incoming_tcp_packet`
+    /// is called).
+    ///
+    /// After this function, listen handles can get ready when a tcp handshake msg comes.
     pub fn listen(
         &self,
         listen_endpoint: IpListenEndpoint,
@@ -83,6 +89,7 @@ impl ListenTable {
         }
     }
 
+    /// checks whether a entry about the port is in ListenTable. The entry is built in `listen()`.
     pub fn can_accept(&self, port: u16) -> bool {
         if let Some(entry) = self.tcp[port as usize].lock().deref_mut() {
             log::debug!("[can_accept] entry.syn_queue: {:?}", entry.syn_queue);
@@ -139,6 +146,9 @@ impl ListenTable {
         }
     }
 
+    /// `incoming_tcp_packet` is called when a tcp socket recv a packet about tcp handshake.
+    ///  This function can add relevant ports into waiting list and the port will be checked and
+    ///  processed in `check_after_poll`.
     pub fn incoming_tcp_packet(&self, src: IpEndpoint, dst: IpEndpoint) {
         if let Some(entry) = self.tcp[dst.port as usize].lock().deref_mut() {
             if !entry.can_accept(dst.addr) {
@@ -176,6 +186,10 @@ impl ListenTable {
         }
     }
 
+    /// Different from PhoenixOS
+    ///
+    /// `check_after_poll` is used to check whether handle is ready, different from the situation
+    /// that Phoenix check it in a preprocess function in RxToken, which is unused in new version.
     pub fn check_after_poll(&self, sockets: &mut SocketSet<'_>) {
         // log::debug!("[check_after_poll] poll");
         let mut list = self.waiting_ports.lock();
@@ -196,7 +210,6 @@ impl ListenTable {
                         log::debug!("[check_after_poll] success get handle!");
                         entry.syn_queue.push_back(handle);
 
-                        entry.syn_recv_sleep.store(true, Ordering::Relaxed);
                         let local_addr = sock.local_endpoint().unwrap();
                         ret = Some((handle, local_addr, i));
                     }
@@ -209,11 +222,6 @@ impl ListenTable {
 
                 if let Some((handle, local_addr, index)) = ret {
                     listen_handles.remove(index);
-                    // let new_handle = SOCKET_SET.add(SocketSetWrapper::new_tcp_socket());
-                    // SOCKET_SET.with_socket_mut::<tcp::Socket, _, _>(new_handle, |sock| {
-                    //     sock.listen(local_addr).unwrap();
-                    // });
-                    // listen_handles.push(new_handle);
                 }
 
                 log::error!(
@@ -224,14 +232,10 @@ impl ListenTable {
                     should_remove = true;
                 }
             }
-
-            // if should_remove {
-            //     log::error!("[check_after_poll] remove port {port}");
-            //     *self.tcp[port as usize].lock() = None;
-            // }
         }
     }
 
+    /// `syn_wake` is used when the sleeping socket recv a tcp packet.
     pub fn syn_wake(&self, dst: IpEndpoint, ack: bool) {
         if let Some(entry) = self.tcp[dst.port as usize].lock().deref_mut() {
             // let is_syn = entry.syn_recv_sleep.load(Ordering::Relaxed);
@@ -252,10 +256,6 @@ impl ListenTable {
             });
         }
     }
-
-    // pub fn remove_entry(&self, port: u16) {
-    //     *self.tcp[port as usize].lock() = None;
-    // }
 }
 
 impl Default for ListenTable {

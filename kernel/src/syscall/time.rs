@@ -147,7 +147,7 @@ pub async fn sys_nanosleep(req: usize, rem: usize) -> SyscallResult {
 }
 
 // clockid
-pub const SUPPORT_CLOCK: usize = 6;
+pub const SUPPORT_CLOCK: usize = 18;
 /// A configurable system-level real-time clock for measuring the real (i.e., the wall clock) time
 pub const CLOCK_REALTIME: usize = 0;
 /// An unsettable system-level clock representing monotonic time since an unspecified past point in time
@@ -161,6 +161,9 @@ pub const CLOCK_MONOTONIC_RAW: usize = 4;
 pub const CLOCK_REALTIME_COARSE: usize = 5;
 pub const CLOCK_BOOTTIME: usize = 6;
 pub const CLOCK_REALTIME_ALARM: usize = 7;
+
+pub const CLOCK_MONOTONIC_NEW: usize = 16;
+pub const CLOCK_REALTIME_COARSE_NEW: usize = 17;
 
 pub static mut CLOCK_DEVIATION: [Duration; SUPPORT_CLOCK] = [Duration::ZERO; SUPPORT_CLOCK];
 
@@ -226,7 +229,20 @@ pub fn sys_clock_gettime(clockid: usize, tp: usize) -> SyscallResult {
                 ts_ptr.write(ts)?;
             }
         }
-
+        CLOCK_MONOTONIC_NEW => {
+            let current = get_time_duration(); // 仿照 MONOTONIC
+            unsafe {
+                let ts: TimeSpec = (CLOCK_DEVIATION[CLOCK_MONOTONIC] + current).into();
+                ts_ptr.write(ts)?;
+            }
+        }
+        CLOCK_REALTIME_COARSE_NEW => {
+            let current = get_time_duration(); // 仿照 REALTIME_COARSE
+            unsafe {
+                let ts: TimeSpec = (CLOCK_DEVIATION[CLOCK_REALTIME_COARSE] + current).into();
+                ts_ptr.write(ts)?;
+            }
+        }
         _ => {
             log::error!("[sys_clock_gettime] unsupported clockid{}", clockid);
             return Err(SysError::EINTR);

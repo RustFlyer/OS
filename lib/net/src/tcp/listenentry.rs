@@ -27,8 +27,8 @@ pub struct ListenTableEntry {
     /// The waker used to wake up the listening socket when a new connection
     /// arrives.
     pub(crate) waker: Waker,
+    /// handles for listening handshake in tcp. (Different from Phoenix)
     pub(crate) handles: ShareMutex<Vec<SocketHandle>>,
-    pub(crate) syn_recv_sleep: AtomicBool,
 }
 
 impl ListenTableEntry {
@@ -42,7 +42,6 @@ impl ListenTableEntry {
             syn_queue: VecDeque::with_capacity(LISTEN_QUEUE_SIZE),
             waker: waker.clone(),
             handles,
-            syn_recv_sleep: AtomicBool::new(false),
         }
     }
 
