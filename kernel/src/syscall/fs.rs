@@ -1367,7 +1367,7 @@ pub fn sys_renameat2(
         new_dentry.as_ref(),
     )?;
 
-    log::error!("[sys_renameat2] implement rename");
+    // log::error!("[sys_renameat2] implement rename");
     Ok(0)
 }
 

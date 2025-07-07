@@ -47,13 +47,14 @@ pub struct Kstat {
 impl Kstat {
     pub fn from_vfs_inode(inode: Arc<dyn Inode>) -> SysResult<Self> {
         let stat = inode.get_attr()?;
+        let inner = inode.get_meta().inner.lock();
         Ok(Kstat {
             st_dev: stat.st_dev,
             st_ino: stat.st_ino,
             st_mode: stat.st_mode, // 0777 permission, we don't care about permission
             st_nlink: stat.st_nlink,
-            st_uid: stat.st_uid,
-            st_gid: stat.st_gid,
+            st_uid: inner.uid,
+            st_gid: inner.gid,
             st_rdev: stat.st_rdev,
             _pad0: stat.__pad,
             st_size: stat.st_size as i64,

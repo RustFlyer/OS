@@ -44,6 +44,7 @@ impl MemInfo {
             slab: 0,
         }
     }
+
     pub fn serialize(&self) -> String {
         let mut res = "".to_string();
         let end = " KB\n";

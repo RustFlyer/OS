@@ -298,7 +298,7 @@ pub async fn sys_clock_nanosleep(
             task.set_state(TaskState::Running);
 
             if remain.is_zero() {
-                log::error!("[CLOCK_REALTIME] remain.is_zero");
+                // log::error!("[CLOCK_REALTIME] remain.is_zero");
                 Ok(0)
             } else {
                 unsafe { rem.write(remain.into()) }?;
@@ -730,19 +730,22 @@ pub fn sys_clock_settime(clockid: usize, tp: usize) -> SyscallResult {
     let addrspace = task.addr_space();
     let mut tp = UserReadPtr::<TimeSpec>::new(tp, &addrspace);
     let tp = unsafe { tp.read() }?;
+    if (tp.tv_nsec as i64) < 0 || tp.tv_nsec >= 1_000_000_000 || (tp.tv_sec as i64) < 0 {
+        return Err(SysError::EINVAL);
+    }
     if !tp.is_valid() {
         return Err(SysError::EINVAL);
     }
     match clockid {
         CLOCK_REALTIME => {
-            if tp.into_ms() < get_time_ms() {
-                log::error!(
-                    "[sys_clock_settime] attempted to set the time to a value less than the current value of the CLOCK_MONOTONIC clock."
-                );
-                return Err(SysError::EINVAL);
-            }
+            // if tp.into_ms() < get_time_ms() {
+            //     log::error!(
+            //         "[sys_clock_settime] attempted to set the time to a value less than the current value of the CLOCK_MONOTONIC clock."
+            //     );
+            //     return Err(SysError::EINVAL);
+            // }
             unsafe {
-                CLOCK_DEVIATION[clockid] = Duration::from(tp) - get_time_duration();
+                CLOCK_DEVIATION[clockid] = Duration::from(tp).saturating_sub(get_time_duration());
             }
         }
         _ => {
