@@ -2,10 +2,8 @@
 /target/
 /vendor/
 /fsimg/
+*.img
+*.bak
 kernel-la
 kernel-rv
-disk-rv.img
-disk-la.img
-sdcard-rv.img
-sdcard-la.img
 linkapp.asm

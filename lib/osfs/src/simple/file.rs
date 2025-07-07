@@ -1,13 +1,14 @@
-use alloc::sync::Arc;
-use alloc::{boxed::Box, string::String};
+use alloc::{boxed::Box, string::String, sync::Arc};
+
 use async_trait::async_trait;
+
 use config::mm::PAGE_SIZE;
-use mm::page_cache::page::Page;
 use systype::error::{SysError, SysResult};
 use vfs::{
     dentry::Dentry,
     file::{File, FileMeta},
 };
+
 pub struct SimpleDirFile {
     meta: FileMeta,
 }
@@ -73,19 +74,15 @@ impl File for SimpleFileFile {
         log::debug!("[base_read] pos: {}", pos);
 
         while !buf.is_empty() && cur_pos < size {
-            let page_pos = cur_pos / PAGE_SIZE * PAGE_SIZE;
+            let file_offset = cur_pos / PAGE_SIZE * PAGE_SIZE;
             let page_offset = cur_pos % PAGE_SIZE;
-            let page = cache.get_page(page_pos);
+            let len = buf.len().min(size - cur_pos).min(PAGE_SIZE - page_offset);
 
-            let page = if page.is_none() {
-                let page = Arc::new(Page::build()?);
-                cache.insert_page(page_offset, page.clone());
-                page
-            } else {
-                page.unwrap()
+            let page = match cache.get_page(file_offset) {
+                Some(page) => page,
+                None => cache.create_zeroed_page(file_offset)?,
             };
 
-            let len = buf.len().min(size - cur_pos).min(PAGE_SIZE - page_offset);
             buf[0..len].copy_from_slice(&page.as_slice()[page_offset..page_offset + len]);
             cur_pos += len;
             buf = &mut buf[len..];
@@ -107,19 +104,15 @@ impl File for SimpleFileFile {
         log::debug!("[base_write] simple file");
 
         while !buf.is_empty() {
-            let page_pos = cur_pos / PAGE_SIZE * PAGE_SIZE;
+            let file_offset = cur_pos / PAGE_SIZE * PAGE_SIZE;
             let page_offset = cur_pos % PAGE_SIZE;
-            let page = cache.get_page(page_pos);
+            let len = buf.len().min(PAGE_SIZE - page_offset);
 
-            let page = if page.is_none() {
-                let page = Arc::new(Page::build()?);
-                cache.insert_page(page_offset, page.clone());
-                page
-            } else {
-                page.unwrap()
+            let page = match cache.get_page(file_offset) {
+                Some(page) => page,
+                None => cache.create_zeroed_page(file_offset)?,
             };
 
-            let len = buf.len().min(PAGE_SIZE - page_offset);
             page.as_mut_slice()[page_offset..page_offset + len].copy_from_slice(&buf[0..len]);
             cur_pos += len;
             buf = &buf[len..];
