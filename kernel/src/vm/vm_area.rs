@@ -37,7 +37,7 @@ use mm::{
     address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum},
     page_cache::page::Page,
 };
-use mutex::ShareMutex;
+use mutex::{ShareMutex, new_share_mutex};
 use osfuture::block_on;
 use shm::SharedMemory;
 use systype::{
@@ -330,7 +330,7 @@ impl VmArea {
             },
             prot,
             pages: BTreeMap::new(),
-            map_type: TypedArea::Anonymous(AnonymousArea),
+            map_type: TypedArea::Anonymous(AnonymousArea::new(flags)),
             handler: Some(AnonymousArea::fault_handler),
         }
     }
@@ -342,10 +342,11 @@ impl VmArea {
         debug_assert!(start_va.to_usize() % PAGE_SIZE == 0);
         debug_assert!(end_va.to_usize() % PAGE_SIZE == 0);
 
+        let flags = VmaFlags::PRIVATE;
         Self {
             start: start_va,
             end: end_va,
-            flags: VmaFlags::PRIVATE,
+            flags,
             pte_flags: {
                 let mapping_flags =
                     MappingFlags::V | MappingFlags::R | MappingFlags::W | MappingFlags::U;
@@ -360,7 +361,7 @@ impl VmArea {
             },
             prot: MappingFlags::R | MappingFlags::W | MappingFlags::U,
             pages: BTreeMap::new(),
-            map_type: TypedArea::Anonymous(AnonymousArea),
+            map_type: TypedArea::Anonymous(AnonymousArea::new(flags)),
             handler: Some(AnonymousArea::fault_handler),
         }
     }
@@ -371,10 +372,12 @@ impl VmArea {
     pub fn new_heap(start_va: VirtAddr, end_va: VirtAddr) -> Self {
         debug_assert!(start_va.to_usize() % PAGE_SIZE == 0);
         debug_assert!(end_va.to_usize() % PAGE_SIZE == 0);
+
+        let flags = VmaFlags::PRIVATE;
         Self {
             start: start_va,
             end: end_va,
-            flags: VmaFlags::PRIVATE,
+            flags,
             pte_flags: {
                 let mapping_flags =
                     MappingFlags::V | MappingFlags::R | MappingFlags::W | MappingFlags::U;
@@ -389,7 +392,7 @@ impl VmArea {
             },
             prot: MappingFlags::R | MappingFlags::W | MappingFlags::U,
             pages: BTreeMap::new(),
-            map_type: TypedArea::Heap(AnonymousArea),
+            map_type: TypedArea::Heap(AnonymousArea::new(flags)),
             handler: Some(AnonymousArea::fault_handler),
         }
     }
@@ -1062,11 +1065,29 @@ impl SharedMemoryArea {
 /// avoid leaking data from other processes or the kernel. This is similar to the
 /// `.bss` section in an executable file.
 #[derive(Clone, Debug)]
-pub struct AnonymousArea;
+pub struct AnonymousArea {
+    /// The mappings from virtual page numbers to physical pages, if the area is shared.
+    mappings: Option<ShareMutex<BTreeMap<VirtPageNum, Arc<Page>>>>,
+}
 
 impl AnonymousArea {
+    /// Creates a new anonymous area with the given flags.
+    fn new(flags: VmaFlags) -> Self {
+        let mappings = if flags.contains(VmaFlags::PRIVATE) {
+            None
+        } else {
+            Some(new_share_mutex(BTreeMap::new()))
+        };
+        Self { mappings }
+    }
+
     /// Handles a page fault.
     fn fault_handler(area: &mut VmArea, info: PageFaultInfo) -> SysResult<()> {
+        let mappings = match &area.map_type {
+            TypedArea::Anonymous(anonymous) => anonymous.mappings.as_ref(),
+            TypedArea::Heap(anonymous) => None,
+            _ => panic!("AnonymousArea::fault_handler: not an anonymous area or a heap area"),
+        };
         let &mut VmArea {
             ref mut pages,
             flags,
@@ -1078,19 +1099,27 @@ impl AnonymousArea {
             page_table,
             ..
         } = info;
-        // log::error!("[AnonymousArea] fault_addr: {:?}", fault_addr);
 
-        if flags.contains(VmaFlags::SHARED) {
-            // log::error!("unimplemented Handling a page fault in a shared anonymous VMA");
-            // return Err(SysError::ENOMEM);
-            unimplemented!("Handling a page fault in a shared anonymous VMA");
-        }
+        let vpn = fault_addr.page_number();
+        let page = if flags.contains(VmaFlags::PRIVATE) {
+            let page = Page::build()?;
+            page.as_mut_slice().fill(0);
+            Arc::new(page)
+        } else {
+            let mut mappings_lock = mappings.unwrap().lock();
+            match mappings_lock.get(&vpn).cloned() {
+                Some(page) => page,
+                None => {
+                    let page = Arc::new(Page::build()?);
+                    page.as_mut_slice().fill(0);
+                    mappings_lock.insert(vpn, Arc::clone(&page));
+                    page
+                }
+            }
+        };
+        page_table.map_page_to(vpn, page.ppn(), pte_flags)?;
+        pages.insert(vpn, page);
 
-        let page = Page::build()?;
-        page_table.map_page_to(fault_addr.page_number(), page.ppn(), pte_flags)?;
-        page.as_mut_slice().fill(0);
-        pages.insert(fault_addr.page_number(), Arc::new(page));
-        // log::error!("[AnonymousArea] fault_handler pass");
         Ok(())
     }
 }
