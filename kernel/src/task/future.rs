@@ -153,6 +153,7 @@ pub async fn task_executor_unit(task: Arc<Task>) {
         task.get_name()
     );
     task.set_waker(take_waker().await);
+    task.init_before_running();
     set_nx_timer_irq();
 
     loop {
@@ -164,6 +165,7 @@ pub async fn task_executor_unit(task: Arc<Task>) {
             TaskState::Sleeping => {
                 task.set_state(TaskState::Interruptible);
                 suspend_now().await;
+                task.set_state(TaskState::Running);
             }
             _ => {}
         }
@@ -198,6 +200,7 @@ pub async fn task_executor_unit(task: Arc<Task>) {
             TaskState::Sleeping => {
                 task.set_state(TaskState::Interruptible);
                 suspend_now().await;
+                task.set_state(TaskState::Running);
             }
             _ => {}
         }
@@ -211,6 +214,7 @@ pub async fn task_executor_unit(task: Arc<Task>) {
             TaskState::Sleeping => {
                 task.set_state(TaskState::Interruptible);
                 suspend_now().await;
+                task.set_state(TaskState::Running);
             }
             _ => {}
         }

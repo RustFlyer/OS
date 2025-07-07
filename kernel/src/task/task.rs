@@ -160,6 +160,8 @@ pub struct Task {
 
     pub pdeathsig: AtomicU32,
 
+    pub vfork_parent: Option<Weak<Task>>,
+
     /// Mask of CPUs allowed for the task.
     cpus_on: SyncUnsafeCell<CpuMask>,
 
@@ -216,6 +218,8 @@ impl Task {
             no_new_privs: AtomicBool::new(false),
             pdeathsig: AtomicU32::new(0),
 
+            vfork_parent: None,
+
             cpus_on: SyncUnsafeCell::new(CpuMask::CPU0),
             timers: new_share_mutex(Vec::new()),
             name: SyncUnsafeCell::new(name),
@@ -258,6 +262,8 @@ impl Task {
 
         itimers: ShareMutex<[ITimer; 3]>,
         caps: SyncUnsafeCell<Capabilities>,
+
+        vfork_parent: Option<Weak<Task>>,
 
         cpus_on: SyncUnsafeCell<CpuMask>,
 
@@ -302,6 +308,7 @@ impl Task {
             dumpable: AtomicBool::new(false),
             no_new_privs: AtomicBool::new(false),
             pdeathsig: AtomicU32::new(0),
+            vfork_parent,
 
             cpus_on,
             timers: new_share_mutex(Vec::new()),

@@ -16,6 +16,8 @@ bitflags! {
         const SIGHAND = 0x00000800;
         /// Set if a pidfd should be placed in parent.
         const PIDFD = 0x00001000;
+        /// Set if vfork
+        const VFORK = 0x0004000;
         /// Set if we want to have the same parent as the cloner.
         const PARENT = 0x00008000;
         /// Set to add to same thread group.

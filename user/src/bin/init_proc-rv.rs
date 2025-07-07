@@ -31,6 +31,8 @@ pub static CMD_HELP: &str = r#"NighthawkOS Quick Command Guide:
   rd <arg>         Run dynamic program test (runtest.exe -w entry-dynamic.exe <arg>)
   ltp <case>       Run LTP single test case (ltp/testcases/bin/<case>)
 
+  [Enter]          Run the last command
+
 Type the corresponding command to quickly run the related test.
 ATTENTION: you should make sure that relevant file exists in your sdcard!
 "#;
@@ -123,6 +125,38 @@ fn parse_args(argstring: &str) -> Vec<String> {
     args
 }
 
+pub fn typecmd(buf: &mut [u8; 256], bptr: &mut usize) {
+    let mut ch = 0;
+    let mut tbptr = *bptr;
+    while ch != 13 {
+        ch = getchar();
+        print!("{}", ch as char);
+        if ch != 13 && ch != 127 && tbptr < 128 {
+            buf[tbptr] = ch;
+            tbptr = tbptr + 1;
+        }
+        if tbptr > 0 && ch == 127 {
+            tbptr = tbptr - 1;
+        }
+    }
+    *bptr = tbptr;
+}
+
+pub fn ischangedir(arg: &str) -> bool {
+    if arg.starts_with("glibc") && chdir("/glibc") >= 0 {
+        println!("chdir glibc success");
+        return true;
+    }
+
+    if arg.starts_with("musl") && chdir("/musl") >= 0 {
+        println!("chdir musl success");
+        return true;
+    }
+
+    println!("fail to chdir");
+    return false;
+}
+
 #[unsafe(no_mangle)]
 fn main() {
     let mut i = 0;
@@ -161,51 +195,34 @@ fn main() {
             close(fd as usize);
         }
 
+        let mut buf = [0; 256];
+        let mut slice = [0; 256];
+        let mut apppath = "";
+        let mut argstring = String::new();
+        let mut isinit = false;
+
         loop {
             println!("please input app name:");
-            let mut bptr: usize = 0;
-            let mut buf = [0; 256];
-            let mut ch = 0;
+            let mut bptr = 0;
+            typecmd(&mut buf, &mut bptr);
 
-            while ch != 13 {
-                ch = getchar();
-                print!("{}", ch as char);
-                if ch != 13 && ch != 127 && bptr < 128 {
-                    buf[bptr] = ch;
-                    bptr = bptr + 1;
-                }
-                if bptr > 0 && ch == 127 {
-                    bptr = bptr - 1;
-                }
+            if bptr != 0 {
+                isinit = true;
+                slice.copy_from_slice(&buf);
+                apppath = core::str::from_utf8(&slice[..bptr]).unwrap();
+                argstring = apppath.to_string();
+                argstring = easy_cmd(argstring);
             }
 
-            if bptr == 0 {
+            if !isinit {
                 continue;
             }
-
-            let buf_slice = &buf[..bptr];
-            let apppath = core::str::from_utf8(&buf_slice).unwrap();
-            let argstring = apppath.to_string();
-            let argstring = easy_cmd(argstring);
-            let args: Vec<String> = parse_args(&argstring);
 
             println!("{}", argstring);
+            let _args: Vec<String> = parse_args(&argstring);
+            let args: Vec<&str> = _args.iter().map(|s| s.as_str()).collect();
 
-            let args: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-
-            if apppath.starts_with("glibc") {
-                if chdir("/glibc") < 0 {
-                    println!("fail to chdir glibc");
-                } else {
-                    println!("chdir glibc success");
-                }
-                continue;
-            } else if apppath.starts_with("musl") {
-                if chdir("/musl") < 0 {
-                    println!("fail to chdir musl");
-                } else {
-                    println!("chdir musl success");
-                }
+            if ischangedir(apppath) {
                 continue;
             }
 

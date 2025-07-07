@@ -65,6 +65,17 @@ impl Task {
         }
     }
 
+    pub fn init_before_running(&self) {
+        let tid = self.tid();
+        let address_space = self.addr_space();
+
+        let tid_address = self.tid_address_mut();
+        if let Some(child_tid) = tid_address.set_child_tid {
+            let mut ct_ptr = UserWritePtr::<usize>::new(child_tid, &address_space);
+            let _ = unsafe { ct_ptr.write(tid) };
+        }
+    }
+
     /// `execve()` executes the program with `elf_file`. `execve()` can extract
     /// elf data from `elf_file`. Then `execve()` builds a new user memory space
     /// and maps new stack and new heap. After setting addrspace, `evecve()`
@@ -189,7 +200,7 @@ impl Task {
 
         let shm_maps;
 
-        let parent;
+        let mut parent;
         let children;
         let pgid;
         let uid = new_share_mutex(self.uid());
@@ -199,7 +210,12 @@ impl Task {
 
         let elf = SyncUnsafeCell::new(unsafe { self.elf() });
 
+        let mut vfork_parent = None;
         let mut name = self.get_name();
+
+        if cloneflags.contains(CloneFlags::VFORK) {
+            vfork_parent = Some(Arc::downgrade(&self));
+        }
 
         if cloneflags.contains(CloneFlags::THREAD) {
             is_process = false;
@@ -236,6 +252,12 @@ impl Task {
             name += "(fork)";
         }
 
+        if cloneflags.contains(CloneFlags::PARENT) {
+            if let Some(grandparent) = (*self.parent_mut().lock()).clone() {
+                parent = new_share_mutex(Some(grandparent));
+            }
+        }
+
         let sig_mask = SyncUnsafeCell::new(self.get_sig_mask());
         let sig_handlers = if cloneflags.contains(CloneFlags::SIGHAND) {
             self.sig_handlers_mut().clone()
@@ -263,7 +285,6 @@ impl Task {
         };
 
         let cpus_on = *self.cpus_on_mut();
-
         let name = SyncUnsafeCell::new(name);
         let new = Arc::new(Self::new_fork_clone(
             tid,
@@ -293,6 +314,7 @@ impl Task {
             elf,
             itimers,
             caps,
+            vfork_parent,
             SyncUnsafeCell::new(cpus_on),
             name,
         ));
@@ -362,6 +384,13 @@ impl Task {
         //     "initproc die!!!, sepc {:#x}",
         //     self.trap_context_mut().sepc
         // );
+
+        // log::error!("[exit] task {} exit", self.tid());
+        if let Some(parent) = self.vfork_parent.clone() {
+            if let Some(task) = parent.upgrade() {
+                task.wake();
+            }
+        }
 
         if self.tid() == INIT_PROC_ID {
             log::warn!("kernel shutdown");

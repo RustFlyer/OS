@@ -232,16 +232,21 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
                     "[sys_wait4] sigchld received, the child for recycle is announced by signal to be {:?}",
                     info.details
                 );
-                let children = task.children_mut().lock();
 
                 let child = match target {
-                    WaitFor::AnyChild => children.values().find(|c| {
-                        c.is_in_state(TaskState::WaitForRecycle)
-                            && c.with_thread_group(|tg| tg.len() == 1)
-                    }),
-
+                    WaitFor::AnyChild => {
+                        let children = task.children_mut().lock();
+                        children
+                            .values()
+                            .find(|c| {
+                                c.is_in_state(TaskState::WaitForRecycle)
+                                    && c.with_thread_group(|tg| tg.len() == 1)
+                            })
+                            .cloned()
+                    }
                     WaitFor::Pid(pid) => {
-                        let child = children.get(&pid).unwrap();
+                        let children = task.children_mut().lock();
+                        let child = children.get(&pid).unwrap().clone();
                         if child.is_in_state(TaskState::WaitForRecycle)
                             && child.with_thread_group(|tg| tg.len() == 1)
                         {
@@ -250,11 +255,30 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
                             None
                         }
                     }
-
                     WaitFor::PGid(_) => unimplemented!(),
-
-                    WaitFor::AnyChildInGroup => unimplemented!(),
+                    WaitFor::AnyChildInGroup => {
+                        let pgid = task.get_pgid();
+                        let mut result = None;
+                        for process in PROCESS_GROUP_MANAGER
+                            .get_group(pgid)
+                            .ok_or_else(|| SysError::ESRCH)?
+                            .into_iter()
+                            .filter_map(|t| t.upgrade())
+                            .filter(|t| t.is_process())
+                        {
+                            let children = process.children_mut().lock();
+                            if let Some(child) = children
+                                .values()
+                                .find(|c| c.is_in_state(TaskState::WaitForRecycle))
+                            {
+                                result = Some(child.clone());
+                                break;
+                            }
+                        }
+                        result
+                    }
                 };
+
                 if let Some(child) = child {
                     break (
                         child.tid(),
@@ -374,14 +398,18 @@ fn __sys_clone(
             unsafe { parent_tid.write(new_tid)? };
         }
     }
+
     if flags.contains(CloneFlags::CHILD_SETTID) {
         let mut child_tid = UserWritePtr::<usize>::new(child_tid_ptr, &addrspace);
+        log::info!("[sys_clone] clone a new thread, tid {new_tid}",);
         unsafe { child_tid.write(new_tid)? };
         new_task.tid_address_mut().set_child_tid = Some(child_tid_ptr);
     }
+
     if flags.contains(CloneFlags::CHILD_CLEARTID) {
         new_task.tid_address_mut().clear_child_tid = Some(child_tid_ptr);
     }
+
     if flags.contains(CloneFlags::SETTLS) {
         new_task.trap_context_mut().set_user_tp(tls_ptr);
     }
@@ -390,7 +418,9 @@ fn __sys_clone(
     spawn_user_task(new_task);
     log::info!("[sys_clone] clone success",);
 
-    // task.set_is_yield(true);
+    if flags.contains(CloneFlags::VFORK) {
+        task.set_state(TaskState::Sleeping);
+    }
 
     Ok(new_tid)
 }
@@ -622,6 +652,13 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
         }
     }
     log::info!("[sys_execve]: finish execve and convert to a new task");
+
+    if let Some(parent) = task.vfork_parent.clone() {
+        if let Some(task) = parent.upgrade() {
+            task.wake();
+        }
+    }
+
     Ok(0)
 }
 
