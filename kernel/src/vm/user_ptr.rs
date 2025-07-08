@@ -158,13 +158,10 @@ where
     /// # Safety
     /// See the module-level documentation for safety information.
     pub unsafe fn read(&mut self) -> SysResult<T> {
-        check_user_access(
-            self.addr_space,
-            self.ptr as usize,
-            size_of::<T>(),
-            MappingFlags::R,
-        )?;
-        Ok(unsafe { self.ptr.read() })
+        unsafe {
+            self.try_into_ref()?;
+        }
+        Ok(unsafe { self.read_uncheked() })
     }
 
     /// Reads a value from the memory location without checking the validity
@@ -193,12 +190,9 @@ where
     /// # Safety
     /// See the module-level documentation for safety information.
     pub unsafe fn read_array(&mut self, len: usize) -> SysResult<Vec<T>> {
-        check_user_access(
-            self.addr_space,
-            self.ptr as usize,
-            len * size_of::<T>(),
-            MappingFlags::R,
-        )?;
+        unsafe {
+            self.try_into_slice(len)?;
+        }
         let mut vec: Vec<T> = Vec::with_capacity(len);
         unsafe {
             vec.as_mut_ptr().copy_from_nonoverlapping(self.ptr, len);
@@ -375,13 +369,10 @@ where
     /// # Safety
     /// See the module-level documentation for safety information.
     pub unsafe fn write(&mut self, value: T) -> SysResult<()> {
-        check_user_access(
-            self.addr_space,
-            self.ptr as usize,
-            size_of::<T>(),
-            MappingFlags::W,
-        )?;
-        unsafe { self.ptr.write(value) };
+        unsafe {
+            self.try_into_mut_ref()?;
+        }
+        unsafe { self.write_unchecked(value) };
         Ok(())
     }
 
@@ -413,12 +404,9 @@ where
     /// # Safety
     /// See the module-level documentation for safety information.
     pub unsafe fn write_array(&mut self, values: &[T]) -> SysResult<()> {
-        check_user_access(
-            self.addr_space,
-            self.ptr as usize,
-            size_of_val(values),
-            MappingFlags::W,
-        )?;
+        unsafe {
+            self.try_into_mut_slice(values.len())?;
+        }
         unsafe {
             self.ptr
                 .copy_from_nonoverlapping(values.as_ptr(), values.len());
@@ -494,7 +482,7 @@ fn check_user_access(
     if len == 0 {
         return Ok(());
     }
-    if addr == 0 {
+    if addr == 0 || addr.checked_add(len).is_none() {
         return Err(SysError::EFAULT);
     }
 
@@ -570,7 +558,7 @@ where
     if len == 0 {
         return Ok(());
     }
-    if addr == 0 {
+    if addr == 0 || addr.checked_add(len).is_none() {
         return Err(SysError::EFAULT);
     }
 
