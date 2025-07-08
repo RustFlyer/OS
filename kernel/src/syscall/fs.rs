@@ -2053,3 +2053,27 @@ pub fn sys_fchownat(
     }
     Ok(0)
 }
+
+pub fn sys_close_range(first: usize, last: usize, flags: usize) -> SyscallResult {
+    const CLOSE_RANGE_UNSHARE: usize = 1;
+    const CLOSE_RANGE_CLOEXEC: usize = 2;
+
+    if first > last {
+        return Err(SysError::EINVAL);
+    }
+
+    if flags & !(CLOSE_RANGE_CLOEXEC | CLOSE_RANGE_UNSHARE) != 0 {
+        return Err(SysError::EINVAL);
+    }
+
+    let task = current_task();
+
+    if flags == CLOSE_RANGE_UNSHARE {
+        let mut fdtable = task.fdtable_mut().lock().clone();
+        fdtable.remove_with_range(first, last, flags)?;
+        *task.fdtable_mut().lock() = fdtable;
+    } else {
+        task.with_mut_fdtable(|table| table.remove_with_range(first, last, flags))?;
+    }
+    Ok(0)
+}

@@ -225,15 +225,25 @@ pub fn read_sockaddr(
     let _guard = SumGuard::new();
 
     unsafe {
-        UserReadPtr::<u8>::new(addr, &addrspace).read_array(addrlen)?;
+        log::error!("[read_sockaddr] addr: {:#x}, addrlen: {}", addr, addrlen);
+        log::error!("[read_sockaddr] in");
+        let mut _user_ptr = UserReadPtr::<u8>::new(addr, &addrspace);
+        let _check = _user_ptr.try_into_slice(addrlen)?;
+        let _r = _check[0];
+        log::error!("[read_sockaddr] out {}", _r);
     }
 
     let family = SaFamily::try_from(unsafe { *(addr as *const u16) })?;
+    log::error!("[read_sockaddr] family pass");
     match family {
         SaFamily::AF_INET => {
             if addrlen < mem::size_of::<SockAddrIn>() {
-                log::error!("[audit_sockaddr] AF_INET addrlen error");
+                log::error!("[read_sockaddr] AF_INET addrlen error");
                 return Err(SysError::EINVAL);
+            }
+            unsafe {
+                let mut _user_ptr = UserReadPtr::<SockAddrIn>::new(addr, &addrspace);
+                let _r = _user_ptr.read();
             }
             let sockaddr = SockAddr {
                 ipv4: unsafe { *(addr as *const _) },
@@ -243,8 +253,12 @@ pub fn read_sockaddr(
         }
         SaFamily::AF_INET6 => {
             if addrlen < mem::size_of::<SockAddrIn6>() {
-                log::error!("[audit_sockaddr] AF_INET6 addrlen error");
+                log::error!("[read_sockaddr] AF_INET6 addrlen error");
                 return Err(SysError::EINVAL);
+            }
+            unsafe {
+                let mut _user_ptr = UserReadPtr::<SockAddrIn6>::new(addr, &addrspace);
+                let _r = _user_ptr.read();
             }
             let sockaddr = SockAddr {
                 ipv6: unsafe { *(addr as *const _) },
@@ -254,8 +268,12 @@ pub fn read_sockaddr(
         }
         SaFamily::AF_UNIX => {
             if addrlen < mem::size_of::<SockAddrUn>() {
-                log::error!("[audit_sockaddr] AF_UNIX addrlen error");
+                log::error!("[read_sockaddr] AF_UNIX addrlen error");
                 return Err(SysError::EINVAL);
+            }
+            unsafe {
+                let mut _user_ptr = UserReadPtr::<SockAddrUn>::new(addr, &addrspace);
+                let _r = _user_ptr.read();
             }
             Ok(SockAddr {
                 ipv6: unsafe { *(addr as *const _) },

@@ -283,7 +283,12 @@ pub async fn sys_connect(sockfd: usize, addr: usize, addrlen: usize) -> SyscallR
     let task = current_task();
     let addrspace = task.addr_space();
 
-    log::info!("[sys_connect] thread: {}, addr: {:#x}", task.tid(), addr);
+    log::info!(
+        "[sys_connect] thread: {}, addr: {:#x}, addrlen: {}",
+        task.tid(),
+        addr,
+        addrlen
+    );
     let remote_addr = read_sockaddr(addrspace.clone(), addr, addrlen)?;
 
     let socket: Arc<Socket> = task

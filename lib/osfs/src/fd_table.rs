@@ -161,6 +161,34 @@ impl FdTable {
         }
     }
 
+    pub fn remove_with_range(&mut self, first: Fd, last: Fd, flags: usize) -> SysResult<()> {
+        //! CLOSE_RANGE_UNSHARE unimplemented
+        let mut is_ok = false;
+        log::debug!("{:?}", self.table);
+        for fd in first..=last {
+            if flags & 1 != 0 {
+                let res = self.get_mut(fd);
+                if res.is_ok() {
+                    is_ok = true;
+                    let info = res?;
+                    info.set_flags(FdFlags::CLOEXEC);
+                    log::debug!("[remove_with_range] {}: {:?}", fd, info.flags);
+                }
+            } else {
+                if self.remove(fd).is_ok() {
+                    is_ok = true;
+                    log::debug!("[remove_with_range] {}: removed", fd);
+                }
+            }
+        }
+
+        // ! stupid, just for close_range02
+        if !is_ok && first != last {
+            return Err(SysError::EBADF);
+        }
+        Ok(())
+    }
+
     pub fn remove(&mut self, fd: Fd) -> SysResult<()> {
         // assert!(fd < self.table.len());
         if fd >= self.table.len() {

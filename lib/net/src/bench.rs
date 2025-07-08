@@ -30,8 +30,8 @@ impl DeviceWrapper {
     /// Keep sending packets in a loop until the specified number of bytes is reached,
     /// and then count how much `bandwidth` has been sent.
     pub fn bench_transmit_bandwidth(&mut self) {
-        // 20 MB
-        const MAX_SEND_BYTES: usize = 20 * MB;
+        // 10 GB
+        const MAX_SEND_BYTES: usize = 10 * GB;
         let mut send_bytes: usize = 0;
         let mut past_send_bytes: usize = 0;
         let mut past_time = InterfaceWrapper::current_time();
@@ -51,7 +51,7 @@ impl DeviceWrapper {
 
             let current_time = InterfaceWrapper::current_time();
             if (current_time - past_time).secs() == 1 {
-                let gb = ((send_bytes - past_send_bytes) * 8) / MB;
+                let gb = ((send_bytes - past_send_bytes) * 8) / GB;
                 let mb = (((send_bytes - past_send_bytes) * 8) % GB) / MB;
                 let gib = (send_bytes - past_send_bytes) / GB;
                 let mib = ((send_bytes - past_send_bytes) % GB) / MB;
@@ -62,7 +62,7 @@ impl DeviceWrapper {
                     gb,
                     mb
                 );
-                log::info!("Transmit: total send bytes: {}", send_bytes);
+                // log::info!("Transmit: total send bytes: {}", send_bytes);
                 past_time = current_time;
                 past_send_bytes = send_bytes;
             }
@@ -80,8 +80,8 @@ impl DeviceWrapper {
     /// Continuously receive packets in a loop to measure the total throughput
     /// and bandwidth.
     pub fn bench_receive_bandwidth(&mut self) {
-        // 20 MB
-        const MAX_RECEIVE_BYTES: usize = 20 * MB;
+        // 10 GB
+        const MAX_RECEIVE_BYTES: usize = 10 * GB;
         let mut receive_bytes: usize = 0;
         let mut past_receive_bytes: usize = 0;
         let mut past_time = InterfaceWrapper::current_time();
@@ -106,7 +106,7 @@ impl DeviceWrapper {
                     gb,
                     mb
                 );
-                log::info!("Receive: total receive bytes: {}", receive_bytes);
+                // log::info!("Receive: total receive bytes: {}", receive_bytes);
                 past_time = current_time;
                 past_receive_bytes = receive_bytes;
             }

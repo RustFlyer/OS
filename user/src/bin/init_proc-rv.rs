@@ -143,6 +143,10 @@ pub fn typecmd(buf: &mut [u8; 256], bptr: &mut usize) {
 }
 
 pub fn ischangedir(arg: &str) -> bool {
+    if arg.starts_with("glibc") == arg.starts_with("musl") {
+        return false;
+    }
+
     if arg.starts_with("glibc") && chdir("/glibc") >= 0 {
         println!("chdir glibc success");
         return true;

@@ -1,6 +1,6 @@
 use core::{iter, time::Duration};
 
-use config::process::INIT_PROC_ID;
+use config::{process::INIT_PROC_ID, vfs::OpenFlags};
 use osfuture::suspend_now;
 use systype::{
     error::{SysError, SyscallResult},
@@ -17,7 +17,7 @@ use crate::{
         },
         manager::TASK_MANAGER,
         sig_members::{Action, ActionType, SIG_DFL, SIG_IGN, SigAction, SigContext},
-        signal::sig_info::*,
+        signal::{pidfd::PF_TABLE, sig_info::*},
     },
     vm::user_ptr::{UserReadPtr, UserWritePtr},
 };
@@ -739,4 +739,112 @@ pub async fn sys_rt_sigsuspend(mask: usize) -> SyscallResult {
     }
 
     Err(SysError::EINTR)
+}
+
+pub fn sys_pidfd_open(pid: usize, flags: u32) -> SyscallResult {
+    if flags != 0 {
+        return Err(SysError::EINVAL);
+    }
+
+    let process_list_lock = TASK_MANAGER.inner().lock();
+    let task = process_list_lock
+        .get(&pid)
+        .and_then(|t| t.upgrade())
+        .filter(|t| t.is_process());
+    drop(process_list_lock);
+
+    let task = match task {
+        Some(task) => task,
+        None => return Err(SysError::ESRCH),
+    };
+
+    let pf_table = PF_TABLE.get().unwrap();
+    let pidfd = pf_table.new_pidfd(&task);
+
+    Ok(pidfd)
+}
+
+pub fn sys_pidfd_send_signal(
+    pidfd: usize,
+    sig_code: i32,
+    info_ptr: usize, // ignore now
+    flags: u32,      // ignore now
+) -> SyscallResult {
+    log::info!(
+        "[sys_pidfd_send_signal] pidfd: {}, sig_code: {}, info_ptr: {:#x}, flags: {}",
+        pidfd,
+        sig_code,
+        info_ptr,
+        flags
+    );
+
+    let pf_table = PF_TABLE.get().expect("PF_TABLE not initialized");
+    let task = match pf_table.get_task_by_pidfd(pidfd) {
+        Some(task) => task,
+        None => {
+            log::error!("[sys_pidfd_send_signal] no task found for pidfd: {}", pidfd);
+            return Err(SysError::ESRCH);
+        }
+    };
+
+    let sig = Sig::from_i32(sig_code);
+    if sig.raw() != 0 && !sig.is_valid() {
+        log::warn!("[sys_pidfd_send_signal] invalid sig_code: {}", sig_code);
+        return Err(SysError::EINVAL);
+    }
+
+    fn check_permission(process: &Arc<Task>) -> bool {
+        process.pid() != INIT_PROC_ID
+    }
+
+    if !check_permission(&task) {
+        log::error!(
+            "[sys_pidfd_send_signal] no permission to send signal to pidfd: {}",
+            pidfd
+        );
+        return Err(SysError::EPERM);
+    }
+
+    if sig.raw() == 0 {
+        log::info!(
+            "[sys_pidfd_send_signal] sig_code is 0, only check if process exists and has permission"
+        );
+        return Ok(0);
+    }
+
+    task.with_thread_group(|tg| {
+        for thread in tg.iter() {
+            log::info!(
+                "[sys_pidfd_send_signal] send signal {:?} to thread {} in process {}",
+                sig,
+                thread.tid(),
+                task.pid(),
+            );
+            thread.receive_siginfo(SigInfo {
+                sig,
+                code: SigInfo::USER,
+                details: SigDetails::Kill { pid: task.pid() },
+            });
+        }
+    });
+
+    Ok(0)
+}
+
+pub fn sys_pidfd_getfd(pidfd: usize, targetfd: usize, flags: u32) -> SyscallResult {
+    if flags != 0 {
+        return Err(SysError::EINVAL);
+    }
+    let task = current_task();
+    let pf_table = PF_TABLE.get().unwrap();
+
+    let target = match pf_table.get_task_by_pidfd(pidfd) {
+        Some(task) => task,
+        None => return Err(SysError::ESRCH),
+    };
+
+    let file = target.with_mut_fdtable(|table| table.get_file(targetfd))?;
+    let newfd = task.with_mut_fdtable(|table| table.alloc(file, OpenFlags::empty()))?;
+
+    Ok(newfd)
 }

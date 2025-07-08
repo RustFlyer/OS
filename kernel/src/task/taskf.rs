@@ -34,9 +34,12 @@ use super::{
     tid::{TidAddress, tid_alloc},
     time_stat::TaskTimeStat,
 };
-use crate::vm::{
-    addr_space::{AddrSpace, switch_to},
-    user_ptr::UserWritePtr,
+use crate::{
+    task::signal::pidfd::PF_TABLE,
+    vm::{
+        addr_space::{AddrSpace, switch_to},
+        user_ptr::UserWritePtr,
+    },
 };
 
 impl Task {
@@ -302,6 +305,7 @@ impl Task {
             pgid,
             uid,
             SpinNoIrqLock::new(0),
+            SpinNoIrqLock::new(None),
             sig_mask,
             sig_handlers,
             sig_manager,
@@ -493,9 +497,16 @@ impl Task {
                     "[Task::do_exit] reparent child process pid {} to init",
                     child.pid()
                 );
+                let lock = child.exit_signal.lock();
+                let sig = if lock.is_none() {
+                    Sig::SIGCHLD
+                } else {
+                    Sig::from_i32(lock.unwrap() as i32)
+                };
+
                 if child.get_state() == TaskState::WaitForRecycle {
                     root.receive_siginfo(SigInfo {
-                        sig: Sig::SIGCHLD,
+                        sig,
                         code: SigInfo::CLD_EXITED,
                         details: SigDetails::None,
                     })
@@ -513,8 +524,15 @@ impl Task {
         // send SIGCHLD to process's parent
         if let Some(parent) = process.parent_mut().lock().as_ref() {
             if let Some(parent) = parent.upgrade() {
+                let lock = self.exit_signal.lock();
+                let sig = if lock.is_none() {
+                    Sig::SIGCHLD
+                } else {
+                    Sig::from_i32(lock.unwrap() as i32)
+                };
+
                 parent.receive_siginfo(SigInfo {
-                    sig: Sig::SIGCHLD,
+                    sig,
                     code: SigInfo::CLD_EXITED,
                     details: SigDetails::Child { pid: process.pid() },
                 })

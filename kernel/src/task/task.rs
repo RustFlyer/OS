@@ -107,6 +107,8 @@ pub struct Task {
     // parent task to clean it and receive exit_code.
     exit_code: SpinNoIrqLock<i32>,
 
+    pub exit_signal: SpinNoIrqLock<Option<u8>>,
+
     // sigmask is signal mask of task. When it is set
     // signal check will ignore its relevant signals.
     sig_mask: SyncUnsafeCell<SigSet>,
@@ -197,7 +199,10 @@ impl Task {
             children: new_share_mutex(BTreeMap::new()),
             pgid: new_share_mutex(pgid),
             uid: new_share_mutex(0),
+
             exit_code: SpinNoIrqLock::new(0),
+            exit_signal: SpinNoIrqLock::new(None),
+
             sig_manager: SyncUnsafeCell::new(SigManager::new()),
             sig_mask: SyncUnsafeCell::new(SigSet::empty()),
             sig_handlers: new_share_mutex(SigHandlers::new()),
@@ -246,7 +251,9 @@ impl Task {
 
         pgid: ShareMutex<PGid>,
         uid: ShareMutex<Uid>,
+
         exit_code: SpinNoIrqLock<i32>,
+        exit_signal: SpinNoIrqLock<Option<u8>>,
 
         sig_mask: SyncUnsafeCell<SigSet>,
         sig_handlers: ShareMutex<SigHandlers>,
@@ -287,7 +294,9 @@ impl Task {
 
             pgid,
             uid,
+
             exit_code,
+            exit_signal,
 
             sig_mask,
             sig_handlers,

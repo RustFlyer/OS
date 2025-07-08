@@ -199,6 +199,12 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         CLOCK_SETTIME => sys_clock_settime(args[0], args[1]),
         TIMER_CREATE => sys_timer_create(args[0], args[1], args[2]),
         TIMER_SETTIME => sys_timer_settime(args[0], args[1], args[2], args[3]),
+        PIDFD_GETFD => sys_pidfd_getfd(args[0], args[1], args[2] as u32),
+        PIDFD_OPEN => sys_pidfd_open(args[0], args[1] as u32),
+        PIDFD_SEND_SIGNAL => {
+            sys_pidfd_send_signal(args[0], args[1] as i32, args[2], args[3] as u32)
+        }
+        CLOSE_RANGE => sys_close_range(args[0], args[1], args[2]),
         _ => {
             println!("Syscall not implemented: {}", syscall_no.as_str());
             panic!("Syscall not implemented: {}", syscall_no.as_str());

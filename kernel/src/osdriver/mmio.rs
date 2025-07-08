@@ -14,7 +14,7 @@ use driver::{
     qemu::{UartDevice, VirtBlkDevice},
 };
 use mm::address::PhysAddr;
-use net::init_network;
+use net::{init_network, net_bench};
 
 use crate::vm::iomap::{ioremap, iounmap};
 
@@ -34,6 +34,8 @@ pub fn probe_mmio(device_tree: &Fdt) {
 
     init_net(device_tree);
     println!("[NET_DEVICE] INIT SUCCESS");
+
+    // net::net_bench();
 
     log::debug!("probe_test finish");
 }

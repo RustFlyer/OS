@@ -145,7 +145,12 @@ pub enum SyscallNo {
     MEMBARRIER = 283,
     COPY_FILE_RANGE = 285,
     STATX = 291,
+
+    PIDFD_SEND_SIGNAL = 424,
+    PIDFD_OPEN = 434,
     CLONE3 = 435,
+    CLOSE_RANGE = 436,
+    PIDFD_GETFD = 438,
 }
 
 impl core::fmt::Display for SyscallNo {
@@ -293,7 +298,11 @@ impl SyscallNo {
             MEMBARRIER => "membarrier",
             COPY_FILE_RANGE => "copy_file_range",
             STATX => "statx",
+            PIDFD_SEND_SIGNAL => "pidfd_send_signal",
+            PIDFD_OPEN => "pidfd_open",
             CLONE3 => "clone3",
+            CLOSE_RANGE => "close_range",
+            PIDFD_GETFD => "pidfd_getfd",
         }
     }
 }

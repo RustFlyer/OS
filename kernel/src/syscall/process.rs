@@ -19,6 +19,8 @@ use vfs::file::File;
 use vfs::path::Path;
 
 use crate::task::cap::{CapUserData, CapUserHeader};
+use crate::task::signal::pidfd::PF_TABLE;
+use crate::task::signal::sig_info::Sig;
 use crate::task::{
     TaskState,
     manager::TASK_MANAGER,
@@ -940,13 +942,26 @@ pub struct CloneArgs {
 }
 
 pub fn sys_clone3(user_args: usize, size: usize) -> SyscallResult {
+    log::error!("[sys_clone3] called");
     if size < core::mem::size_of::<CloneArgs>() {
         return Err(SysError::EINVAL);
     }
+
+    if size > core::mem::size_of::<CloneArgs>() {
+        return Err(SysError::EFAULT);
+    }
+
     let task = current_task();
     let addrspace = task.addr_space();
+    log::error!("[sys_clone3] userptr");
     let mut args_ptr = UserReadPtr::<CloneArgs>::new(user_args, &addrspace);
     let args = unsafe { args_ptr.read()? };
+    log::error!("[sys_clone3] ptr pass");
+
+    let exit_signal = args.exit_signal as i32;
+    if exit_signal != 0 && !Sig::from_i32(exit_signal).is_valid() {
+        return Err(SysError::EINVAL);
+    }
 
     log::info!(
         "[sys_clone3] flags:0x{:x}, stack=0x{:x}, tls=0x{:x} parent_tid=0x{:x} child_tid=0x{:x} exit_signal={}",
@@ -958,12 +973,28 @@ pub fn sys_clone3(user_args: usize, size: usize) -> SyscallResult {
         args.exit_signal
     );
 
-    log::info!("[sys_clone3] {:?}", args);
+    log::error!("[sys_clone3] {:?}", args);
 
     let flags = CloneFlags::from_bits(args.flags & !0xff).ok_or(SysError::EINVAL)?;
     let new_task = task.fork(flags);
     new_task.trap_context_mut().set_user_ret_val(0);
     let new_tid = new_task.tid();
+
+    if flags.contains(CloneFlags::SIGHAND) && !flags.contains(CloneFlags::VM) {
+        return Err(SysError::EINVAL);
+    }
+
+    if flags.contains(CloneFlags::THREAD)
+        && (!flags.contains(CloneFlags::SIGHAND) || !flags.contains(CloneFlags::VM))
+    {
+        return Err(SysError::EINVAL);
+    }
+
+    if args.stack != 0 && args.stack_size == 0 {
+        return Err(SysError::EINVAL);
+    }
+
+    log::error!("[sys_clone3] begin to exe");
 
     if args.stack != 0 {
         new_task
@@ -989,6 +1020,14 @@ pub fn sys_clone3(user_args: usize, size: usize) -> SyscallResult {
     if flags.contains(CloneFlags::SETTLS) && args.tls != 0 {
         new_task.trap_context_mut().set_user_tp(args.tls as usize);
     }
+
+    if flags.contains(CloneFlags::PIDFD) && args.pidfd != 0 {
+        let pidfd = PF_TABLE.get().unwrap().new_pidfd(&new_task);
+        let mut user_pidfd = UserWritePtr::<usize>::new(args.pidfd as usize, &addrspace);
+        unsafe { user_pidfd.write(pidfd)? };
+    }
+
+    *new_task.exit_signal.lock() = Some((args.exit_signal & 0xFF) as u8);
 
     log::info!("[sys_clone3] who is your parent? {}", new_task.ppid());
     spawn_user_task(new_task);
