@@ -166,9 +166,6 @@ pub const CLOCK_REALTIME_COARSE: usize = 5;
 pub const CLOCK_BOOTTIME: usize = 6;
 pub const CLOCK_REALTIME_ALARM: usize = 7;
 
-pub const CLOCK_MONOTONIC_NEW: usize = 16;
-pub const CLOCK_REALTIME_COARSE_NEW: usize = 17;
-
 pub static mut CLOCK_DEVIATION: [Duration; SUPPORT_CLOCK] = [Duration::ZERO; SUPPORT_CLOCK];
 
 /// clock_gettime is used to obtain the current time values of various "clocks" in the Linux/POSIX environment
@@ -189,9 +186,9 @@ pub fn sys_clock_gettime(clockid: usize, tp: usize) -> SyscallResult {
     let addr_space = task.addr_space();
     let mut ts_ptr = UserWritePtr::<TimeSpec>::new(tp, &addr_space);
 
-    if ts_ptr.is_null() {
-        return Ok(0);
-    }
+    // if ts_ptr.is_null() {
+    //     return Ok(0);
+    // }
 
     match clockid {
         CLOCK_REALTIME | CLOCK_MONOTONIC | CLOCK_REALTIME_COARSE => {
@@ -233,23 +230,9 @@ pub fn sys_clock_gettime(clockid: usize, tp: usize) -> SyscallResult {
                 ts_ptr.write(ts)?;
             }
         }
-        CLOCK_MONOTONIC_NEW => {
-            let current = get_time_duration();
-            unsafe {
-                let ts: TimeSpec = (CLOCK_DEVIATION[CLOCK_MONOTONIC] + current).into();
-                ts_ptr.write(ts)?;
-            }
-        }
-        CLOCK_REALTIME_COARSE_NEW => {
-            let current = get_time_duration();
-            unsafe {
-                let ts: TimeSpec = (CLOCK_DEVIATION[CLOCK_REALTIME_COARSE] + current).into();
-                ts_ptr.write(ts)?;
-            }
-        }
         _ => {
             log::error!("[sys_clock_gettime] unsupported clockid{}", clockid);
-            return Err(SysError::EINTR);
+            return Err(SysError::EINVAL);
         }
     }
     Ok(0)
@@ -486,6 +469,9 @@ pub fn sys_getitimer(which: usize, curr_value: usize) -> SyscallResult {
 
 /// finds the resolution (precision) of the specified clock clockid
 pub fn sys_clock_getres(_clockid: usize, res: usize) -> SyscallResult {
+    if ((_clockid as isize) < 0) {
+        return Err(SysError::EINVAL);
+    }
     let task = current_task();
     let addrspace = task.addr_space();
     let mut resptr = UserWritePtr::<TimeSpec>::new(res, &addrspace);
@@ -749,7 +735,7 @@ pub fn sys_clock_settime(clockid: usize, tp: usize) -> SyscallResult {
             }
         }
         _ => {
-            log::error!("[sys_clock_gettime] unsupported clockid{}", clockid);
+            log::error!("[sys_clock_settime] unsupported clockid{}", clockid);
             return Err(SysError::EINVAL);
         }
     }

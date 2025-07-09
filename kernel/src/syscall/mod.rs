@@ -192,8 +192,8 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         CAPSET => sys_capset(args[0], args[1]),
         PRCTL => sys_prctl(args[0], args[1], args[2], args[3], args[4]),
         RT_SIGSUSPEND => sys_rt_sigsuspend(args[0]).await,
-        SETRESGID => Ok(0),
-        SETRESUID => Ok(0),
+        SETRESGID => sys_setresgid(args[0] as isize, args[1] as isize, args[2] as isize),
+        SETRESUID => sys_setresuid(args[0] as isize, args[1] as isize, args[2] as isize),
         CHROOT => sys_chroot(args[0]),
         CLOCK_ADJTIME => sys_clock_adjtime(args[0], args[1]),
         CLOCK_SETTIME => sys_clock_settime(args[0], args[1]),
@@ -205,6 +205,12 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
             sys_pidfd_send_signal(args[0], args[1] as i32, args[2], args[3] as u32)
         }
         CLOSE_RANGE => sys_close_range(args[0], args[1], args[2]),
+        COPY_FILE_RANGE => {
+            sys_copy_file_range(args[0], args[1], args[2], args[3], args[4], args[5]).await
+        }
+        FSETXATTR => sys_fsetxattr(args[0], args[1], args[2], args[3], args[4] as i32),
+        FGETXATTR => sys_fgetxattr(args[0], args[1], args[2], args[3]),
+        FREMOVEXATTR => sys_fremovexattr(args[0], args[1]),
         _ => {
             println!("Syscall not implemented: {}", syscall_no.as_str());
             panic!("Syscall not implemented: {}", syscall_no.as_str());

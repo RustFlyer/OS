@@ -1,11 +1,22 @@
-use alloc::sync::Arc;
+use alloc::{
+    collections::btree_map::BTreeMap,
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
+};
 
 use downcast_rs::{DowncastSync, impl_downcast};
 
-use config::inode::{InodeMode, InodeState, InodeType};
+use config::{
+    inode::{InodeMode, InodeState, InodeType},
+    vfs::AccessFlags,
+};
 use mm::page_cache::PageCache;
 use mutex::SpinNoIrqLock;
-use systype::{error::SysResult, time::TimeSpec};
+use systype::{
+    error::{SysError, SysResult},
+    time::TimeSpec,
+};
 
 use crate::{stat::Stat, superblock::SuperBlock};
 
@@ -44,6 +55,8 @@ pub struct InodeMetaInner {
     pub uid: u32,
     /// gid of the inode.
     pub gid: u32,
+    /// user define
+    pub xattrs: BTreeMap<String, Vec<u8>>,
 }
 
 impl InodeMeta {
@@ -63,6 +76,7 @@ impl InodeMeta {
                 state: InodeState::Uninit,
                 uid: 0,
                 gid: 0,
+                xattrs: BTreeMap::new(),
             }),
         }
     }
@@ -77,6 +91,34 @@ impl Drop for InodeMeta {
                 // TODO: flush dirty data
             }
             InodeState::Synced => {}
+        }
+    }
+}
+
+impl InodeMetaInner {
+    pub fn set_xattr(&mut self, name: &str, value: &[u8], flags: i32) -> SysResult<()> {
+        let exists = self.xattrs.contains_key(name);
+        match flags {
+            1 if exists => return Err(SysError::EEXIST),
+            2 if !exists => return Err(SysError::ENODATA),
+            _ => {}
+        }
+        self.xattrs.insert(name.to_string(), value.to_vec());
+        Ok(())
+    }
+
+    pub fn get_xattr(&self, name: &str) -> SysResult<&[u8]> {
+        self.xattrs
+            .get(name)
+            .map(|v| v.as_slice())
+            .ok_or(SysError::ENODATA)
+    }
+
+    pub fn remove_xattr(&mut self, name: &str) -> SysResult<()> {
+        if self.xattrs.remove(name).is_some() {
+            Ok(())
+        } else {
+            Err(SysError::ENODATA)
         }
     }
 }
@@ -142,6 +184,50 @@ pub trait Inode: Send + Sync + DowncastSync {
 
     fn page_cache(&self) -> &PageCache {
         &self.get_meta().page_cache
+    }
+
+    fn set_xattr(&self, name: &str, value: &[u8], flags: i32) -> SysResult<()> {
+        self.get_meta().inner.lock().set_xattr(name, value, flags)
+    }
+
+    fn get_xattr(&self, name: &str) -> SysResult<Vec<u8>> {
+        self.get_meta()
+            .inner
+            .lock()
+            .get_xattr(name)
+            .map(|v| v.to_vec())
+    }
+
+    fn remove_xattr(&self, name: &str) -> SysResult<()> {
+        self.get_meta().inner.lock().remove_xattr(name)
+    }
+
+    fn check_permission(&self, uid: usize, gid: usize, access: AccessFlags) -> bool {
+        let meta = self.get_meta().inner.lock();
+        let mode = meta.mode.bits();
+        // 0o400/0o200/0o100: owner r/w/x
+        // 0o040/0o020/0o010: group r/w/x
+        // 0o004/0o002/0o001: other r/w/x
+        if uid == 0 {
+            return true;
+        }
+        let (r, w, x) = if uid as u32 == meta.uid {
+            (0o400, 0o200, 0o100)
+        } else if gid as u32 == meta.gid {
+            (0o040, 0o020, 0o010)
+        } else {
+            (0o004, 0o002, 0o001)
+        };
+        if access.contains(AccessFlags::R_OK) && (mode & r == 0) {
+            return false;
+        }
+        if access.contains(AccessFlags::W_OK) && (mode & w == 0) {
+            return false;
+        }
+        if access.contains(AccessFlags::X_OK) && (mode & x == 0) {
+            return false;
+        }
+        true
     }
 }
 

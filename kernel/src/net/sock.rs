@@ -1,19 +1,27 @@
 use core::task::Waker;
 
+use alloc::sync::Arc;
 use net::{
-    NetPollState, addr::UNSPECIFIED_IPV4, tcp::core::TcpSocket, udp::UdpSocket, unix::UnixSocket,
+    NetPollState,
+    addr::UNSPECIFIED_IPV4,
+    tcp::core::TcpSocket,
+    udp::UdpSocket,
+    unix::{UnixSocket, extract_path_from_sockaddr_un},
 };
 use smoltcp::wire::IpEndpoint;
 use systype::error::{SysError, SysResult};
 
 use crate::processor::current_task;
 
-use super::addr::SockAddr;
+use super::{
+    addr::{SaFamily, SockAddr, SockAddrUn},
+    check_unix_path, is_local_ip,
+};
 
 pub enum Sock {
     Tcp(TcpSocket),
     Udp(UdpSocket),
-    Unix(UnixSocket),
+    Unix(Arc<UnixSocket>),
 }
 
 impl Sock {
@@ -26,27 +34,36 @@ impl Sock {
     }
 
     pub fn bind(&self, sockfd: usize, local_addr: SockAddr) -> SysResult<()> {
-        match self {
-            Sock::Tcp(tcp) => {
-                let local_addr = local_addr.as_listen_endpoint();
-                let addr = if local_addr.addr.is_none() {
-                    UNSPECIFIED_IPV4
-                } else {
-                    local_addr.addr.unwrap()
-                };
-                tcp.bind(IpEndpoint::new(addr, local_addr.port))
+        let family = SaFamily::try_from(unsafe { local_addr.family })?;
+        match (self, family) {
+            (Sock::Tcp(tcp), SaFamily::AF_INET) | (Sock::Tcp(tcp), SaFamily::AF_INET6) => {
+                let listen_ep = local_addr.as_listen_endpoint().ok_or(SysError::EINVAL)?;
+                if !is_local_ip(&listen_ep) {
+                    return Err(SysError::EADDRNOTAVAIL);
+                }
+                let addr = listen_ep.addr.unwrap_or(UNSPECIFIED_IPV4);
+                tcp.bind(IpEndpoint::new(addr, listen_ep.port))
             }
-
-            Sock::Udp(udp) => {
-                let local_addr = local_addr.as_listen_endpoint();
-                if let Some(prev_fd) = udp.check_bind(sockfd, local_addr) {
+            (Sock::Udp(udp), SaFamily::AF_INET) | (Sock::Udp(udp), SaFamily::AF_INET6) => {
+                let listen_ep = local_addr.as_listen_endpoint().ok_or(SysError::EINVAL)?;
+                if !is_local_ip(&listen_ep) {
+                    return Err(SysError::EADDRNOTAVAIL);
+                }
+                if let Some(prev_fd) = udp.check_bind(sockfd, listen_ep) {
                     current_task()
                         .with_mut_fdtable(|table| table.dup3_with_flags(prev_fd, sockfd))?;
                     return Ok(());
                 }
-                udp.bind(local_addr)
+                udp.bind(listen_ep)
             }
-            Sock::Unix(_unix) => unimplemented!(),
+            (Sock::Unix(unix), SaFamily::AF_UNIX) => {
+                let path = local_addr.as_unix_path().ok_or(SysError::EINVAL)?;
+                match check_unix_path(&path) {
+                    Ok(()) => unix.clone().bind(&path),
+                    Err(e) => Err(e),
+                }
+            }
+            _ => Err(SysError::EAFNOSUPPORT),
         }
     }
 
@@ -54,7 +71,7 @@ impl Sock {
         match self {
             Sock::Tcp(tcp) => tcp.listen(current_task().waker_mut().as_ref().unwrap()),
             Sock::Udp(_udp) => Err(SysError::EOPNOTSUPP),
-            Sock::Unix(_unix) => unimplemented!(),
+            Sock::Unix(_unix) => Err(SysError::EOPNOTSUPP),
         }
     }
 
@@ -68,7 +85,10 @@ impl Sock {
                 let remote_addr = remote_addr.as_endpoint();
                 udp.connect(remote_addr)
             }
-            Sock::Unix(_unix) => Ok(()),
+            Sock::Unix(unix) => unsafe {
+                let path = extract_path_from_sockaddr_un(&remote_addr.unix.path);
+                unix.connect(&path)
+            },
         }
     }
 
@@ -82,7 +102,26 @@ impl Sock {
                 let peer_addr = SockAddr::from_endpoint(udp.peer_addr()?);
                 Ok(peer_addr)
             }
-            Sock::Unix(_unix) => unimplemented!(),
+            Sock::Unix(unix) => {
+                let peer = unix.peer.lock();
+                if let Some(peer_sock) = &*peer {
+                    let path_opt = peer_sock.path.lock();
+                    if let Some(path) = &*path_opt {
+                        let mut addr = SockAddrUn {
+                            family: SaFamily::AF_UNIX as u16,
+                            path: [0; 108],
+                        };
+                        let bytes = path.as_bytes();
+                        let len = bytes.len().min(108);
+                        addr.path[..len].copy_from_slice(&bytes[..len]);
+                        Ok(SockAddr { unix: addr })
+                    } else {
+                        Err(SysError::ENOTCONN)
+                    }
+                } else {
+                    Err(SysError::ENOTCONN)
+                }
+            }
         }
     }
 
@@ -96,7 +135,21 @@ impl Sock {
                 let local_addr = SockAddr::from_endpoint(udp.local_addr()?);
                 Ok(local_addr)
             }
-            Sock::Unix(_unix) => unimplemented!(),
+            Sock::Unix(unix) => {
+                let path_opt = unix.path.lock();
+                if let Some(path) = &*path_opt {
+                    let mut addr = SockAddrUn {
+                        family: SaFamily::AF_UNIX as u16,
+                        path: [0; 108],
+                    };
+                    let bytes = path.as_bytes();
+                    let len = bytes.len().min(108);
+                    addr.path[..len].copy_from_slice(&bytes[..len]);
+                    Ok(SockAddr { unix: addr })
+                } else {
+                    Err(SysError::ENOTCONN)
+                }
+            }
         }
     }
 
@@ -107,7 +160,7 @@ impl Sock {
                 Some(addr) => udp.send_to(buf, addr.as_endpoint()).await,
                 None => udp.send(buf).await,
             },
-            Sock::Unix(_unix) => unimplemented!(),
+            Sock::Unix(unix) => unix.send(buf),
         }
     }
 
@@ -121,7 +174,18 @@ impl Sock {
                 let (len, endpoint) = udp.recv_from(buf).await?;
                 Ok((len, SockAddr::from_endpoint(endpoint)))
             }
-            Sock::Unix(_unix) => unimplemented!(),
+            Sock::Unix(unix) => {
+                let n = unix.recv(buf)?;
+                let mut addr = SockAddrUn {
+                    family: 1,
+                    path: [0; 108],
+                };
+                if let Some(path) = &*unix.path.lock() {
+                    let bytes = path.as_bytes();
+                    addr.path[..bytes.len()].copy_from_slice(bytes);
+                }
+                Ok((n, SockAddr { unix: addr }))
+            }
         }
     }
 

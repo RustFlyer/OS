@@ -15,7 +15,7 @@ use config::{
     vfs::AtFd,
 };
 use mutex::{SpinNoIrqLock, new_share_mutex};
-use osfs::sys_root_dentry;
+use osfs::{proc::create_thread_stat_file, sys_root_dentry};
 use osfuture::suspend_now;
 use shm::manager::SHARED_MEMORY_MANAGER;
 use systype::{error::SysResult, time::ITimer};
@@ -287,6 +287,8 @@ impl Task {
             new_share_mutex(self.fdtable_mut().lock().clone())
         };
 
+        let perm = (*self.perm_mut().lock());
+
         let cpus_on = *self.cpus_on_mut();
         let name = SyncUnsafeCell::new(name);
         let new = Arc::new(Self::new_fork_clone(
@@ -320,6 +322,7 @@ impl Task {
             caps,
             vfork_parent,
             SyncUnsafeCell::new(cpus_on),
+            new_share_mutex(perm),
             name,
         ));
 
@@ -333,6 +336,8 @@ impl Task {
         }
 
         TASK_MANAGER.add_task(&new);
+        create_thread_stat_file(new.tid());
+
         new
     }
 
@@ -571,5 +576,58 @@ impl Task {
         );
 
         content
+    }
+
+    pub fn proc_stat_read(&self) -> String {
+        let task = self;
+        let comm = format!("(task{})", task.tid());
+        let state = "R";
+        let ppid = task.ppid();
+        let pgrp = task.get_pgid();
+        let session = 0;
+        let tty_nr = 0;
+        let tpgid = 0;
+        let flags = 0;
+        let minflt = 0;
+        let cminflt = 0;
+        let majflt = 0;
+        let cmajflt = 0;
+        let utime = task.get_process_utime().as_micros();
+        let stime = 0;
+        let cutime = 0;
+        let cstime = 0;
+        let priority = 20;
+        let nice = 0;
+        let num_threads = 1;
+        let itrealvalue = 0;
+        let starttime = 0;
+
+        format!(
+            "{pid} {comm} {state} {ppid} {pgrp} {session} {tty_nr} {tpgid} {flags} \
+             {minflt} {cminflt} {majflt} {cmajflt} {utime} {stime} {cutime} {cstime} \
+             {priority} {nice} {num_threads} {itrealvalue} {starttime}\n",
+            pid = task.tid(),
+            comm = comm,
+            state = state,
+            ppid = ppid,
+            pgrp = pgrp,
+            session = session,
+            tty_nr = tty_nr,
+            tpgid = tpgid,
+            flags = flags,
+            minflt = minflt,
+            cminflt = cminflt,
+            majflt = majflt,
+            cmajflt = cmajflt,
+            utime = utime,
+            stime = stime,
+            cutime = cutime,
+            cstime = cstime,
+            priority = priority,
+            nice = nice,
+            num_threads = num_threads,
+            itrealvalue = itrealvalue,
+            starttime = starttime,
+        )
     }
 }

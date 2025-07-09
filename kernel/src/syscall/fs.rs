@@ -80,6 +80,8 @@ use crate::{
 /// The file status flags are all of the remaining flags listed in `man 2 openat`.
 pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) -> SyscallResult {
     let task = current_task();
+    let uid = task.uid();
+    let gid = task.get_pgid();
     let flags = OpenFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
     // `mode` is not supported yet.
     // The mode argument specifies the file mode bits be applied when a new file is created.
@@ -137,8 +139,16 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
     // Create a regular file when `O_CREAT` is specified if the file does not exist.
     if dentry.is_negative() {
         if flags.contains(OpenFlags::O_CREAT) {
-            log::debug!("[sys_openat] create a new file");
             let parent = dentry.parent().unwrap();
+            if !parent.inode().unwrap().check_permission(
+                uid,
+                gid,
+                AccessFlags::W_OK | AccessFlags::X_OK,
+            ) {
+                return Err(SysError::EACCES);
+            }
+
+            log::debug!("[sys_openat] create a new file");
             parent.create(dentry.as_ref(), InodeMode::REG)?
         } else {
             return Err(SysError::ENOENT);
@@ -149,11 +159,21 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
     let inode = dentry.inode().unwrap();
     let inode_type = inode.inotype();
 
+    if flags.writable() || flags.contains(OpenFlags::O_TRUNC) {
+        if !inode.check_permission(uid, gid, AccessFlags::W_OK) {
+            return Err(SysError::EACCES);
+        }
+    }
+
     if !inode_type.is_dir() && flags.contains(OpenFlags::O_DIRECTORY) {
         return Err(SysError::ENOTDIR);
     }
     if inode_type.is_dir() && flags.writable() {
         return Err(SysError::EISDIR);
+    }
+
+    if flags.contains(OpenFlags::O_TRUNC) && flags.writable() {
+        inode.set_size(0);
     }
 
     let file = <dyn File>::open(dentry)?;
@@ -2075,5 +2095,135 @@ pub fn sys_close_range(first: usize, last: usize, flags: usize) -> SyscallResult
     } else {
         task.with_mut_fdtable(|table| table.remove_with_range(first, last, flags))?;
     }
+    Ok(0)
+}
+
+pub async fn sys_copy_file_range(
+    fd_in: usize,
+    off_in_ptr: usize,
+    fd_out: usize,
+    off_out_ptr: usize,
+    len: usize,
+    flags: usize,
+) -> SyscallResult {
+    if flags != 0 {
+        return Err(SysError::EINVAL);
+    }
+
+    let task = current_task();
+    let addr_space = task.addr_space();
+
+    let file_in = task.with_mut_fdtable(|table| table.get_file(fd_in))?;
+    let file_out = task.with_mut_fdtable(|table| table.get_file(fd_out))?;
+
+    if !file_in.flags().readable() || !file_out.flags().writable() {
+        return Err(SysError::EBADF);
+    }
+
+    let mut off_in = if off_in_ptr == 0 {
+        None
+    } else {
+        unsafe { Some(UserReadPtr::<u64>::new(off_in_ptr, &addr_space).read()?) }
+    };
+
+    let mut off_out = if off_out_ptr == 0 {
+        None
+    } else {
+        unsafe { Some(UserReadPtr::<u64>::new(off_out_ptr, &addr_space).read()?) }
+    };
+
+    let bytes_copied = file_out
+        .copy_file_range(file_in.as_ref(), off_in.as_mut(), off_out.as_mut(), len)
+        .await?;
+
+    if let Some(off) = off_in {
+        unsafe { UserWritePtr::<u64>::new(off_in_ptr, &addr_space).write(off)? };
+    }
+
+    if let Some(off) = off_out {
+        unsafe { UserWritePtr::<u64>::new(off_out_ptr, &addr_space).write(off)? };
+    }
+
+    Ok(bytes_copied)
+}
+
+pub fn sys_fsetxattr(
+    fd: usize,
+    name_ptr: usize,
+    value_ptr: usize,
+    size: usize,
+    flags: i32,
+) -> SyscallResult {
+    let task = current_task();
+    let addr_space = task.addr_space();
+
+    let name = {
+        let mut name_ptr = UserReadPtr::<u8>::new(name_ptr, &addr_space);
+        let cstring = name_ptr.read_c_string(256)?;
+        cstring.into_string().map_err(|_| SysError::EINVAL)?
+    };
+
+    let value = if size > 0 {
+        let mut value_ptr = UserReadPtr::<u8>::new(value_ptr, &addr_space);
+        unsafe { value_ptr.read_array(size)? }
+    } else {
+        Vec::new()
+    };
+
+    let xattr_flags = flags;
+
+    let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
+    let inode = file.inode();
+
+    inode.set_xattr(&name, &value, xattr_flags)?;
+
+    Ok(0)
+}
+
+pub fn sys_fgetxattr(fd: usize, name_ptr: usize, value_ptr: usize, size: usize) -> SyscallResult {
+    let task = current_task();
+    let addr_space = task.addr_space();
+
+    let name = {
+        let mut name_ptr = UserReadPtr::<u8>::new(name_ptr, &addr_space);
+        let cstring = name_ptr.read_c_string(256)?;
+        cstring.into_string().map_err(|_| SysError::EINVAL)?
+    };
+
+    let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
+    let inode = file.inode();
+
+    let value = inode.get_xattr(&name)?;
+
+    if value_ptr == 0 {
+        return Ok(value.len());
+    }
+
+    let copy_len = core::cmp::min(size, value.len());
+    let mut user_value_ptr = UserWritePtr::<u8>::new(value_ptr, &addr_space);
+    unsafe {
+        user_value_ptr
+            .try_into_mut_slice(copy_len)?
+            .copy_from_slice(&value[..copy_len]);
+    }
+
+    Ok(copy_len)
+}
+
+pub fn sys_fremovexattr(fd: usize, name_ptr: usize) -> SyscallResult {
+    let task = current_task();
+    let addr_space = task.addr_space();
+
+    let name = {
+        let mut name_ptr = UserReadPtr::<u8>::new(name_ptr, &addr_space);
+        let cstring = name_ptr.read_c_string(256)?;
+        cstring.into_string().map_err(|_| SysError::EINVAL)?
+    };
+
+    let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
+    let inode = file.inode();
+
+    inode.remove_xattr(&name)?;
+
     Ok(0)
 }

@@ -100,12 +100,16 @@ pub enum SysError {
     ENOTEMPTY = 39,
     /// Inode is null
     ENINODE = 40,
+    /// no data
+    ENODATA = 61,
     /// Socket operation on non-socket
     ENOTSOCK = 88,
     /// Protocol not supported
     EPROTONOSUPPORT = 93,
     /// Unsupported
     EOPNOTSUPP = 95,
+    /// EAFNOSUPPORT 远程端点指定的地址族不能与这种类型的套接字一起使用
+    EAFNOSUPPORT = 97,
     /// Socket address is already in use
     EADDRINUSE = 98,
     /// Address not available
@@ -172,9 +176,11 @@ impl SysError {
             ENOSYS => "Invalid system call number",
             ENOTEMPTY => "Directory not empty",
             ENINODE => "Inode is null",
+            ENODATA => "no data",
             ENOTSOCK => "Socket operation on non-socket",
             EPROTONOSUPPORT => "Protocol not supported",
             EOPNOTSUPP => "Unsupported",
+            EAFNOSUPPORT => "Address family not supported (POSIX.1-2001).",
             EADDRINUSE => "Address already in use",
             EADDRNOTAVAIL => "Address not available",
             EISCONN => "Transport endpoint is already connected",

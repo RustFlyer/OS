@@ -23,6 +23,7 @@ extern crate alloc;
 pub mod dev;
 pub mod etc;
 pub mod fd_table;
+pub mod passwd;
 pub mod pipe;
 pub mod proc;
 pub mod pselect;
@@ -162,4 +163,6 @@ pub fn init() {
         .unwrap()
         .load_dir()
         .unwrap();
+
+    passwd::login_user();
 }

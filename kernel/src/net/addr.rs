@@ -8,7 +8,10 @@ use core::{
     net::{Ipv4Addr, Ipv6Addr},
 };
 
-use alloc::sync::Arc;
+use alloc::{
+    string::{String, ToString},
+    sync::Arc,
+};
 use smoltcp::wire::{IpAddress, IpEndpoint, IpListenEndpoint};
 use systype::error::{SysError, SysResult};
 
@@ -98,6 +101,32 @@ pub union SockAddr {
 }
 
 impl SockAddr {
+    pub fn as_unix_path(&self) -> Option<String> {
+        unsafe {
+            if let Ok(SaFamily::AF_UNIX) = SaFamily::try_from(self.family) {
+                let path_bytes = &self.unix.path;
+                let len = path_bytes
+                    .iter()
+                    .position(|&c| c == 0)
+                    .unwrap_or(path_bytes.len());
+                Some(String::from_utf8_lossy(&path_bytes[..len]).to_string())
+            } else {
+                None
+            }
+        }
+    }
+
+    pub fn from_unix_path(path: &str) -> Self {
+        let mut unix = SockAddrUn {
+            family: SaFamily::AF_UNIX as u16,
+            path: [0; 108],
+        };
+        let bytes = path.as_bytes();
+        let len = bytes.len().min(108);
+        unix.path[..len].copy_from_slice(&bytes[..len]);
+        Self { unix }
+    }
+
     /// You should make sure that `SockAddr` is IpEndpoint
     pub fn as_endpoint(&self) -> IpEndpoint {
         unsafe {
@@ -115,12 +144,12 @@ impl SockAddr {
         }
     }
 
-    pub fn as_listen_endpoint(&self) -> IpListenEndpoint {
+    pub fn as_listen_endpoint(&self) -> Option<IpListenEndpoint> {
         unsafe {
             match SaFamily::try_from(self.family).unwrap() {
-                SaFamily::AF_INET => self.ipv4.into(),
-                SaFamily::AF_INET6 => self.ipv6.into(),
-                SaFamily::AF_UNIX => panic!("Shouldn't get there"),
+                SaFamily::AF_INET => Some(self.ipv4.into()),
+                SaFamily::AF_INET6 => Some(self.ipv6.into()),
+                SaFamily::AF_UNIX => None,
             }
         }
     }
@@ -225,17 +254,13 @@ pub fn read_sockaddr(
     let _guard = SumGuard::new();
 
     unsafe {
-        log::error!("[read_sockaddr] addr: {:#x}, addrlen: {}", addr, addrlen);
-        log::error!("[read_sockaddr] in");
         let mut _user_ptr = UserReadPtr::<u8>::new(addr, &addrspace);
         let _check = _user_ptr.try_into_slice(addrlen)?;
-        log::error!("[read_sockaddr] mid");
         let _r = _check[0];
-        log::error!("[read_sockaddr] out {}", _r);
     }
 
     let family = SaFamily::try_from(unsafe { *(addr as *const u16) })?;
-    log::error!("[read_sockaddr] family pass");
+    // log::error!("[read_sockaddr] family pass");
     match family {
         SaFamily::AF_INET => {
             if addrlen < mem::size_of::<SockAddrIn>() {
@@ -268,7 +293,7 @@ pub fn read_sockaddr(
             Ok(sockaddr)
         }
         SaFamily::AF_UNIX => {
-            if addrlen < mem::size_of::<SockAddrUn>() {
+            if addrlen < 2 {
                 log::error!("[read_sockaddr] AF_UNIX addrlen error");
                 return Err(SysError::EINVAL);
             }

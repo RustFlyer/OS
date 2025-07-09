@@ -1,4 +1,4 @@
-use alloc::sync::Arc;
+use alloc::{format, sync::Arc};
 use config::{
     inode::{InodeMode, InodeType},
     vfs::OpenFlags,
@@ -6,8 +6,9 @@ use config::{
 use exe::{dentry::ExeDentry, inode::ExeInode};
 use meminfo::{dentry::MemInfoDentry, inode::MemInfoInode};
 use mounts::{dentry::MountsDentry, inode::MountsInode};
+use stat::{dentry::StatDentry, inode::StatInode};
 use systype::error::SysResult;
-use vfs::{dentry::Dentry, inode::Inode};
+use vfs::{dentry::Dentry, inode::Inode, sys_root_dentry};
 
 use crate::{
     proc::status::{dentry::StatusDentry, inode::StatusInode},
@@ -17,6 +18,7 @@ use crate::{
 pub mod exe;
 pub mod meminfo;
 pub mod mounts;
+pub mod stat;
 pub mod status;
 
 pub mod fs;
@@ -26,6 +28,8 @@ pub mod superblock;
 pub trait KernelProcIf {
     fn exe() -> alloc::string::String;
     fn status() -> alloc::string::String;
+    fn stat() -> alloc::string::String;
+    fn stat_from_tid(tid: usize) -> alloc::string::String;
 }
 
 pub fn init_procfs(root_dentry: Arc<dyn Dentry>) -> SysResult<()> {
@@ -115,6 +119,12 @@ pub fn init_procfs(root_dentry: Arc<dyn Dentry>) -> SysResult<()> {
     );
     self_dentry.add_child(status_dentry);
 
+    // /proc/self/stat
+    let stat_inode = StatInode::new(root_dentry.superblock().unwrap(), 0);
+    let stat_dentry: Arc<dyn Dentry> =
+        StatDentry::new(Some(stat_inode), Some(Arc::downgrade(&self_dentry)));
+    self_dentry.add_child(stat_dentry);
+
     // /proc/self/mounts
     let mounts_inode = MountsInode::new(root_dentry.superblock().unwrap());
     let mounts_dentry: Arc<dyn Dentry> =
@@ -126,4 +136,26 @@ pub fn init_procfs(root_dentry: Arc<dyn Dentry>) -> SysResult<()> {
     self_dentry.add_child(mounts_dentry);
 
     Ok(())
+}
+
+pub fn create_thread_stat_file(tid: usize) {
+    // /proc/self/stat
+    let root = sys_root_dentry();
+    let root_dentry = root.lookup("proc").unwrap();
+
+    let num = format!("{}", tid);
+    if root_dentry.get_child(&num).is_some() {
+        return;
+    }
+
+    let num_inode = SimpleInode::new(root_dentry.superblock().unwrap());
+    num_inode.set_inotype(InodeType::Dir);
+    let num_dentry: Arc<dyn Dentry> =
+        SimpleDentry::new(&num, Some(num_inode), Some(Arc::downgrade(&root_dentry)));
+    root_dentry.add_child(num_dentry.clone());
+
+    let stat_inode = StatInode::new(root_dentry.superblock().unwrap(), tid);
+    let stat_dentry: Arc<dyn Dentry> =
+        StatDentry::new(Some(stat_inode), Some(Arc::downgrade(&num_dentry)));
+    num_dentry.add_child(stat_dentry);
 }

@@ -49,6 +49,16 @@ pub enum TaskState {
     UnInterruptible,
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+pub struct TaskPerm {
+    pub ruid: u32,
+    pub euid: u32,
+    pub suid: u32,
+    pub rgid: u32,
+    pub egid: u32,
+    pub sgid: u32,
+}
+
 pub struct Task {
     // Three members below are decided as birth and
     // can not be changed during the lifetime.
@@ -169,6 +179,8 @@ pub struct Task {
 
     timers: ShareMutex<Vec<Option<Timer>>>,
 
+    perm: ShareMutex<TaskPerm>,
+
     // name, used for debug
     name: SyncUnsafeCell<String>,
 }
@@ -227,6 +239,8 @@ impl Task {
 
             cpus_on: SyncUnsafeCell::new(CpuMask::CPU0),
             timers: new_share_mutex(Vec::new()),
+
+            perm: new_share_mutex(TaskPerm::default()),
             name: SyncUnsafeCell::new(name),
         }
     }
@@ -273,6 +287,7 @@ impl Task {
         vfork_parent: Option<Weak<Task>>,
 
         cpus_on: SyncUnsafeCell<CpuMask>,
+        perm: ShareMutex<TaskPerm>,
 
         name: SyncUnsafeCell<String>,
     ) -> Self {
@@ -321,6 +336,7 @@ impl Task {
 
             cpus_on,
             timers: new_share_mutex(Vec::new()),
+            perm,
             name,
         }
     }
@@ -486,6 +502,10 @@ impl Task {
 
     pub fn fdtable_mut(&self) -> ShareMutex<FdTable> {
         self.fd_table.clone()
+    }
+
+    pub fn perm_mut(&self) -> ShareMutex<TaskPerm> {
+        self.perm.clone()
     }
 
     pub fn thread_group_mut(&self) -> ShareMutex<ThreadGroup> {

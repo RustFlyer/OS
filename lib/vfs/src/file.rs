@@ -314,7 +314,11 @@ impl dyn File {
     /// Returns the number of bytes written.
     pub async fn write(&self, buf: &[u8]) -> SysResult<usize> {
         if !self.flags().writable() {
-            log::error!("[File::write] path: {}, flags: {:?}", self.dentry().path(), self.flags());
+            log::error!(
+                "[File::write] path: {}, flags: {:?}",
+                self.dentry().path(),
+                self.flags()
+            );
             return Err(SysError::EBADF);
         }
         if self.flags().contains(OpenFlags::O_APPEND) {
@@ -459,6 +463,74 @@ impl dyn File {
         path_buf.truncate(len);
         let path = CString::new(path_buf).unwrap().into_string().unwrap();
         Ok(path)
+    }
+
+    /// Copies data from `src` file to `self` (destination file), using the most direct
+    /// read/write methods available.
+    ///
+    /// # Arguments
+    /// * `src` - The source file to copy from.
+    /// * `src_off` - Optional mutable reference to the source offset. If `None`, use and update the file's current offset.
+    /// * `dst_off` - Optional mutable reference to the destination offset. If `None`, use and update the file's current offset.
+    /// * `len` - The maximum number of bytes to copy.
+    ///
+    /// Returns the number of bytes copied, or an error.
+    pub async fn copy_file_range(
+        &self,
+        src: &dyn File,
+        src_off: Option<&mut u64>,
+        dst_off: Option<&mut u64>,
+        len: usize,
+    ) -> SysResult<usize> {
+        let mut total = 0usize;
+        let buf_size = 4096;
+        let mut buf = vec![0u8; buf_size];
+
+        let mut src_offset = src_off.as_ref().map(|r| **r);
+        let mut dst_offset = dst_off.as_ref().map(|r| **r);
+
+        while total < len {
+            let to_read = core::cmp::min(buf_size, len - total);
+
+            // --- Source read ---
+            let n = if let Some(ref mut off) = src_offset {
+                let n = src.base_read(&mut buf[..to_read], *off as usize).await?;
+                *off += n as u64;
+                n
+            } else {
+                src.read(&mut buf[..to_read]).await?
+            };
+            if n == 0 {
+                break;
+            }
+
+            // --- Destination write ---
+            let m = if let Some(ref mut off) = dst_offset {
+                let m = self.base_write(&buf[..n], *off as usize).await?;
+                *off += m as u64;
+                m
+            } else {
+                self.write(&buf[..n]).await?
+            };
+            total += m;
+            if m < n {
+                break;
+            }
+        }
+
+        // Write back value if pointer provided
+        if let Some(off) = src_off {
+            if let Some(new_off) = src_offset {
+                *off = new_off;
+            }
+        }
+        if let Some(off) = dst_off {
+            if let Some(new_off) = dst_offset {
+                *off = new_off;
+            }
+        }
+
+        Ok(total)
     }
 }
 

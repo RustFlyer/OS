@@ -1,4 +1,4 @@
-use alloc::boxed::Box;
+use alloc::{boxed::Box, sync::Arc};
 
 use async_trait::async_trait;
 
@@ -29,7 +29,7 @@ unsafe impl Send for Socket {}
 impl Socket {
     pub fn new(domain: SaFamily, types: SocketType, nonblock: bool) -> SysResult<Self> {
         let sk = match domain {
-            SaFamily::AF_UNIX => Sock::Unix(UnixSocket {}),
+            SaFamily::AF_UNIX => Sock::Unix(Arc::new(UnixSocket::new())),
             SaFamily::AF_INET | SaFamily::AF_INET6 => match types {
                 SocketType::STREAM => Sock::Tcp(TcpSocket::new_v4()),
                 SocketType::DGRAM => Sock::Udp(UdpSocket::new()),

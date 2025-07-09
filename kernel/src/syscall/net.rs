@@ -22,10 +22,10 @@ pub const NONBLOCK: i32 = 0x800;
 pub const CLOEXEC: i32 = 0x80000;
 
 pub fn sys_socket(domain: usize, types: i32, protocal: usize) -> SyscallResult {
-    if domain == 1 {
-        log::error!("not support unix socket");
-        return Err(SysError::ENOSYS);
-    }
+    // if domain == 1 {
+    //     log::error!("not support unix socket");
+    //     return Err(SysError::ENOSYS);
+    // }
     let domain = SaFamily::try_from(domain as u16)?;
     log::info!("[sys_socket] new socket {domain:?} {types:#x} protocal:{protocal:#x}");
 
@@ -64,7 +64,7 @@ pub fn sys_bind(sockfd: usize, addr: usize, addrlen: usize) -> SyscallResult {
         addr
     );
 
-    log::debug!("[sys_bind] local_addr: {:?}", local_addr.as_endpoint());
+    // log::debug!("[sys_bind] local_addr: {:?}", local_addr.as_endpoint());
     let socket: Arc<Socket> = task
         .with_mut_fdtable(|table| table.get_file(sockfd))?
         .downcast_arc::<Socket>()
@@ -291,16 +291,18 @@ pub async fn sys_connect(sockfd: usize, addr: usize, addrlen: usize) -> SyscallR
     );
     let remote_addr = read_sockaddr(addrspace.clone(), addr, addrlen)?;
 
+    // not 0.0.0.0
+    if remote_addr.as_unix_path().is_none()
+        && !remote_addr.as_listen_endpoint().unwrap().is_specified()
+    {
+        return Err(SysError::EADDRNOTAVAIL);
+    }
+
     let socket: Arc<Socket> = task
         .with_mut_fdtable(|table| table.get_file(sockfd))?
         .downcast_arc::<Socket>()
         .map_err(|_| SysError::ENOTSOCK)?;
 
-    log::info!(
-        "[sys_connect] sockfd {} trys to connect {}",
-        sockfd,
-        remote_addr.as_endpoint()
-    );
     socket.sk.connect(remote_addr).await?;
     Ok(0)
 }
