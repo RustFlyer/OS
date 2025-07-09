@@ -1,6 +1,7 @@
 #![no_std]
 #![allow(unused)]
 #![allow(unknown_lints)]
+#![feature(sync_unsafe_cell)]
 
 use alloc::sync::Arc;
 use core::{

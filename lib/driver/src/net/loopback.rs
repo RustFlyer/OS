@@ -1,7 +1,8 @@
 use alloc::{boxed::Box, collections::VecDeque, vec, vec::Vec};
+
 use smoltcp::phy::{DeviceCapabilities, Medium};
 
-use super::{DevError, DevResult, EthernetAddress, NetDevice, netbuf::NetBufPtrOps};
+use super::{DevError, DevResult, EthernetAddress, NetDevice, netpool::NetBufPtrOps};
 
 /// The loopback interface operates at the network layer and handles the packets
 /// directly at the IP level. Consequently, packets sent to 127.0.0.1 do not
@@ -77,9 +78,8 @@ impl NetDevice for LoopbackDev {
         }
     }
 
-    fn alloc_tx_buffer(&mut self, size: usize) -> DevResult<Box<dyn NetBufPtrOps>> {
+    fn take_tx_buffer(&mut self, size: usize) -> DevResult<Box<dyn NetBufPtrOps>> {
         let mut buffer = vec![0; size];
-        buffer.resize(size, 0);
         Ok(Box::new(SimpleNetBuf(buffer)))
     }
 }

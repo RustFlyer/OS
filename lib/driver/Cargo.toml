@@ -10,12 +10,13 @@ mm = { path = "../mm" }
 
 mutex = { path = "../mutex" }
 polyhal-macro = { path = "../polyhal-macro" }
-log = { workspace = true }
-spin = { workspace = true }
-uart_16550 = { workspace = true }
-smoltcp = { workspace = true }
 async-trait = { workspace = true }
 downcast-rs = { workspace = true }
+lazy_static = { workspace = true }
+log = { workspace = true }
+smoltcp = { workspace = true }
+spin = { workspace = true }
+uart_16550 = { workspace = true }
 virtio-drivers = { workspace = true }
 
 [features]

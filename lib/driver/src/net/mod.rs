@@ -1,9 +1,10 @@
 use alloc::boxed::Box;
-use netbuf::NetBufPtrOps;
+
 use smoltcp::phy::DeviceCapabilities;
 
+use netpool::NetBufPtrOps;
+
 pub mod loopback;
-pub mod netbuf;
 pub mod netpool;
 pub mod virtnet;
 
@@ -28,42 +29,49 @@ pub enum DevError {
     Unsupported,
 }
 
-pub(crate) const fn as_dev_err(e: virtio_drivers::Error) -> DevError {
-    use virtio_drivers::Error::*;
-    match e {
-        QueueFull => DevError::BadState,
-        NotReady => DevError::Again,
-        WrongToken => DevError::BadState,
-        AlreadyUsed => DevError::AlreadyExists,
-        InvalidParam => DevError::InvalidParam,
-        DmaError => DevError::NoMemory,
-        IoError => DevError::Io,
-        Unsupported => DevError::Unsupported,
-        ConfigSpaceTooSmall => DevError::BadState,
-        ConfigSpaceMissing => DevError::BadState,
-        _ => DevError::BadState,
+impl DevError {
+    /// Converts a `virtio_drivers::Error` into a `DevError`.
+    pub const fn from_virtio_error(e: virtio_drivers::Error) -> Self {
+        use virtio_drivers::Error::*;
+        match e {
+            QueueFull => DevError::BadState,
+            NotReady => DevError::Again,
+            WrongToken => DevError::BadState,
+            AlreadyUsed => DevError::AlreadyExists,
+            InvalidParam => DevError::InvalidParam,
+            DmaError => DevError::NoMemory,
+            IoError => DevError::Io,
+            Unsupported => DevError::Unsupported,
+            ConfigSpaceTooSmall => DevError::BadState,
+            ConfigSpaceMissing => DevError::BadState,
+            _ => DevError::BadState,
+        }
     }
 }
 
-/// A specialized `Result` type for device operations.
+/// A special `Result` type for device operations.
 pub type DevResult<T = ()> = Result<T, DevError>;
 
+/// A 48-bit Ethernet (MAC) address.
 pub struct EthernetAddress(pub [u8; 6]);
+
 pub trait NetDevice: Sync + Send {
+    /// Returns the capabilities of the network device.
     fn capabilities(&self) -> DeviceCapabilities;
-    /// The ethernet address of the NIC.
+
+    /// Returns the ethernet address of the device.
     fn mac_address(&self) -> EthernetAddress;
 
-    /// Whether can transmit packets.
+    /// Returns whether the device can transmit packets.
     fn can_transmit(&self) -> bool;
 
-    /// Whether can receive packets.
+    /// Returns whether the device can receive packets.
     fn can_receive(&self) -> bool;
 
-    /// Size of the receive queue.
+    /// Returns the size of the receive queue.
     fn rx_queue_size(&self) -> usize;
 
-    /// Size of the transmit queue.
+    /// Returns the size of the transmit queue.
     fn tx_queue_size(&self) -> usize;
 
     /// Gives back the `rx_buf` to the receive queue for later receiving.
@@ -77,7 +85,6 @@ pub trait NetDevice: Sync + Send {
     fn recycle_tx_buffers(&mut self) -> DevResult;
 
     /// Transmits a packet in the buffer to the network, without blocking,
-    /// returns [`DevResult`].
     fn transmit(&mut self, tx_buf: Box<dyn NetBufPtrOps>) -> DevResult;
 
     /// Receives a packet from the network and store it in the [`NetBuf`],
@@ -90,7 +97,6 @@ pub trait NetDevice: Sync + Send {
     /// [`DevError::Again`].
     fn receive(&mut self) -> DevResult<Box<dyn NetBufPtrOps>>;
 
-    /// Allocate a memory buffer of a specified size for network transmission,
-    /// returns [`DevResult`]
-    fn alloc_tx_buffer(&mut self, size: usize) -> DevResult<Box<dyn NetBufPtrOps>>;
+    /// Returns an available transmit buffer of size `size` of the device.
+    fn take_tx_buffer(&mut self, size: usize) -> DevResult<Box<dyn NetBufPtrOps>>;
 }
