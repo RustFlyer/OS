@@ -229,6 +229,7 @@ pub fn read_sockaddr(
         log::error!("[read_sockaddr] in");
         let mut _user_ptr = UserReadPtr::<u8>::new(addr, &addrspace);
         let _check = _user_ptr.try_into_slice(addrlen)?;
+        log::error!("[read_sockaddr] mid");
         let _r = _check[0];
         log::error!("[read_sockaddr] out {}", _r);
     }
