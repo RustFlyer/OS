@@ -23,9 +23,10 @@ pub enum SigDetails {
     Child {
         /// child's pid
         pid: usize,
-    }
+    },
 }
 
+#[allow(unused)]
 impl SigInfo {
     /// sent by kill, sigsend, raise
     pub const USER: i32 = 0;
@@ -69,6 +70,7 @@ impl SigInfo {
 pub struct Sig(i32);
 
 /// Sig为0时表示空信号，从1开始才是有含义的信号
+#[allow(unused)]
 impl Sig {
     pub const SIGHUP: Sig = Sig(1); // Hangup detected on controlling terminal or death of controlling process
     pub const SIGINT: Sig = Sig(2); // Interrupt from keyboard
@@ -108,7 +110,11 @@ impl Sig {
     ///
     /// `signum` must be a valid signal number, or 0 as a placeholder value.
     pub fn from_i32(signum: i32) -> Sig {
-        debug_assert!(signum >= 0 && signum < NSIG as i32, "Invalid signal number: {}", signum);
+        debug_assert!(
+            signum >= 0 && signum < NSIG as i32,
+            "Invalid signal number: {}",
+            signum
+        );
         Sig(signum)
     }
 
@@ -264,9 +270,3 @@ impl From<Sig> for SigSet {
         Self::from_bits(1 << sig.index()).unwrap()
     }
 }
-
-// impl fmt::Debug for SigSet {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         write!(f, "{:#018X}", self.bits())
-//     }
-// }

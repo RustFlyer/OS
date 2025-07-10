@@ -4,6 +4,7 @@
 #![feature(naked_functions)]
 #![feature(sync_unsafe_cell)]
 #![allow(clippy::module_inception)]
+#![feature(stmt_expr_attributes)]
 // #![allow(dead_code)]
 // #![allow(unused)]
 
@@ -113,7 +114,7 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         log::info!("device tree blob PA start: {:#x}", dtb_addr);
         log::info!("====== kernel memory layout end ======");
 
-        osdriver::probe_tree();
+        osdriver::probe_device_tree();
         println!("[PROBE_DEV_TREE] INIT SUCCESS");
 
         log::info!("hart {}: initialized driver", hart_id);
@@ -135,6 +136,7 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         // do the other harts enable the kernel page table.
         unsafe {
             vm::switch_to_kernel_page_table();
+            config::board::HARTS_NUM += 1;
         }
         println!("[HART {}] INIT SUCCESS", hart_id);
     }

@@ -193,7 +193,8 @@ impl Task {
         name: String,
     ) -> Self {
         let tid = tid_alloc();
-        let pgid = tid.0;
+        let mut perm = TaskPerm::default();
+        perm.pgid = tid.0 as u32;
         Task {
             tid,
             process: None,
@@ -236,7 +237,7 @@ impl Task {
             cpus_on: SyncUnsafeCell::new(CpuMask::CPU0),
             timers: new_share_mutex(Vec::new()),
 
-            perm: new_share_mutex(TaskPerm::default()),
+            perm: new_share_mutex(perm),
             name: SyncUnsafeCell::new(name),
         }
     }

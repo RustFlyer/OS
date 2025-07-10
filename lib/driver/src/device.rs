@@ -4,36 +4,27 @@ use virtio_drivers::transport::DeviceType;
 
 use crate::{BlockDevice, CharDevice, net::NetDevice};
 
-// /// General Device Operations
-// #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-// pub enum DeviceType {
-//     Block,
-//     Char,
-//     Net,
-//     Display,
-// }
-
 #[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(usize)]
-pub enum DeviceMajor {
+pub enum OSDeviceMajor {
     Serial = 4,
     Block = 8,
     Net = 9,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct DevId {
+pub struct OSDevId {
     /// Major Device Number
-    pub major: DeviceMajor,
+    pub major: OSDeviceMajor,
     /// Minor Device Number. It Identifies different device instances of the
     /// same type
     pub minor: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DeviceMeta {
+pub struct OSDeviceMeta {
     /// Device id.
-    pub dev_id: DevId,
+    pub dev_id: OSDevId,
     /// Name of the device.
     pub name: String,
     /// Mmio start address.
@@ -46,14 +37,14 @@ pub struct DeviceMeta {
     pub dtype: DeviceType,
 }
 
-pub trait Device: Sync + Send + DowncastSync {
-    fn meta(&self) -> &DeviceMeta;
+pub trait OSDevice: Sync + Send + DowncastSync {
+    fn meta(&self) -> &OSDeviceMeta;
 
     fn init(&self);
 
     fn handle_irq(&self);
 
-    fn dev_id(&self) -> DevId {
+    fn dev_id(&self) -> OSDevId {
         self.meta().dev_id
     }
 

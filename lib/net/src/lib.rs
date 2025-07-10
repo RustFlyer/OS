@@ -94,3 +94,7 @@ impl IEvent for PollTimer {
         TimerState::Cancelled
     }
 }
+
+pub fn net_device_exist() -> bool {
+    ETH0.get().is_some()
+}

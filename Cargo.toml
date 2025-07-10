@@ -38,6 +38,10 @@ elf = { git = "https://github.com/adong660/rust-elf.git", branch = "no-std-elfst
 loongArch64 = { git = "https://github.com/adong660/loongArch64", branch = "main" }
 lwext4_rust = { git = "https://github.com/EchudeT/lwext4_rust.git", rev = "d546" }
 
+plic = "0.0.2"
+visionfive2-sd = { git = "https://github.com/os-module/visionfive2-sd.git" }
+bitfield-struct = "0.8"
+byte-slice-cast = { version = "1.2.2", default-features = false }
 
 [workspace.dependencies.smoltcp]
 git = "https://github.com/EchudeT/smoltcp.git"

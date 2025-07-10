@@ -116,7 +116,7 @@ pub fn net_poll_init() {
 }
 
 #[deprecated = "Legacy elf load test."]
-pub fn static_elf_test() {
+pub fn _static_elf_test() {
     // let hello_world = get_app_data_by_name("hello_world").unwrap();
     // let time_test = get_app_data_by_name("time_test").unwrap();
     // let add = get_app_data_by_name("add").unwrap();

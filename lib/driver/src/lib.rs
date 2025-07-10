@@ -13,10 +13,10 @@ use console::console_putchar;
 use qemu::UartDevice;
 use spin::Once;
 
+pub mod block;
 pub mod cpu;
 pub mod device;
 pub mod hal;
-pub mod manager;
 pub mod net;
 pub mod plic;
 pub mod qemu;
@@ -27,11 +27,6 @@ pub use virtio_drivers::transport::DeviceType;
 pub mod console;
 
 extern crate alloc;
-
-#[cfg(target_arch = "riscv64")]
-pub type DevTransport = MmioTransport<'static>;
-#[cfg(target_arch = "loongarch64")]
-pub type DevTransport = PciTransport;
 
 pub static BLOCK_DEVICE: Once<Arc<dyn BlockDevice>> = Once::new();
 pub static BLOCK_DEVICE2: Once<Arc<dyn BlockDevice>> = Once::new();
@@ -122,3 +117,14 @@ macro_rules! println {
         $crate::console_print(format_args!(concat!($fmt, "\n") $(, $($arg)+)?))
     }
 }
+
+macro_rules! wait_for {
+    ($cond:expr) => {{
+        let mut timeout = 10000000;
+        while !$cond && timeout > 0 {
+            // core::hint::spin_loop();
+            timeout -= 1;
+        }
+    }};
+}
+pub(crate) use wait_for;

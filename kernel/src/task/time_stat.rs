@@ -139,7 +139,6 @@ impl TaskTimeStat {
     /// will return true and notify kernel to schedule another task.
     pub fn schedule_time_out(&self) -> bool {
         let dtime = get_time_duration() - self.schedule_start_time;
-        // log::error!("dtime: {:?}", dtime);
         dtime >= TIME_SLICE_DUATION
     }
 }

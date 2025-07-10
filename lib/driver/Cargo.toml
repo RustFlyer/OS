@@ -17,6 +17,11 @@ smoltcp = { workspace = true }
 async-trait = { workspace = true }
 downcast-rs = { workspace = true }
 virtio-drivers = { workspace = true }
+plic = { workspace = true }
+bitfield-struct = { workspace = true }
+byte-slice-cast = { workspace = true }
+bitflags = { workspace = true }
+
 
 [features]
 smoltcp = []

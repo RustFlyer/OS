@@ -34,25 +34,12 @@ use super::{
     tid::{TidAddress, tid_alloc},
     time_stat::TaskTimeStat,
 };
-use crate::{
-    task::signal::pidfd::PF_TABLE,
-    vm::{
-        addr_space::{AddrSpace, switch_to},
-        user_ptr::UserWritePtr,
-    },
+use crate::vm::{
+    addr_space::{AddrSpace, switch_to},
+    user_ptr::UserWritePtr,
 };
 
 impl Task {
-    /// Switches Task to User
-    pub fn enter_user_mode(&mut self) {
-        self.timer_mut().switch_to_user();
-    }
-
-    /// Switches Task to Kernel
-    pub fn enter_kernel_mode(&mut self) {
-        self.timer_mut().switch_to_kernel();
-    }
-
     /// Suspends the Task until it is waken or time out
     pub async fn suspend_timeout(&self, limit: Duration) -> Duration {
         let expire = get_time_duration() + limit;
@@ -473,13 +460,12 @@ impl Task {
             } else {
                 log::info!("[exit] exiting process has at least one thread in group, just return");
             }
-            // log::warn!("[do_exit] {} leaves before setting state", self.get_name());
-            // log::warn!(
-            //     "[do_exit] {} process {:?}'s state {:?}",
-            //     self.get_name(),
-            //     self.process().get_name(),
-            //     self.process().get_state()
-            // );
+            log::trace!(
+                "[do_exit] {} process {:?}'s state {:?}",
+                self.get_name(),
+                self.process().get_name(),
+                self.process().get_state()
+            );
             return;
         }
 

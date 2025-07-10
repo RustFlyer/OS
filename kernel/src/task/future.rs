@@ -175,13 +175,7 @@ pub async fn task_executor_unit(task: Arc<Task>) {
         trap::trap_handler(&task);
 
         let mut interrupted = async_syscall(&task).await;
-
         TIMER_MANAGER.check(get_time_duration());
-
-        // if task.is_yield() {
-        //     yield_now().await;
-        //     task.set_is_yield(false);
-        // }
 
         if task.timer_mut().schedule_time_out()
             && executor::has_waiting_task_alone(current_hart().id)

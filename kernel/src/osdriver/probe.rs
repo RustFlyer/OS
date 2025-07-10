@@ -1,177 +1,105 @@
-/// Refer to virtio_drivers
-use core::ptr::NonNull;
-use core::{mem, ptr};
-
 use alloc::sync::Arc;
 use config::mm::KERNEL_MAP_OFFSET;
-use driver::hal::VirtHalImpl;
-use driver::net::loopback::LoopbackDev;
-use driver::qemu::VirtBlkDevice;
-use driver::{BLOCK_DEVICE, BlockDevice, println};
-use flat_device_tree::Fdt;
-use flat_device_tree::node::FdtNode;
-use flat_device_tree::standard_nodes::Compatible;
-use net::init_network;
-use virtio_drivers::device::console::VirtIOConsole;
-use virtio_drivers::transport::mmio::{MmioTransport, VirtIOHeader};
-use virtio_drivers::transport::pci::bus::{BarInfo, MemoryBarType};
-use virtio_drivers::transport::pci::bus::{
-    Cam, Command, ConfigurationAccess, DeviceFunction, MmioCam, PciRoot,
+use core::{
+    mem::size_of,
+    ptr::{self, NonNull},
 };
-use virtio_drivers::transport::pci::{VirtioPciError, virtio_device_type};
-use virtio_drivers::transport::{self, Transport};
-use virtio_drivers::transport::{DeviceType, pci::PciTransport};
+use driver::{
+    BLOCK_DEVICE, BlockDevice, CHAR_DEVICE, MmioSerialPort,
+    hal::VirtHalImpl,
+    net::{loopback::LoopbackDev, virtnet::create_virt_net_dev},
+    println,
+    qemu::{UartDevice, VirtBlkDevice},
+};
+use flat_device_tree::{Fdt, node::FdtNode};
+use net::{init_network, net_device_exist};
+use virtio_drivers::{
+    device::console::VirtIOConsole,
+    transport::{
+        DeviceType, Transport,
+        mmio::MmioTransport,
+        pci::{
+            PciTransport,
+            bus::{
+                BarInfo, Cam, Command, ConfigurationAccess, DeviceFunction, MemoryBarType, MmioCam,
+                PciRoot,
+            },
+            virtio_device_type,
+        },
+    },
+};
 
-/// search for pci root.
-pub fn probe_pci_root<'a>(root: &'a Fdt<'a>) -> PciRoot<MmioCam<'a>> {
-    let pcie_node = root
-        .find_node("/pcie@20000000")
-        .expect("PCIe node not found in device tree");
+use crate::osdriver::ioremap_if_need;
 
-    let reg = pcie_node.reg().next().unwrap();
+pub fn probe_tree(fdt: &Fdt) {
+    log::debug!("probe_tree begin");
 
-    log::debug!("{:?}", reg);
-    let base = (reg.starting_address as usize + KERNEL_MAP_OFFSET) as *mut u8;
-    let config_access = unsafe { MmioCam::new(base, Cam::Ecam) };
-    let pci_root = unsafe { PciRoot::new(config_access) };
+    probe_char_device(fdt);
+    println!("ok");
 
-    pci_root
-}
-
-/// search for virtio blk in pci
-pub fn probe_virtio_blk_pci(pci_root: &mut PciRoot<MmioCam>) -> Option<Arc<VirtBlkDevice>> {
-    log::debug!("begin to find");
-    for bus in 0..=0x7f {
-        for device in 0..32 {
-            for function in 0..8 {
-                let dev_fn = DeviceFunction {
-                    bus,
-                    device,
-                    function,
-                };
-                if bus == 0 && (device == 1 || device == 2) && function == 0 {
-                    // DEBUG: output all bars in device
-                    let bars = pci_root.bars(dev_fn).unwrap();
-                    bars.iter().for_each(|bar| {
-                        if bar.is_some() {
-                            log::debug!("{:?}", bar.clone().unwrap());
-                        }
-                    });
-                }
-
-                // if device exists and it is valid, this function will return a transport
-                match PciTransport::new::<VirtHalImpl, MmioCam>(pci_root, dev_fn) {
-                    Ok(transport) => {
-                        log::debug!("find {:?}", transport);
-                        if transport.device_type() == DeviceType::Block {
-                            let dev = Arc::new(VirtBlkDevice::new_from_pci(transport));
-                            log::info!(
-                                "[probe_virtio_blk_pci] created a new block device: {:?}",
-                                dev.clone().block_size()
-                            );
-                            return Some(dev);
-                        }
-                    }
-                    Err(e) => {
-                        if let VirtioPciError::InvalidVendorId(_) = e {
-                            // no device found in dev_fn
-                            continue;
-                        }
-                        log::error!("dev_fn: {:?}, {:?}", dev_fn, e);
-                    }
+    for node in fdt.all_nodes() {
+        if let (Some(compatible), Some(region)) = (node.compatible(), node.reg().next()) {
+            if compatible.all().any(|s| s == "virtio,mmio")
+                && region.size.unwrap_or(0)
+                    > size_of::<virtio_drivers::transport::mmio::VirtIOHeader>()
+            {
+                log::debug!("Found MMIO virtio: {}", node.name);
+                let vaddr = ioremap_if_need(region.starting_address as usize, region.size.unwrap());
+                let header =
+                    NonNull::new(vaddr as *mut virtio_drivers::transport::mmio::VirtIOHeader)
+                        .unwrap();
+                match unsafe { MmioTransport::new(header, region.size.unwrap()) } {
+                    Ok(transport) => handle_mmio_device(transport),
+                    Err(e) => log::warn!("Failed to create MmioTransport: {}", e),
                 }
             }
         }
     }
-    log::warn!("No virtio block device found on PCI");
-    None
+
+    probe_pci_tree(fdt);
+
+    if !net_device_exist() {
+        init_network(LoopbackDev::new(), true);
+    }
+
+    log::debug!("probe_tree done");
 }
 
-fn virtio_device(transport: impl Transport) {
-    panic!("[virtio_device] Mmio not supported");
-}
-
-fn virtio_device_pci(transport: PciTransport) {
+fn handle_mmio_device(transport: MmioTransport<'static>) {
     match transport.device_type() {
-        DeviceType::Block => virtio_blk_pci(transport),
-        DeviceType::Console => virtio_console_pci(transport),
-        DeviceType::Socket => log::warn!("[virtio_device_pci] Socket: not implemented"),
+        DeviceType::Block => {
+            log::info!("Init virtio-blk");
+            BLOCK_DEVICE.call_once(|| Arc::new(VirtBlkDevice::new(transport)));
+        }
+        DeviceType::Network => {
+            log::info!("Init virtio-net");
+            let dev = create_virt_net_dev(transport).expect("create virt net failed");
+            init_network(dev, false);
+        }
+        DeviceType::Console => {
+            log::info!("Init virtio-console (char)");
+        }
+        _ => log::warn!("Unknown MMIO device: {:?}", transport.device_type()),
+    }
+}
+
+fn virtio_device(transport: PciTransport) {
+    match transport.device_type() {
+        DeviceType::Block => virtio_blk(transport),
+        DeviceType::Network => virtio_net(transport),
+        DeviceType::Console => virtio_console(transport),
         t => log::warn!("Unrecognized virtio device: {:?}", t),
     }
 }
 
-fn virtio_blk_pci(transport: PciTransport) {
-    BLOCK_DEVICE.call_once(|| Arc::new(VirtBlkDevice::new_from_pci(transport)));
-    log::info!("virtio-blk test finished");
-    println!("[BLOCK_DEVICE] INIT SUCCESS");
-}
-
-fn virtio_console_pci(transport: PciTransport) {
-    let mut console = VirtIOConsole::<VirtHalImpl, PciTransport>::new(transport)
-        .expect("Failed to create console driver");
-    if let Some(size) = console.size().unwrap() {
-        log::info!("VirtIO console {}", size);
-    }
-    for &c in b"Hello world on console!\n" {
-        console.send(c).expect("Failed to send character");
-    }
-    let c = console.recv(true).expect("Failed to read from console");
-    log::info!("Read {:?}", c);
-    log::info!("virtio-console test finished");
-    println!("[CONSOLE_DEVICE] INIT SUCCESS");
-}
-
-pub fn probe_pci<'a>(fdt: &'a Fdt<'a>) {
-    for node in fdt.all_nodes() {
-        // Dump information about the node for debugging.
-        log::trace!(
-            "{}: {:?}",
-            node.name,
-            node.compatible().map(Compatible::first),
-        );
-        for range in node.reg() {
-            log::trace!(
-                "  {:#018x?}, length {:?}",
-                range.starting_address,
-                range.size
-            );
-        }
-
-        // Check whether it is a VirtIO MMIO device.
-        if let (Some(compatible), Some(region)) = (node.compatible(), node.reg().next()) {
-            if compatible.all().any(|s| s == "virtio,mmio")
-                && region.size.unwrap_or(0) > size_of::<VirtIOHeader>()
-            {
-                log::debug!("Found VirtIO MMIO device at {:?}", region);
-
-                let header = NonNull::new(region.starting_address as *mut VirtIOHeader).unwrap();
-                match unsafe { MmioTransport::new(header, region.size.unwrap()) } {
-                    Err(e) => log::warn!("Error creating VirtIO MMIO transport: {}", e),
-                    Ok(transport) => {
-                        log::info!(
-                            "Detected virtio MMIO device with vendor id {:#X}, device type {:?}, version {:?}",
-                            transport.vendor_id(),
-                            transport.device_type(),
-                            transport.version(),
-                        );
-                        virtio_device(transport);
-                    }
-                }
-            }
-        }
-    }
-
+fn probe_pci_tree(fdt: &Fdt) {
+    use virtio_drivers::transport::pci::bus::Cam;
     if let Some(pci_node) = fdt.find_compatible(&["pci-host-cam-generic"]) {
-        log::info!("Found PCI node: {}", pci_node.name);
         enumerate_pci(pci_node, Cam::MmioCam);
     }
     if let Some(pcie_node) = fdt.find_compatible(&["pci-host-ecam-generic"]) {
-        log::info!("Found PCIe node: {}", pcie_node.name);
         enumerate_pci(pcie_node, Cam::Ecam);
     }
-
-    init_network(LoopbackDev::new(), true);
-    println!("[NET_DEVICE] INIT SUCCESS");
 }
 
 pub fn enumerate_pci(pci_node: FdtNode, cam: Cam) {
@@ -184,6 +112,8 @@ pub fn enumerate_pci(pci_node: FdtNode, cam: Cam) {
             region.starting_address,
             region.starting_address as usize + region.size.unwrap()
         );
+        let _vaddr = ioremap_if_need(region.starting_address as usize, region.size.unwrap());
+
         // assert_eq!(region.size.unwrap(), cam.size() as usize);
         // SAFETY: We know the pointer is to a valid MMIO region.
         let mut pci_root = PciRoot::new(unsafe {
@@ -212,7 +142,7 @@ pub fn enumerate_pci(pci_node: FdtNode, cam: Cam) {
                     transport.device_type(),
                     transport.read_device_features(),
                 );
-                virtio_device_pci(transport);
+                virtio_device(transport);
             }
         }
     }
@@ -375,6 +305,83 @@ impl From<u32> for PciRangeType {
             2 => Self::Memory32,
             3 => Self::Memory64,
             _ => panic!("Tried to convert invalid range type {}", value),
+        }
+    }
+}
+
+fn probe_char_device(fdt: &Fdt) {
+    let chosen = fdt.chosen().ok();
+    let mut stdout = chosen.and_then(|c| c.stdout().map(|n| n.node()));
+    if stdout.is_none() {
+        stdout = fdt.find_compatible(&["ns16550a", "snps,dw-apb-uart", "sifive,uart0"])
+    }
+    if let Some(node) = stdout {
+        let reg = node.reg().next().unwrap();
+        let base = ioremap_if_need(reg.starting_address as usize, reg.size.unwrap());
+        let uart = unsafe { MmioSerialPort::new(base) };
+        CHAR_DEVICE.call_once(|| Arc::new(UartDevice::new_from_mmio(uart)));
+    }
+}
+
+fn virtio_blk(transport: PciTransport) {
+    BLOCK_DEVICE.call_once(|| Arc::new(VirtBlkDevice::new(transport)));
+    log::info!("virtio-blk test finished");
+    println!("[BLOCK_DEVICE] INIT SUCCESS");
+}
+
+fn virtio_console(transport: PciTransport) {
+    let mut console = VirtIOConsole::<VirtHalImpl, PciTransport>::new(transport)
+        .expect("Failed to create console driver");
+    if let Some(size) = console.size().unwrap() {
+        log::info!("VirtIO console {}", size);
+    }
+    for &c in b"Hello world on console!\n" {
+        console.send(c).expect("Failed to send character");
+    }
+    let c = console.recv(true).expect("Failed to read from console");
+    log::info!("Read {:?}", c);
+    log::info!("virtio-console test finished");
+    println!("[CONSOLE_DEVICE] INIT SUCCESS");
+}
+
+fn virtio_net(_transport: PciTransport) {
+    init_network(LoopbackDev::new(), true);
+    log::info!("virtio-net test finished");
+}
+
+fn probe_sd_mmc_devices(fdt: &Fdt) {
+    // common SD/MMC/SDIO controller compatible table
+    const MMC_COMPATS: &[&str] = &[
+        "starfive,jh7110-mmc",
+        "dw_mshc", // DesignWare
+        "snps,dw-mshc",
+        "mmc",
+        "sdhci",
+        "sdio",
+    ];
+
+    for node in fdt.all_nodes() {
+        if let (Some(compatible), Some(region)) = (node.compatible(), node.reg().next()) {
+            if compatible
+                .all()
+                .any(|s| MMC_COMPATS.iter().any(|c| s.contains(c)))
+            {
+                let base = region.starting_address as usize;
+                let size = region.size.unwrap_or(0x1000);
+                let irq = node
+                    .property("interrupts")
+                    .and_then(|p| p.as_usize())
+                    .unwrap_or(33);
+                log::info!(
+                    "Found SD/MMC/SDIO controller: {} at 0x{:x}, irq {}",
+                    node.name,
+                    base,
+                    irq
+                );
+                let vaddr = ioremap_if_need(base, size);
+                // BLOCK_DEVICE.call_once(|| Arc::new(BlockDevice::new(vaddr, size, irq)));
+                println!("[BLOCK_DEVICE] SD/MMC Controller INIT SUCCESS");
+            }
         }
     }
 }

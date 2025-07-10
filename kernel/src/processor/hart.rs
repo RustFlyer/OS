@@ -87,11 +87,6 @@ impl Hart {
         new_task: &mut Arc<Task>,
         pps: &mut ProcessorPrivilegeState,
     ) {
-        // println!(
-        //     "[hart] =====================switch to task {} tid {}=====================",
-        //     new_task.get_name(),
-        //     new_task.tid()
-        // );
         disable_interrupt();
         pps.auto_sum(); // `pps` is the user task's PPS which is to be enabled.
         core::mem::swap(self.get_mut_pps(), pps);
@@ -106,13 +101,11 @@ impl Hart {
         disable_interrupt();
         pps.auto_sum(); // `pps` is the hart's original PPS which is to be enabled.
         core::mem::swap(self.get_mut_pps(), pps);
-        // let _task = self.get_task();
         unsafe {
             vm::switch_to_kernel_page_table();
         }
         self.clear_task();
         enable_interrupt();
-        // println!("[hart] =====================switch out=====================");
     }
 
     pub fn kernel_switch_in(&mut self, pps: &mut ProcessorPrivilegeState) {
