@@ -76,6 +76,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         }
         MKDIR => sys_mkdirat(args[0], args[1], args[2] as u32).await,
         CHDIR => sys_chdir(args[0]).await,
+        FCHDIR => sys_fchdir(args[0]).await,
         BRK => sys_brk(args[0]).await,
         UNLINKAT => sys_unlinkat(args[0], args[1], args[2] as i32).await,
         GETDENTS64 => sys_getdents64(args[0], args[1], args[2]).await,

@@ -547,6 +547,23 @@ pub async fn sys_chdir(path: usize) -> SyscallResult {
     Ok(0)
 }
 
+/// `fchdir()` changes the current working directory of the calling process to the directory specified
+/// in `fd`.
+///
+/// # Returns
+/// On success, zero is returned.  On error, -1 is returned, and errno is set appropriately.
+pub async fn sys_fchdir(fd: usize) -> SyscallResult {
+    let task = current_task();
+    let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
+    let dentry = file.dentry();
+    if !dentry.inode().ok_or(SysError::ENOENT)?.inotype().is_dir() {
+        log::error!("[sys_fchdir] dentry is not a directory");
+        return Err(SysError::ENOTDIR);
+    }
+    task.set_cwd(dentry);
+    Ok(0)
+}
+
 /// `unlinkat()` deletes  a name from the filesystem. If that name was the last link to a file and no
 /// processes have the file open, the file is deleted and the space it was using is made  available
 /// for reuse.
