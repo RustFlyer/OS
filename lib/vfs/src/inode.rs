@@ -128,6 +128,14 @@ pub trait Inode: Send + Sync + DowncastSync {
 
     fn get_attr(&self) -> SysResult<Stat>;
 
+    fn get_uid(&self) -> u32 {
+        self.get_meta().inner.lock().uid
+    }
+
+    fn get_gid(&self) -> u32 {
+        self.get_meta().inner.lock().gid
+    }
+
     fn ino(&self) -> usize {
         self.get_meta().ino
     }
@@ -202,22 +210,30 @@ pub trait Inode: Send + Sync + DowncastSync {
         self.get_meta().inner.lock().remove_xattr(name)
     }
 
-    fn check_permission(&self, uid: usize, gid: usize, access: AccessFlags) -> bool {
+    fn check_permission(&self, euid: u32, egid: u32, groups: &[u32], access: AccessFlags) -> bool {
         let meta = self.get_meta().inner.lock();
         let mode = meta.mode.bits();
-        // 0o400/0o200/0o100: owner r/w/x
-        // 0o040/0o020/0o010: group r/w/x
-        // 0o004/0o002/0o001: other r/w/x
-        if uid == 0 {
+
+        if euid == 0 {
+            if access.contains(AccessFlags::X_OK) {
+                if mode & 0o111 == 0 {
+                    return false;
+                }
+            }
             return true;
         }
-        let (r, w, x) = if uid as u32 == meta.uid {
+
+        let is_owner = euid == meta.uid;
+        let is_group = egid == meta.gid || groups.contains(&meta.gid);
+
+        let (r, w, x) = if is_owner {
             (0o400, 0o200, 0o100)
-        } else if gid as u32 == meta.gid {
+        } else if is_group {
             (0o040, 0o020, 0o010)
         } else {
             (0o004, 0o002, 0o001)
         };
+
         if access.contains(AccessFlags::R_OK) && (mode & r == 0) {
             return false;
         }

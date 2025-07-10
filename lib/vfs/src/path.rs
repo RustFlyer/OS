@@ -5,7 +5,7 @@
 //! from a path string, and then call [`Path::walk`] to resolve it to a dentry.
 //! Symlinks are supported and the user can decide whether to resolve them or not.
 
-use alloc::{string::String, sync::Arc};
+use alloc::{string::String, sync::Arc, vec::Vec};
 
 use config::inode::InodeType;
 use systype::error::{SysError, SysResult};
@@ -82,13 +82,28 @@ impl Path {
     /// The caller may want to call [`Self::resolve_symlink`] on the returned dentry
     /// to resolve it.
     pub fn walk(&self) -> SysResult<Arc<dyn Dentry>> {
-        self.walk_recursive(&mut 0)
+        self.walk_recursive(&mut 0, None)
+    }
+
+    /// similar to walk, the different function is getting parent dentrys
+    pub fn walk_with_parents(
+        &self,
+        dentry_list: &mut Vec<Arc<dyn Dentry>>,
+    ) -> SysResult<Arc<dyn Dentry>> {
+        self.walk_recursive(&mut 0, Some(dentry_list))
     }
 
     /// Do the same as [`Self::walk`], but with a counter to help to limit the
     /// recursion depth.
-    fn walk_recursive(&self, counter: &mut usize) -> SysResult<Arc<dyn Dentry>> {
+    fn walk_recursive(
+        &self,
+        counter: &mut usize,
+        dentry_list: Option<&mut Vec<Arc<dyn Dentry>>>,
+    ) -> SysResult<Arc<dyn Dentry>> {
         let path = self.path.as_str();
+
+        let list_exist = dentry_list.is_some();
+        let mut list: Vec<Arc<dyn Dentry>> = Vec::new();
 
         let mut dentry = if path.starts_with("/") {
             Arc::clone(&sys_root_dentry())
@@ -122,6 +137,14 @@ impl Path {
                     dentry = dentry.lookup(name)?;
                 }
             }
+
+            if list_exist {
+                list.push(dentry.clone());
+            }
+        }
+
+        if list_exist {
+            dentry_list.unwrap().extend(list);
         }
         Ok(dentry)
     }
@@ -163,7 +186,7 @@ impl Path {
         }
 
         let target_path = <dyn File>::open(Arc::clone(&dentry))?.readlink()?;
-        Path::new(dentry, target_path).walk_recursive(counter)
+        Path::new(dentry, target_path).walk_recursive(counter, None)
     }
 
     /// Do the same as [`Self::resolve_symlink`], but will resolve the symlink

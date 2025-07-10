@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, ffi::CString, string::ToString, vec::Vec};
+use alloc::{boxed::Box, ffi::CString, string::ToString, sync::Arc, vec::Vec};
 use core::{
     cmp, mem,
     pin::Pin,
@@ -35,6 +35,7 @@ use systype::{
 };
 use timer::{TimedTaskResult, TimeoutFuture};
 use vfs::{
+    dentry::Dentry,
     file::File,
     kstat::Kstat,
     path::{Path, split_parent_and_name},
@@ -136,13 +137,18 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
         dentry = Path::resolve_symlink_through(dentry)?;
     }
 
+    let _cred = task.perm_mut();
+    let cred = _cred.lock();
+    let groups = &cred.groups;
+
     // Create a regular file when `O_CREAT` is specified if the file does not exist.
     if dentry.is_negative() {
         if flags.contains(OpenFlags::O_CREAT) {
             let parent = dentry.parent().unwrap();
             if !parent.inode().unwrap().check_permission(
-                uid,
-                gid,
+                uid as u32,
+                gid as u32,
+                groups,
                 AccessFlags::W_OK | AccessFlags::X_OK,
             ) {
                 return Err(SysError::EACCES);
@@ -160,7 +166,7 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
     let inode_type = inode.inotype();
 
     if flags.writable() || flags.contains(OpenFlags::O_TRUNC) {
-        if !inode.check_permission(uid, gid, AccessFlags::W_OK) {
+        if !inode.check_permission(uid as u32, gid as u32, groups, AccessFlags::W_OK) {
             return Err(SysError::EACCES);
         }
     }
@@ -497,8 +503,17 @@ pub async fn sys_mkdirat(dirfd: usize, pathname: usize, mode: u32) -> SyscallRes
 
     let parent = dentry.parent().ok_or(SysError::ENOENT)?;
     let mode = InodeMode::from_bits_truncate(mode).union(InodeMode::DIR);
-    // let mode = InodeMode::DIR;
+
     parent.mkdir(dentry.as_ref(), mode)?;
+    let inode = dentry.inode().unwrap();
+
+    let _cred = task.perm_mut();
+    let cred = _cred.lock();
+    inode.set_uid(cred.euid);
+
+    let parent_gid = parent.inode().unwrap().get_gid();
+    inode.set_gid(parent_gid);
+
     Ok(0)
 }
 
@@ -763,16 +778,19 @@ pub async fn sys_umount2(target: usize, flags: u32) -> SyscallResult {
 pub async fn sys_faccessat(dirfd: usize, pathname: usize, mode: i32) -> SyscallResult {
     let task = current_task();
     let addr_space = task.addr_space();
-    let _mode = AccessFlags::from_bits(mode).ok_or(SysError::EINVAL)?;
+    let access = AccessFlags::from_bits(mode).ok_or(SysError::EINVAL)?;
 
     let path = {
         let mut user_ptr = UserReadPtr::<u8>::new(pathname, &addr_space);
         let cstring = user_ptr.read_c_string(256)?;
         cstring.into_string().map_err(|_| SysError::EINVAL)?
     };
-    log::info!("[sys_faccessat] dirfd: {dirfd}, path: {path}, mode: {_mode:?}");
+    log::info!("[sys_faccessat] dirfd: {dirfd}, path: {path}, access: {access:?}");
 
-    let mut dentry = task.walk_at(AtFd::from(dirfd), path.clone())?;
+    let mut pdentrylist: Vec<Arc<dyn Dentry>> = Vec::new();
+
+    let mut dentry =
+        task.walk_at_with_parents(AtFd::from(dirfd), path.clone(), &mut pdentrylist)?;
     if dentry.is_negative() {
         return Err(SysError::ENOENT);
     }
@@ -784,8 +802,32 @@ pub async fn sys_faccessat(dirfd: usize, pathname: usize, mode: i32) -> SyscallR
         }
     }
 
-    // File permissions are not implemented yet, so any access to an existing file is allowed.
-    Ok(0)
+    let inode = dentry.inode().unwrap();
+    let _cred = task.perm_mut();
+    let cred = _cred.lock();
+
+    let euid = cred.euid;
+    let egid = cred.egid;
+
+    let groups: &[u32] = &cred.groups;
+
+    for d in &pdentrylist[..pdentrylist.len() - 1] {
+        let inode = d.inode().unwrap();
+        if !inode.check_permission(euid, egid, groups, AccessFlags::X_OK) {
+            return Err(SysError::EACCES);
+        }
+    }
+
+    // F_OK: only check existence
+    if access.is_empty() {
+        return Ok(0);
+    }
+
+    if inode.check_permission(euid, egid, groups, access) {
+        Ok(0)
+    } else {
+        Err(SysError::EACCES)
+    }
 }
 
 /// set system robust mutex list

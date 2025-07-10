@@ -205,8 +205,6 @@ impl Task {
 
         let mut parent;
         let children;
-        let pgid;
-        let uid = new_share_mutex(self.uid());
         let cwd;
         let root;
         let itimers;
@@ -227,7 +225,6 @@ impl Task {
             process = Some(Arc::downgrade(self));
             threadgroup = self.thread_group_mut().clone();
             parent = (*self.parent_mut()).clone();
-            pgid = (*self.pgid_mut()).clone();
             cwd = self.cwd();
             root = self.root();
             itimers = new_share_mutex(self.with_mut_itimers(|t| *t));
@@ -242,7 +239,6 @@ impl Task {
             process = None;
             threadgroup = new_share_mutex(ThreadGroup::new());
             parent = new_share_mutex(Some(Arc::downgrade(self)));
-            pgid = new_share_mutex(self.get_pgid());
 
             shm_maps = new_share_mutex(BTreeMap::clone(&self.shm_maps_mut().lock()));
             for (_, shm_id) in shm_maps.lock().iter() {
@@ -287,7 +283,7 @@ impl Task {
             new_share_mutex(self.fdtable_mut().lock().clone())
         };
 
-        let perm = (*self.perm_mut().lock());
+        let perm = (*self.perm_mut().lock()).clone();
 
         let cpus_on = *self.cpus_on_mut();
         let name = SyncUnsafeCell::new(name);
@@ -304,8 +300,6 @@ impl Task {
             shm_maps,
             parent,
             children,
-            pgid,
-            uid,
             SpinNoIrqLock::new(0),
             SpinNoIrqLock::new(None),
             sig_mask,
@@ -386,13 +380,31 @@ impl Task {
         Path::new(base_dir, path).walk()
     }
 
+    /// similar to walk_at. The different point is that it can get parent dentrys.
+    pub fn walk_at_with_parents(
+        &self,
+        dirfd: AtFd,
+        path: String,
+        list: &mut Vec<Arc<dyn Dentry>>,
+    ) -> SysResult<Arc<dyn Dentry>> {
+        let base_dir = if path.starts_with("/") {
+            self.root_mut()
+        } else {
+            match dirfd {
+                AtFd::FdCwd => self.cwd_mut(),
+                AtFd::Normal(fd) => self.with_mut_fdtable(|table| table.get_file(fd))?.dentry(),
+            }
+        };
+        Path::new(base_dir, path).walk_with_parents(list)
+    }
+
     pub fn exit(self: &Arc<Self>) {
-        // assert_ne!(
-        //     self.tid(),
-        //     INIT_PROC_ID,
-        //     "initproc die!!!, sepc {:#x}",
-        //     self.trap_context_mut().sepc
-        // );
+        assert_ne!(
+            self.tid(),
+            INIT_PROC_ID,
+            "initproc die!!!, sepc {:#x}",
+            self.trap_context_mut().sepc
+        );
 
         // log::error!("[exit] task {} exit", self.tid());
         if let Some(parent) = self.vfork_parent.clone() {

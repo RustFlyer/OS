@@ -898,8 +898,6 @@ pub fn sys_clone3(user_args: usize, size: usize) -> SyscallResult {
         return Err(SysError::EINVAL);
     }
 
-    log::error!("[sys_clone3] begin to exe");
-
     if args.stack != 0 {
         new_task
             .trap_context_mut()
@@ -938,12 +936,6 @@ pub fn sys_clone3(user_args: usize, size: usize) -> SyscallResult {
     log::info!("[sys_clone3] clone success",);
 
     Ok(new_tid)
-}
-
-pub fn sys_setsid() -> SyscallResult {
-    log::debug!("[sys_setsid]");
-    let task = current_task();
-    Ok(task.pid())
 }
 
 #[derive(FromRepr, Clone, Copy, Debug, Eq, PartialEq)]

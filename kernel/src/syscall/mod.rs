@@ -212,6 +212,9 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         FGETXATTR => sys_fgetxattr(args[0], args[1], args[2], args[3]),
         FREMOVEXATTR => sys_fremovexattr(args[0], args[1]),
         SIGALTSTACK => sys_sigaltstack(args[0], args[1]),
+        GETSID => sys_getsid(args[0]),
+        GETGROUPS => sys_getgroups(args[0], args[1]),
+        SETGROUPS => sys_setgroups(args[0], args[1]),
         _ => {
             println!("Syscall not implemented: {}", syscall_no.as_str());
             panic!("Syscall not implemented: {}", syscall_no.as_str());

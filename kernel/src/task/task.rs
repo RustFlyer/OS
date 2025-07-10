@@ -49,7 +49,7 @@ pub enum TaskState {
     UnInterruptible,
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct TaskPerm {
     pub ruid: u32,
     pub euid: u32,
@@ -57,6 +57,9 @@ pub struct TaskPerm {
     pub rgid: u32,
     pub egid: u32,
     pub sgid: u32,
+    pub pgid: u32,
+    pub sid: u32,
+    pub groups: Vec<u32>,
 }
 
 pub struct Task {
@@ -107,11 +110,6 @@ pub struct Task {
     // because parent task should recycle children and free
     // them in wait4 at last.
     children: ShareMutex<BTreeMap<Tid, Arc<Task>>>,
-
-    // pgid is the id of a process group if existed.
-    pgid: ShareMutex<PGid>,
-
-    uid: ShareMutex<Uid>,
 
     // when task exits, it will set exit_code and wait for
     // parent task to clean it and receive exit_code.
@@ -209,8 +207,6 @@ impl Task {
             shm_maps: new_share_mutex(BTreeMap::new()),
             parent: new_share_mutex(None),
             children: new_share_mutex(BTreeMap::new()),
-            pgid: new_share_mutex(pgid),
-            uid: new_share_mutex(0),
 
             exit_code: SpinNoIrqLock::new(0),
             exit_signal: SpinNoIrqLock::new(None),
@@ -263,9 +259,6 @@ impl Task {
         parent: ShareMutex<Option<Weak<Task>>>,
         children: ShareMutex<BTreeMap<Tid, Arc<Task>>>,
 
-        pgid: ShareMutex<PGid>,
-        uid: ShareMutex<Uid>,
-
         exit_code: SpinNoIrqLock<i32>,
         exit_signal: SpinNoIrqLock<Option<u8>>,
 
@@ -306,9 +299,6 @@ impl Task {
 
             parent,
             children,
-
-            pgid,
-            uid,
 
             exit_code,
             exit_signal,
@@ -354,11 +344,7 @@ impl Task {
     }
 
     pub fn uid(&self) -> Uid {
-        *self.uid.lock()
-    }
-
-    pub fn uid_lock(&self) -> ShareMutex<Uid> {
-        self.uid.clone()
+        self.perm.lock().euid as Uid
     }
 
     pub fn process(self: &Arc<Self>) -> Arc<Task> {
@@ -459,10 +445,6 @@ impl Task {
         &self.children
     }
 
-    pub fn pgid_mut(&self) -> &ShareMutex<PGid> {
-        &self.pgid
-    }
-
     #[allow(clippy::mut_from_ref)]
     pub fn sig_mask_mut(&self) -> &mut SigSet {
         unsafe { &mut *self.sig_mask.get() }
@@ -525,7 +507,8 @@ impl Task {
     }
 
     pub fn get_pgid(&self) -> PGid {
-        *self.pgid.lock()
+        let cred = self.perm.lock();
+        cred.pgid as PGid
     }
 
     pub fn get_name(&self) -> String {
@@ -597,7 +580,8 @@ impl Task {
     }
 
     pub fn set_pgid(&self, pgid: PGid) {
-        *self.pgid_mut().lock() = pgid;
+        let mut cred = self.perm.lock();
+        cred.pgid = pgid as u32;
     }
 
     pub fn set_sig_cx_ptr(&self, new_ptr: usize) {

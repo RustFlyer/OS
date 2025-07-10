@@ -3,81 +3,81 @@ use systype::error::{SysError, SyscallResult};
 use crate::{
     processor::current_task,
     task::{manager::TASK_MANAGER, process_manager::PROCESS_GROUP_MANAGER},
+    vm::user_ptr::{UserReadPtr, UserWritePtr},
 };
-
 /// Returns the real user ID of the calling process.
 pub fn sys_getuid() -> SyscallResult {
-    let task = current_task();
-    Ok(task.uid())
+    let _cred = current_task().perm_mut();
+    let mut cred = _cred.lock();
+
+    Ok(cred.ruid as usize)
 }
 
 /// Returns the real group ID of the calling process.
 pub fn sys_getgid() -> SyscallResult {
-    let task = current_task();
-    Ok(task.get_pgid())
+    let _cred = current_task().perm_mut();
+    let mut cred = _cred.lock();
+
+    Ok(cred.rgid as usize)
 }
 
 /// `setgid` sets the effective group ID of the calling process.
-/// If the calling process is privileged, the real GID and saved set-group-ID are also set.
-///
-/// more precisely: has the CAP_SETGID capability in its user namespace.
-///
-/// In linux, every processes (tasks) has its own **real group ID (RGID), effective group ID (EGID)
-/// and saved set-group-ID (SGID)**.
-/// Therefore, any process is under its main group and this group's id is GID.
-///
-/// For threads, they will share the gid of their process.
-///
-/// Typical application: After the daemon process starts, it first starts as root,
-/// and then sets gid/gid to a regular user to reduce permissions and enhance system security.
+/// If the calling process is privileged (root), the real GID and saved set-group-ID are also set.
 pub fn sys_setgid(gid: usize) -> SyscallResult {
-    // log::warn!("[sys_setgid] unimplemented call gid: {gid}");
-    let task = current_task();
-    task.set_pgid(gid);
+    let _cred = current_task().perm_mut();
+    let mut cred = _cred.lock();
+
+    // Only root (euid == 0) can set all three GIDs, others can only set egid to their own rgid/egid/sgid
+    if cred.euid == 0 {
+        cred.rgid = gid as u32;
+        cred.egid = gid as u32;
+        cred.sgid = gid as u32;
+    } else if gid as u32 == cred.rgid || gid as u32 == cred.egid || gid as u32 == cred.sgid {
+        cred.egid = gid as u32;
+    } else {
+        return Err(SysError::EPERM);
+    }
+
     Ok(0)
 }
 
-/// `setuid` sets user id of current system account.
-/// `uid` is a number used by the operating system to uniquely identify a user.
-///
-/// Each process is running with a "UID" identity.
-///
-/// Typical application: A daemon process first performs sensitive tasks as root,
-/// and then setuid(1000) returns to a regular user to continue working stably
-/// and enhance security.
+/// `setuid` sets the effective user ID of the calling process.
+/// If the calling process is privileged (root), the real UID and saved set-user-ID are also set.
 pub fn sys_setuid(uid: usize) -> SyscallResult {
-    log::debug!("[sys_setuid]  uid: {uid}");
-    let task = current_task();
-    *task.uid_lock().lock() = uid;
+    let _cred = current_task().perm_mut();
+    let mut cred = _cred.lock();
+
+    // Only root (euid == 0) can set all three UIDs, others can only set euid to their own ruid/euid/suid
+    if cred.euid == 0 {
+        cred.ruid = uid as u32;
+        cred.euid = uid as u32;
+        cred.suid = uid as u32;
+    } else if uid as u32 == cred.ruid || uid as u32 == cred.euid || uid as u32 == cred.suid {
+        cred.euid = uid as u32;
+    } else {
+        return Err(SysError::EPERM);
+    }
+
     Ok(0)
 }
 
-/// `getpgid` gets pgid from thread with specified id `pid`.
-/// If `pid` is zero, the function will return current task pgid.
+/// Returns the process group ID (PGID) of the specified process.
+/// If pid is zero, returns the PGID of the calling process.
 pub fn sys_getpgid(pid: usize) -> SyscallResult {
     let task = if pid != 0 {
-        TASK_MANAGER.get_task(pid).ok_or(SysError::ENOMEM)?
+        TASK_MANAGER.get_task(pid).ok_or(SysError::ESRCH)?
     } else {
         current_task()
     };
-    let pgid = task.get_pgid();
+    let _cred = task.perm_mut();
+    let mut cred = _cred.lock();
 
-    Ok(pgid)
+    Ok(cred.pgid as usize)
 }
 
 /// setpgid() sets the PGID of the process specified by pid to pgid.
-///
-/// # Exception
-/// - If `pid` is zero, then the process ID of the calling process is used.
-/// - If `pgid` is zero, then the PGID of the process specified by pid is made the
-///   same as its process ID.
-///
-/// If setpgid() is used to move a process from one process group to another (as is
-/// done by some shells when creating pipelines), both process groups must be part of
-/// the same session (see setsid(2) and credentials(7)).
-///
-/// In this case, the pgid specifies an existing process group to be joined
-/// and the session ID of that group must match the session ID of the joining process.
+/// If pid is zero, uses the calling process.
+/// If pgid is zero, sets PGID to the PID of the process.
 pub fn sys_setpgid(pid: usize, pgid: usize) -> SyscallResult {
     let task = if pid != 0 {
         TASK_MANAGER.get_task(pid).ok_or(SysError::ESRCH)?
@@ -85,35 +85,44 @@ pub fn sys_setpgid(pid: usize, pgid: usize) -> SyscallResult {
         current_task()
     };
 
-    if pgid == 0 {
-        PROCESS_GROUP_MANAGER.add_group(&task);
-    } else if PROCESS_GROUP_MANAGER.get_group(pgid).is_none() {
+    let new_pgid = if pgid == 0 { task.pid() } else { pgid };
+
+    // Add to process group, create if not exist
+    if PROCESS_GROUP_MANAGER.get_group(new_pgid).is_none() {
         PROCESS_GROUP_MANAGER.add_group(&task);
     } else {
-        PROCESS_GROUP_MANAGER.add_process(pgid, &task);
+        PROCESS_GROUP_MANAGER.add_process(new_pgid, &task);
     }
+
+    // Update the process's PGID in its credentials
+    let _cred = task.perm_mut();
+    let mut cred = _cred.lock();
+    cred.pgid = new_pgid as u32;
 
     Ok(0)
 }
 
-/// `geteuid()` returns the effective user ID of the calling process.
+/// Returns the effective user ID of the calling process.
 pub fn sys_geteuid() -> SyscallResult {
-    let euid = current_task().uid();
-    log::debug!("[sys_geteuid] euid: {} now return 9", euid);
-    Ok(euid)
+    let _cred = current_task().perm_mut();
+    let mut cred = _cred.lock();
+
+    Ok(cred.euid as usize)
 }
 
-/// `getegid()` returns the effective group ID of the calling process.
+/// Returns the effective group ID of the calling process.
 pub fn sys_getegid() -> SyscallResult {
-    let egid = current_task().get_pgid();
-    log::debug!("[sys_getegid] egid: {}", egid);
-    Ok(egid)
+    let _cred = current_task().perm_mut();
+    let mut cred = _cred.lock();
+
+    Ok(cred.egid as usize)
 }
 
 pub fn sys_setresuid(ruid: isize, euid: isize, suid: isize) -> SyscallResult {
     let mut _cred = current_task().perm_mut();
     let mut cred = _cred.lock();
 
+    log::error!("[sys_setresuid] ruid: {ruid}, euid: {euid}, suid: {suid}");
     let uid = cred.euid;
     if uid != 0 {
         if (ruid != -1
@@ -149,6 +158,7 @@ pub fn sys_setresgid(rgid: isize, egid: isize, sgid: isize) -> SyscallResult {
     let mut _cred = current_task().perm_mut();
     let mut cred = _cred.lock();
 
+    log::error!("[sys_setresgid] rgid: {rgid}, egid: {egid}, sgid: {sgid}");
     let uid = cred.euid;
     if uid != 0 {
         if (rgid != -1
@@ -176,6 +186,83 @@ pub fn sys_setresgid(rgid: isize, egid: isize, sgid: isize) -> SyscallResult {
     }
     if sgid != -1 {
         cred.sgid = sgid as u32;
+    }
+    Ok(0)
+}
+
+pub fn sys_getsid(pid: usize) -> SyscallResult {
+    let task = if pid != 0 {
+        TASK_MANAGER.get_task(pid).ok_or(SysError::ESRCH)?
+    } else {
+        current_task()
+    };
+    let _cred = task.perm_mut();
+    let cred = _cred.lock();
+
+    Ok(cred.sid as usize)
+}
+
+pub fn sys_setsid() -> SyscallResult {
+    let task = current_task();
+    let mut _cred = task.perm_mut();
+    let mut cred = _cred.lock();
+
+    if task.pid() == cred.pgid as usize {
+        return Err(SysError::EPERM);
+    }
+
+    cred.sid = task.pid() as u32;
+    cred.pgid = task.pid() as u32;
+    PROCESS_GROUP_MANAGER.add_group(&task);
+
+    Ok(cred.sid as usize)
+}
+
+pub fn sys_getgroups(size: usize, list_ptr: usize) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+    let _cred = task.perm_mut();
+    let cred = _cred.lock();
+
+    let groups: &[u32] = &cred.groups;
+    let ngroups = groups.len();
+
+    if size == 0 {
+        return Ok(ngroups);
+    }
+
+    if size < ngroups {
+        return Err(SysError::EINVAL);
+    }
+
+    let mut list_ptr = UserWritePtr::<u32>::new(list_ptr, &addrspace);
+    if !list_ptr.is_null() {
+        unsafe { list_ptr.write_array(groups)? };
+    }
+
+    Ok(ngroups)
+}
+
+pub fn sys_setgroups(size: usize, list_ptr: usize) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+    let _cred = task.perm_mut();
+    let mut cred = _cred.lock();
+
+    if cred.euid != 0 {
+        return Err(SysError::EPERM);
+    }
+    if size > 128 {
+        return Err(SysError::EINVAL);
+    }
+
+    let mut list_ptr = UserReadPtr::<u32>::new(list_ptr, &addrspace);
+
+    if size > 0 {
+        if list_ptr.is_null() {
+            return Err(SysError::EFAULT);
+        }
+        unsafe { cred.groups = list_ptr.read_array(size)? };
     }
     Ok(0)
 }
