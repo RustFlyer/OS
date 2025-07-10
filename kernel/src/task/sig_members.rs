@@ -332,6 +332,12 @@ impl Action {
     }
 }
 
+// For SignalStack.ss_flags
+pub const SS_ONSTACK: i32 = 1;
+pub const SS_DISABLE: i32 = 2;
+
+pub const MIN_SIGALTSTACK_SIZE: usize = 2048;
+
 /// 信号栈是为信号处理程序执行提供的专用栈空间.它通常包含以下内容:
 /// 1.信号上下文：这是信号处理程序运行时的上下文信息，包括所有寄存器的值、
 /// 程序计数器（PC）、栈指针等。它使得信号处理程序可以访问到被中断的程序的状态，
@@ -341,7 +347,9 @@ impl Action {
 /// 那么这些函数的栈帧也会被压入信号栈。每个栈帧通常包含了函数参数、
 /// 局部变量以及返回地址。 4.信号处理程序的返回地址：当信号处理程序完成执行后，
 /// 系统需要知道从哪里返回继续执行，因此信号栈上会保存一个返回地址。
-#[derive(Clone, Copy, Debug, Default)]
+///
+/// when SignalStack ss_flags contains SS_DISABLE, the stack is null.
+#[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub struct SignalStack {
     /// Base address of stack
@@ -355,6 +363,16 @@ pub struct SignalStack {
 impl SignalStack {
     pub fn get_stack_top(&self) -> usize {
         self.ss_sp + self.ss_size
+    }
+}
+
+impl Default for SignalStack {
+    fn default() -> Self {
+        SignalStack {
+            ss_sp: 0,
+            ss_flags: SS_DISABLE,
+            ss_size: 0,
+        }
     }
 }
 

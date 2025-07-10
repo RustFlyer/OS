@@ -16,7 +16,10 @@ use crate::{
             FutexAddr, FutexHashKey, FutexOp, FutexWaiter, futex_manager, single_futex_manager,
         },
         manager::TASK_MANAGER,
-        sig_members::{Action, ActionType, SIG_DFL, SIG_IGN, SigAction, SigContext},
+        sig_members::{
+            Action, ActionType, MIN_SIGALTSTACK_SIZE, SIG_DFL, SIG_IGN, SS_DISABLE, SS_ONSTACK,
+            SigAction, SigContext, SignalStack,
+        },
         signal::{pidfd::PF_TABLE, sig_info::*},
     },
     vm::user_ptr::{UserReadPtr, UserWritePtr},
@@ -411,7 +414,6 @@ pub async fn sys_sigreturn() -> SyscallResult {
     let sig_cx_ptr = task.get_sig_cx_ptr();
     let addr_space = task.addr_space();
     let mut sig_cx_ptr = UserReadPtr::<SigContext>::new(sig_cx_ptr, &addr_space);
-    // log::debug!("[sys_sigreturn] sig_cx_ptr: {sig_cx_ptr:?}");
     // restore trap context before sig handle
 
     let mut rs = String::new();
@@ -420,18 +422,15 @@ pub async fn sys_sigreturn() -> SyscallResult {
         .iter()
         .enumerate()
         .for_each(|(idx, u)| rs.push_str(format!("r[{idx:02}] = {u:#x}, ").as_str()));
-    // log::debug!(
-    //     "[sys_sigreturn] task: {} ,before trap context: [{:?}]",
-    //     task.get_name(),
-    //     rs
-    // );
+
     unsafe {
         let sig_cx = sig_cx_ptr.read()?;
-        // log::error!("{:?}", sig_cx);
         *mask = sig_cx.mask;
-        // TODO: no sig_stack for now so don't need to restore
+
+        let sig_stack = task.sig_stack_mut();
+        sig_stack.ss_flags &= !SS_ONSTACK;
+
         trap_cx.sepc = sig_cx.user_reg[0];
-        //log::debug!("[sys_sigreturn] restore trap_cx a0: {} with backup in sig_cx: {}", trap_cx.user_reg[10], sig_cx.user_reg[10]);
         trap_cx.user_reg = sig_cx.user_reg;
     }
     let mut rs = String::new();
@@ -440,14 +439,17 @@ pub async fn sys_sigreturn() -> SyscallResult {
         .iter()
         .enumerate()
         .for_each(|(idx, u)| rs.push_str(format!("r[{idx:02}] = {u:#x}, ").as_str()));
+
     log::debug!(
         "[sys_sigreturn] tid: {}, task: {}, after trap context: [{:?}]",
         task.tid(),
         task.get_name(),
         rs
     );
-    // simdebug::stop();
-    // log::debug!("sig: {:#x}", task.sig_manager_mut().bitmap.bits());
+
+    let sig_stack = task.sig_stack_mut();
+    sig_stack.ss_flags &= !SS_ONSTACK;
+
     // its return value is the a0 before signal interrupt, so that it won't be changed in async_syscall
     // trap_cx.display();
     Ok(trap_cx.get_user_a0())
@@ -847,4 +849,42 @@ pub fn sys_pidfd_getfd(pidfd: usize, targetfd: usize, flags: u32) -> SyscallResu
     let newfd = task.with_mut_fdtable(|table| table.alloc(file, OpenFlags::empty()))?;
 
     Ok(newfd)
+}
+
+/// Get alternate signal stack
+pub fn sys_sigaltstack(new_stack_ptr: usize, old_stack_ptr: usize) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+
+    let mut new_stack = UserReadPtr::<SignalStack>::new(new_stack_ptr, &addrspace);
+    let mut old_stack = UserWritePtr::<SignalStack>::new(old_stack_ptr, &addrspace);
+
+    let mut sigaltstack = task.sig_stack_mut();
+
+    if !old_stack.is_null() {
+        unsafe {
+            old_stack.write(*sigaltstack)?;
+        }
+    }
+
+    if !new_stack.is_null() {
+        let new = unsafe { new_stack.read()? };
+
+        if new.ss_flags & !(SS_DISABLE) != 0 {
+            return Err(SysError::EINVAL);
+        }
+        if (new.ss_flags & SS_DISABLE) == 0 {
+            if new.ss_size < MIN_SIGALTSTACK_SIZE {
+                return Err(SysError::ENOMEM);
+            }
+        }
+
+        if (sigaltstack.ss_flags & SS_ONSTACK) != 0 {
+            return Err(SysError::EPERM);
+        }
+
+        *sigaltstack = new;
+    }
+
+    Ok(0)
 }

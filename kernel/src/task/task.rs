@@ -135,7 +135,7 @@ pub struct Task {
 
     // sig_stack is the stack set specifically for signal-handlers.
     // It stores signal handler context and relevant signal infos.
-    sig_stack: SyncUnsafeCell<Option<SignalStack>>,
+    sig_stack: SyncUnsafeCell<SignalStack>,
 
     // sig_cx_ptr is ptr to sig_stack.
     sig_cx_ptr: AtomicUsize,
@@ -218,7 +218,7 @@ impl Task {
             sig_manager: SyncUnsafeCell::new(SigManager::new()),
             sig_mask: SyncUnsafeCell::new(SigSet::empty()),
             sig_handlers: new_share_mutex(SigHandlers::new()),
-            sig_stack: SyncUnsafeCell::new(None),
+            sig_stack: SyncUnsafeCell::new(SignalStack::default()),
             sig_cx_ptr: AtomicUsize::new(0),
 
             tid_address: SyncUnsafeCell::new(TidAddress::new()),
@@ -272,7 +272,7 @@ impl Task {
         sig_mask: SyncUnsafeCell<SigSet>,
         sig_handlers: ShareMutex<SigHandlers>,
         sig_manager: SyncUnsafeCell<SigManager>,
-        sig_stack: SyncUnsafeCell<Option<SignalStack>>,
+        sig_stack: SyncUnsafeCell<SignalStack>,
         sig_cx_ptr: AtomicUsize,
 
         tid_address: SyncUnsafeCell<TidAddress>,
@@ -399,7 +399,7 @@ impl Task {
     }
 
     #[allow(clippy::mut_from_ref)]
-    pub fn sig_stack_mut(&self) -> &mut Option<SignalStack> {
+    pub fn sig_stack_mut(&self) -> &mut SignalStack {
         unsafe { &mut *self.sig_stack.get() }
     }
 

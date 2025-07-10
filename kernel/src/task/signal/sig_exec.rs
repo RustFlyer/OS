@@ -8,7 +8,7 @@ use super::sig_info::Sig;
 use crate::task::{
     Task, TaskState,
     manager::TASK_MANAGER,
-    sig_members::{ActionType, SigActionFlag, SigContext},
+    sig_members::{ActionType, SS_DISABLE, SS_ONSTACK, SigActionFlag, SigContext},
     signal::sig_info::{SigDetails, SigInfo, SigSet},
 };
 use crate::vm::user_ptr::UserWritePtr;
@@ -91,20 +91,33 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
             *task.sig_mask_mut() |= action.mask;
             // TODO: cx.user_fx.encounter_signal();
             // TODO: sig_stack isn't actually used for now (Even so in Phoenix, because sig_stack is always None)
-            let sig_stack = task.sig_stack_mut().take();
-            let sp = match sig_stack {
-                Some(s) => {
-                    log::error!("[sigstack] use user defined signal stack. Unimplemented");
-                    s.get_stack_top()
-                }
-                None => {
-                    // 如果进程未定义专门的信号栈，
-                    // 用户自定义的信号处理函数将使用进程的普通栈空间，
-                    // 即和其他普通函数相同的栈。这个栈通常就是进程的主栈，
-                    // 也就是在进程启动时由操作系统自动分配的栈。
-                    cx.get_user_sp()
-                }
+            // let sig_stack = task.sig_stack_mut().take();
+            // let sp = match sig_stack {
+            //     Some(s) => {
+            //         log::error!("[sigstack] use user defined signal stack. Unimplemented");
+            //         s.get_stack_top()
+            //     }
+            //     None => {
+            //         // 如果进程未定义专门的信号栈，
+            //         // 用户自定义的信号处理函数将使用进程的普通栈空间，
+            //         // 即和其他普通函数相同的栈。这个栈通常就是进程的主栈，
+            //         // 也就是在进程启动时由操作系统自动分配的栈。
+            //         cx.get_user_sp()
+            //     }
+            // };
+
+            let sig_stack = task.sig_stack_mut();
+            let use_altstack = action.flags.contains(SigActionFlag::SA_ONSTACK)
+                && (sig_stack.ss_flags & SS_DISABLE) == 0
+                && (sig_stack.ss_flags & SS_ONSTACK) == 0;
+
+            let sp = if use_altstack {
+                sig_stack.ss_flags |= SS_ONSTACK;
+                sig_stack.get_stack_top()
+            } else {
+                cx.get_user_sp()
             };
+
             // extend the sig_stack
             // 在栈上压入一个sig_cx，存储trap frame里的寄存器信息
 
@@ -115,7 +128,7 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
             let mut sig_cx = SigContext {
                 flags: 0,
                 link: 0,
-                stack: sig_stack.unwrap_or_default(),
+                stack: *sig_stack,
                 mask: old_mask,
                 sig: [0; 16],
                 user_reg: cx.user_reg,

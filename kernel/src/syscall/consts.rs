@@ -1,6 +1,7 @@
 //! # Syscall numbers
 //!
 //! Syscall numbers from <asm-generic/unistd.h>.
+//! from https://github.com/torvalds/linux/blob/master/include/uapi/asm-generic/unistd.h
 
 #![allow(clippy::upper_case_acronyms)]
 
@@ -80,6 +81,7 @@ pub enum SyscallNo {
     KILL = 129,
     TKILL = 130,
     TGKILL = 131,
+    SIGALTSTACK = 132,
     RT_SIGSUSPEND = 133,
     RT_SIGACTION = 134,
     RT_SIGPROCMASK = 135,
@@ -236,6 +238,7 @@ impl SyscallNo {
             KILL => "kill",
             TKILL => "tkill",
             TGKILL => "tgkill",
+            SIGALTSTACK => "sigaltstack",
             RT_SIGSUSPEND => "rt_sigsuspend",
             RT_SIGACTION => "rt_sigaction",
             RT_SIGPROCMASK => "rt_sigprocmask",

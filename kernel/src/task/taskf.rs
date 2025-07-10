@@ -27,7 +27,7 @@ use super::{
     future,
     manager::TASK_MANAGER,
     process_manager::PROCESS_GROUP_MANAGER,
-    sig_members::SigManager,
+    sig_members::{SigManager, SignalStack},
     signal::sig_info::{Sig, SigDetails, SigInfo},
     task::{Task, TaskState},
     threadgroup::ThreadGroup,
@@ -269,7 +269,7 @@ impl Task {
         };
 
         let sig_manager = SyncUnsafeCell::new(SigManager::new());
-        let sig_stack = SyncUnsafeCell::new(None);
+        let sig_stack = SyncUnsafeCell::new(SignalStack::default());
         let sig_cx_ptr = AtomicUsize::new(0);
 
         let caps = SyncUnsafeCell::new(self.capability().clone());
