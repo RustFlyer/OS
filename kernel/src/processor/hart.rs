@@ -4,7 +4,6 @@ use config::device::MAX_HARTS;
 extern crate alloc;
 use alloc::sync::Arc;
 
-use driver::println;
 use pps::ProcessorPrivilegeState;
 
 use core::arch::asm;

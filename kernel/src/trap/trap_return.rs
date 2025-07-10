@@ -1,5 +1,5 @@
 use super::trap_context::TrapContext;
-use crate::task::{Task, TaskState};
+use crate::task::Task;
 use crate::trap::trap_env;
 use alloc::sync::Arc;
 
@@ -18,21 +18,15 @@ pub fn trap_return(task: &Arc<Task>) {
     // 1. current task yields after last trap.
     // 2. current task gets into sig-handler.
     let trap_cx = task.trap_context_mut();
-    // trap_cx.sstatus.set_fs(FS::Clean);
 
     // assert that interrupt will be disabled when trap returns
     #[cfg(target_arch = "riscv64")]
     assert!(!(trap_cx.sstatus.sie()));
 
-    // assert!(!(task.is_in_state(TaskState::Zombie) || task.is_in_state(TaskState::Sleeping)));
-
     task.timer_mut().switch_to_user();
-    // log::debug!("[trap_return] go to user space");
-    // log::debug!("sstatus: {:?}", task.trap_context_mut().sstatus);
     unsafe {
         let ptr = trap_cx as *mut TrapContext;
         __return_to_user(ptr);
     }
-    // log::debug!("[trap_return] return from user space");
     task.timer_mut().switch_to_kernel();
 }

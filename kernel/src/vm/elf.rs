@@ -352,6 +352,7 @@ impl AddrSpace {
     }
 }
 
+#[allow(unused)]
 mod aux {
     //! Module for auxiliary headers.
     //!

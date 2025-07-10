@@ -4,8 +4,8 @@
 #![feature(naked_functions)]
 #![feature(sync_unsafe_cell)]
 #![allow(clippy::module_inception)]
-#![allow(dead_code)]
-#![allow(unused)]
+// #![allow(dead_code)]
+// #![allow(unused)]
 
 mod boot;
 mod entry;
@@ -26,7 +26,6 @@ use arch::mm::fence;
 use config::mm::{DTB_END, DTB_START};
 use driver::println;
 use mm::{self, frame, heap};
-use processor::hart;
 
 #[macro_use]
 extern crate alloc;

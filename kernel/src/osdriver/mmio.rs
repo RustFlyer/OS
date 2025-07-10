@@ -14,12 +14,12 @@ use driver::{
     qemu::{UartDevice, VirtBlkDevice},
 };
 use mm::address::PhysAddr;
-use net::{init_network, net_bench};
+use net::init_network;
 
 use crate::vm::iomap::{ioremap, iounmap};
 
 pub fn probe_mmio(device_tree: &Fdt) {
-    let blk = probe_virtio_blk(device_tree);
+    probe_virtio_blk(device_tree);
     // BLOCK_DEVICE.call_once(|| blk.unwrap());
 
     let chardev = probe_char_device(device_tree);
@@ -233,8 +233,8 @@ fn probe_serial_console(stdout: &node::FdtNode) -> MmioSerialPort {
 }
 
 pub fn init_net(root: &Fdt) {
-    log::info!("[init_net] can't find qemu virtio-net.");
-    return init_network(LoopbackDev::new(), true);
+    // log::info!("[init_net] can't find qemu virtio-net.");
+    // return init_network(LoopbackDev::new(), true);
 
     let netmeta = probe_virtio_net(root);
     if let Some(net_meta) = netmeta {

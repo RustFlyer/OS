@@ -309,13 +309,4 @@ impl TrapContext {
             self.user_reg[4] = self.last_a0;
         }
     }
-
-    // pub fn display(&self) {
-    //     log::info!("================TrapContext================");
-    //     log::info!("sepc    : {:#x}", self.sepc);
-    //     log::info!("sstatus : {:#x}", self.sstatus.bits());
-    //     log::info!("sum     : {}", (self.sstatus.bits() & 1 << 8) > 0);
-    //     log::info!("user_reg: {:#?}", self.user_reg);
-    //     log::info!("================    End    ================");
-    // }
 }

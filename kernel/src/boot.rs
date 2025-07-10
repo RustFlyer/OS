@@ -3,6 +3,7 @@ use config::device::MAX_HARTS;
 use config::mm::HART_START_ADDR;
 
 /// start mutil cores
+#[allow(unused)]
 pub fn start_harts(hart_id: usize) {
     for i in 0..MAX_HARTS {
         if i == hart_id {
