@@ -5,9 +5,19 @@ use core::{
 
 use alloc::{sync::Arc, vec::Vec};
 use config::vfs::PollEvents;
+use crate_interface::call_interface;
 use vfs::file::File;
 
 use crate::fd_table::Fd;
+
+#[crate_interface::def_interface]
+pub trait PSFHasSignalIf: Send + Sync {
+    fn has_signal() -> bool;
+}
+
+pub(crate) fn _has_signal() -> bool {
+    call_interface!(PSFHasSignalIf::has_signal())
+}
 
 pub type FilePollRet = (Fd, PollEvents, Arc<dyn File>);
 

@@ -118,15 +118,15 @@ impl DeviceTreeManager {
     pub fn handle_irq(&mut self) {
         disable_interrupt();
 
-        log::trace!("Handling interrupt");
+        // log::trace!("Handling interrupt");
         // First clain interrupt from PLIC
         if let Some(irq_number) = self.plic().claim_irq(self.irq_context()) {
             if let Some(dev) = self.irq_map.get(&irq_number) {
-                log::trace!(
-                    "Handling interrupt from device: {:?}, irq: {}",
-                    dev.name(),
-                    irq_number
-                );
+                // log::trace!(
+                //     "Handling interrupt from device: {:?}, irq: {}",
+                //     dev.name(),
+                //     irq_number
+                // );
                 dev.handle_irq();
                 // Complete interrupt when done
                 self.plic().complete_irq(irq_number, self.irq_context());

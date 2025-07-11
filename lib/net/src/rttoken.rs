@@ -38,7 +38,7 @@ impl RxToken for NetRxToken<'_> {
         crate::tcp::snoop_tcp_packet(self.1.packet(), is_ethernet).ok();
 
         let mut rx_buf = self.1;
-        log::debug!("[NetRxToken] receive {:?}", rx_buf);
+        // log::debug!("[NetRxToken] receive {:?}", rx_buf);
         let result = f(rx_buf.packet_mut());
         self.0.borrow_mut().recycle_rx_buffer(rx_buf).unwrap();
         result
@@ -59,7 +59,7 @@ impl TxToken for NetTxToken<'_> {
     {
         let mut dev = self.0.borrow_mut();
         let mut tx_buf = dev.alloc_tx_buffer(len).unwrap();
-        log::debug!("[NetTxToken] transmit {:?}", tx_buf);
+        // log::debug!("[NetTxToken] transmit {:?}", tx_buf);
         let ret = f(tx_buf.packet_mut());
         dev.transmit(tx_buf).unwrap();
         ret

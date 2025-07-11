@@ -37,6 +37,9 @@ use crate::osdriver::{
 pub fn probe_tree(fdt: &Fdt) {
     log::debug!("probe_tree begin");
 
+    // Local Net Device (For Qemu)
+    init_network(LoopbackDev::new(), true);
+
     if let Some(plic) = probe_plic(fdt) {
         device_manager().set_plic(plic);
         println!("[PLIC] INIT SUCCESS");

@@ -325,13 +325,13 @@ impl PageTable {
         }
         *entry = PageTableEntry::new(ppn, flags);
 
-        log::trace!(
-            "Mapped VPN {:#x} to PPN {:#x} with flags {:?} in page table at {:#x}",
-            vpn.address().to_usize(),
-            ppn.address().to_usize(),
-            flags,
-            self.root.address().to_usize()
-        );
+        // log::trace!(
+        //     "Mapped VPN {:#x} to PPN {:#x} with flags {:?} in page table at {:#x}",
+        //     vpn.address().to_usize(),
+        //     ppn.address().to_usize(),
+        //     flags,
+        //     self.root.address().to_usize()
+        // );
 
         #[cfg(target_arch = "riscv64")]
         if non_leaf_created {

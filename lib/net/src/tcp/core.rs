@@ -53,11 +53,12 @@ unsafe impl Sync for TcpSocket {}
 
 impl Drop for TcpSocket {
     fn drop(&mut self) {
-        log::info!("[TcpSocket::Drop]");
         self.shutdown(SHUT_RDWR).ok();
         // Safe because we have mut reference to `self`.
         // self.listen_handles.lock().clear();
         if let Some(handle) = unsafe { self.handle.get().read() } {
+            log::error!("[TcpSocket::Drop] {}", handle);
+
             let mut cnt = 0;
             loop {
                 let is_close = SOCKET_SET.with_socket_mut::<tcp::Socket, _, _>(handle, |sock| {
@@ -70,7 +71,17 @@ impl Drop for TcpSocket {
                 poll_interfaces();
                 cnt += 1;
             }
+
             // LISTEN_TABLE.remove_entry(self.bound_endpoint().unwrap().port);
+            SOCKET_SET.remove(handle);
+        }
+
+        let mut handles = self.listen_handles.lock();
+        for handle in handles.drain(..) {
+            SOCKET_SET.with_socket_mut::<tcp::Socket, _, _>(handle, |sock| {
+                sock.abort();
+                sock.close();
+            });
             SOCKET_SET.remove(handle);
         }
     }

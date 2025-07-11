@@ -82,9 +82,7 @@ impl ListenTable {
 
     pub fn unlisten(&self, port: u16) {
         log::info!("TCP socket unlisten on {}", port);
-        log::info!("TCP socket unlisten on not remove tcp {}", port);
-        // return;
-        if let Some(entry) = self.tcp[port as usize].lock().deref_mut() {
+        if let Some(entry) = self.tcp[port as usize].lock().take() {
             entry.waker.wake_by_ref()
         }
     }
@@ -109,7 +107,7 @@ impl ListenTable {
         log::debug!("[accept] port: {}", port);
 
         if let Some(entry) = self.tcp[port as usize].lock().deref_mut() {
-            log::error!("[accept] entry: {:?}", *entry);
+            // log::error!("[accept] entry: {:?}", *entry);
             let syn_queue = &mut entry.syn_queue;
             syn_queue.iter().for_each(|&tuple| {
                 log::debug!("[accept] {}, isconnect?{}", tuple, is_connected(tuple))
@@ -171,18 +169,6 @@ impl ListenTable {
             );
 
             self.waiting_ports.lock().push(dst.port as usize);
-
-            // let mut socket = SocketSetWrapper::new_tcp_socket();
-            // if socket.listen(entry.listen_endpoint).is_ok() {
-            //     let handle = sockets.add(socket);
-            //     log::info!(
-            //         "TCP socket {}: prepare for connection {} -> {}",
-            //         handle,
-            //         src,
-            //         entry.listen_endpoint
-            //     );
-            //     entry.syn_queue.push_back(handle);
-            // }
         }
     }
 

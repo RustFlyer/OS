@@ -1,6 +1,7 @@
 use core::fmt;
 
 use driver::print;
+use log::Level;
 use logger::LogInterface;
 use mutex::SpinNoIrqLock;
 
@@ -16,6 +17,11 @@ struct LogInterfaceImpl;
 impl LogInterface for LogInterfaceImpl {
     fn print_log(record: &log::Record) {
         let _guard = LOG_LOCK.lock();
+
+        // if record.level() != Level::Trace {
+        //     return;
+        // }
+
         print_in_color(
             format_args!(
                 "[{:>5}][{}:{}] {}\n",

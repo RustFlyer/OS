@@ -223,6 +223,9 @@ impl TcpSocket {
             }
             LISTEN_TABLE.listen(bound_endpoint, waker, self.listen_handles.clone())?;
 
+            if let Some(handle) = unsafe { self.handle.get().read() } {
+                log::error!("[listen] {:?} listen", handle);
+            }
             // log::info!("[TcpSocket::listen] listening on {bound_endpoint:?}");
             for _ in 0..24 {
                 let sock_handle = SOCKET_SET.add(SocketSetWrapper::new_tcp_socket());

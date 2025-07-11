@@ -1601,24 +1601,6 @@ pub async fn sys_pselect6(
     let task = current_task();
     let addrspace = task.addr_space();
 
-    // macro_rules! make_convert {
-    //     ($ty:ty) => {
-    //         |up: usize| -> SysResult<Option<$ty>> {
-    //             let mut ptr = UserReadWritePtr::<$ty>::new(up, &addrspace);
-    //             if ptr.is_null() {
-    //                 Ok(None)
-    //             } else {
-    //                 let r = unsafe { ptr.read() }?;
-    //                 Ok(Some(r))
-    //             }
-    //         }
-    //     };
-    // }
-
-    // let pconvert = make_convert!(FdSet);
-    // let tconvert = make_convert!(TimeSpec);
-    // let sconvert = make_convert!(SigSet);
-
     log::info!("[sys_pselect6] timeout: {:#x}", timeout);
 
     let pconvert = |up: usize| -> SysResult<Option<FdSet>> {
@@ -1676,12 +1658,6 @@ pub async fn sys_pselect6(
         "[sys_pselect6] readfds: {readfds:?}, writefds: {writefds:?}, exceptfds: {exceptfds:?}"
     );
     log::info!("[sys_pselect6] timeout: {:?}", timeout);
-
-    // if let Some(t) = timeout {
-    //     if t.is_zero() {
-    //         return Ok(0);
-    //     }
-    // }
 
     let mut polls = Vec::<FilePollRet>::with_capacity(nfds);
 
@@ -1743,7 +1719,7 @@ pub async fn sys_pselect6(
                     writeback(readfds, readfds1)?;
                     writeback(writefds, writefds1)?;
                     writeback(exceptfds, exceptfds1)?;
-                    osfuture::yield_now().await;
+                    // osfuture::yield_now().await;
                     return Ok(0);
                 }
             },
