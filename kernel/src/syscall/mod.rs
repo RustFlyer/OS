@@ -55,7 +55,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         EXECVE => sys_execve(args[0], args[1], args[2]).await,
         GETPID => sys_getpid(),
         GETTID => sys_gettid(),
-        GETCWD => sys_getcwd(args[0], args[1]).await,
+        GETCWD => sys_getcwd(args[0], args[1]),
         FSTAT => sys_fstat(args[0], args[1]),
         FSTATAT => sys_fstatat(args[0], args[1], args[2], args[3] as i32),
         CLOSE => sys_close(args[0]),

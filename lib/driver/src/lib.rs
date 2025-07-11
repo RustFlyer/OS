@@ -7,6 +7,7 @@ use core::{
     fmt::{self, Write},
     task::Waker,
 };
+use device::OSDevice;
 use virtio_drivers::transport::{mmio::MmioTransport, pci::PciTransport};
 
 use console::console_putchar;
@@ -32,14 +33,14 @@ pub static BLOCK_DEVICE: Once<Arc<dyn BlockDevice>> = Once::new();
 pub static BLOCK_DEVICE2: Once<Arc<dyn BlockDevice>> = Once::new();
 pub static CHAR_DEVICE: Once<Arc<dyn CharDevice>> = Once::new();
 
-pub trait BlockDevice: Send + Sync {
+pub trait BlockDevice: Send + Sync + OSDevice {
     fn read(&self, block_id: usize, buf: &mut [u8]);
     fn write(&self, block_id: usize, buf: &[u8]);
     fn size(&self) -> u64;
     fn block_size(&self) -> usize;
 }
 
-pub trait CharDevice: Send + Sync {
+pub trait CharDevice: Send + Sync + OSDevice {
     fn get(&self) -> u8;
     fn puts(&self, datas: &[u8]);
     fn handle_irq(&self);

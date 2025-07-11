@@ -1,4 +1,5 @@
 use crate::BlockDevice;
+use crate::device::OSDevice;
 use crate::hal::VirtHalImpl;
 use alloc::sync::Arc;
 use config::device::{BLOCK_SIZE, DEV_SIZE, VIRTIO0};
@@ -113,5 +114,33 @@ impl BlockDevice for VirtBlkDevice<PciTransport> {
     /// Get Block Size
     fn size(&self) -> u64 {
         DEV_SIZE
+    }
+}
+
+impl OSDevice for VirtBlkDevice<MmioTransport<'static>> {
+    fn meta(&self) -> &crate::device::OSDeviceMeta {
+        todo!()
+    }
+
+    fn init(&self) {
+        todo!()
+    }
+
+    fn handle_irq(&self) {
+        todo!()
+    }
+}
+
+impl OSDevice for VirtBlkDevice<PciTransport> {
+    fn meta(&self) -> &crate::device::OSDeviceMeta {
+        todo!()
+    }
+
+    fn init(&self) {
+        todo!()
+    }
+
+    fn handle_irq(&self) {
+        todo!()
     }
 }

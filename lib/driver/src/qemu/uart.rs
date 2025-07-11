@@ -1,4 +1,4 @@
-use crate::CharDevice;
+use crate::{CharDevice, device::OSDevice};
 use mutex::SpinNoIrqLock;
 use uart_16550::MmioSerialPort;
 
@@ -35,6 +35,20 @@ impl Default for UartDevice {
     }
 }
 
+impl OSDevice for UartDevice {
+    fn meta(&self) -> &crate::device::OSDeviceMeta {
+        todo!()
+    }
+
+    fn init(&self) {
+        todo!()
+    }
+
+    fn handle_irq(&self) {
+        todo!()
+    }
+}
+
 impl CharDevice for UartDevice {
     /// Get a Char as u8
     fn get(&self) -> u8 {
@@ -67,6 +81,10 @@ impl CharDevice for UartDevice {
             r += 1;
         }
         r
+    }
+
+    fn waker(&self, _waker: core::task::Waker) {
+        core::todo!()
     }
 
     fn handle_irq(&self) {

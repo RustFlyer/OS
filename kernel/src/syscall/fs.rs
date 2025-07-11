@@ -307,7 +307,7 @@ pub fn sys_lseek(fd: usize, offset: isize, whence: usize) -> SyscallResult {
 /// On success, these functions return a `pointer` to a string containing the `pathname` of the current
 /// working directory.
 /// On  failure,  these functions return NULL, and `errno` is set to indicate the error.
-pub async fn sys_getcwd(buf: usize, len: usize) -> SyscallResult {
+pub fn sys_getcwd(buf: usize, len: usize) -> SyscallResult {
     log::info!("[sys_getcwd] len: {len:#x}");
 
     let task = current_task();

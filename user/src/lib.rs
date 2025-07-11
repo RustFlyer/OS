@@ -6,6 +6,7 @@
 pub mod console;
 
 mod error;
+pub mod initproclib;
 mod lang_items;
 #[allow(unused)]
 mod syscall;
@@ -19,6 +20,8 @@ use config::{inode::InodeMode, vfs::OpenFlags};
 pub use error::SyscallErr;
 // use sig::{Sig, SigAction};
 use syscall::*;
+
+pub use initproclib::*;
 
 // const USER_HEAP_SIZE: usize = 16384;
 const USER_HEAP_SIZE: usize = 0x32000;
@@ -79,9 +82,9 @@ macro_rules! wexitstatus {
     };
 }
 
-// pub fn getcwd(path: usize, len: usize) -> isize {
-//     sys_getcwd(path, len)
-// }
+pub fn getcwd(path: *mut u8, len: usize) -> isize {
+    sys_getcwd(path, len)
+}
 
 // pub fn mount(dev_name: usize, target_path: usize, ftype: usize, flags: u32,
 // data: usize) -> isize {     sys_mount(dev_name, target_path, ftype, flags,
