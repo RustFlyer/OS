@@ -66,31 +66,31 @@ pub fn stop_at(name: &'static str) {
 /// Numbered breakpoints for quick debugging
 #[inline(never)]
 #[unsafe(no_mangle)]
-pub fn stop_0() {
+pub fn stop0() {
     debug_break();
 }
 
 #[inline(never)]
 #[unsafe(no_mangle)]
-pub fn stop_1() {
+pub fn stop1() {
     debug_break();
 }
 
 #[inline(never)]
 #[unsafe(no_mangle)]
-pub fn stop_2() {
+pub fn stop2() {
     debug_break();
 }
 
 #[inline(never)]
 #[unsafe(no_mangle)]
-pub fn stop_3() {
+pub fn stop3() {
     debug_break();
 }
 
 #[inline(never)]
 #[unsafe(no_mangle)]
-pub fn stop_4() {
+pub fn stop4() {
     debug_break();
 }
 

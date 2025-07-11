@@ -496,6 +496,8 @@ pub async fn sys_mkdirat(dirfd: usize, pathname: usize, mode: u32) -> SyscallRes
 
     log::info!("[sys_mkdirat] dirfd: {dirfd}, path: {path}, mode: {mode}");
 
+    simdebug::stop0();
+
     let dentry = task.walk_at(AtFd::from(dirfd), path)?;
     if !dentry.is_negative() {
         return Err(SysError::EEXIST);

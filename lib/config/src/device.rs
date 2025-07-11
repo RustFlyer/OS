@@ -1,6 +1,6 @@
 use super::mm::KERNEL_MAP_OFFSET;
 
-pub const MAX_HARTS: usize = 4;
+pub const MAX_HARTS: usize = 1;
 
 pub const MMIO_SERIAL_PORT_ADDR: usize = 0x10000000 + KERNEL_MAP_OFFSET;
 

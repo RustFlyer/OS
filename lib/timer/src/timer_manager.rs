@@ -42,6 +42,7 @@ impl TimerManager {
                 }
             }
         }
+        // *self.timers.lock() = timers;
     }
 }
 

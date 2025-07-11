@@ -8,10 +8,11 @@ use core::{
     cell::UnsafeCell,
     cmp,
     fmt::{self, Debug, Write},
+    hint::spin_loop,
     task::Waker,
 };
 use mutex::SpinNoIrqLock;
-use osfuture::{suspend_now, take_waker};
+use osfuture::{suspend_now, take_waker, yield_now};
 use virtio_drivers::transport::DeviceType;
 
 use async_trait::async_trait;
@@ -28,7 +29,7 @@ const UART_BUF_LEN: usize = 512;
 
 pub static UART0: Once<Arc<dyn CharDevice>> = Once::new();
 
-trait UartDriver: Send + Sync {
+pub trait UartDriver: Send + Sync {
     fn init(&mut self);
     fn putc(&mut self, byte: u8);
     fn getc(&mut self) -> u8;
@@ -52,7 +53,13 @@ unsafe impl Send for Serial {}
 unsafe impl Sync for Serial {}
 
 impl Serial {
-    fn new(mmio_base: usize, mmio_size: usize, irq_no: usize, driver: Box<dyn UartDriver>) -> Self {
+    /// Create a new Serial. `driver` refers to `Uart` now.
+    pub fn new(
+        mmio_base: usize,
+        mmio_size: usize,
+        irq_no: usize,
+        driver: Box<dyn UartDriver>,
+    ) -> Self {
         let meta = OSDeviceMeta {
             dev_id: OSDevId {
                 major: OSDeviceMajor::Serial,
@@ -131,7 +138,8 @@ impl OSDevice for Serial {
 impl CharDevice for Serial {
     async fn read(&self, buf: &mut [u8]) -> usize {
         while !self.poll_in().await {
-            suspend_now().await
+            // yield_now().await;
+            spin_loop();
         }
         let mut len = 0;
         self.with_mut_inner(|inner| {

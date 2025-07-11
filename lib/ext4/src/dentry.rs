@@ -73,6 +73,8 @@ impl Dentry for ExtDentry {
     fn base_lookup(&self, dentry: &dyn Dentry) -> SysResult<()> {
         let superblock = self.superblock().unwrap();
         let path = CString::new(dentry.path()).unwrap();
+        log::error!("fir");
+        log::error!("path: {:?}", path);
         if ExtInode::exists(&path, InodeTypes::EXT4_DE_DIR)? {
             let new_file = ExtDir::open(&path)?;
             let inode = ExtDirInode::new(superblock, new_file);

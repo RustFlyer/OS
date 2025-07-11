@@ -65,6 +65,19 @@ pub fn push_in_available_line(runnable: Runnable, info: ScheduleInfo) {
     // log::trace!("One Task is Waken!");
     let mut least_waiting_tasks_num: usize = usize::MAX;
     let mut available_line_id: usize = 0;
+
+    if MAX_HARTS == 1 {
+        available_line_id = 0;
+        unsafe {
+            if info.woken_while_running {
+                HART_TASKS_LINES[available_line_id].push(runnable);
+            } else {
+                HART_TASKS_LINES[available_line_id].push_prio(runnable);
+            }
+        }
+        return;
+    }
+
     for i in 0..MAX_HARTS {
         let hart_mask = 1 << i;
         unsafe {

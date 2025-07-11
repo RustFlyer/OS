@@ -29,12 +29,17 @@ use virtio_drivers::{
     },
 };
 
-use crate::osdriver::ioremap_if_need;
+use crate::osdriver::{ioremap_if_need, probe_char_device_by_serial};
 
 pub fn probe_tree(fdt: &Fdt) {
     log::debug!("probe_tree begin");
 
-    probe_char_device(fdt);
+    if let Some(serial) = probe_char_device_by_serial(fdt) {
+        CHAR_DEVICE.call_once(|| serial);
+        println!("[SERIAL] INIT SUCCESS");
+    } else {
+        probe_char_device(fdt);
+    }
     println!("ok");
 
     for node in fdt.all_nodes() {
