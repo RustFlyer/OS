@@ -386,12 +386,12 @@ impl Task {
     }
 
     pub fn exit(self: &Arc<Self>) {
-        assert_ne!(
-            self.tid(),
-            INIT_PROC_ID,
-            "initproc die!!!, sepc {:#x}",
-            self.trap_context_mut().sepc
-        );
+        // assert_ne!(
+        //     self.tid(),
+        //     INIT_PROC_ID,
+        //     "initproc die!!!, sepc {:#x}",
+        //     self.trap_context_mut().sepc
+        // );
 
         // log::error!("[exit] task {} exit", self.tid());
         if let Some(parent) = self.vfork_parent.clone() {

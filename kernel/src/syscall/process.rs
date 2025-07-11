@@ -221,12 +221,28 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
         // 3. if there is no child for recycle and WNOHANG option is not set, wait for SIGCHLD from target
         let (child_tid, exit_code, child_utime, child_stime) = loop {
             task.set_state(TaskState::Interruptible);
-            task.set_wake_up_signal(!task.get_sig_mask() | SigSet::SIGCHLD);
+
+            let exit_signals = {
+                let children = task.children_mut().lock();
+                let mut sigset = SigSet::empty();
+                for child in children.values() {
+                    if let Some(sig) = *child.exit_signal.lock() {
+                        sigset |= SigSet::from(Sig::from_i32(sig as i32));
+                    } else {
+                        sigset |= SigSet::SIGCHLD;
+                    }
+                }
+                sigset
+            };
+
+            task.set_wake_up_signal(!task.get_sig_mask() | exit_signals);
             log::info!("[sys_wait4] task [{}] suspend for sigchld", task.get_name());
             suspend_now().await;
             // wake up from suspend for any reason(may not be SIGCHLD)
             task.set_state(TaskState::Running);
-            let si = task.sig_manager_mut().get_expect(SigSet::SIGCHLD);
+
+            log::error!("{} exit_signals: {:?}", task.tid(), exit_signals);
+            let si = task.sig_manager_mut().get_expect(exit_signals);
             // if it is SIGCHLD, then we can get the child for recycle
             // TODO: check if the matched child is identical to the SIGCHLD's info
             if let Some(info) = si {
@@ -291,7 +307,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
                 }
             } else {
                 log::info!("[sys_wait4] return SysError::EINTR");
-                log::info!(
+                log::error!(
                     "[sys_wait4] pending signals: {:?}",
                     task.sig_manager_mut().queue
                 );
