@@ -85,6 +85,7 @@ impl Serial {
         }
     }
 
+    #[allow(clippy::mut_from_ref)]
     fn uart(&self) -> &mut Box<dyn UartDriver> {
         unsafe { &mut *self.uart.get() }
     }

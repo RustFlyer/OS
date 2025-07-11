@@ -227,7 +227,11 @@ fn kill(task: &Arc<Task>, sig: Sig) {
         }
     });
     // 将信号放入低7位 (第8位是core dump标志,在gdb调试崩溃程序中用到)
-    task.set_exit_code(sig.raw() as i32 & 0x7F);
+    let mut exit_code = sig.raw() as i32 & 0x7F;
+    if SigSet::DUMP_MASK.contain_signal(sig) {
+        exit_code |= 0x80;
+    }
+    task.set_exit_code(exit_code);
 }
 
 fn stop(task: &Arc<Task>, sig: Sig) {
