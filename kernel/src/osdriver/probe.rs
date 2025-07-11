@@ -6,6 +6,7 @@ use core::{
 };
 use driver::{
     BLOCK_DEVICE, CHAR_DEVICE, MmioSerialPort,
+    device::OSDevice,
     hal::VirtHalImpl,
     net::{loopback::LoopbackDev, virtnet::create_virt_net_dev},
     println,
@@ -29,18 +30,25 @@ use virtio_drivers::{
     },
 };
 
-use crate::osdriver::{ioremap_if_need, probe_char_device_by_serial};
+use crate::osdriver::{
+    ioremap_if_need, manager::device_manager, probe_char_device_by_serial, probe_plic,
+};
 
 pub fn probe_tree(fdt: &Fdt) {
     log::debug!("probe_tree begin");
 
+    if let Some(plic) = probe_plic(fdt) {
+        device_manager().set_plic(plic);
+        println!("[PLIC] INIT SUCCESS");
+    }
+
     if let Some(serial) = probe_char_device_by_serial(fdt) {
+        device_manager().add_device(serial.dev_id(), serial.clone());
         CHAR_DEVICE.call_once(|| serial);
         println!("[SERIAL] INIT SUCCESS");
     } else {
         probe_char_device(fdt);
     }
-    println!("ok");
 
     for node in fdt.all_nodes() {
         if let (Some(compatible), Some(region)) = (node.compatible(), node.reg().next()) {

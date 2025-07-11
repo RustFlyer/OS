@@ -110,6 +110,7 @@ impl OSDevice for Serial {
     }
 
     fn handle_irq(&self) {
+        // log::error!("handle serial interrupt");
         let uart = self.uart();
         self.with_mut_inner(|inner| {
             while uart.poll_in() {
@@ -123,7 +124,7 @@ impl OSDevice for Serial {
                 }
             }
             // Round Robin
-            if let Some(waiting) = inner.pollin_queue.pop_front() {
+            while let Some(waiting) = inner.pollin_queue.pop_front() {
                 waiting.wake();
             }
         });
@@ -138,8 +139,8 @@ impl OSDevice for Serial {
 impl CharDevice for Serial {
     async fn read(&self, buf: &mut [u8]) -> usize {
         while !self.poll_in().await {
-            // yield_now().await;
-            spin_loop();
+            suspend_now().await;
+            // spin_loop();
         }
         let mut len = 0;
         self.with_mut_inner(|inner| {

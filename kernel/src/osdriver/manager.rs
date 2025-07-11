@@ -9,6 +9,17 @@ use driver::{
 
 use crate::osdriver::ioremap_if_need;
 
+pub static mut OSDEVICE_MANAGER: Option<DeviceTreeManager> = None;
+
+pub fn init_device_manager() {
+    unsafe { OSDEVICE_MANAGER = Some(DeviceTreeManager::new()) }
+}
+
+#[allow(static_mut_refs)]
+pub fn device_manager() -> &'static mut DeviceTreeManager {
+    unsafe { OSDEVICE_MANAGER.as_mut().unwrap() }
+}
+
 /// The DeviceManager struct is responsible for managing the devices within the
 /// system. It handles the initialization, probing, and interrupt management for
 /// various devices.
@@ -121,9 +132,9 @@ impl DeviceTreeManager {
                 self.plic().complete_irq(irq_number, self.irq_context());
                 return;
             }
-            log::warn!("Unknown interrupt: {}", irq_number);
+            log::error!("Unknown interrupt: {}", irq_number);
         } else {
-            log::warn!("No interrupt available");
+            log::error!("No interrupt available");
         }
     }
 
@@ -133,12 +144,20 @@ impl DeviceTreeManager {
     }
 
     /// mmio memory region map finished in this function
-    pub fn probe(&mut self) {
+    pub fn map_devices_interrupt(&mut self) {
         // Add to interrupt map if have interrupts
         for dev in self.devices.values() {
             if let Some(irq) = dev.irq_no() {
                 self.irq_map.insert(irq, dev.clone());
             }
         }
+    }
+
+    pub fn add_device(&mut self, id: OSDevId, device: Arc<dyn OSDevice>) {
+        self.devices.insert(id, device);
+    }
+
+    pub fn set_plic(&mut self, plic: PLIC) {
+        self.plic = Some(plic);
     }
 }

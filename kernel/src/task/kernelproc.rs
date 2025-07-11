@@ -1,3 +1,4 @@
+use alloc::string::String;
 use osfs::proc::KernelProcIf;
 
 use crate::processor::current_task;
@@ -21,6 +22,10 @@ impl KernelProcIf for KernelProcIfImpl {
     }
 
     fn stat_from_tid(tid: usize) -> alloc::string::String {
-        TASK_MANAGER.get_task(tid).unwrap().proc_stat_read()
+        if let Some(task) = TASK_MANAGER.get_task(tid) {
+            return task.proc_stat_read();
+        }
+        log::error!("no task {}", tid);
+        return String::new();
     }
 }

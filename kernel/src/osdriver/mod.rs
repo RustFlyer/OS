@@ -2,10 +2,12 @@ pub mod manager;
 pub mod probe;
 use alloc::{boxed::Box, sync::Arc};
 use driver::{
+    device::OSDevice,
     plic::PLIC,
     println,
     serial::{Serial, uart8250::Uart},
 };
+use manager::{device_manager, init_device_manager};
 use probe::*;
 
 use flat_device_tree::{Fdt, node::FdtNode};
@@ -18,6 +20,9 @@ use crate::vm::iomap::ioremap;
 #[allow(unused)]
 pub fn probe_device_tree() {
     let mut dtb_addr = unsafe { DTB_ADDR };
+
+    init_device_manager();
+
     #[cfg(target_arch = "riscv64")]
     ioremap(dtb_addr, 24 * 1024).expect("can not ioremap");
     #[cfg(target_arch = "loongarch64")]
@@ -37,6 +42,12 @@ pub fn probe_device_tree() {
     }
 
     probe_tree(&device_tree);
+
+    let manager = device_manager();
+    manager.map_devices();
+    manager.init_devices();
+    manager.enable_device_interrupts();
+    manager.map_devices_interrupt();
 }
 
 pub fn ioremap_if_need(paddr: usize, size: usize) -> usize {

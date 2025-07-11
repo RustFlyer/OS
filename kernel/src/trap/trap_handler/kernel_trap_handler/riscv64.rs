@@ -8,6 +8,8 @@ use riscv::{
 use arch::time::{get_time_duration, set_nx_timer_irq};
 use timer::TIMER_MANAGER;
 
+use crate::osdriver::manager::device_manager;
+
 #[unsafe(no_mangle)]
 pub fn kernel_trap_handler() {
     let scause = scause::read();
@@ -27,6 +29,10 @@ fn interrupt_handler(i: Interrupt) {
             TIMER_MANAGER.check(get_time_duration());
             set_nx_timer_irq();
         }
+        Interrupt::SupervisorExternal => {
+            // log::error!("[kernel] receive externel interrupt");
+            device_manager().handle_irq();
+        }
         _ => trap_panic(),
     }
 }
@@ -43,5 +49,6 @@ fn trap_panic() -> ! {
         satp::read().bits(),
     );
     log::error!("{}", msg);
+    simdebug::stop0();
     panic!("{}", msg);
 }
