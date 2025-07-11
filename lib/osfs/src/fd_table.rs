@@ -22,18 +22,7 @@ pub struct FdInfo {
 pub struct FdTable {
     table: Vec<Option<FdInfo>>,
     rlimit: RLimit,
-    // zombie: AtomicBool,
 }
-
-// impl Clone for FdTable {
-//     fn clone(&self) -> Self {
-//         Self {
-//             table: self.table.clone(),
-//             rlimit: self.rlimit.clone(),
-//             zombie: AtomicBool::new(self.zombie.load(core::sync::atomic::Ordering::Relaxed)),
-//         }
-//     }
-// }
 
 impl FdInfo {
     pub fn new(file: Arc<dyn File>, flags: FdFlags) -> Self {

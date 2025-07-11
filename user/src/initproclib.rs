@@ -127,20 +127,16 @@ pub fn parse_args(argstring: &str) -> Vec<String> {
 pub fn typecmd(buf: &mut [u8; 256], bptr: &mut usize) {
     let mut ch = 0;
     let mut tbptr = *bptr;
-    while ch != 13 {
+    while ch != '\n' as u8 {
         ch = getchar();
-        if ch != 13 && ch != 127 && tbptr < 128 {
+        if ch != 13 && ch != 127 && ch != '\n' as u8 && tbptr < 128 {
             buf[tbptr] = ch;
             tbptr = tbptr + 1;
-        }
-        if ch != 13 {
-            print!("{}", ch as char);
         }
         if tbptr > 0 && ch == 127 {
             tbptr = tbptr - 1;
         }
     }
-    print!("\n");
     *bptr = tbptr;
 }
 

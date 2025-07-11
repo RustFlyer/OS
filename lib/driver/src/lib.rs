@@ -47,7 +47,7 @@ pub trait BlockDevice: Send + Sync + OSDevice {
 
 #[async_trait]
 pub trait CharDevice: Send + Sync + OSDevice {
-    fn get(&self) -> u8;
+    fn get(&self, data: &mut u8) -> Result<(), uart_16550::WouldBlockError>;
     fn puts(&self, datas: &[u8]);
     fn handle_irq(&self);
 

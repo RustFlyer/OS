@@ -1,3 +1,5 @@
+use core::error::Error;
+
 use crate::{CharDevice, device::OSDevice};
 use alloc::boxed::Box;
 use async_trait::async_trait;
@@ -8,6 +10,7 @@ use uart_16550::MmioSerialPort;
 use config::device::MMIO_SERIAL_PORT_ADDR;
 #[cfg(target_arch = "loongarch64")]
 use config::device::PCI_SERIAL_PORT_ADDR;
+use virtio_drivers::transport::mmio::MmioError;
 
 pub struct QUartDevice {
     pub device: SpinNoIrqLock<MmioSerialPort>,
@@ -54,8 +57,9 @@ impl OSDevice for QUartDevice {
 #[async_trait]
 impl CharDevice for QUartDevice {
     /// Get a Char as u8
-    fn get(&self) -> u8 {
-        self.device.lock().receive()
+    fn get(&self, data: &mut u8) -> Result<(), uart_16550::WouldBlockError> {
+        *data = self.device.lock().try_receive()?;
+        Ok(())
     }
 
     /// Put Chars Out
@@ -85,7 +89,8 @@ impl CharDevice for QUartDevice {
     }
 
     async fn poll_in(&self) -> bool {
-        true
+        // stupid. When you watch it, the data will be lost
+        self.device.lock().try_receive().is_ok()
     }
 
     async fn poll_out(&self) -> bool {

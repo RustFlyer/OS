@@ -93,13 +93,13 @@ impl Termios {
     pub(crate) fn new() -> Self {
         Self {
             // IMAXBEL | IUTF8 | IXON | IXANY | ICRNL | BRKINT
-            iflag: 0, // 0o66402,
+            iflag: 0o66402,
             // OPOST | ONLCR
             oflag: 0o5,
             // HUPCL | CREAD | CSIZE | EXTB
             cflag: 0o2277,
             // IEXTEN | ECHOTCL | ECHOKE ECHO | ECHOE | ECHOK | ISIG | ICANON
-            lflag: 0, // 0o105073,
+            lflag: 0o105073,
             line: 0,
             cc: [
                 3,   // VINTR Ctrl-C
@@ -132,5 +132,10 @@ impl Termios {
     pub(crate) fn is_echo(&self) -> bool {
         const ECHO: u32 = 0o0000010;
         self.lflag & ECHO != 0
+    }
+
+    pub(crate) fn is_icanon(&self) -> bool {
+        const ICANON: u32 = 0o0000002;
+        self.lflag & ICANON != 0
     }
 }

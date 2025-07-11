@@ -530,10 +530,18 @@ pub async fn sys_chdir(path: usize) -> SyscallResult {
     let task = current_task();
     let addr_space = task.addr_space();
     let path = UserReadPtr::<u8>::new(path, &addr_space).read_c_string(256)?;
-    let path = path.into_string().map_err(|_| SysError::EINVAL)?;
+    let mut path = path.into_string().map_err(|_| SysError::EINVAL)?;
+
+    if path.starts_with("~") {
+        let root = task.root_mut().path();
+        if root == "/" {
+            path.remove(0);
+        } else {
+            path = path.replace("~", &task.root_mut().path());
+        }
+    }
 
     log::info!("[sys_chdir] path: {path}");
-
     let dentry = task.walk_at(AtFd::FdCwd, path)?;
     log::info!(
         "[sys_chdir] dentry inotype: {:?}",

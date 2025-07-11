@@ -1,7 +1,7 @@
 use alloc::sync::Arc;
 
 use async_trait::async_trait;
-use config::vfs::OpenFlags;
+use config::vfs::{OpenFlags, PollEvents};
 use mutex::SpinNoIrqLock;
 use systype::error::{SysResult, SyscallResult};
 use vfs::{
@@ -53,18 +53,45 @@ impl File for TtyFile {
             .downcast_arc::<TtyInode>()
             .unwrap_or_else(|_| unreachable!())
             .char_dev;
-        let rlen = dev.read(buf).await;
-
+        log::debug!("tty read {}", buf.len());
+        let mut rlen = 0;
         let termios = self.inner.lock().termios;
-        if termios.is_icrnl() {
-            for i in 0..rlen {
-                if buf[i] == b'\r' {
-                    buf[i] = b'\n';
+
+        if termios.is_icanon() {
+            while rlen < buf.len() {
+                let mut ch = [0u8; 1];
+                let n = dev.read(&mut ch).await;
+                if n == 0 {
+                    break;
+                }
+                let mut c = ch[0];
+                if termios.is_icrnl() && c == b'\r' {
+                    c = b'\n';
+                }
+                buf[rlen] = c;
+                rlen += 1;
+                if termios.is_echo() {
+                    self.base_write(&[c], 0).await?;
+                }
+                if c == b'\n' {
+                    break;
                 }
             }
-        }
-        if termios.is_echo() {
-            self.base_write(buf, 0).await?;
+        } else {
+            let mut ch = [0u8; 1];
+            if dev.read(&mut ch).await == 0 {
+                rlen = 0;
+            } else {
+                let mut ch = ch[0];
+                if termios.is_icrnl() && ch == b'\r' {
+                    ch = b'\n';
+                }
+                buf[0] = ch;
+                rlen = 1;
+                if termios.is_echo() {
+                    self.base_write(&buf[..rlen], 0).await?;
+                }
+            }
         }
         Ok(rlen)
     }
@@ -100,7 +127,7 @@ impl File for TtyFile {
             TCSETS | TCSETSW | TCSETSF => {
                 unsafe {
                     self.inner.lock().termios = *(arg as *const Termios);
-                    // log::info!("termios {:#x?}", self.inner.lock().termios);
+                    log::info!("[TtyFile::ioctl] termios {:#x?}", self.inner.lock().termios);
                 }
                 Ok(0)
             }
@@ -137,5 +164,29 @@ impl File for TtyFile {
             TCSBRK => Ok(0),
             _ => todo!(),
         }
+    }
+
+    async fn base_poll(&self, events: PollEvents) -> PollEvents {
+        let mut res = PollEvents::empty();
+        let char_dev = &self
+            .inode()
+            .downcast_arc::<TtyInode>()
+            .unwrap_or_else(|_| unreachable!())
+            .char_dev;
+
+        if events.contains(PollEvents::IN) {
+            if char_dev.poll_in().await {
+                res |= PollEvents::IN;
+            }
+        }
+
+        if events.contains(PollEvents::OUT) {
+            if char_dev.poll_out().await {
+                res |= PollEvents::OUT;
+            }
+        }
+
+        log::debug!("[TtyFile::base_poll] ret events:{res:?}");
+        res
     }
 }

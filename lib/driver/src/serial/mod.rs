@@ -170,7 +170,7 @@ impl CharDevice for Serial {
         true
     }
 
-    fn get(&self) -> u8 {
+    fn get(&self, data: &mut u8) -> Result<(), uart_16550::WouldBlockError> {
         todo!()
     }
 
