@@ -1,6 +1,7 @@
 use core::task::Waker;
 
 use alloc::{collections::vec_deque::VecDeque, sync::Arc};
+use common::RingBuffer;
 use config::{
     inode::{InodeMode, InodeType},
     mm::PAGE_SIZE,
@@ -14,7 +15,6 @@ use vfs::{
     sys_root_dentry,
 };
 
-use super::ringbuffer::RingBuffer;
 pub const PIPE_BUF_LEN: usize = 16 * PAGE_SIZE;
 pub struct PipeInode {
     meta: InodeMeta,

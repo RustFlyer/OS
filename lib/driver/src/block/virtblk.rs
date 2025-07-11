@@ -10,9 +10,9 @@ use virtio_drivers::{
     transport::{mmio::MmioTransport, pci::PciTransport},
 };
 
-pub struct QVirtBlkDevice<T: Transport>(SpinNoIrqLock<VirtIOBlk<VirtHalImpl, T>>);
+pub struct VirtBlkDevice<T: Transport>(SpinNoIrqLock<VirtIOBlk<VirtHalImpl, T>>);
 
-impl<T: Transport> QVirtBlkDevice<T> {
+impl<T: Transport> VirtBlkDevice<T> {
     pub fn new(transport: T) -> Self {
         let blk = VirtIOBlk::<VirtHalImpl, T>::new(transport);
         if let Err(e) = blk {
@@ -22,12 +22,12 @@ impl<T: Transport> QVirtBlkDevice<T> {
     }
 }
 
-unsafe impl Sync for QVirtBlkDevice<MmioTransport<'static>> {}
-unsafe impl Send for QVirtBlkDevice<MmioTransport<'static>> {}
-unsafe impl Sync for QVirtBlkDevice<PciTransport> {}
-unsafe impl Send for QVirtBlkDevice<PciTransport> {}
+unsafe impl Sync for VirtBlkDevice<MmioTransport<'static>> {}
+unsafe impl Send for VirtBlkDevice<MmioTransport<'static>> {}
+unsafe impl Sync for VirtBlkDevice<PciTransport> {}
+unsafe impl Send for VirtBlkDevice<PciTransport> {}
 
-impl BlockDevice for QVirtBlkDevice<MmioTransport<'static>> {
+impl BlockDevice for VirtBlkDevice<MmioTransport<'static>> {
     /// Read Block
     ///
     /// - ['block_id'] is the id of block in VirtHW
@@ -72,7 +72,7 @@ impl BlockDevice for QVirtBlkDevice<MmioTransport<'static>> {
     }
 }
 
-impl BlockDevice for QVirtBlkDevice<PciTransport> {
+impl BlockDevice for VirtBlkDevice<PciTransport> {
     /// Read Block
     ///
     /// - ['block_id'] is the id of block in VirtHW
@@ -117,7 +117,7 @@ impl BlockDevice for QVirtBlkDevice<PciTransport> {
     }
 }
 
-impl OSDevice for QVirtBlkDevice<MmioTransport<'static>> {
+impl OSDevice for VirtBlkDevice<MmioTransport<'static>> {
     fn meta(&self) -> &crate::device::OSDeviceMeta {
         todo!()
     }
@@ -131,7 +131,7 @@ impl OSDevice for QVirtBlkDevice<MmioTransport<'static>> {
     }
 }
 
-impl OSDevice for QVirtBlkDevice<PciTransport> {
+impl OSDevice for VirtBlkDevice<PciTransport> {
     fn meta(&self) -> &crate::device::OSDeviceMeta {
         todo!()
     }

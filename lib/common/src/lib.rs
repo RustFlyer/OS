@@ -1,3 +1,9 @@
+#![no_std]
+#![allow(unused)]
+#![allow(unknown_lints)]
+
+extern crate alloc;
+
 use alloc::{vec, vec::Vec};
 use core::cmp;
 
@@ -12,9 +18,9 @@ pub enum RingBufferState {
 pub struct RingBuffer {
     arr: Vec<u8>,
     // NOTE: When and only when `head` equals `tail`, `state` can only be `Full` or `Empty`.
-    pub(crate) head: usize,
-    pub(crate) tail: usize,
-    pub(crate) state: RingBufferState,
+    pub head: usize,
+    pub tail: usize,
+    pub state: RingBufferState,
 }
 
 impl RingBuffer {

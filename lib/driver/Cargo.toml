@@ -7,9 +7,11 @@ edition = "2024"
 arch = { path = "../arch" }
 config = { path = "../config" }
 mm = { path = "../mm" }
-
+common = { path = "../common" }
+osfuture = { path = "../osfuture" }
 mutex = { path = "../mutex" }
 polyhal-macro = { path = "../polyhal-macro" }
+
 log = { workspace = true }
 spin = { workspace = true }
 uart_16550 = { workspace = true }
@@ -21,6 +23,7 @@ plic = { workspace = true }
 bitfield-struct = { workspace = true }
 byte-slice-cast = { workspace = true }
 bitflags = { workspace = true }
+rustversion = { workspace = true }
 
 
 [features]

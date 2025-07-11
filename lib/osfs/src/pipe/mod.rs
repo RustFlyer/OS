@@ -7,7 +7,6 @@ use write::PipeWriteFile;
 pub mod inode;
 pub mod read;
 pub mod readfile;
-pub mod ringbuffer;
 pub mod write;
 pub mod writefile;
 

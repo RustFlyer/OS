@@ -5,11 +5,11 @@ use core::{
     ptr::{self, NonNull},
 };
 use driver::{
-    BLOCK_DEVICE, BlockDevice, CHAR_DEVICE, MmioSerialPort,
+    BLOCK_DEVICE, CHAR_DEVICE, MmioSerialPort,
     hal::VirtHalImpl,
     net::{loopback::LoopbackDev, virtnet::create_virt_net_dev},
     println,
-    qemu::{UartDevice, VirtBlkDevice},
+    qemu::{QUartDevice, QVirtBlkDevice},
 };
 use flat_device_tree::{Fdt, node::FdtNode};
 use net::{init_network, net_device_exist};
@@ -69,7 +69,7 @@ fn handle_mmio_device(transport: MmioTransport<'static>) {
     match transport.device_type() {
         DeviceType::Block => {
             log::info!("Init virtio-blk");
-            BLOCK_DEVICE.call_once(|| Arc::new(VirtBlkDevice::new(transport)));
+            BLOCK_DEVICE.call_once(|| Arc::new(QVirtBlkDevice::new(transport)));
         }
         DeviceType::Network => {
             log::info!("Init virtio-net");
@@ -319,12 +319,12 @@ fn probe_char_device(fdt: &Fdt) {
         let reg = node.reg().next().unwrap();
         let base = ioremap_if_need(reg.starting_address as usize, reg.size.unwrap());
         let uart = unsafe { MmioSerialPort::new(base) };
-        CHAR_DEVICE.call_once(|| Arc::new(UartDevice::new_from_mmio(uart)));
+        CHAR_DEVICE.call_once(|| Arc::new(QUartDevice::new_from_mmio(uart)));
     }
 }
 
 fn virtio_blk(transport: PciTransport) {
-    BLOCK_DEVICE.call_once(|| Arc::new(VirtBlkDevice::new(transport)));
+    BLOCK_DEVICE.call_once(|| Arc::new(QVirtBlkDevice::new(transport)));
     log::info!("virtio-blk test finished");
     println!("[BLOCK_DEVICE] INIT SUCCESS");
 }
@@ -378,7 +378,7 @@ fn probe_sd_mmc_devices(fdt: &Fdt) {
                     base,
                     irq
                 );
-                let vaddr = ioremap_if_need(base, size);
+                let _vaddr = ioremap_if_need(base, size);
                 // BLOCK_DEVICE.call_once(|| Arc::new(BlockDevice::new(vaddr, size, irq)));
                 println!("[BLOCK_DEVICE] SD/MMC Controller INIT SUCCESS");
             }

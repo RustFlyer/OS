@@ -22,7 +22,7 @@ use super::{
 };
 use crate::{
     BlockDevice,
-    device::{OSDevId, OSDevice, OSDeviceMajor, OSDeviceMeta},
+    device::{OSDevId, OSDevice, OSDeviceKind, OSDeviceMajor, OSDeviceMeta},
     wait_for,
 };
 
@@ -48,12 +48,16 @@ impl MMC {
                 mmio_base: base_address,
                 mmio_size: size,
                 irq_no: None,
-                dtype: DeviceType::Block,
+                dtype: OSDeviceKind::SDMMC,
+                pci_bar: None,
+                pci_bdf: None,
+                pci_ids: None,
             },
             fifo_offset: UnsafeCell::new(0x600),
             frames: UnsafeCell::new(Vec::new()),
         }
     }
+
     pub fn card_init(&self) {
         log::info!("====================== SDIO Init START ========================");
 

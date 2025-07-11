@@ -175,6 +175,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "common"
+version = "0.1.0"
+dependencies = [
+ "log",
+]
+
+[[package]]
 name = "config"
 version = "0.1.0"
 dependencies = [
@@ -254,13 +261,16 @@ dependencies = [
  "bitfield-struct",
  "bitflags 2.9.1",
  "byte-slice-cast",
+ "common",
  "config",
  "downcast-rs",
  "log",
  "mm",
  "mutex",
+ "osfuture",
  "plic",
  "polyhal-macro",
+ "rustversion",
  "sbi-rt",
  "smoltcp",
  "spin",
@@ -623,6 +633,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "bitflags 2.9.1",
+ "common",
  "config",
  "crate_interface",
  "driver",

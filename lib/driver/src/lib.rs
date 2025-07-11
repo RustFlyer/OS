@@ -2,7 +2,9 @@
 #![allow(unused)]
 #![allow(unknown_lints)]
 
+use alloc::boxed::Box;
 use alloc::sync::Arc;
+use async_trait::async_trait;
 use core::{
     fmt::{self, Write},
     task::Waker,
@@ -10,8 +12,9 @@ use core::{
 use device::OSDevice;
 use virtio_drivers::transport::{mmio::MmioTransport, pci::PciTransport};
 
+pub use console::console_print;
 use console::console_putchar;
-use qemu::UartDevice;
+use qemu::QUartDevice;
 use spin::Once;
 
 pub mod block;
@@ -21,6 +24,8 @@ pub mod hal;
 pub mod net;
 pub mod plic;
 pub mod qemu;
+pub mod serial;
+pub mod test;
 
 pub use uart_16550::MmioSerialPort;
 pub use virtio_drivers::transport::DeviceType;
@@ -40,69 +45,17 @@ pub trait BlockDevice: Send + Sync + OSDevice {
     fn block_size(&self) -> usize;
 }
 
+#[async_trait]
 pub trait CharDevice: Send + Sync + OSDevice {
     fn get(&self) -> u8;
     fn puts(&self, datas: &[u8]);
     fn handle_irq(&self);
 
-    fn write(&self, buf: &[u8]) -> usize;
-    fn read(&self, buf: &mut [u8]) -> usize;
+    async fn write(&self, buf: &[u8]) -> usize;
+    async fn read(&self, buf: &mut [u8]) -> usize;
 
-    fn waker(&self, _waker: Waker) {
-        todo!()
-    }
-}
-
-pub fn init() {
-    // init_block_device();
-    init_char_device();
-
-    // let buf = "hello char dev\n";
-    // CHAR_DEVICE.get().unwrap().write(buf.as_bytes());
-    println!("[CHAR_DEVICE] INIT SUCCESS");
-}
-
-fn init_block_device() {
-    log::debug!("block in");
-    // BLOCK_DEVICE.call_once(|| Arc::new(VirtBlkDevice::new()));
-    log::debug!("block out");
-}
-
-fn init_char_device() {
-    CHAR_DEVICE.call_once(|| Arc::new(UartDevice::new()));
-}
-
-struct Console;
-
-impl Write for Console {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        for c in s.as_bytes() {
-            console_putchar(*c);
-        }
-        Ok(())
-    }
-}
-
-pub fn console_print(args: fmt::Arguments<'_>) {
-    // Note: Is the lock necessary?
-    // static PRINT_MUTEX: SpinNoIrqLock<()> = SpinNoIrqLock::new(());
-    // let _lock = PRINT_MUTEX.lock();
-    Console.write_fmt(args).unwrap();
-}
-
-pub fn block_device_test() {
-    let block_device = BLOCK_DEVICE.get().unwrap();
-    let mut write_buffer = [0u8; 512];
-    let mut read_buffer = [0u8; 512];
-    for i in 100..553 {
-        for byte in write_buffer.iter_mut() {
-            *byte = i as u8;
-        }
-        block_device.write(i as usize, &write_buffer);
-        block_device.read(i as usize, &mut read_buffer);
-        assert_eq!(write_buffer, read_buffer);
-    }
-    println!("block device test passed!");
+    async fn poll_in(&self) -> bool;
+    async fn poll_out(&self) -> bool;
 }
 
 #[macro_export]

@@ -1,4 +1,6 @@
 use crate::{CharDevice, device::OSDevice};
+use alloc::boxed::Box;
+use async_trait::async_trait;
 use mutex::SpinNoIrqLock;
 use uart_16550::MmioSerialPort;
 
@@ -7,11 +9,11 @@ use config::device::MMIO_SERIAL_PORT_ADDR;
 #[cfg(target_arch = "loongarch64")]
 use config::device::PCI_SERIAL_PORT_ADDR;
 
-pub struct UartDevice {
+pub struct QUartDevice {
     pub device: SpinNoIrqLock<MmioSerialPort>,
 }
 
-impl UartDevice {
+impl QUartDevice {
     pub fn new() -> Self {
         #[cfg(target_arch = "loongarch64")]
         let serialport = unsafe { MmioSerialPort::new(PCI_SERIAL_PORT_ADDR) };
@@ -29,13 +31,13 @@ impl UartDevice {
     }
 }
 
-impl Default for UartDevice {
+impl Default for QUartDevice {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl OSDevice for UartDevice {
+impl OSDevice for QUartDevice {
     fn meta(&self) -> &crate::device::OSDeviceMeta {
         todo!()
     }
@@ -49,22 +51,21 @@ impl OSDevice for UartDevice {
     }
 }
 
-impl CharDevice for UartDevice {
+#[async_trait]
+impl CharDevice for QUartDevice {
     /// Get a Char as u8
     fn get(&self) -> u8 {
         self.device.lock().receive()
     }
 
     /// Put Chars Out
-    ///
-    /// - [datas] is buffer for chars
     fn puts(&self, datas: &[u8]) {
         for data in datas {
             self.device.lock().send(*data);
         }
     }
 
-    fn read(&self, buf: &mut [u8]) -> usize {
+    async fn read(&self, buf: &mut [u8]) -> usize {
         let rlen = buf.len();
         let mut r = 0;
         while r < rlen {
@@ -74,7 +75,7 @@ impl CharDevice for UartDevice {
         r
     }
 
-    fn write(&self, buf: &[u8]) -> usize {
+    async fn write(&self, buf: &[u8]) -> usize {
         let mut r = 0;
         for data in buf {
             self.device.lock().send(*data);
@@ -83,8 +84,12 @@ impl CharDevice for UartDevice {
         r
     }
 
-    fn waker(&self, _waker: core::task::Waker) {
-        core::todo!()
+    async fn poll_in(&self) -> bool {
+        true
+    }
+
+    async fn poll_out(&self) -> bool {
+        true
     }
 
     fn handle_irq(&self) {

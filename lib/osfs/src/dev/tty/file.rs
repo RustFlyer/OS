@@ -53,7 +53,7 @@ impl File for TtyFile {
             .downcast_arc::<TtyInode>()
             .unwrap_or_else(|_| unreachable!())
             .char_dev;
-        let rlen = dev.read(buf);
+        let rlen = dev.read(buf).await;
 
         let termios = self.inner.lock().termios;
         if termios.is_icrnl() {
@@ -78,7 +78,7 @@ impl File for TtyFile {
             .downcast_arc::<TtyInode>()
             .unwrap_or_else(|_| unreachable!())
             .char_dev;
-        dev.write(buf);
+        dev.write(buf).await;
 
         Ok(buf.len())
     }
