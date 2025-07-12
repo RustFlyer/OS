@@ -165,7 +165,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
             let mut result = None;
             for process in PROCESS_GROUP_MANAGER
                 .get_group(pgid)
-                .ok_or_else(|| SysError::ESRCH)?
+                .ok_or(SysError::ESRCH)?
                 .into_iter()
                 .filter_map(|t| t.upgrade())
                 .filter(|t| t.is_process())
@@ -263,7 +263,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
                         let mut result = None;
                         for process in PROCESS_GROUP_MANAGER
                             .get_group(pgid)
-                            .ok_or_else(|| SysError::ESRCH)?
+                            .ok_or(SysError::ESRCH)?
                             .into_iter()
                             .filter_map(|t| t.upgrade())
                             .filter(|t| t.is_process())
@@ -500,7 +500,7 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
     if broken_tests
         .iter()
         .filter(|t| path.contains(**t))
-        .last()
+        .next_back()
         .is_some()
     {
         log::error!("not support cgroup");
@@ -558,12 +558,12 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
     };
 
     let filepath = dentry.path();
-    let expath = filepath.rsplitn(2, '/').nth(1).unwrap_or("");
+    let expath = filepath.rsplit_once('/').map(|x| x.0).unwrap_or("");
     let argpath = format!(
         "PATH={}:/bin:/sbin:/usr/bin:/usr/local/bin:/usr/local/sbin:ltp/testcases/bin:",
         expath
     );
-    envs.push(String::from(argpath));
+    envs.push(argpath);
 
     log::info!("[sys_execve]: open file {}", dentry.path());
     let file = <dyn File>::open(dentry)?;
