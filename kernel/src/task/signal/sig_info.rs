@@ -19,11 +19,31 @@ pub enum SigDetails {
     Kill {
         /// sender's pid
         pid: usize,
+        /// When calling Linux `pidfd_send_signal` system call, this is the `info`
+        /// parameter passed to the signal handler. Otherwise, it is `None`.
+        siginfo: Option<LinuxSigInfo>,
     },
     Child {
         /// child's pid
         pid: usize,
     },
+}
+
+#[derive(Debug, Default, Copy, Clone)]
+#[repr(C)]
+pub struct LinuxSigInfo {
+    pub si_signo: i32,
+    pub si_errno: i32,
+    pub si_code: i32,
+    pub si_trapno: i32,
+    pub si_pid: i32,
+    pub si_uid: u32,
+    pub si_status: i32,
+    pub si_utime: u32,
+    pub si_stime: u32,
+    pub si_value: u64,
+    pub _pad: [u32; 20],
+    pub _align: [u64; 0],
 }
 
 #[allow(unused)]

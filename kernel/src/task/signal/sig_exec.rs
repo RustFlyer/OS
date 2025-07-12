@@ -9,7 +9,7 @@ use crate::task::{
     Task, TaskState,
     manager::TASK_MANAGER,
     sig_members::{ActionType, SS_DISABLE, SS_ONSTACK, SigActionFlag, SigContext},
-    signal::sig_info::{SigDetails, SigInfo, SigSet},
+    signal::sig_info::{LinuxSigInfo, SigDetails, SigInfo, SigSet},
 };
 use crate::vm::user_ptr::UserWritePtr;
 
@@ -162,23 +162,28 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
                 // log::error!("[SA_SIGINFO] set sig_cx {sig_cx:?}");
                 // a2
                 cx.set_user_a2(new_sp);
-                #[derive(Default, Copy, Clone)]
-                #[repr(C)]
-                pub struct LinuxSigInfo {
-                    pub si_signo: i32,
-                    pub si_errno: i32,
-                    pub si_code: i32,
-                    pub _pad: [i32; 29],
-                    _align: [u64; 0],
-                }
-                let siginfo_v = LinuxSigInfo {
-                    si_signo: si.sig.raw() as _,
-                    si_code: si.code,
-                    ..Default::default()
+
+                let siginfo = if let SigDetails::Kill { pid: _, siginfo } = si.details {
+                    match siginfo {
+                        Some(info) => info,
+                        None => {
+                            log::warn!("[sig_exec] siginfo is None, use the default value");
+                            LinuxSigInfo {
+                                si_signo: si.sig.raw() as _,
+                                si_code: si.code,
+                                si_pid: task.tid() as _,
+                                si_uid: task.uid() as _,
+                                ..Default::default()
+                            }
+                        }
+                    }
+                } else {
+                    log::error!("[sig_exec] SigDetail should be Kill, but got: {:?}", si.details);
+                    panic!("sig_exec: unexpected siginfo details");
                 };
                 new_sp -= size_of::<LinuxSigInfo>();
                 let mut siginfo_ptr = UserWritePtr::<LinuxSigInfo>::new(new_sp, &addr_space);
-                unsafe { siginfo_ptr.write(siginfo_v)? };
+                unsafe { siginfo_ptr.write(siginfo)? };
                 cx.set_user_a1(new_sp);
             }
 
@@ -277,7 +282,10 @@ impl IEvent for SigEvent {
             task.receive_siginfo(SigInfo {
                 sig: Sig::from_i32(self.sig),
                 code: SigInfo::USER,
-                details: SigDetails::Kill { pid: task.pid() },
+                details: SigDetails::Kill {
+                    pid: task.pid(),
+                    siginfo: None,
+                },
             });
         }
         TimerState::Cancelled
