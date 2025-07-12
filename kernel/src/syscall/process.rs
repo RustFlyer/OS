@@ -241,7 +241,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
             // wake up from suspend for any reason(may not be SIGCHLD)
             task.set_state(TaskState::Running);
 
-            log::error!("{} exit_signals: {:?}", task.tid(), exit_signals);
+            // log::error!("{} exit_signals: {:?}", task.tid(), exit_signals);
             let si = task.sig_manager_mut().get_expect(exit_signals);
             // if it is SIGCHLD, then we can get the child for recycle
             // TODO: check if the matched child is identical to the SIGCHLD's info

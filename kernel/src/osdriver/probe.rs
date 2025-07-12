@@ -43,14 +43,17 @@ pub fn probe_tree(fdt: &Fdt) {
     if let Some(plic) = probe_plic(fdt) {
         device_manager().set_plic(plic);
         println!("[PLIC] INIT SUCCESS");
+    } else {
+        probe_char_device(fdt);
+        println!("[CHAR] INIT SUCCESS");
     }
 
     if let Some(serial) = probe_char_device_by_serial(fdt) {
-        device_manager().add_device(serial.dev_id(), serial.clone());
-        CHAR_DEVICE.call_once(|| serial);
-        println!("[SERIAL] INIT SUCCESS");
-    } else {
-        probe_char_device(fdt);
+        if CHAR_DEVICE.get().is_none() {
+            device_manager().add_device(serial.dev_id(), serial.clone());
+            CHAR_DEVICE.call_once(|| serial);
+            println!("[SERIAL] INIT SUCCESS");
+        }
     }
 
     for node in fdt.all_nodes() {

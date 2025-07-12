@@ -603,11 +603,6 @@ pub async fn sys_unlinkat(dirfd: usize, pathname: usize, flags: i32) -> SyscallR
     };
     log::info!("[sys_unlinkat] dirfd: {dirfd}, path: {path}, flags: {flags:?}");
 
-    if path == "/dev/shm/testshm" {
-        log::warn!("[sys_unlinkat] stupid return");
-        return Ok(0);
-    }
-
     let dentry = task.walk_at(AtFd::from(dirfd), path)?;
     let parent = dentry.parent().ok_or(SysError::EBUSY)?;
     let is_dir = dentry.inode().ok_or(SysError::ENOENT)?.inotype().is_dir();
@@ -1077,7 +1072,7 @@ pub struct IoVec {
 
 /// `sys_readv()` read data from file into multiple buffers
 pub async fn sys_readv(fd: usize, iov: usize, iovcnt: usize) -> SyscallResult {
-    // log::info!("[sys_readv] fd: {fd}, iov: {iov:#x}, iovcnt: {iovcnt}");
+    log::info!("[sys_readv] fd: {fd}, iov: {iov:#x}, iovcnt: {iovcnt}");
 
     let task = current_task();
     let addrspace = task.addr_space();
@@ -1087,16 +1082,16 @@ pub async fn sys_readv(fd: usize, iov: usize, iovcnt: usize) -> SyscallResult {
         unsafe { iovs_ptr.read_array(iovcnt)? }
     };
 
-    // log::info!("[sys_readv] iov: {:?}", iovs);
-
     let mut read_bytes = 0;
     let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
     for iov in iovs {
         if iov.len == 0 {
             continue;
         }
+
         let mut ptr = UserWritePtr::<u8>::new(iov.base, &addrspace);
         let slice = unsafe { ptr.try_into_mut_slice(iov.len)? };
+
         read_bytes += file.read(slice).await?;
     }
 

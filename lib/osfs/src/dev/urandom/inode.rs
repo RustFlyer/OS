@@ -18,7 +18,7 @@ pub struct UrandomInode {
 impl UrandomInode {
     pub fn new(superblock: Arc<dyn SuperBlock>) -> Arc<Self> {
         let size = BLOCK_SIZE;
-        let mode = InodeMode::REG;
+        let mode = InodeMode::CHAR;
         let inode = Arc::new(Self {
             meta: InodeMeta::new(alloc_ino(), superblock),
         });

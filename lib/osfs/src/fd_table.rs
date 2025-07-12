@@ -131,17 +131,17 @@ impl FdTable {
         let mut cnt = 0;
         for slot in self.table.iter_mut() {
             if let Some(fd_info) = slot {
-                log::debug!(
-                    "fdinfo ino {} type {:?} fd {} close",
-                    fd_info.file.inode().get_meta().ino,
-                    fd_info.file.inode().inotype(),
-                    cnt
-                );
-                log::debug!(
-                    "fd {} remained: {}",
-                    cnt,
-                    Arc::strong_count(&fd_info.file) - 1
-                );
+                // log::debug!(
+                //     "fdinfo ino {} type {:?} fd {} close",
+                //     fd_info.file.inode().get_meta().ino,
+                //     fd_info.file.inode().inotype(),
+                //     cnt
+                // );
+                // log::debug!(
+                //     "fd {} remained: {}",
+                //     cnt,
+                //     Arc::strong_count(&fd_info.file) - 1
+                // );
                 if fd_info.flags().contains(FdFlags::CLOEXEC) {
                     *slot = None;
                 }

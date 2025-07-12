@@ -45,7 +45,7 @@ pub fn probe_device_tree() {
 
     let manager = device_manager();
     manager.map_devices();
-    manager.init_devices();
+    manager.initialize_devices();
     manager.enable_device_interrupts();
     manager.map_devices_interrupt();
 }
@@ -72,7 +72,7 @@ pub fn probe_plic(root: &Fdt) -> Option<PLIC> {
         ioremap_if_need(mmio_base, mmio_size);
         Some(PLIC::new(mmio_base, mmio_size))
     } else {
-        log::error!("[PLIC probe] faild to find plic");
+        log::error!("[PLIC probe] failed to find plic");
         None
     }
 }

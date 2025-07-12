@@ -108,7 +108,7 @@ impl Task {
     ) -> SysResult<()> {
         let addrspace = AddrSpace::build_user()?;
         let (entry_point, auxv) = addrspace.load_elf(elf_file.clone())?;
-        log::debug!("[execve] load elf: over");
+        // log::debug!("[execve] load elf: over");
         let stack_top = addrspace.map_stack()?;
         addrspace.map_heap()?;
 

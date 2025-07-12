@@ -71,7 +71,7 @@ impl File for SimpleFileFile {
         let inode = self.inode();
         let cache = inode.page_cache();
 
-        log::debug!("[base_read] pos: {}", pos);
+        log::debug!("[base_read] pos: {}, path: {}", pos, self.dentry().path());
 
         while !buf.is_empty() && cur_pos < size {
             let file_offset = cur_pos / PAGE_SIZE * PAGE_SIZE;

@@ -232,6 +232,8 @@ impl dyn File {
         let inode = self.inode();
         let position = self.pos();
 
+        // log::error!("[read] {} {}", self.dentry().path(), inode.get_meta().ino);
+
         let bytes_read = match inode.inotype() {
             InodeType::File => self.read_through_page_cache(buf, position).await?,
             _ => self.base_read(buf, position).await?,

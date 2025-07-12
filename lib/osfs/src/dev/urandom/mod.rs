@@ -2,7 +2,7 @@ use alloc::{string::String, sync::Arc};
 use dentry::UrandomDentry;
 use inode::UrandomInode;
 use systype::error::SysResult;
-use vfs::{dentry::Dentry, path::Path, sys_root_dentry};
+use vfs::{path::Path, sys_root_dentry};
 
 pub mod dentry;
 pub mod file;
@@ -19,9 +19,6 @@ pub fn init() -> SysResult<()> {
     let urandom_dentry = UrandomDentry::new("urandom", Some(inode), Some(weak_parent));
     parent.add_child(urandom_dentry.clone());
 
-    let sb = parent.clone().superblock();
-    let urandom_inode = UrandomInode::new(sb.clone().unwrap());
-    urandom_dentry.set_inode(urandom_inode);
     log::debug!("success init urandom");
 
     Ok(())

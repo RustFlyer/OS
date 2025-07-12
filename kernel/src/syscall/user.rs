@@ -213,9 +213,11 @@ pub fn sys_setsid() -> SyscallResult {
 
     cred.sid = task.pid() as u32;
     cred.pgid = task.pid() as u32;
+    drop(cred);
+
     PROCESS_GROUP_MANAGER.add_group(&task);
 
-    Ok(cred.sid as usize)
+    Ok(task.pid() as usize)
 }
 
 pub fn sys_getgroups(size: usize, list_ptr: usize) -> SyscallResult {

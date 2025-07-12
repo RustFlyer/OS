@@ -62,10 +62,8 @@ impl DeviceTreeManager {
 
     /// Initializes all devices that have been discovered and added to the
     /// device manager.
-    pub fn init_devices(&mut self) {
-        for dev in self.devices.values() {
-            dev.init();
-        }
+    pub fn initialize_devices(&mut self) {
+        self.devices.values().for_each(|d| d.init());
     }
 
     pub fn map_devices(&self) {
@@ -103,6 +101,11 @@ impl DeviceTreeManager {
     }
 
     pub fn enable_device_interrupts(&mut self) {
+        if self.plic.is_none() {
+            log::warn!("no plic");
+            return;
+        }
+
         let total = unsafe { board::HARTS_NUM };
         for i in 0..total * 2 {
             for dev in self.devices.values() {
@@ -116,9 +119,13 @@ impl DeviceTreeManager {
     }
 
     pub fn handle_irq(&mut self) {
+        if self.plic.is_none() {
+            log::warn!("no plic");
+            return;
+        }
+
         disable_interrupt();
 
-        // log::trace!("Handling interrupt");
         // First clain interrupt from PLIC
         if let Some(irq_number) = self.plic().claim_irq(self.irq_context()) {
             if let Some(dev) = self.irq_map.get(&irq_number) {

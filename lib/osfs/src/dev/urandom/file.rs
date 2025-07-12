@@ -20,6 +20,7 @@ impl UrandomFile {
             seed: AtomicU64::new(0x12345678abcdef),
         }
     }
+
     fn next(&self) -> u8 {
         let mut x = self.seed.load(core::sync::atomic::Ordering::Relaxed);
         x ^= x << 13;
@@ -40,6 +41,7 @@ impl File for UrandomFile {
         for b in buf.iter_mut() {
             *b = self.next();
         }
+        // log::error!("read random: {:?}", buf.len());
         Ok(buf.len())
     }
 
