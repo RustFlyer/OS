@@ -78,12 +78,29 @@ pub fn init_procfs(root_dentry: Arc<dyn Dentry>) -> SysResult<()> {
     );
     kernel_dentry.add_child(pid_max_dentry.clone());
     kernel_dentry
+        .clone()
         .into_dyn()
         .create(pid_max_dentry.into_dyn_ref(), InodeMode::REG)?;
     log::info!("[init_procfs] add pid_max_dentry");
     let pid_max_file = pid_max_dentry.base_open()?;
     pid_max_file.set_flags(OpenFlags::O_WRONLY);
     osfuture::block_on(async { pid_max_file.write("32768\0".as_bytes()).await })?;
+
+    // /proc/sys/kernel/tainted
+    let tainted_dentry = SimpleDentry::new(
+        "tainted",
+        None,
+        Some(Arc::downgrade(&kernel_dentry.clone().into_dyn())),
+    );
+    kernel_dentry.add_child(tainted_dentry.clone());
+    kernel_dentry
+        .clone()
+        .into_dyn()
+        .create(tainted_dentry.into_dyn_ref(), InodeMode::REG)?;
+    log::info!("[init_procfs] add tainted_dentry");
+    let tainted_file = tainted_dentry.base_open()?;
+    tainted_file.set_flags(OpenFlags::O_WRONLY);
+    osfuture::block_on(async { tainted_file.write("0\0".as_bytes()).await })?;
 
     // /proc/cpuinfo
     let cpuinfo_inode = SimpleInode::new(root_dentry.superblock().unwrap());

@@ -67,10 +67,18 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
     match action.atype {
         ActionType::Ignore => Ok(false),
         ActionType::Kill => {
+            if task.tid() == 1 {
+                log::warn!("[sig_exec] kill init task, ignored");
+                return Ok(false);
+            }
             kill(&task, si.sig);
             Ok(false)
         }
         ActionType::Stop => {
+            if task.tid() == 1 {
+                log::warn!("[sig_exec] kill init task, ignored");
+                return Ok(false);
+            }
             stop(&task, si.sig);
             Ok(false)
         }
@@ -227,7 +235,11 @@ fn kill(task: &Arc<Task>, sig: Sig) {
         }
     });
     // 将信号放入低7位 (第8位是core dump标志,在gdb调试崩溃程序中用到)
-    task.set_exit_code(sig.raw() as i32 & 0x7F);
+    let mut exit_code = sig.raw() as i32 & 0x7F;
+    if SigSet::DUMP_MASK.contain_signal(sig) {
+        exit_code |= 0x80;
+    }
+    task.set_exit_code(exit_code);
 }
 
 fn stop(task: &Arc<Task>, sig: Sig) {
