@@ -303,7 +303,10 @@ pub fn sys_kill(pid: isize, sig_code: i32) -> SyscallResult {
                 thread.receive_siginfo(SigInfo {
                     sig,
                     code: SigInfo::USER,
-                    details: SigDetails::Kill { pid: process.pid() },
+                    details: SigDetails::Kill {
+                        pid: process.pid(),
+                        siginfo: None,
+                    },
                 });
             }
         });
@@ -440,7 +443,7 @@ pub async fn sys_sigreturn() -> SyscallResult {
         .enumerate()
         .for_each(|(idx, u)| rs.push_str(format!("r[{idx:02}] = {u:#x}, ").as_str()));
 
-    log::debug!(
+    log::info!(
         "[sys_sigreturn] tid: {}, task: {}, after trap context: [{:?}]",
         task.tid(),
         task.get_name(),
@@ -516,7 +519,9 @@ pub fn sys_rt_sigaction(
                     task.get_name(),
                     entry
                 );
-                ActionType::User { entry }
+                ActionType::User {
+                    entry,
+                }
             }
         };
 
@@ -620,7 +625,10 @@ pub fn sys_tgkill(tgid: isize, tid: isize, signum: i32) -> SyscallResult {
                 thread.receive_siginfo(SigInfo {
                     sig,
                     code: SigInfo::TKILL,
-                    details: SigDetails::Kill { pid: task.pid() },
+                    details: SigDetails::Kill {
+                        pid: task.pid(),
+                        siginfo: None,
+                    },
                 });
                 return Ok(0);
             }
@@ -814,6 +822,21 @@ pub fn sys_pidfd_send_signal(
         return Ok(0);
     }
 
+    let siginfo = if info_ptr == 0 {
+        LinuxSigInfo {
+            si_signo: sig.raw() as _,
+            si_errno: 0,
+            si_code: SigInfo::USER,
+            si_pid: task.pid() as _,
+            si_uid: task.uid() as _,
+            ..Default::default()
+        }
+    } else {
+        let addrspace = task.addr_space();
+        let mut info_ptr = UserReadPtr::<LinuxSigInfo>::new(info_ptr, &addrspace);
+        unsafe { info_ptr.read().map_err(|_| SysError::EFAULT)? }
+    };
+
     task.with_thread_group(|tg| {
         for thread in tg.iter() {
             log::info!(
@@ -825,7 +848,7 @@ pub fn sys_pidfd_send_signal(
             thread.receive_siginfo(SigInfo {
                 sig,
                 code: SigInfo::USER,
-                details: SigDetails::Kill { pid: task.pid() },
+                details: SigDetails::Kill { pid: task.pid(), siginfo: Some(siginfo) },
             });
         }
     });
