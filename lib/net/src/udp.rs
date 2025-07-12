@@ -1,9 +1,10 @@
+use crate::externf::__NetSocketIf_mod;
 use core::{
     ops::Deref,
     sync::atomic::{AtomicBool, Ordering},
     task::Waker,
 };
-
+use crate_interface::call_interface;
 use smoltcp::{
     iface::SocketHandle,
     socket::udp::{self, BindError, SendError},
@@ -18,6 +19,7 @@ use systype::error::{SysError, SysResult};
 use crate::{
     NetPollState, SOCKET_SET, SocketSetWrapper,
     addr::{UNSPECIFIED_LISTEN_ENDPOINT, is_unspecified, to_endpoint},
+    externf::NetSocketIf,
     portmap::PORT_MAP,
     tcp::has_signal,
 };
@@ -34,17 +36,22 @@ pub struct UdpSocket {
     local_addr: RwLock<Option<IpListenEndpoint>>,
     peer_addr: RwLock<Option<IpEndpoint>>,
     nonblock: AtomicBool,
+    pub reuse_addr: AtomicBool,
+    pub reuse_port: AtomicBool,
 }
 
 impl UdpSocket {
     pub fn new() -> Self {
         let socket = SocketSetWrapper::new_udp_socket();
         let handle = SOCKET_SET.add(socket);
+        log::error!("[udp::new] add {}", handle);
         Self {
             handle,
             local_addr: RwLock::new(None),
             peer_addr: RwLock::new(None),
             nonblock: AtomicBool::new(false),
+            reuse_addr: AtomicBool::new(false),
+            reuse_port: AtomicBool::new(false),
         }
     }
 
@@ -79,15 +86,26 @@ impl UdpSocket {
     /// this function checks whether a specified `bound_addr` is binded in `PORT_MAP`.
     /// If not, this function will insert it into `PORT_MAP`.
     pub fn check_bind(&self, fd: usize, mut bound_addr: IpListenEndpoint) -> Option<usize> {
-        if let Some((fd, prev_bound_addr)) = PORT_MAP.get(bound_addr.port) {
-            if bound_addr == prev_bound_addr {
-                return Some(fd);
+        if let Some(vec) = PORT_MAP.get(bound_addr.port) {
+            let mut all_reuse = self.reuse_addr.load(Ordering::Relaxed);
+            for (other_fd, prev_bound_addr) in &vec {
+                if bound_addr == *prev_bound_addr {
+                    return Some(*other_fd);
+                }
+                let can_reuse = call_interface!(NetSocketIf::check_socket_reuseaddr(*other_fd));
+                if can_reuse.is_some() && !can_reuse.unwrap() {
+                    all_reuse = false;
+                }
+            }
+            if !all_reuse {
+                return Some(vec[0].0);
             }
         }
 
         if bound_addr.port == 0 {
             bound_addr.port = UdpSocket::get_ephemeral_port();
         }
+
         PORT_MAP.insert(bound_addr.port, fd, bound_addr);
         None
     }
@@ -444,5 +462,30 @@ impl UdpSocket {
             *curr = next_port as u16;
         }
         port
+    }
+
+    pub fn is_reuse_addr(&self) -> bool {
+        self.reuse_addr.load(Ordering::SeqCst)
+    }
+
+    pub fn is_reuse_port(&self) -> bool {
+        self.reuse_port.load(Ordering::SeqCst)
+    }
+}
+
+impl Drop for UdpSocket {
+    fn drop(&mut self) {
+        log::error!("[udp::drop] remove {}", self.handle);
+
+        if let Ok(addr) = self.local_addr() {
+            PORT_MAP.remove(addr.port);
+        }
+
+        SOCKET_SET.with_socket_mut::<udp::Socket, _, _>(self.handle, |socket| {
+            socket.close();
+        });
+        SOCKET_SET.remove(self.handle);
+        let timestamp = SOCKET_SET.poll_interfaces();
+        SOCKET_SET.check_poll(timestamp);
     }
 }

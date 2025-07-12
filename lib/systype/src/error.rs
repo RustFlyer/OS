@@ -104,6 +104,8 @@ pub enum SysError {
     ENODATA = 61,
     /// Socket operation on non-socket
     ENOTSOCK = 88,
+    /// Protocol not available
+    ENOPROTOOPT = 92,
     /// Protocol not supported
     EPROTONOSUPPORT = 93,
     /// Unsupported
@@ -178,6 +180,7 @@ impl SysError {
             ENINODE => "Inode is null",
             ENODATA => "no data",
             ENOTSOCK => "Socket operation on non-socket",
+            ENOPROTOOPT => "Protocol not available",
             EPROTONOSUPPORT => "Protocol not supported",
             EOPNOTSUPP => "Unsupported",
             EAFNOSUPPORT => "Address family not supported (POSIX.1-2001).",

@@ -1,4 +1,4 @@
-use core::task::Waker;
+use core::{sync::atomic::Ordering, task::Waker};
 
 use alloc::sync::Arc;
 use net::{
@@ -229,6 +229,18 @@ impl Sock {
             Sock::Tcp(tcp) => tcp.register_send_waker(&waker),
             Sock::Udp(udp) => udp.register_send_waker(&waker),
             Sock::Unix(_unix) => unimplemented!(),
+        }
+    }
+
+    pub fn set_reuse_addr(&self, val: bool) {
+        if let Sock::Udp(udp) = self {
+            udp.reuse_addr.store(val, Ordering::SeqCst);
+        }
+    }
+
+    pub fn set_reuse_port(&self, val: bool) {
+        if let Sock::Udp(udp) = self {
+            udp.reuse_port.store(val, Ordering::SeqCst);
         }
     }
 }

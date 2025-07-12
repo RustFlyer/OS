@@ -7,6 +7,7 @@ use systype::error::{SysError, SysResult};
 use crate::processor::current_task;
 
 pub mod addr;
+pub mod interface;
 pub mod sock;
 pub mod socket;
 pub mod sockopt;
