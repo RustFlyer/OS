@@ -307,7 +307,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
                 }
             } else {
                 log::info!("[sys_wait4] return SysError::EINTR");
-                log::error!(
+                log::info!(
                     "[sys_wait4] pending signals: {:?}",
                     task.sig_manager_mut().queue
                 );

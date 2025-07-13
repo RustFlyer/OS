@@ -58,6 +58,8 @@ pub struct InodeMetaInner {
     /// user define
     pub xattrs: BTreeMap<String, Vec<u8>>,
     /// Reference to a symlink file.
+    ///
+    /// This is only used for simplefs for now! Don't use it in other filesystems.
     pub symlink: Option<String>,
 }
 

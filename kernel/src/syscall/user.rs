@@ -41,6 +41,24 @@ pub fn sys_setgid(gid: usize) -> SyscallResult {
     Ok(0)
 }
 
+pub fn sys_setreuid(ruid: usize, euid: usize) -> SyscallResult {
+    let _cred = current_task().perm_mut();
+    let mut cred_lock = _cred.lock();
+
+    // Only root (euid == 0) can set all three UIDs, others can only set euid to their own ruid/euid/suid
+    if cred_lock.euid == 0 {
+        cred_lock.ruid = ruid as u32;
+        cred_lock.euid = euid as u32;
+        cred_lock.suid = euid as u32;
+    } else if ruid as u32 == cred_lock.ruid || ruid as u32 == cred_lock.euid || ruid as u32 == cred_lock.suid {
+        cred_lock.euid = euid as u32;
+    } else {
+        return Err(SysError::EPERM);
+    }
+
+    Ok(0)
+}
+
 /// `setuid` sets the effective user ID of the calling process.
 /// If the calling process is privileged (root), the real UID and saved set-user-ID are also set.
 pub fn sys_setuid(uid: usize) -> SyscallResult {
@@ -266,5 +284,36 @@ pub fn sys_setgroups(size: usize, list_ptr: usize) -> SyscallResult {
         }
         unsafe { cred.groups = list_ptr.read_array(size)? };
     }
+    Ok(0)
+}
+
+pub fn sys_fadvise64_64(fd: usize, offset: usize, len: usize, advice: i32) -> SyscallResult {
+    let task = current_task();
+    let _file =
+        task.with_mut_fdtable(|fdtable| fdtable.get_file(fd).map_err(|_| SysError::EBADF))?;
+
+    // Currently, we do not implement any specific file advice handling.
+    // This is a placeholder for future implementation.
+    log::info!(
+        "[sys_fadvise64_64] fd: {}, offset: {}, len: {}, advice: {}",
+        fd,
+        offset,
+        len,
+        advice
+    );
+
+    enum Advice {
+        Normal = 0,
+        Random = 1,
+        Sequential = 2,
+        WillNeed = 3,
+        DontNeed = 4,
+        NoReuse = 5,
+    }
+
+    if advice < 0 || advice > Advice::NoReuse as i32 {
+        return Err(SysError::EINVAL);
+    }
+
     Ok(0)
 }

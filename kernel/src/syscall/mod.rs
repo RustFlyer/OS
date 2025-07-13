@@ -93,6 +93,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         GETGID => sys_getgid(),
         IOCTL => sys_ioctl(args[0], args[1], args[2]),
         SETGID => sys_setgid(args[0]),
+        SETREUID => sys_setreuid(args[0], args[1]),
         SETUID => sys_setuid(args[0]),
         CLOCK_GETTIME => sys_clock_gettime(args[0], args[1]),
         SENDFILE => sys_sendfile64(args[0], args[1], args[2], args[3]).await,
@@ -216,6 +217,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         GETSID => sys_getsid(args[0]),
         GETGROUPS => sys_getgroups(args[0], args[1]),
         SETGROUPS => sys_setgroups(args[0], args[1]),
+        FADVISE64_64 => sys_fadvise64_64(args[0], args[1], args[2], args[3] as i32),
         _ => {
             println!("Syscall not implemented: {}", syscall_no.as_str());
             panic!("Syscall not implemented: {}", syscall_no.as_str());

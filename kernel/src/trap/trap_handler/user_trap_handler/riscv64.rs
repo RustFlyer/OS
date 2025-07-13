@@ -71,6 +71,7 @@ pub fn user_exception_handler(task: &Task, e: Exception, stval: usize) {
                     code: SigInfo::USER,
                     details: SigDetails::Kill {
                         pid: task.get_pgid(),
+                        siginfo: None,
                     },
                 });
             }
@@ -87,6 +88,7 @@ pub fn user_exception_handler(task: &Task, e: Exception, stval: usize) {
                 code: SigInfo::USER,
                 details: SigDetails::Kill {
                     pid: task.get_pgid(),
+                    siginfo: None,
                 },
             });
         }

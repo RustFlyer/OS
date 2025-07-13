@@ -97,19 +97,18 @@ impl Dentry for SimpleDentry {
     }
 
     fn base_open(self: Arc<Self>) -> SysResult<Arc<dyn File>> {
-        let mut dentry = self.clone().into_dyn();
+        let dentry = self.clone().into_dyn();
         let inode = self.inode().ok_or(SysError::EEXIST)?;
         log::debug!("[simple::base_open] inode.inotype: {:?}", inode.inotype());
-
-        if inode.inotype() == InodeType::SymLink {
-            let target = inode.symlink_target();
-            dentry = Path::new(sys_root_dentry(), target).walk()?;
-        }
 
         match inode.inotype() {
             InodeType::Dir => Ok(SimpleDirFile::new(dentry.clone())),
             InodeType::File => Ok(SimpleFileFile::new(dentry.clone())),
-            _ => unreachable!(),
+            InodeType::SymLink => {
+                log::debug!("[simple::base_open] open symlink: {}", dentry.name());
+                Ok(SimpleFileFile::new(dentry))
+            }
+            _ => unimplemented!(),
         }
     }
 

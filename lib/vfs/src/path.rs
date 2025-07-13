@@ -186,7 +186,7 @@ impl Path {
         }
 
         let target_path = <dyn File>::open(Arc::clone(&dentry))?.readlink()?;
-        Path::new(dentry, target_path).walk_recursive(counter, None)
+        Path::new(dentry.parent().unwrap(), target_path).walk_recursive(counter, None)
     }
 
     /// Do the same as [`Self::resolve_symlink`], but will resolve the symlink
