@@ -57,6 +57,8 @@ pub struct InodeMetaInner {
     pub gid: u32,
     /// user define
     pub xattrs: BTreeMap<String, Vec<u8>>,
+    /// Reference to a symlink file.
+    pub symlink: Option<String>,
 }
 
 impl InodeMeta {
@@ -77,6 +79,7 @@ impl InodeMeta {
                 uid: 0,
                 gid: 0,
                 xattrs: BTreeMap::new(),
+                symlink: None,
             }),
         }
     }
@@ -148,6 +151,10 @@ pub trait Inode: Send + Sync + DowncastSync {
         self.get_meta().inner.lock().size
     }
 
+    fn symlink_target(&self) -> String {
+        self.get_meta().inner.lock().symlink.clone().unwrap()
+    }
+
     fn set_size(&self, size: usize) {
         self.get_meta().inner.lock().size = size;
     }
@@ -184,6 +191,10 @@ pub trait Inode: Send + Sync + DowncastSync {
 
     fn set_gid(&self, gid: u32) {
         self.get_meta().inner.lock().gid = gid;
+    }
+
+    fn set_symlink_target(&self, target: &str) {
+        self.get_meta().inner.lock().symlink = Some(target.to_string());
     }
 
     fn superblock(&self) -> Arc<dyn SuperBlock> {

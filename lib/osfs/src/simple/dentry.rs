@@ -1,10 +1,15 @@
-use alloc::sync::{Arc, Weak};
+use alloc::{
+    string::ToString,
+    sync::{Arc, Weak},
+};
 use config::inode::{InodeMode, InodeType};
 use systype::error::{SysError, SysResult};
 use vfs::{
     dentry::{Dentry, DentryMeta},
     file::File,
     inode::Inode,
+    path::Path,
+    sys_root_dentry,
 };
 
 use super::{
@@ -54,13 +59,28 @@ impl Dentry for SimpleDentry {
         Ok(())
     }
 
-    fn base_symlink(&self, _dentry: &dyn Dentry, _target: &str) -> SysResult<()> {
-        log::error!("[base_symlink] not implemented");
+    fn base_symlink(&self, dentry: &dyn Dentry, target: &str) -> SysResult<()> {
+        let sb = self.superblock().ok_or(SysError::ENOTDIR)?;
+        let inode = SimpleInode::new(sb);
+
+        inode.set_inotype(InodeType::SymLink);
+        inode.set_symlink_target(target);
+
+        dentry.set_inode(inode);
         Ok(())
     }
 
-    fn base_link(&self, _dentry: &dyn Dentry, _old_dentry: &dyn Dentry) -> SysResult<()> {
-        todo!()
+    fn base_link(&self, dentry: &dyn Dentry, old_dentry: &dyn Dentry) -> SysResult<()> {
+        let tinode = old_dentry.inode().ok_or(SysError::ENOENT)?;
+        if tinode.inotype() == InodeType::Dir {
+            return Err(SysError::EPERM);
+        }
+
+        let meta = tinode.get_meta();
+        meta.inner.lock().nlink += 1;
+        dentry.set_inode(tinode);
+
+        Ok(())
     }
 
     fn base_lookup(&self, dentry: &dyn Dentry) -> SysResult<()> {
@@ -68,22 +88,8 @@ impl Dentry for SimpleDentry {
         log::debug!("[simple::base_lookup] name: {}", name);
         let _ = self.get_child(name).ok_or(SysError::ENOENT)?;
 
-        // let sb = self.superblock().ok_or(SysError::ENOTDIR)?;
-        // let inode = SimpleInode::new(sb);
-        // inode.set_inotype(InodeType::File);
-        // child.set_inode(inode);
-
-        // log::debug!(
-        //     "[simple::base_lookup] inotype: {:?}",
-        //     child.inode().unwrap().inotype()
-        // );
-
         Ok(())
     }
-
-    // fn base_new_neg_child(self: Arc<Self>, name: &str) -> Arc<dyn Dentry> {
-    //     Self::new(name, self.inode(), Some(Arc::downgrade(&self.into_dyn())))
-    // }
 
     fn base_new_neg_child(self: Arc<Self>, name: &str) -> Arc<dyn Dentry> {
         let this = self as Arc<dyn Dentry>;
@@ -94,11 +100,18 @@ impl Dentry for SimpleDentry {
     }
 
     fn base_open(self: Arc<Self>) -> SysResult<Arc<dyn File>> {
+        let mut dentry = self.clone().into_dyn();
         let inode = self.inode().ok_or(SysError::EEXIST)?;
         log::debug!("[simple::base_open] inode.inotype: {:?}", inode.inotype());
+
+        if inode.inotype() == InodeType::SymLink {
+            let target = inode.symlink_target();
+            dentry = Path::new(sys_root_dentry(), target).walk()?;
+        }
+
         match inode.inotype() {
-            InodeType::Dir => Ok(SimpleDirFile::new(self.clone())),
-            InodeType::File => Ok(SimpleFileFile::new(self.clone())),
+            InodeType::Dir => Ok(SimpleDirFile::new(dentry.clone())),
+            InodeType::File => Ok(SimpleFileFile::new(dentry.clone())),
             _ => unreachable!(),
         }
     }

@@ -100,12 +100,6 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
     let name = path.clone();
     log::info!("[sys_openat] dirfd: {dirfd:#x}, path: {path}, flags: {flags:?}, mode: {mode:?}");
 
-    // DEBUG
-    if name.contains("cgroup") {
-        log::error!("not support cgroup");
-        return Err(SysError::EINVAL);
-    }
-
     let mut dentry = task.walk_at(AtFd::from(dirfd), path)?;
 
     if flags.contains(OpenFlags::O_TMPFILE) {
