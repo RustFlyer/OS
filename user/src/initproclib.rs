@@ -133,7 +133,6 @@ pub fn typecmd(buf: &mut [u8; 256], bptr: &mut usize) {
     while ch != '\n' as u8 {
         ch = getchar();
         if ch == 9 {
-            print!("{}", 127 as char);
             supple_cmd(buf, &mut tbptr);
             continue;
         }
@@ -299,7 +298,6 @@ const BUF_SIZE: usize = 4096;
 pub fn list_dir(path: &str) -> Vec<(String, u8)> {
     let mut names = Vec::new();
 
-    // open current directory
     let fd = open(
         -100,
         path,
@@ -345,7 +343,42 @@ pub fn list_dir(path: &str) -> Vec<(String, u8)> {
 pub fn supple_cmd(buf: &mut [u8; 256], bptr: &mut usize) {
     let mut tbptr = *bptr;
     let prefix = core::str::from_utf8(&buf[..tbptr]).unwrap_or("");
-    let files = list_dir(".");
+    let mut files = list_dir(".");
+
+    if tbptr == 0 {
+        let matches: Vec<&String> = files
+            .iter()
+            .map(|(m, _u)| m)
+            .filter(|f| f.starts_with(prefix))
+            .collect();
+
+        let max_len = matches.iter().map(|s| s.len()).max().unwrap_or(0);
+
+        let last_one = matches.len();
+        print!("\n");
+        for (i, name) in matches.iter().enumerate() {
+            let d_type = files[i].1;
+            let padded = format!("{:<width$}", name, width = max_len);
+            let colored = match d_type {
+                4 => format!("\x1b[1;34m{}\x1b[0m", padded),  // dir blue
+                8 => format!("\x1b[1;32m{}\x1b[0m", padded),  // normal green
+                10 => format!("\x1b[1;36m{}\x1b[0m", padded), // link light blue
+                _ => padded,
+            };
+            print!("{} ", colored);
+            if (i + 1) % 4 == 0 && (i + 1) != last_one {
+                print!("\n");
+            }
+        }
+        print!("\n");
+        print!("{}:", unsafe { PWD.clone() });
+        print!("{}", prefix);
+        return;
+    }
+
+    files.extend(list_dir("/bin"));
+    files.sort();
+
     let matches: Vec<&String> = files
         .iter()
         .map(|(m, _u)| m)
@@ -361,63 +394,22 @@ pub fn supple_cmd(buf: &mut [u8; 256], bptr: &mut usize) {
             print!("{}", b as char);
         }
         tbptr = matched.len();
-    } else if matches.len() > 1 && tbptr > 0 {
-        let mut files = list_dir(".");
-        files.extend(list_dir("/bin"));
-
-        let mut matches: Vec<&String> = files
-            .iter()
-            .map(|(m, _u)| m)
-            .filter(|f| f.starts_with(prefix))
-            .collect();
-        matches.sort();
-
-        let max_len = matches
-            .iter()
-            .map(|s| format!("\x1b[1;34m{}\x1b[0m", s).len())
-            .max()
-            .unwrap_or(0);
-
-        let last_one = matches.len();
-        print!("\n");
-        for (i, name) in matches.iter().enumerate() {
-            let d_type = files[i].1;
-            let colored = match d_type {
-                4 => format!("\x1b[1;34m{}\x1b[0m", name), // dir blue
-                8 => format!("\x1b[1;32m{}\x1b[0m", name), // normal green
-                _ => name.to_string(),
-            };
-            print!("{:<width$} ", colored, width = max_len);
-            if (i + 1) % 6 == 0 && (i + 1) != last_one {
-                print!("\n");
-            }
-        }
-        print!("\n");
-        print!("{}:", unsafe { PWD.clone() });
-        print!("{}", prefix);
     } else if matches.len() > 1 {
-        let matches: Vec<&String> = files
-            .iter()
-            .map(|(m, _u)| m)
-            .filter(|f| f.starts_with(prefix))
-            .collect();
-        let max_len = matches
-            .iter()
-            .map(|s| format!("\x1b[1;34m{}\x1b[0m", s).len())
-            .max()
-            .unwrap_or(0);
+        let max_len = matches.iter().map(|s| s.len()).max().unwrap_or(0);
 
         let last_one = matches.len();
         print!("\n");
         for (i, name) in matches.iter().enumerate() {
             let d_type = files[i].1;
+            let padded = format!("{:<width$}", name, width = max_len);
             let colored = match d_type {
-                4 => format!("\x1b[1;34m{}\x1b[0m", name), // dir blue
-                8 => format!("\x1b[1;32m{}\x1b[0m", name), // normal green
-                _ => name.to_string(),
+                4 => format!("\x1b[1;34m{}\x1b[0m", padded),  // dir blue
+                8 => format!("\x1b[1;32m{}\x1b[0m", padded),  // normal green
+                10 => format!("\x1b[1;36m{}\x1b[0m", padded), // link light blue
+                _ => padded,
             };
-            print!("{:<width$} ", colored, width = max_len);
-            if (i + 1) % 6 == 0 && (i + 1) != last_one {
+            print!("{} ", colored);
+            if (i + 1) % 4 == 0 && (i + 1) != last_one {
                 print!("\n");
             }
         }
