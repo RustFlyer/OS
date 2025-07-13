@@ -1,7 +1,4 @@
-use alloc::{
-    string::ToString,
-    sync::{Arc, Weak},
-};
+use alloc::sync::{Arc, Weak};
 use config::inode::{InodeMode, InodeType};
 use systype::error::{SysError, SysResult};
 use vfs::{

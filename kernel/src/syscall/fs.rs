@@ -18,6 +18,7 @@ use driver::BLOCK_DEVICE;
 use osfs::{
     FS_MANAGER,
     dev::{
+        loopx::loopinfo::{LoopInfo64, LoopIoctlCmd},
         rtc::{RtcTime, ioctl::RtcIoctlCmd},
         tty::{
             TtyIoctlCmd,
@@ -931,6 +932,13 @@ pub fn sys_ioctl(fd: usize, request: usize, argp: usize) -> SyscallResult {
         } else if let Some(cmd) = RtcIoctlCmd::from_repr(request as u64) {
             match cmd {
                 RtcIoctlCmd::RTC_RD_TIME => core::mem::size_of::<RtcTime>(),
+                _ => 0,
+            }
+        } else if let Some(cmd) = LoopIoctlCmd::from_repr(request) {
+            match cmd {
+                LoopIoctlCmd::GETSTATUS => core::mem::size_of::<LoopInfo64>(),
+                LoopIoctlCmd::GETSTATUS64 => core::mem::size_of::<LoopInfo64>(),
+                LoopIoctlCmd::SETSTATUS => core::mem::size_of::<LoopInfo64>(),
                 _ => 0,
             }
         } else {
@@ -2258,6 +2266,23 @@ pub fn sys_fremovexattr(fd: usize, name_ptr: usize) -> SyscallResult {
     let inode = file.inode();
 
     inode.remove_xattr(&name)?;
+
+    Ok(0)
+}
+
+pub fn sys_fallocate(fd: usize, mode: usize, offset: usize, len: usize) -> SyscallResult {
+    log::debug!("[sys_fallocate] fd: {fd}, mode: {mode}, offset: {offset}, len: {len}");
+    if mode != 0 {
+        return Err(SysError::EOPNOTSUPP);
+    }
+
+    let task = current_task();
+    let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
+
+    let inode = file.inode();
+
+    let size = inode.size().max(offset + len);
+    inode.set_size(size);
 
     Ok(0)
 }

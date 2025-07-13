@@ -1,5 +1,6 @@
 use alloc::string::String;
-use osfs::proc::KernelProcIf;
+use mutex::ShareMutex;
+use osfs::{dev::loopx::externf::KernelTableIf, fd_table::FdTable, proc::KernelProcIf};
 
 use crate::processor::current_task;
 
@@ -27,5 +28,15 @@ impl KernelProcIf for KernelProcIfImpl {
         }
         log::error!("no task {}", tid);
         return String::new();
+    }
+}
+
+struct KernelTableIfImpl;
+
+#[crate_interface::impl_interface]
+impl KernelTableIf for KernelProcIfImpl {
+    fn table() -> ShareMutex<FdTable> {
+        let task = current_task();
+        task.fdtable_mut()
     }
 }

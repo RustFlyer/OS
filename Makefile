@@ -195,6 +195,7 @@ fs-img: user
 	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/netperf/* emnt/
 	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/libcbench/* emnt/
 	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/lmbench/* emnt/
+	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/test/* emnt/
 	
 # for software
 	-mkdir emnt/software

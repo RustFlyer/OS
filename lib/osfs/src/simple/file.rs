@@ -71,7 +71,7 @@ impl File for SimpleFileFile {
         let inode = self.inode();
         let cache = inode.page_cache();
 
-        log::debug!("[base_read] pos: {}, path: {}", pos, self.dentry().path());
+        // log::debug!("[base_read] pos: {}, path: {}", pos, self.dentry().path());
 
         while !buf.is_empty() && cur_pos < size {
             let file_offset = cur_pos / PAGE_SIZE * PAGE_SIZE;
@@ -90,7 +90,7 @@ impl File for SimpleFileFile {
 
         let mut chs = String::new();
         buf.iter().for_each(|u| chs.push(*u as char));
-        log::debug!("[base_read] output: {chs}");
+        // log::debug!("[base_read] output: {chs}");
 
         Ok(cur_pos - pos)
     }

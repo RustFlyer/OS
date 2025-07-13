@@ -76,7 +76,12 @@ pub fn user_exception_handler(task: &Task, e: Exception, stval: usize) {
             }
         }
         Exception::IllegalInstruction => {
-            log::error!("[trap_handler] illegal instruction at {:#x}", stval);
+            let addr = register::sepc::read();
+            log::error!(
+                "[trap_handler] illegal instruction {:#x} at {:#x}",
+                stval,
+                addr
+            );
             task.receive_siginfo(SigInfo {
                 sig: Sig::SIGILL,
                 code: SigInfo::USER,
