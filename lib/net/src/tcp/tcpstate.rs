@@ -110,7 +110,7 @@ impl TcpSocket {
             // SAFETY: no other threads can read or write these fields.
             let handle = unsafe { self.handle.get().read() }
                 .unwrap_or_else(|| SOCKET_SET.add(SocketSetWrapper::new_tcp_socket()));
-
+            log::error!("[connect] add {}", handle);
             // TODO: check remote addr unreachable
             let bound_endpoint = self.bound_endpoint()?;
             let iface = &ETH0.get().unwrap().iface;
@@ -223,15 +223,13 @@ impl TcpSocket {
             }
             LISTEN_TABLE.listen(bound_endpoint, waker, self.listen_handles.clone())?;
 
-            if let Some(handle) = unsafe { self.handle.get().read() } {
-                log::error!("[listen] {:?} listen", handle);
-            }
             // log::info!("[TcpSocket::listen] listening on {bound_endpoint:?}");
             for _ in 0..24 {
                 let sock_handle = SOCKET_SET.add(SocketSetWrapper::new_tcp_socket());
                 SOCKET_SET.with_socket_mut::<tcp::Socket, _, _>(sock_handle, |sock| {
                     sock.listen(bound_endpoint).unwrap();
                 });
+                log::error!("[listen] add {}", sock_handle);
                 self.listen_handles.lock().push(sock_handle);
             }
 

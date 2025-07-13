@@ -5,6 +5,7 @@
 #![feature(sync_unsafe_cell)]
 #![allow(clippy::module_inception)]
 #![feature(stmt_expr_attributes)]
+#![feature(slice_as_array)]
 // #![allow(dead_code)]
 // #![allow(unused)]
 

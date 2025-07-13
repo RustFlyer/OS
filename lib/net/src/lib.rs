@@ -16,6 +16,7 @@ extern crate alloc;
 pub mod addr;
 pub mod bench;
 pub mod device;
+pub mod externf;
 pub mod interface;
 pub mod portmap;
 pub mod rttoken;

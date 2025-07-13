@@ -65,14 +65,18 @@ impl Drop for TcpSocket {
                     sock.state() == State::Closed
                 });
                 if is_close || cnt > 10000 {
-                    log::error!("[shutdown] poll cnt is {}", cnt);
+                    // log::error!("[shutdown] poll cnt is {}", cnt);
                     break;
                 }
                 poll_interfaces();
                 cnt += 1;
             }
 
-            // LISTEN_TABLE.remove_entry(self.bound_endpoint().unwrap().port);
+            SOCKET_SET.with_socket_mut::<tcp::Socket, _, _>(handle, |sock| {
+                sock.abort();
+            });
+
+            log::error!("remove {}", handle);
             SOCKET_SET.remove(handle);
         }
 
@@ -80,9 +84,11 @@ impl Drop for TcpSocket {
         for handle in handles.drain(..) {
             SOCKET_SET.with_socket_mut::<tcp::Socket, _, _>(handle, |sock| {
                 sock.abort();
-                sock.close();
             });
+            log::error!("remove {}", handle);
             SOCKET_SET.remove(handle);
         }
+        let timestamp = SOCKET_SET.poll_interfaces();
+        SOCKET_SET.check_poll(timestamp);
     }
 }

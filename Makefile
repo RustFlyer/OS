@@ -20,6 +20,8 @@ DOCKER_NAME = os
 PACKAGE_NAME = kernel
 BOOTLOADER = default
 
+SOFTWARE_DIR = ../software
+
 ifeq ($(ARCH), riscv64)
 	export TARGET = riscv64gc-unknown-none-elf
 else ifeq ($(ARCH), loongarch64)
@@ -193,7 +195,10 @@ fs-img: user
 	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/netperf/* emnt/
 	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/libcbench/* emnt/
 	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/lmbench/* emnt/
-	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/vim/* emnt/
+	
+# for software
+	-mkdir emnt/software
+	-sudo cp -r $(SOFTWARE_DIR)/$(ARCH)/$(TESTCASE_LIBC)/* emnt/software
 
 	sudo cp -r img-data/common/* emnt/
 	sudo cp -r img-data/$(ARCH)/* emnt/

@@ -100,6 +100,51 @@ pub fn sys_setsockopt(
     log::info!(
         "[sys_setsockopt] fd: {sockfd} {level:#x} {optname:#x} optval:{optval:#x} optlen:{optlen}",
     );
+    let task = current_task();
+    let addrspace = task.addr_space();
+    let socket: Arc<Socket> = task
+        .with_mut_fdtable(|table| table.get_file(sockfd))?
+        .downcast_arc::<Socket>()
+        .map_err(|_| SysError::ENOTSOCK)?;
+
+    let level = SocketLevel::try_from(level)?;
+    let optname = SocketOpt::try_from(optname)?;
+
+    // 只支持 SOL_SOCKET 层的 SO_REUSEADDR/SO_REUSEPORT
+    if level == SocketLevel::SOL_SOCKET {
+        match optname {
+            SocketOpt::REUSEADDR => {
+                let val = if optlen >= 4 {
+                    let mut buf = [0u8; 4];
+                    unsafe {
+                        let mut ptr = UserReadPtr::<u8>::new(optval, &addrspace);
+                        buf = *ptr.read_array(4)?.to_vec().as_array().unwrap();
+                    }
+                    u32::from_ne_bytes(buf) != 0
+                } else {
+                    false
+                };
+                socket.sk.set_reuse_addr(val);
+            }
+            SocketOpt::REUSEPORT => {
+                let val = if optlen >= 4 {
+                    let mut buf = [0u8; 4];
+                    unsafe {
+                        let mut ptr = UserReadPtr::<u8>::new(optval, &addrspace);
+                        buf = *ptr.read_array(4)?.to_vec().as_array().unwrap();
+                    }
+                    u32::from_ne_bytes(buf) != 0
+                } else {
+                    false
+                };
+                socket.sk.set_reuse_port(val);
+            }
+            _ => {
+                log::warn!("[setsockopt] unsupported optname: {:?}", optname);
+                // return Err(SysError::ENOPROTOOPT);
+            }
+        }
+    }
     Ok(0)
 }
 

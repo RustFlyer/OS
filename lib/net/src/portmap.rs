@@ -1,4 +1,4 @@
-use alloc::collections::btree_map::BTreeMap;
+use alloc::{collections::btree_map::BTreeMap, vec::Vec};
 use mutex::SpinNoIrqLock;
 use smoltcp::wire::IpListenEndpoint;
 
@@ -23,14 +23,14 @@ type Fd = usize;
 ///   sockets. If you want to implement this function, you should change
 ///   `BTreeMap<Port, (Fd, IpListenEndpoint)>` to `BTreeMap<Port, Vec(Fd, IpListenEndpoint)>`.
 pub(crate) static PORT_MAP: PortMap = PortMap::new();
-pub struct PortMap(SpinNoIrqLock<BTreeMap<Port, (Fd, IpListenEndpoint)>>);
+pub struct PortMap(SpinNoIrqLock<BTreeMap<Port, Vec<(Fd, IpListenEndpoint)>>>);
 
 impl PortMap {
     const fn new() -> Self {
         Self(SpinNoIrqLock::new(BTreeMap::new()))
     }
 
-    pub fn get(&self, port: Port) -> Option<(Fd, IpListenEndpoint)> {
+    pub fn get(&self, port: Port) -> Option<Vec<(Fd, IpListenEndpoint)>> {
         self.0.lock().get(&port).cloned()
     }
 
@@ -39,6 +39,19 @@ impl PortMap {
     }
 
     pub fn insert(&self, port: Port, fd: Fd, listen_endpoint: IpListenEndpoint) {
-        self.0.lock().insert(port, (fd, listen_endpoint));
+        let mut map = self.0.lock();
+        map.entry(port)
+            .or_insert_with(Vec::new)
+            .push((fd, listen_endpoint));
+    }
+
+    pub fn remove_fd(&self, port: Port, fd: Fd) {
+        let mut map = self.0.lock();
+        if let Some(vec) = map.get_mut(&port) {
+            vec.retain(|(f, _)| *f != fd);
+            if vec.is_empty() {
+                map.remove(&port);
+            }
+        }
     }
 }

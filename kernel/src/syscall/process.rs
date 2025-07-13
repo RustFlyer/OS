@@ -511,51 +511,10 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
         return Err(SysError::ENOENT);
     }
 
-    // DEBUG
-    let broken_tests = ["cgroup", "cp_tests.sh", "cn_pec.sh", "cpuacct.sh"];
-    if broken_tests
-        .iter()
-        .filter(|t| path.contains(**t))
-        .next_back()
-        .is_some()
-    {
-        log::error!("not support cgroup");
-        return Err(SysError::EOPNOTSUPP);
-    }
-
-    // let mut busybox_prefix = String::from("bin");
-
-    // if task.cwd().lock().path().contains("musl") {
-    //     envs.push(String::from(r#"PATH=/:/musl/lib:"#));
-    //     // busybox_prefix = String::from("musl");
-    // }
-
-    // if task.cwd().lock().path().contains("glibc") {
-    //     envs.push(String::from(r#"PATH=/:/glibc/lib:"#));
-    //     // busybox_prefix = String::from("glibc");
-    // }
-
     log::info!("[sys_execve] task: {:?}", task.get_name());
     log::info!("[sys_execve] args: {args:?}");
     log::info!("[sys_execve] envs: {envs:?}");
     log::info!("[sys_execve] path: {path:?}");
-
-    // let env_iter = envs.iter();
-    // for env in env_iter {
-    //     if env.starts_with("PWD") {
-    //         if let Some((_key, value)) = env.split_once('=') {
-    //             if value == "/" {
-    //                 continue;
-    //             }
-    //             path.remove(0);
-    //             args[0].remove(0);
-    //             path.insert_str(0, value);
-    //             args[0].insert_str(0, value);
-    //             log::debug!("new path = {}", path);
-    //             break;
-    //         }
-    //     }
-    // }
 
     let dentry = {
         let root = if path.starts_with("/") {

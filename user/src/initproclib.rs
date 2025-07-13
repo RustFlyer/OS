@@ -3,8 +3,8 @@ extern crate alloc;
 use core::str::from_utf8;
 
 use crate::{
-    chdir, close, console::getchar, dup, execve, exit, fork, getcwd, mkdir, open, print, println,
-    waitpid,
+    chdir, close, console::getchar, dup, execve, exit, fork, getcwd, getdents, mkdir, open, print,
+    println, waitpid,
 };
 
 use alloc::{
@@ -31,10 +31,13 @@ pub static CMD_HELP: &str = r#"NighthawkOS Quick Command Guide:
   ltp <case>       Run LTP single test case (ltp/testcases/bin/<case>)
 
   [Enter]          Run the last command
+  [Tab]            Tab key command completion
 
 Type the corresponding command to quickly run the related test.
 ATTENTION: you should make sure that relevant file exists in your sdcard!
 "#;
+
+pub static mut PWD: String = String::new();
 
 pub fn easy_cmd(s: String) -> String {
     let str = s.as_str();
@@ -129,6 +132,10 @@ pub fn typecmd(buf: &mut [u8; 256], bptr: &mut usize) {
     let mut tbptr = *bptr;
     while ch != '\n' as u8 {
         ch = getchar();
+        if ch == 9 {
+            supple_cmd(buf, &mut tbptr);
+            continue;
+        }
         if ch != 13 && ch != 127 && ch != '\n' as u8 && tbptr < 128 {
             buf[tbptr] = ch;
             tbptr = tbptr + 1;
@@ -169,6 +176,7 @@ pub fn current_working_path() -> String {
 }
 
 #[inline]
+#[allow(static_mut_refs)]
 pub fn usershell() {
     let mut buf = [0; 256];
     let mut slice = [0; 256];
@@ -179,7 +187,8 @@ pub fn usershell() {
     println!("{}", CMD_HELP);
 
     loop {
-        print!("{}:", current_working_path());
+        unsafe { PWD = current_working_path() };
+        print!("{}:", unsafe { PWD.clone() });
         let mut bptr = 0;
         typecmd(&mut buf, &mut bptr);
 
@@ -282,4 +291,131 @@ pub fn loongarch_init() {
         dup(fd as usize);
         close(fd as usize);
     }
+}
+
+const BUF_SIZE: usize = 4096;
+
+pub fn list_dir(path: &str) -> Vec<(String, u8)> {
+    let mut names = Vec::new();
+
+    let fd = open(
+        -100,
+        path,
+        OpenFlags::O_RDONLY | OpenFlags::O_DIRECTORY,
+        InodeMode::empty(),
+    );
+
+    if fd < 0 {
+        return names;
+    }
+
+    let mut buf = [0u8; BUF_SIZE];
+
+    loop {
+        let nread = getdents(fd as usize, &mut buf, BUF_SIZE);
+        if nread <= 0 {
+            break;
+        }
+        let mut bpos = 0;
+        while bpos < nread as usize {
+            // resolve linux_dirent64
+            let ptr = unsafe { buf.as_ptr().add(bpos) };
+            let d_reclen = unsafe { *(ptr.add(16) as *const u16) } as usize;
+            let d_type = unsafe { *(ptr.add(18) as *const u8) };
+            let name_ptr = unsafe { ptr.add(19) };
+            let name_len = (0..(d_reclen - 19))
+                .position(|i| unsafe { *name_ptr.add(i) } == 0)
+                .unwrap_or(d_reclen - 19);
+            let name = unsafe {
+                core::str::from_utf8_unchecked(core::slice::from_raw_parts(name_ptr, name_len))
+            };
+            if name != "." && name != ".." {
+                names.push((name.to_string(), d_type));
+            }
+            bpos += d_reclen;
+        }
+    }
+    close(fd as usize);
+    names
+}
+
+#[allow(static_mut_refs)]
+pub fn supple_cmd(buf: &mut [u8; 256], bptr: &mut usize) {
+    let mut tbptr = *bptr;
+    let prefix = core::str::from_utf8(&buf[..tbptr]).unwrap_or("");
+    let mut files = list_dir(".");
+
+    if tbptr == 0 {
+        let matches: Vec<&String> = files
+            .iter()
+            .map(|(m, _u)| m)
+            .filter(|f| f.starts_with(prefix))
+            .collect();
+
+        let max_len = matches.iter().map(|s| s.len()).max().unwrap_or(0);
+
+        let last_one = matches.len();
+        print!("\n");
+        for (i, name) in matches.iter().enumerate() {
+            let d_type = files[i].1;
+            let padded = format!("{:<width$}", name, width = max_len);
+            let colored = match d_type {
+                4 => format!("\x1b[1;34m{}\x1b[0m", padded),  // dir blue
+                8 => format!("\x1b[1;32m{}\x1b[0m", padded),  // normal green
+                10 => format!("\x1b[1;36m{}\x1b[0m", padded), // link light blue
+                _ => padded,
+            };
+            print!("{} ", colored);
+            if (i + 1) % 4 == 0 && (i + 1) != last_one {
+                print!("\n");
+            }
+        }
+        print!("\n");
+        print!("{}:", unsafe { PWD.clone() });
+        print!("{}", prefix);
+        return;
+    }
+
+    files.extend(list_dir("/bin"));
+    files.sort();
+
+    let matches: Vec<&String> = files
+        .iter()
+        .map(|(m, _u)| m)
+        .filter(|f| f.starts_with(prefix))
+        .collect();
+
+    if matches.len() == 1 {
+        let matched = matches[0];
+        print!("\r\x1b[2K");
+        print!("{}:", unsafe { PWD.clone() });
+        for (i, b) in matched.bytes().enumerate() {
+            buf[i] = b;
+            print!("{}", b as char);
+        }
+        tbptr = matched.len();
+    } else if matches.len() > 1 {
+        let max_len = matches.iter().map(|s| s.len()).max().unwrap_or(0);
+
+        let last_one = matches.len();
+        print!("\n");
+        for (i, name) in matches.iter().enumerate() {
+            let d_type = files[i].1;
+            let padded = format!("{:<width$}", name, width = max_len);
+            let colored = match d_type {
+                4 => format!("\x1b[1;34m{}\x1b[0m", padded),  // dir blue
+                8 => format!("\x1b[1;32m{}\x1b[0m", padded),  // normal green
+                10 => format!("\x1b[1;36m{}\x1b[0m", padded), // link light blue
+                _ => padded,
+            };
+            print!("{} ", colored);
+            if (i + 1) % 4 == 0 && (i + 1) != last_one {
+                print!("\n");
+            }
+        }
+        print!("\n");
+        print!("{}:", unsafe { PWD.clone() });
+        print!("{}", prefix);
+    }
+    *bptr = tbptr;
 }

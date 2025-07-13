@@ -912,7 +912,7 @@ version = "0.1.0"
 [[package]]
 name = "smoltcp"
 version = "0.12.0"
-source = "git+https://github.com/EchudeT/smoltcp.git#f8bfa311206aaf29a8dbd55c5920b1fe674a5db1"
+source = "git+https://github.com/EchudeT/smoltcp.git#56af079f3dfe105d726ff2bd346a44abd93d8af4"
 dependencies = [
  "bitflags 1.3.2",
  "byteorder",
