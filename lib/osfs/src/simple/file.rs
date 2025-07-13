@@ -120,4 +120,15 @@ impl File for SimpleFileFile {
         Ok(cur_pos - offset)
         // Err(SysError::EISDIR)
     }
+
+    fn base_readlink(&self, buf: &mut [u8]) -> SysResult<usize> {
+        let inode = self.dentry().inode().ok_or(SysError::EINVAL)?;
+        let inode_meta = inode.get_meta();
+        let inner = inode_meta.inner.lock();
+        let symlink = inner.symlink.clone().ok_or(SysError::EINVAL)?;
+        let target = symlink.as_bytes();
+        let len = target.len().min(buf.len());
+        buf[..len].copy_from_slice(&target[..len]);
+        Ok(len)
+    }
 }
