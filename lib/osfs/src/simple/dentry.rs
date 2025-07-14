@@ -135,10 +135,18 @@ impl Dentry for SimpleDentry {
 
     fn base_rename(
         &self,
-        _dentry: &dyn Dentry,
+        dentry: &dyn Dentry,
         _new_dir: &dyn Dentry,
-        _new_dentry: &dyn Dentry,
+        new_dentry: &dyn Dentry,
     ) -> SysResult<()> {
-        todo!()
+        if dentry.inode().unwrap().dev_id() == 0 {
+            return Err(SysError::EPERM);
+        }
+
+        new_dentry.set_inode(dentry.inode().unwrap());
+        dentry.unset_inode();
+        dentry.get_meta().children.lock().clear();
+
+        Ok(())
     }
 }
