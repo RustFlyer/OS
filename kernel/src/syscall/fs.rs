@@ -830,7 +830,7 @@ pub async fn sys_faccessat(dirfd: usize, pathname: usize, mode: i32) -> SyscallR
 
     let groups: &[u32] = &cred.groups;
 
-    for d in &pdentrylist[..pdentrylist.len() - 1] {
+    for d in &pdentrylist[..pdentrylist.len().saturating_sub(1)] {
         let inode = d.inode().unwrap();
         if !inode.check_permission(euid, egid, groups, AccessFlags::X_OK) {
             return Err(SysError::EACCES);

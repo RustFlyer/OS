@@ -173,9 +173,17 @@ PHONY += user
 user:
 	cd user && make build
 
+PHONY += copy-software
+copy-software:
+	@echo "Copying software directories into testcase..."
+	-rm -rf ./testcase/loongarch64 ./testcase/riscv64
+	-mkdir -p ./testcase
+	-cp -r ../software/loongarch64 ./testcase/
+	-cp -r ../software/riscv64 ./testcase/
+	@echo "Finished copying software."
 
 PHONY += fs-img
-fs-img: user
+fs-img: user copy-software
 	@echo "building fs-img ext4..."
 	@echo $(FS_IMG)
 	rm -rf $(FS_IMG)
@@ -195,11 +203,8 @@ fs-img: user
 	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/netperf/* emnt/
 	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/libcbench/* emnt/
 	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/lmbench/* emnt/
-	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/test/* emnt/
-	
-# for software
-	-mkdir emnt/software
-	-sudo cp -r $(SOFTWARE_DIR)/$(ARCH)/$(TESTCASE_LIBC)/* emnt/software
+	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/vim/* emnt/
+	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/git/* emnt/
 
 	sudo cp -r img-data/common/* emnt/
 	sudo cp -r img-data/$(ARCH)/* emnt/
@@ -224,7 +229,7 @@ fs-img-submit-la:
 
 
 PHONY += fs-img-submit
-fs-img-submit: user
+fs-img-submit: user copy-software
 	@echo $(FS_IMG)
 	rm -rf $(FS_IMG)
 	mkdir -p $(FS_IMG_DIR)
