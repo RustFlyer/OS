@@ -19,8 +19,8 @@ use osfs::{
     FS_MANAGER,
     dev::{
         loopx::{
-            blkinfo::BlkIoctlCmd,
-            loopinfo::{LoopInfo64, LoopIoctlCmd},
+            blkinfo::{BlkIoctlCmd, HdGeometry},
+            loopinfo::{LoopInfo, LoopInfo64, LoopIoctlCmd},
         },
         rtc::{RtcTime, ioctl::RtcIoctlCmd},
         tty::{
@@ -176,7 +176,7 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
         return Err(SysError::EISDIR);
     }
 
-    if flags.contains(OpenFlags::O_TRUNC) && flags.writable() {
+    if inode_type.is_reg() && flags.contains(OpenFlags::O_TRUNC) && flags.writable() {
         inode.set_size(0);
     }
 
@@ -938,7 +938,7 @@ pub fn sys_ioctl(fd: usize, request: usize, argp: usize) -> SyscallResult {
                 RtcIoctlCmd::RTC_RD_TIME => core::mem::size_of::<RtcTime>(),
                 _ => 0,
             }
-        } else if let Some(cmd) = LoopIoctlCmd::from_repr(request32) {
+        } else if let Some(cmd) = LoopIoctlCmd::from_repr(request32 as u32) {
             match cmd {
                 LoopIoctlCmd::GETSTATUS => core::mem::size_of::<LoopInfo64>(),
                 LoopIoctlCmd::GETSTATUS64 => core::mem::size_of::<LoopInfo64>(),
@@ -950,6 +950,8 @@ pub fn sys_ioctl(fd: usize, request: usize, argp: usize) -> SyscallResult {
                 BlkIoctlCmd::BLKGETSIZE64 => core::mem::size_of::<u64>(),
                 BlkIoctlCmd::BLKGETSIZE => core::mem::size_of::<u32>(),
                 BlkIoctlCmd::BLKSSZGET => core::mem::size_of::<u32>(),
+                BlkIoctlCmd::FATIOCTLGETVOLUMEID => core::mem::size_of::<u32>(),
+                BlkIoctlCmd::HDIOGETGEO => core::mem::size_of::<HdGeometry>(),
                 _ => 0,
             }
         } else {
@@ -2210,11 +2212,34 @@ pub fn sys_fsetxattr(
     let task = current_task();
     let addr_space = task.addr_space();
 
+    // 验证 flags
+    const XATTR_CREATE: i32 = 1;
+    const XATTR_REPLACE: i32 = 2;
+
+    if flags & !(XATTR_CREATE | XATTR_REPLACE) != 0 {
+        return Err(SysError::EINVAL);
+    }
+
     let name = {
         let mut name_ptr = UserReadPtr::<u8>::new(name_ptr, &addr_space);
-        let cstring = name_ptr.read_c_string(256)?;
+        // 读取时限制最大长度，避免读取过长的字符串
+        let cstring = name_ptr.read_c_string(257)?; // XATTR_NAME_MAX + 2
         cstring.into_string().map_err(|_| SysError::EINVAL)?
     };
+
+    // 检查 name 长度 - 关键修复点
+    if name.is_empty() {
+        return Err(SysError::ERANGE);
+    }
+    // Linux 中 XATTR_NAME_MAX 是 255，包含前缀
+    if name.len() > 255 {
+        return Err(SysError::ERANGE);
+    }
+
+    // 检查 value 大小
+    if size > 65536 {
+        return Err(SysError::E2BIG);
+    }
 
     let value = if size > 0 {
         let mut value_ptr = UserReadPtr::<u8>::new(value_ptr, &addr_space);
@@ -2223,12 +2248,21 @@ pub fn sys_fsetxattr(
         Vec::new()
     };
 
-    let xattr_flags = flags;
-
     let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
     let inode = file.inode();
 
-    inode.set_xattr(&name, &value, xattr_flags)?;
+    // 处理 XATTR_CREATE 和 XATTR_REPLACE 语义
+    let exists = inode.get_xattr(&name).is_ok();
+
+    if flags & XATTR_CREATE != 0 && exists {
+        return Err(SysError::EEXIST);
+    }
+
+    if flags & XATTR_REPLACE != 0 && !exists {
+        return Err(SysError::ENODATA);
+    }
+
+    inode.set_xattr(&name, &value, flags)?;
 
     Ok(0)
 }

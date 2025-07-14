@@ -1,15 +1,16 @@
 use super::{
-    blkinfo::BlkIoctlCmd,
-    loopinfo::{LoopInfo64, LoopIoctlCmd},
+    blkinfo::{BlkIoctlCmd, HdGeometry},
+    loopinfo::{LoopInfo, LoopInfo64, LoopIoctlCmd},
 };
 use crate::dev::loopx::externf::__KernelTableIf_mod;
 use alloc::{boxed::Box, sync::Arc};
 use async_trait::async_trait;
-use config::vfs::SeekFrom;
+use config::{device::BLOCK_SIZE, vfs::SeekFrom};
 use crate_interface::call_interface;
 use mutex::SpinNoIrqLock;
 use systype::error::{SysError, SysResult, SyscallResult};
 use vfs::{
+    dentry::Dentry,
     direntry::DirEntry,
     file::{File, FileMeta},
 };
@@ -20,6 +21,17 @@ pub struct LoopFile {
     pub file: SpinNoIrqLock<Option<Arc<dyn File>>>,
 }
 
+impl LoopFile {
+    pub fn new(dentry: Arc<dyn Dentry>) -> Arc<Self> {
+        let f = Self {
+            meta: FileMeta::new(dentry),
+            inner: SpinNoIrqLock::new(LoopInfo64::default()),
+            file: SpinNoIrqLock::new(None),
+        };
+        Arc::new(f)
+    }
+}
+
 #[async_trait]
 impl File for LoopFile {
     fn meta(&self) -> &FileMeta {
@@ -28,9 +40,9 @@ impl File for LoopFile {
 
     async fn base_read(&self, buf: &mut [u8], pos: usize) -> SysResult<usize> {
         let lock = self.file.lock().clone();
-        log::error!("loop read");
+        // log::error!("loop read");
         if let Some(file) = lock {
-            log::error!("loop read {} at offset {}", file.dentry().path(), pos);
+            // log::error!("loop read {} at offset {:#x}", file.dentry().path(), pos);
             file.seek(SeekFrom::Start(pos as u64))?;
             return file.read(buf).await;
         }
@@ -39,9 +51,8 @@ impl File for LoopFile {
 
     async fn base_write(&self, buf: &[u8], pos: usize) -> SysResult<usize> {
         let lock = self.file.lock().clone();
-        log::error!("loop write");
         if let Some(file) = lock {
-            log::error!("loop write {} at offset {}", file.dentry().path(), pos);
+            // log::error!("loop write {} at offset {:#x}", file.dentry().path(), pos);
             file.seek(SeekFrom::Start(pos as u64))?;
             return file.write(buf).await;
         }
@@ -57,7 +68,7 @@ impl File for LoopFile {
     }
 
     fn ioctl(&self, cmd: usize, arg: usize) -> SyscallResult {
-        if let Some(cmd) = LoopIoctlCmd::from_repr(cmd) {
+        if let Some(cmd) = LoopIoctlCmd::from_repr(cmd as u32) {
             match cmd {
                 LoopIoctlCmd::SETFD => {
                     let table = call_interface!(KernelTableIf::table());
@@ -76,6 +87,7 @@ impl File for LoopFile {
                     Ok(0)
                 }
                 LoopIoctlCmd::CLRFD => {
+                    log::error!("[loopx::ioctl] clear");
                     *self.file.lock() = None;
                     Ok(0)
                 }
@@ -112,6 +124,7 @@ impl File for LoopFile {
                     }
                     Ok(0)
                 }
+
                 e => {
                     log::error!("not implement {:?}", e);
                     Err(SysError::ENOTTY)
@@ -133,16 +146,16 @@ impl File for LoopFile {
                 }
                 BlkIoctlCmd::BLKSSZGET => {
                     unsafe {
-                        *(arg as *mut u32) = 512;
+                        *(arg as *mut u32) = BLOCK_SIZE as u32;
                     }
                     Ok(0)
                 }
                 BlkIoctlCmd::BLKGETSIZE => {
                     let file = self.file.lock();
                     if let Some(ref f) = *file {
-                        let size = f.inode().size() as u64;
+                        let size = f.inode().size();
                         unsafe {
-                            *(arg as *mut u32) = (size / 512) as u32;
+                            *(arg as *mut u32) = (size / BLOCK_SIZE) as u32;
                         }
                         Ok(0)
                     } else {
@@ -150,6 +163,24 @@ impl File for LoopFile {
                     }
                 }
                 BlkIoctlCmd::BLKFLSBUF => Ok(0),
+                BlkIoctlCmd::FATIOCTLGETVOLUMEID => {
+                    unsafe {
+                        *(arg as *mut u32) = 0x12345678;
+                    }
+                    Ok(0)
+                }
+                BlkIoctlCmd::HDIOGETGEO => {
+                    let old_geometry = HdGeometry {
+                        heads: 255,      // 最大255个磁头
+                        sectors: 63,     // 每磁道63个扇区
+                        cylinders: 1024, // 1024个柱面
+                        start: 0,        // 起始扇区为0
+                    };
+                    unsafe {
+                        *(arg as *mut HdGeometry) = old_geometry;
+                    }
+                    Ok(0)
+                }
             }
         } else {
             log::error!("[LoopFile::ioctl] cmd {cmd:#x} not included");

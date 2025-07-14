@@ -331,6 +331,11 @@ impl dyn File {
         let size = self.size();
         let position = self.pos();
 
+        if position > size && inode.inotype() == InodeType::BlockDevice {
+            log::error!("write at {:#x} when size is {:#X}", position, size);
+            return Err(SysError::ENOSPC);
+        }
+
         if position > size && inode.inotype() == InodeType::File {
             unimplemented!("Holes are not supported yet");
         }
@@ -340,8 +345,11 @@ impl dyn File {
             _ => self.base_write(buf, position).await?,
         };
         let new_position = position + bytes_written;
+
         self.set_pos(new_position);
-        inode.set_size(usize::max(inode.size(), new_position));
+        if inode.inotype() != InodeType::BlockDevice {
+            inode.set_size(usize::max(inode.size(), new_position));
+        }
         inode.set_state(InodeState::DirtyAll);
 
         Ok(bytes_written)

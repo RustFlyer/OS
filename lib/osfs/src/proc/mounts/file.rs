@@ -24,7 +24,7 @@ impl File for MountsFile {
         for (_fstype, fs) in fs_mgr.iter() {
             let supers = fs.get_meta().sblks.lock();
             for (_mount_path, _sb) in supers.iter() {
-                info += "proc /proc proc rw,nosuid,nodev,noexec,relatime 0 0\n"
+                // info += "proc /proc proc rw,nosuid,nodev,noexec,relatime 0 0\n"
             }
         }
         let len = info.len();

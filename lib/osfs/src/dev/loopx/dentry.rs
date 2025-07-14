@@ -6,6 +6,7 @@ use vfs::{
     dentry::{Dentry, DentryMeta},
     file::{File, FileMeta},
     inode::Inode,
+    path::Path,
     sys_root_dentry,
 };
 
@@ -37,13 +38,19 @@ impl Dentry for LoopDentry {
     }
 
     fn base_open(self: Arc<Self>) -> SysResult<Arc<dyn File>> {
-        let file_meta = FileMeta::new(self);
-        *file_meta.flags.lock() = OpenFlags::O_RDWR;
-        Ok(Arc::new(LoopFile {
-            meta: file_meta,
-            inner: SpinNoIrqLock::new(LoopInfo64::default()),
-            file: SpinNoIrqLock::new(None),
-        }))
+        // let file_meta = FileMeta::new(self);
+        // *file_meta.flags.lock() = OpenFlags::O_RDWR;
+        // Ok(Arc::new(LoopFile {
+        //     meta: file_meta,
+        //     inner: SpinNoIrqLock::new(LoopInfo64::default()),
+        //     file: SpinNoIrqLock::new(None),
+        // }))
+        let inode = self.inode().ok_or(SysError::ENOENT)?;
+        // log::error!("inode open {:#x}", inode.size());
+        let loopinode = inode
+            .downcast_arc::<LoopInode>()
+            .unwrap_or_else(|_| unreachable!());
+        Ok(loopinode.file.clone())
     }
 
     fn base_create(&self, _dentry: &dyn Dentry, _mode: config::inode::InodeMode) -> SysResult<()> {
@@ -60,7 +67,9 @@ impl Dentry for LoopDentry {
             .strip_prefix("loop")
             .and_then(|n| n.parse::<u32>().ok())
         {
-            let inode = LoopInode::new(sys_root_dentry().superblock().unwrap(), minor);
+            let d = Path::new(sys_root_dentry(), dentry.path()).walk()?;
+            let f = LoopFile::new(d);
+            let inode = LoopInode::new(sys_root_dentry().superblock().unwrap(), minor, f);
             dentry.set_inode(inode);
             Ok(())
         } else {

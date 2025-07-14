@@ -19,7 +19,7 @@
 - [ ] [  19] memcontrol02                54
 - [ ] [  20] rename01                    48
 - [ ] [  21] rename03                    48
-- [ ] [  22] fsetxattr01                 46
+- [x] [  22] fsetxattr01                 46
 - [ ] [  23] setxattr01                  46
 - [x] [  24] clock_getres01              44
 - [ ] [  25] mem                         42

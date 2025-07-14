@@ -5,6 +5,7 @@ use config::{
 };
 use systype::error::SysResult;
 use vfs::{
+    file::File,
     inode::{Inode, InodeMeta},
     inoid::alloc_ino,
     stat::Stat,
@@ -14,15 +15,17 @@ use vfs::{
 pub struct LoopInode {
     meta: InodeMeta,
     pub minor: u32,
+    pub file: Arc<dyn File>,
 }
 
 impl LoopInode {
-    pub fn new(superblock: Arc<dyn SuperBlock>, minor: u32) -> Arc<Self> {
-        let size = BLOCK_SIZE;
+    pub fn new(superblock: Arc<dyn SuperBlock>, minor: u32, file: Arc<dyn File>) -> Arc<Self> {
+        let size = 0x100000;
         let mode = InodeMode::BLOCK;
         let inode = Arc::new(Self {
             meta: InodeMeta::new(alloc_ino(), superblock),
             minor,
+            file,
         });
         inode.set_inotype(InodeType::from(mode));
         inode.set_size(size);
@@ -38,7 +41,7 @@ impl Inode for LoopInode {
     fn get_attr(&self) -> SysResult<Stat> {
         let inner = self.meta.inner.lock();
         let mode = inner.mode.bits();
-        let len = inner.size;
+        let size = inner.size;
         Ok(Stat {
             st_dev: (7 << 8) | self.minor as u64,
             st_ino: self.meta.ino as u64,
@@ -48,10 +51,10 @@ impl Inode for LoopInode {
             st_gid: 0,
             st_rdev: 0,
             __pad: 0,
-            st_size: len as u64,
+            st_size: size as u64,
             st_blksize: 512,
             __pad2: 0,
-            st_blocks: (len / 512) as u64,
+            st_blocks: (size / BLOCK_SIZE) as u64,
             st_atime: inner.atime,
             st_mtime: inner.mtime,
             st_ctime: inner.ctime,
