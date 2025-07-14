@@ -48,10 +48,6 @@ impl File for MapsFile {
         Err(SysError::ENOTDIR)
     }
 
-    fn flush(&self) -> SysResult<usize> {
-        Err(SysError::EINVAL)
-    }
-
     fn base_readlink(&self, _buf: &mut [u8]) -> SysResult<usize> {
         panic!("MapsFile does not support readlink");
     }

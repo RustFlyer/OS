@@ -32,23 +32,23 @@ impl Dentry for StatDentry {
     }
 
     fn base_create(&self, _dentry: &dyn Dentry, _mode: config::inode::InodeMode) -> SysResult<()> {
-        todo!()
+        Err(systype::error::SysError::EACCES)
     }
 
     fn base_link(&self, _dentry: &dyn Dentry, _old_dentry: &dyn Dentry) -> SysResult<()> {
-        todo!()
+        Err(systype::error::SysError::EACCES)
     }
 
     fn base_lookup(&self, _dentry: &dyn Dentry) -> SysResult<()> {
-        todo!()
+        Err(systype::error::SysError::ENOTDIR)
     }
 
     fn base_unlink(&self, _dentry: &dyn Dentry) -> SysResult<()> {
-        todo!()
+        Err(systype::error::SysError::EACCES)
     }
 
     fn base_new_neg_child(self: Arc<Self>, _name: &str) -> Arc<dyn Dentry> {
-        todo!()
+        panic!("StatDentry does not support new_neg_child")
     }
 
     fn base_rename(
@@ -57,6 +57,6 @@ impl Dentry for StatDentry {
         _new_dir: &dyn Dentry,
         _new_dentry: &dyn Dentry,
     ) -> SysResult<()> {
-        todo!()
+        Err(systype::error::SysError::EACCES)
     }
 }

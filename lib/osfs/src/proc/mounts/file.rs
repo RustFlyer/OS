@@ -42,8 +42,4 @@ impl File for MountsFile {
     fn base_read_dir(&self) -> SysResult<Option<DirEntry>> {
         Err(SysError::ENOTDIR)
     }
-
-    fn flush(&self) -> SysResult<usize> {
-        todo!()
-    }
 }
