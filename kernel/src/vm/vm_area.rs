@@ -985,6 +985,21 @@ impl FileBackedArea {
         area.pages.insert(fault_addr.page_number(), page);
         Ok(())
     }
+
+    /// Returns the file backing store.
+    pub fn file(&self) -> &Arc<dyn File> {
+        &self.file
+    }
+
+    /// Returns the offset of the mapped region in the file.
+    pub fn offset(&self) -> usize {
+        self.offset
+    }
+
+    /// Returns the length of the mapped region in the file.
+    pub fn len(&self) -> usize {
+        self.len
+    }
 }
 
 impl Debug for FileBackedArea {

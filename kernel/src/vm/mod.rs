@@ -3,12 +3,12 @@ pub mod elf;
 pub mod mmap;
 pub mod shm;
 pub mod user_ptr;
+pub mod vm_area;
 
 #[cfg(target_arch = "riscv64")]
 pub mod iomap;
 
 mod page_table;
-mod vm_area;
 
 pub use page_table::switch_to_kernel_page_table;
 
