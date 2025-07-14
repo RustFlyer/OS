@@ -1,9 +1,11 @@
-use alloc::{format, sync::Arc};
+use alloc::{format, string::String, sync::Arc};
+
 use config::{
     inode::{InodeMode, InodeType},
     vfs::OpenFlags,
 };
 use exe::{dentry::ExeDentry, inode::ExeInode};
+use maps::{dentry::MapsDentry, inode::MapsInode};
 use meminfo::{dentry::MemInfoDentry, inode::MemInfoInode};
 use mounts::{dentry::MountsDentry, inode::MountsInode};
 use stat::{dentry::StatDentry, inode::StatInode};
@@ -16,6 +18,7 @@ use crate::{
 };
 
 pub mod exe;
+pub mod maps;
 pub mod meminfo;
 pub mod mounts;
 pub mod stat;
@@ -26,10 +29,12 @@ pub mod superblock;
 
 #[crate_interface::def_interface]
 pub trait KernelProcIf {
-    fn exe() -> alloc::string::String;
-    fn status() -> alloc::string::String;
-    fn stat() -> alloc::string::String;
-    fn stat_from_tid(tid: usize) -> alloc::string::String;
+    fn exe() -> String;
+    fn status() -> String;
+    fn stat() -> String;
+    fn stat_from_tid(tid: usize) -> String;
+    fn maps() -> String;
+    fn maps_from_tid(tid: usize) -> String;
 }
 
 pub fn init_procfs(root_dentry: Arc<dyn Dentry>) -> SysResult<()> {
@@ -53,7 +58,6 @@ pub fn init_procfs(root_dentry: Arc<dyn Dentry>) -> SysResult<()> {
     let sys_dentry: Arc<dyn Dentry> =
         SimpleDentry::new("sys", Some(sys_inode), Some(Arc::downgrade(&root_dentry)));
     root_dentry.add_child(sys_dentry.clone());
-    log::info!("[init_procfs] add sys_dentry path = {}", sys_dentry.path());
 
     // /proc/sys/kernel
     let kernel_inode = SimpleInode::new(root_dentry.superblock().unwrap());
@@ -65,10 +69,6 @@ pub fn init_procfs(root_dentry: Arc<dyn Dentry>) -> SysResult<()> {
     );
 
     sys_dentry.add_child(kernel_dentry.clone());
-    log::info!(
-        "[init_procfs] add kernel_dentry path = {}",
-        kernel_dentry.path()
-    );
 
     // /proc/sys/kernel/pid_max
     let pid_max_dentry = SimpleDentry::new(
@@ -81,7 +81,6 @@ pub fn init_procfs(root_dentry: Arc<dyn Dentry>) -> SysResult<()> {
         .clone()
         .into_dyn()
         .create(pid_max_dentry.into_dyn_ref(), InodeMode::REG)?;
-    log::info!("[init_procfs] add pid_max_dentry");
     let pid_max_file = pid_max_dentry.base_open()?;
     pid_max_file.set_flags(OpenFlags::O_WRONLY);
     osfuture::block_on(async { pid_max_file.write("32768\0".as_bytes()).await })?;
@@ -97,7 +96,6 @@ pub fn init_procfs(root_dentry: Arc<dyn Dentry>) -> SysResult<()> {
         .clone()
         .into_dyn()
         .create(tainted_dentry.into_dyn_ref(), InodeMode::REG)?;
-    log::info!("[init_procfs] add tainted_dentry");
     let tainted_file = tainted_dentry.base_open()?;
     tainted_file.set_flags(OpenFlags::O_WRONLY);
     osfuture::block_on(async { tainted_file.write("0\0".as_bytes()).await })?;
@@ -123,17 +121,12 @@ pub fn init_procfs(root_dentry: Arc<dyn Dentry>) -> SysResult<()> {
     let exe_inode = ExeInode::new(root_dentry.superblock().unwrap());
     let exe_dentry: Arc<dyn Dentry> =
         ExeDentry::new(Some(exe_inode), Some(Arc::downgrade(&self_dentry)));
-    log::info!("[init_procfs] add exe_dentry path = {}", exe_dentry.path());
     self_dentry.add_child(exe_dentry);
 
     // /proc/self/status
     let status_inode = StatusInode::new(root_dentry.superblock().unwrap());
     let status_dentry: Arc<dyn Dentry> =
         StatusDentry::new(Some(status_inode), Some(Arc::downgrade(&self_dentry)));
-    log::info!(
-        "[init_procfs] add status_dentry path = {}",
-        status_dentry.path()
-    );
     self_dentry.add_child(status_dentry);
 
     // /proc/self/stat
@@ -146,17 +139,18 @@ pub fn init_procfs(root_dentry: Arc<dyn Dentry>) -> SysResult<()> {
     let mounts_inode = MountsInode::new(root_dentry.superblock().unwrap());
     let mounts_dentry: Arc<dyn Dentry> =
         MountsDentry::new(Some(mounts_inode), Some(Arc::downgrade(&self_dentry)));
-    log::info!(
-        "[init_procfs] add mounts_dentry path = {}",
-        mounts_dentry.path()
-    );
     self_dentry.add_child(mounts_dentry);
+
+    // /proc/self/maps
+    let maps_inode = MapsInode::new(root_dentry.superblock().unwrap(), 0);
+    let maps_dentry: Arc<dyn Dentry> =
+        MapsDentry::new(Some(maps_inode), Some(Arc::downgrade(&self_dentry)));
+    self_dentry.add_child(maps_dentry);
 
     Ok(())
 }
 
 pub fn create_thread_stat_file(tid: usize) {
-    // /proc/self/stat
     let root = sys_root_dentry();
     let root_dentry = root.lookup("proc").unwrap();
 
@@ -165,14 +159,22 @@ pub fn create_thread_stat_file(tid: usize) {
         return;
     }
 
+    // /proc/<tid>
     let num_inode = SimpleInode::new(root_dentry.superblock().unwrap());
     num_inode.set_inotype(InodeType::Dir);
     let num_dentry: Arc<dyn Dentry> =
         SimpleDentry::new(&num, Some(num_inode), Some(Arc::downgrade(&root_dentry)));
     root_dentry.add_child(num_dentry.clone());
 
+    // /proc/<tid>/stat
     let stat_inode = StatInode::new(root_dentry.superblock().unwrap(), tid);
     let stat_dentry: Arc<dyn Dentry> =
         StatDentry::new(Some(stat_inode), Some(Arc::downgrade(&num_dentry)));
     num_dentry.add_child(stat_dentry);
+
+    // /proc/<tid>/maps
+    let maps_inode = MapsInode::new(root_dentry.superblock().unwrap(), tid);
+    let maps_dentry: Arc<dyn Dentry> =
+        MapsDentry::new(Some(maps_inode), Some(Arc::downgrade(&num_dentry)));
+    num_dentry.add_child(maps_dentry);
 }

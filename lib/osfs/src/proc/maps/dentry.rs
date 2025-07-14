@@ -1,0 +1,64 @@
+use alloc::sync::{Arc, Weak};
+
+use config::inode::InodeMode;
+use systype::error::SysResult;
+use vfs::{
+    dentry::{Dentry, DentryMeta},
+    file::{File, FileMeta},
+    inode::Inode,
+};
+
+use super::{file::MapsFile, inode::MapsInode};
+
+pub struct MapsDentry {
+    meta: DentryMeta,
+}
+
+impl MapsDentry {
+    pub fn new(inode: Option<Arc<MapsInode>>, parent: Option<Weak<dyn Dentry>>) -> Arc<Self> {
+        Arc::new(Self {
+            meta: DentryMeta::new("maps", inode.map(|i| i as Arc<dyn Inode>), parent),
+        })
+    }
+}
+
+impl Dentry for MapsDentry {
+    fn get_meta(&self) -> &DentryMeta {
+        &self.meta
+    }
+
+    fn base_open(self: Arc<Self>) -> SysResult<Arc<dyn File>> {
+        Ok(Arc::new(MapsFile {
+            meta: FileMeta::new(self),
+        }))
+    }
+
+    fn base_create(&self, _dentry: &dyn Dentry, _mode: InodeMode) -> SysResult<()> {
+        Err(systype::error::SysError::EACCES)
+    }
+
+    fn base_lookup(&self, _dentry: &dyn Dentry) -> SysResult<()> {
+        Err(systype::error::SysError::ENOTDIR)
+    }
+
+    fn base_link(&self, _dentry: &dyn Dentry, _old_dentry: &dyn Dentry) -> SysResult<()> {
+        Err(systype::error::SysError::EACCES)
+    }
+
+    fn base_unlink(&self, _dentry: &dyn Dentry) -> SysResult<()> {
+        Err(systype::error::SysError::EACCES)
+    }
+
+    fn base_new_neg_child(self: Arc<Self>, _name: &str) -> Arc<dyn Dentry> {
+        panic!("MapsDentry does not support new_neg_child")
+    }
+
+    fn base_rename(
+        &self,
+        _dentry: &dyn Dentry,
+        _new_dir: &dyn Dentry,
+        _new_dentry: &dyn Dentry,
+    ) -> SysResult<()> {
+        Err(systype::error::SysError::EACCES)
+    }
+}
