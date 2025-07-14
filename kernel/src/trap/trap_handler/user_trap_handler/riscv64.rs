@@ -21,6 +21,7 @@ use crate::vm::user_ptr::UserReadPtr;
 /// task_executor_unit(), which calls this trap_handler() function.
 pub fn trap_handler(task: &Task) {
     let stval = register::stval::read();
+    let sepc = register::sepc::read();
     let cause = register::scause::read().cause();
 
     unsafe { load_trap_handler() };
@@ -35,13 +36,13 @@ pub fn trap_handler(task: &Task) {
 
     match cause {
         Trap::Exception(e) => {
-            user_exception_handler(task, Exception::from_number(e).unwrap(), stval)
+            user_exception_handler(task, Exception::from_number(e).unwrap(), stval, sepc)
         }
         Trap::Interrupt(i) => user_interrupt_handler(task, Interrupt::from_number(i).unwrap()),
     }
 }
 
-pub fn user_exception_handler(task: &Task, e: Exception, stval: usize) {
+pub fn user_exception_handler(task: &Task, e: Exception, stval: usize, sepc: usize) {
     match e {
         Exception::UserEnvCall => {
             task.set_is_syscall(true);
@@ -64,7 +65,7 @@ pub fn user_exception_handler(task: &Task, e: Exception, stval: usize) {
                     fault_addr.to_usize(),
                     access,
                     e.as_str(),
-                    stval
+                    sepc
                 );
                 task.receive_siginfo(SigInfo {
                     sig: Sig::SIGSEGV,
@@ -77,11 +78,10 @@ pub fn user_exception_handler(task: &Task, e: Exception, stval: usize) {
             }
         }
         Exception::IllegalInstruction => {
-            let addr = register::sepc::read();
             log::error!(
                 "[trap_handler] illegal instruction {:#x} at {:#x}",
                 stval,
-                addr
+                sepc
             );
             task.receive_siginfo(SigInfo {
                 sig: Sig::SIGILL,

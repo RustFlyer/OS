@@ -71,7 +71,7 @@ impl Inode for PipeInode {
             st_size: inner.size as u64,
             st_blksize: 0,
             __pad2: 0,
-            st_blocks: 0 as u64,
+            st_blocks: 0,
             st_atime: inner.atime,
             st_mtime: inner.mtime,
             st_ctime: inner.ctime,

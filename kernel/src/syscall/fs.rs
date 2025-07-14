@@ -2,6 +2,7 @@ use alloc::{boxed::Box, ffi::CString, string::ToString, sync::Arc, vec::Vec};
 use core::{
     cmp, mem,
     pin::Pin,
+    ptr,
     task::{Context, Poll},
     time::Duration,
 };
@@ -35,6 +36,7 @@ use osfs::{
 use osfuture::{Select2Futures, SelectOutput};
 use systype::{
     error::{SysError, SysResult, SyscallResult},
+    splice::SpliceFlags,
     time::TimeSpec,
 };
 use timer::{TimedTaskResult, TimeoutFuture};
@@ -831,7 +833,7 @@ pub async fn sys_faccessat(dirfd: usize, pathname: usize, mode: i32) -> SyscallR
 
     let groups: &[u32] = &cred.groups;
 
-    for d in &pdentrylist[..pdentrylist.len() - 1] {
+    for d in &pdentrylist[..pdentrylist.len().saturating_sub(1)] {
         let inode = d.inode().unwrap();
         if !inode.check_permission(euid, egid, groups, AccessFlags::X_OK) {
             return Err(SysError::EACCES);
@@ -895,7 +897,7 @@ pub async fn sys_pipe2(pipefd: usize, flags: i32) -> SyscallResult {
     let pipe = task.with_mut_fdtable(|table| {
         let fd_read = table.alloc(pipe_read, flags)?;
         let fd_write = table.alloc(pipe_write, flags)?;
-        log::info!("[sys_pipe2] read_fd: {fd_read}, write_fd: {fd_write}, flags: {flags:?}");
+        log::error!("[sys_pipe2] read_fd: {fd_read}, write_fd: {fd_write}, flags: {flags:?}");
         Ok([fd_read as u32, fd_write as u32])
     })?;
 
@@ -2330,4 +2332,103 @@ pub fn sys_fallocate(fd: usize, mode: usize, offset: usize, len: usize) -> Sysca
     inode.set_size(size);
 
     Ok(0)
+}
+
+pub async fn sys_splice(
+    fd_in: usize,
+    off_in_ptr: usize,
+    fd_out: usize,
+    off_out_ptr: usize,
+    len: usize,
+    flags: i32,
+) -> SyscallResult {
+    type Offset = i32;
+
+    log::error!(
+        "[sys_splice] fd_in: {}, off_in_ptr: {}, fd_out: {}, off_out_ptr: {}, len: {}, flags: {}",
+        fd_in, off_in_ptr, fd_out, off_out_ptr, len, flags
+    );
+    let _flags = SpliceFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
+    let fd_in = current_task()
+        .with_mut_fdtable(|ft| ft.get_file(fd_in))
+        .map_err(|_| SysError::EBADF)?;
+    let fd_out = current_task()
+        .with_mut_fdtable(|ft| ft.get_file(fd_out))
+        .map_err(|_| SysError::EBADF)?;
+
+    if !fd_in.flags().readable() || !fd_out.flags().writable() {
+        log::error!(
+            "[sys_splice] not readable/writable",
+        );
+        return Err(SysError::EBADF);
+    }
+    if ptr::eq(fd_out.as_ref(), fd_in.as_ref()) {
+        return Err(SysError::EINVAL);
+    }
+    if fd_out.flags().contains(OpenFlags::O_APPEND) {
+        return Err(SysError::EINVAL);
+    }
+
+    let fd_in_type = fd_in.inode().inotype();
+    let fd_out_type = fd_out.inode().inotype();
+    if !fd_in_type.is_fifo() && !fd_out_type.is_fifo() {
+        return Err(SysError::EINVAL);
+    }
+    if fd_in_type.is_fifo() && off_in_ptr != 0 || fd_out_type.is_fifo() && off_out_ptr != 0 {
+        return Err(SysError::ESPIPE);
+    }
+
+    let off_in: Option<Offset> = if off_in_ptr == 0 {
+        None
+    } else {
+        Some(unsafe {
+            UserReadPtr::<Offset>::new(off_in_ptr, &current_task().addr_space()).read()?
+        })
+    };
+    let off_out: Option<Offset> = if off_out_ptr == 0 {
+        None
+    } else {
+        Some(unsafe {
+            UserReadPtr::<Offset>::new(off_out_ptr, &current_task().addr_space()).read()?
+        })
+    };
+
+    let mut buffer: Vec<u8> = vec![0; len];
+
+    let bytes_read = if fd_in_type.is_fifo() {
+        fd_in.read(buffer.as_mut_slice()).await?
+    } else if let Some(offset) = off_in {
+        let pos = fd_in.pos();
+        fd_in.seek(SeekFrom::Start(offset as u64))?;
+        let bytes_read = fd_in.read(buffer.as_mut_slice()).await?;
+        fd_in.seek(SeekFrom::Start(pos as u64))?;
+        bytes_read
+    } else {
+        fd_in.read(buffer.as_mut_slice()).await?
+    };
+
+    if bytes_read == 0 {
+        return Ok(0);
+    }
+
+    let bytes_written = if fd_out_type.is_fifo() {
+        fd_out.write(buffer.as_slice()).await?
+    } else if let Some(offset) = off_out {
+        let pos = fd_out.pos();
+        fd_out.seek(SeekFrom::Start(offset as u64))?;
+        let bytes_written = fd_out.write(buffer.as_slice()).await?;
+        fd_out.seek(SeekFrom::Start(pos as u64))?;
+        bytes_written
+    } else {
+        fd_out.write(buffer.as_slice()).await?
+    };
+
+    if bytes_written != bytes_read {
+        panic!(
+            "sys_splice: bytes_written ({}) != bytes_read ({})",
+            bytes_written, bytes_read
+        );
+    }
+
+    Ok(bytes_read)
 }
