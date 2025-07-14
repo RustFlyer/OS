@@ -53,7 +53,7 @@ impl File for TtyFile {
             .downcast_arc::<TtyInode>()
             .unwrap_or_else(|_| unreachable!())
             .char_dev;
-        log::debug!("tty read {}", buf.len());
+        // log::debug!("tty read {}", buf.len());
         let mut rlen = 0;
         let termios = self.inner.lock().termios;
 

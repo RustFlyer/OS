@@ -116,10 +116,10 @@ impl OSDevice for Serial {
         self.with_mut_inner(|inner| {
             while uart.poll_in() {
                 let byte = uart.getc();
-                log::info!(
-                    "Serial interrupt handler got byte: {}, ascii: {byte}",
-                    core::str::from_utf8(&[byte]).unwrap()
-                );
+                // log::info!(
+                //     "Serial interrupt handler got byte: {}, ascii: {byte}",
+                //     core::str::from_utf8(&[byte]).unwrap()
+                // );
                 if inner.read_buf.enqueue(byte).is_none() {
                     break;
                 }

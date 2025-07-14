@@ -6,9 +6,9 @@
 - [ ] [   6] fanotify13                 200
 - [x] [   7] access01                   199
 - [ ] [   8] memfd_create01             157
-- [ ] [   9] waitpid01                  126
+- [x] [   9] waitpid01                  126
 - [ ] [  10] pkey01                     108
-- [ ] [  11] getpid01                   100
+- [x] [  11] getpid01                   100
 - [ ] [  12] fsmount01                   96
 - [ ] [  13] chdir01                     92
 - [ ] [  14] fanotify09                  76

@@ -1,9 +1,13 @@
-use core::fmt;
+use core::{
+    fmt,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
 use driver::print;
-use log::Level;
 use logger::LogInterface;
 use mutex::SpinNoIrqLock;
+
+static mut LOGOUT: AtomicBool = AtomicBool::new(false);
 
 static LOG_LOCK: SpinNoIrqLock<()> = SpinNoIrqLock::new(());
 
@@ -18,9 +22,9 @@ impl LogInterface for LogInterfaceImpl {
     fn print_log(record: &log::Record) {
         let _guard = LOG_LOCK.lock();
 
-        // if record.level() != Level::Trace {
-        //     return;
-        // }
+        if !can_log() {
+            return;
+        }
 
         print_in_color(
             format_args!(
@@ -33,4 +37,20 @@ impl LogInterface for LogInterfaceImpl {
             logger::level2color(record.level()),
         );
     }
+}
+
+#[allow(static_mut_refs)]
+pub fn can_log() -> bool {
+    unsafe { LOGOUT.load(Ordering::Relaxed) }
+}
+
+#[allow(static_mut_refs)]
+pub fn enable_log() {
+    unsafe { LOGOUT.store(true, Ordering::Relaxed) };
+    log::debug!("Log Enable");
+}
+
+#[allow(static_mut_refs)]
+pub fn disable_log() {
+    unsafe { LOGOUT.store(false, Ordering::Relaxed) }
 }

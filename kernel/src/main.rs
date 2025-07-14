@@ -27,6 +27,7 @@ use core::ptr;
 use arch::mm::fence;
 use config::mm::{DTB_END, DTB_START};
 use driver::println;
+use logging::disable_log;
 use mm::{self, frame, heap};
 
 #[macro_use]
@@ -53,6 +54,9 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
     if unsafe { !INITIALIZED } {
         /* Initialize logger */
         logger::init();
+
+        // too much log delay, cut up!
+        disable_log();
 
         log::info!("hart {}: initializing kernel", hart_id);
         log::info!("dtb_addr: {:#x}", dtb_addr);

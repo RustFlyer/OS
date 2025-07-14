@@ -26,7 +26,7 @@ use osfs::{
         rtc::{RtcTime, ioctl::RtcIoctlCmd},
         tty::{
             TtyIoctlCmd,
-            ioctl::{Pid, Termios},
+            ioctl::{Pid, Termios, WinSize},
         },
     },
     fd_table::{FdFlags, FdSet},
@@ -48,6 +48,7 @@ use vfs::{
 };
 
 use crate::{
+    logging::enable_log,
     processor::current_task,
     task::{TaskState, sig_members::IntrBySignalFuture, signal::sig_info::SigSet},
     vm::user_ptr::{UserReadPtr, UserReadWritePtr, UserWritePtr},
@@ -105,6 +106,10 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
 
     let name = path.clone();
     log::info!("[sys_openat] dirfd: {dirfd:#x}, path: {path}, flags: {flags:?}, mode: {mode:?}");
+
+    if path == "/dev/tty" {
+        enable_log();
+    }
 
     let mut dentry = task.walk_at(AtFd::from(dirfd), path)?;
 
@@ -925,14 +930,19 @@ pub fn sys_ioctl(fd: usize, request: usize, argp: usize) -> SyscallResult {
     log::info!("[sys_ioctl] fd: {fd}, request: {request:#x}, arg: {argp:#x}");
     let task = current_task();
     let addrspace = task.addr_space();
-    let mut arg = UserWritePtr::<u8>::new(argp, &addrspace);
     let request32 = request & 0xffff_ffff;
     unsafe {
         let len = if let Some(cmd) = TtyIoctlCmd::from_repr(request32) {
             match cmd {
                 TtyIoctlCmd::TCGETS => core::mem::size_of::<Termios>(),
+                TtyIoctlCmd::TCGETA => core::mem::size_of::<Termios>(),
                 TtyIoctlCmd::TIOCGPGRP => core::mem::size_of::<Pid>(),
+                TtyIoctlCmd::TIOCSPGRP => core::mem::size_of::<Pid>(),
                 TtyIoctlCmd::TCSETS => core::mem::size_of::<Termios>(),
+                TtyIoctlCmd::TCSETSW => core::mem::size_of::<Termios>(),
+                TtyIoctlCmd::TCSETSF => core::mem::size_of::<Termios>(),
+                TtyIoctlCmd::TIOCGWINSZ => core::mem::size_of::<WinSize>(),
+                TtyIoctlCmd::TIOCSWINSZ => core::mem::size_of::<WinSize>(),
                 _ => 0,
             }
         } else if let Some(cmd) = RtcIoctlCmd::from_repr(request32 as u64) {
@@ -960,11 +970,13 @@ pub fn sys_ioctl(fd: usize, request: usize, argp: usize) -> SyscallResult {
             0
         };
 
-        // log::debug!("[sys_ioctl] should write with len: {len}");
-
-        let slice = arg.try_into_mut_slice(len)?;
-
         let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
+
+        if len == 0 {
+            return file.ioctl(request32, argp);
+        }
+        let mut arg = UserWritePtr::<u8>::new(argp, &addrspace);
+        let slice = arg.try_into_mut_slice(len)?;
         file.ioctl(request32, slice.as_ptr() as usize)
     }
 }
@@ -2346,7 +2358,12 @@ pub async fn sys_splice(
 
     log::error!(
         "[sys_splice] fd_in: {}, off_in_ptr: {}, fd_out: {}, off_out_ptr: {}, len: {}, flags: {}",
-        fd_in, off_in_ptr, fd_out, off_out_ptr, len, flags
+        fd_in,
+        off_in_ptr,
+        fd_out,
+        off_out_ptr,
+        len,
+        flags
     );
     let _flags = SpliceFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
     let fd_in = current_task()
@@ -2357,9 +2374,7 @@ pub async fn sys_splice(
         .map_err(|_| SysError::EBADF)?;
 
     if !fd_in.flags().readable() || !fd_out.flags().writable() {
-        log::error!(
-            "[sys_splice] not readable/writable",
-        );
+        log::error!("[sys_splice] not readable/writable",);
         return Err(SysError::EBADF);
     }
     if ptr::eq(fd_out.as_ref(), fd_in.as_ref()) {

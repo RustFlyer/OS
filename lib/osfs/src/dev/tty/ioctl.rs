@@ -53,7 +53,7 @@ pub enum TtyIoctlCmd {
 
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
-pub(crate) struct WinSize {
+pub struct WinSize {
     ws_row: u16,
     ws_col: u16,
     ws_xpixel: u16, // Unused

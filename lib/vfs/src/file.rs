@@ -191,11 +191,11 @@ pub trait File: Send + Sync + DowncastSync {
         Err(SysError::ENOTTY)
     }
 
-    fn dev_id(&self) -> (u32, u32) {
+    fn dev_id(&self) -> (u8, u8) {
         let inode = self.inode();
         let dev_id = inode.dev_id();
-        let major = (dev_id >> 8) as u32;
-        let minor = (dev_id & 0xFF) as u32;
+        let major = (dev_id >> 8) as u8;
+        let minor = (dev_id & 0xFF) as u8;
         (major, minor)
     }
 

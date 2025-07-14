@@ -87,7 +87,11 @@ impl File for LoopFile {
                     Ok(0)
                 }
                 LoopIoctlCmd::CLRFD => {
-                    log::error!("[loopx::ioctl] clear");
+                    let is_enixo = { self.file.lock().is_none() };
+                    if is_enixo {
+                        return Err(SysError::ENXIO);
+                    }
+
                     *self.file.lock() = None;
                     Ok(0)
                 }
