@@ -18,7 +18,7 @@ use mutex::{SpinNoIrqLock, new_share_mutex};
 use osfs::{proc::create_thread_stat_file, sys_root_dentry};
 use osfuture::suspend_now;
 use shm::manager::SHARED_MEMORY_MANAGER;
-use systype::{error::SysResult, time::ITimer};
+use systype::{error::SysResult, memory_flags::MappingFlags, time::ITimer};
 use timer::{TIMER_MANAGER, Timer};
 use vfs::{dentry::Dentry, file::File, path::Path};
 
@@ -37,6 +37,7 @@ use super::{
 use crate::vm::{
     addr_space::{AddrSpace, switch_to},
     user_ptr::UserWritePtr,
+    vm_area::{TypedArea, VmaFlags},
 };
 
 impl Task {
@@ -202,7 +203,7 @@ impl Task {
         let mut name = self.get_name();
 
         if cloneflags.contains(CloneFlags::VFORK) {
-            vfork_parent = Some(Arc::downgrade(&self));
+            vfork_parent = Some(Arc::downgrade(self));
         }
 
         if cloneflags.contains(CloneFlags::THREAD) {
@@ -627,5 +628,66 @@ impl Task {
             itrealvalue = itrealvalue,
             starttime = starttime,
         )
+    }
+
+    pub fn proc_maps_read(&self) -> String {
+        let mut content = String::new();
+        let addr_space = self.addr_space();
+        let vm_areas = addr_space.vm_areas.lock();
+
+        for (_, vma) in vm_areas.iter() {
+            let start_addr = vma.start_va().to_usize();
+            let end_addr = vma.end_va().to_usize();
+
+            // Format permissions
+            let mut perms = String::new();
+            let prot = vma.prot();
+            perms.push(if prot.contains(MappingFlags::R) {
+                'r'
+            } else {
+                '-'
+            });
+            perms.push(if prot.contains(MappingFlags::W) {
+                'w'
+            } else {
+                '-'
+            });
+            perms.push(if prot.contains(MappingFlags::X) {
+                'x'
+            } else {
+                '-'
+            });
+            perms.push(if vma.flags().contains(VmaFlags::SHARED) {
+                's'
+            } else {
+                'p'
+            });
+
+            // Get file information if this is a file-backed mapping
+            let (path, offset, dev_major, dev_minor, inode) = match &vma.map_type {
+                TypedArea::FileBacked(file_area) => {
+                    let file = file_area.file();
+                    let dentry = file.dentry();
+                    let path = dentry.path();
+                    let offset = file_area.offset();
+                    let inode = dentry.inode().unwrap().ino();
+                    // Use fake device numbers for now (08:01)
+                    (path, offset, 8, 1, inode)
+                }
+                TypedArea::Anonymous(_) => ("[anon]".to_string(), 0, 0, 0, 0),
+                TypedArea::Heap(_) => ("[heap]".to_string(), 0, 0, 0, 0),
+                TypedArea::SharedMemory(_) => ("[shared]".to_string(), 0, 0, 0, 0),
+                TypedArea::Offset(_) => ("[kernel]".to_string(), 0, 0, 0, 0),
+            };
+
+            // Format the maps line:
+            // start-end perms offset dev_major:dev_minor inode path
+            content.push_str(&format!(
+                "{:016x}-{:016x} {} {:08x} {:02x}:{:02x} {} {}\n",
+                start_addr, end_addr, perms, offset, dev_major, dev_minor, inode, path
+            ));
+        }
+
+        content
     }
 }
