@@ -218,6 +218,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         GETGROUPS => sys_getgroups(args[0], args[1]),
         SETGROUPS => sys_setgroups(args[0], args[1]),
         FADVISE64_64 => sys_fadvise64_64(args[0], args[1], args[2], args[3] as i32),
+        SPLICE => sys_splice(args[0], args[1], args[2], args[3], args[4], args[5] as i32).await,
         _ => {
             println!("Syscall not implemented: {}", syscall_no.as_str());
             panic!("Syscall not implemented: {}", syscall_no.as_str());

@@ -10,4 +10,5 @@ pub mod error;
 pub mod memory_flags;
 pub mod rlimit;
 pub mod rusage;
+pub mod splice;
 pub mod time;
