@@ -670,9 +670,10 @@ impl Task {
                     let dentry = file.dentry();
                     let path = dentry.path();
                     let offset = file_area.offset();
+                    let dev_no = file.dev_id();
                     let inode = dentry.inode().unwrap().ino();
                     // Use fake device numbers for now (08:01)
-                    (path, offset, 8, 1, inode)
+                    (path, offset, dev_no.0, dev_no.1, inode)
                 }
                 TypedArea::Anonymous(_) => ("[anon]".to_string(), 0, 0, 0, 0),
                 TypedArea::Heap(_) => ("[heap]".to_string(), 0, 0, 0, 0),
