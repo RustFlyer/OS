@@ -4,6 +4,7 @@ use inode::LoopInode;
 use systype::error::SysResult;
 use vfs::{path::Path, sys_root_dentry};
 
+pub mod blkinfo;
 pub mod dentry;
 pub mod externf;
 pub mod file;

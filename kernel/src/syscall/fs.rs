@@ -18,7 +18,10 @@ use driver::BLOCK_DEVICE;
 use osfs::{
     FS_MANAGER,
     dev::{
-        loopx::loopinfo::{LoopInfo64, LoopIoctlCmd},
+        loopx::{
+            blkinfo::BlkIoctlCmd,
+            loopinfo::{LoopInfo64, LoopIoctlCmd},
+        },
         rtc::{RtcTime, ioctl::RtcIoctlCmd},
         tty::{
             TtyIoctlCmd,
@@ -489,10 +492,7 @@ pub async fn sys_mkdirat(dirfd: usize, pathname: usize, mode: u32) -> SyscallRes
     let path = UserReadPtr::<u8>::new(pathname, &addr_space).read_c_string(256)?;
     let path = path.into_string().map_err(|_| SysError::EINVAL)?;
 
-    log::info!("[sys_mkdirat] dirfd: {dirfd}, path: {path}, mode: {mode}");
-
-    simdebug::stop0();
-
+    log::info!("[sys_mkdirat] dirfd: {dirfd}, path: {path}");
     let dentry = task.walk_at(AtFd::from(dirfd), path)?;
     if !dentry.is_negative() {
         return Err(SysError::EEXIST);
@@ -500,6 +500,8 @@ pub async fn sys_mkdirat(dirfd: usize, pathname: usize, mode: u32) -> SyscallRes
 
     let parent = dentry.parent().ok_or(SysError::ENOENT)?;
     let mode = InodeMode::from_bits_truncate(mode).union(InodeMode::DIR);
+
+    log::info!("[sys_mkdirat] mode: {mode:?}");
 
     parent.mkdir(dentry.as_ref(), mode)?;
     let inode = dentry.inode().unwrap();
@@ -645,12 +647,13 @@ pub async fn sys_unlinkat(dirfd: usize, pathname: usize, flags: i32) -> SyscallR
 ///   130817  directory    16       4096  sub3
 /// ```
 pub async fn sys_getdents64(fd: usize, buf: usize, len: usize) -> SyscallResult {
-    log::info!("[sys_getdents64] fd {fd}, len {len:#x}");
+    log::info!("[sys_getdents64] fd {fd}, buf: {buf:#x}, len {len:#x}");
     let task = current_task();
     let addr_space = task.addr_space();
     let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
     let mut ptr = UserWritePtr::<u8>::new(buf, &addr_space);
     let buf = unsafe { ptr.try_into_mut_slice(len) }?;
+    log::info!("[sys_getdents64] read_dir");
     file.read_dir(buf)
 }
 
@@ -921,24 +924,32 @@ pub fn sys_ioctl(fd: usize, request: usize, argp: usize) -> SyscallResult {
     let task = current_task();
     let addrspace = task.addr_space();
     let mut arg = UserWritePtr::<u8>::new(argp, &addrspace);
+    let request32 = request & 0xffff_ffff;
     unsafe {
-        let len = if let Some(cmd) = TtyIoctlCmd::from_repr(request) {
+        let len = if let Some(cmd) = TtyIoctlCmd::from_repr(request32) {
             match cmd {
                 TtyIoctlCmd::TCGETS => core::mem::size_of::<Termios>(),
                 TtyIoctlCmd::TIOCGPGRP => core::mem::size_of::<Pid>(),
                 TtyIoctlCmd::TCSETS => core::mem::size_of::<Termios>(),
                 _ => 0,
             }
-        } else if let Some(cmd) = RtcIoctlCmd::from_repr(request as u64) {
+        } else if let Some(cmd) = RtcIoctlCmd::from_repr(request32 as u64) {
             match cmd {
                 RtcIoctlCmd::RTC_RD_TIME => core::mem::size_of::<RtcTime>(),
                 _ => 0,
             }
-        } else if let Some(cmd) = LoopIoctlCmd::from_repr(request) {
+        } else if let Some(cmd) = LoopIoctlCmd::from_repr(request32) {
             match cmd {
                 LoopIoctlCmd::GETSTATUS => core::mem::size_of::<LoopInfo64>(),
                 LoopIoctlCmd::GETSTATUS64 => core::mem::size_of::<LoopInfo64>(),
                 LoopIoctlCmd::SETSTATUS => core::mem::size_of::<LoopInfo64>(),
+                _ => 0,
+            }
+        } else if let Some(cmd) = BlkIoctlCmd::from_repr(request32) {
+            match cmd {
+                BlkIoctlCmd::BLKGETSIZE64 => core::mem::size_of::<u64>(),
+                BlkIoctlCmd::BLKGETSIZE => core::mem::size_of::<u32>(),
+                BlkIoctlCmd::BLKSSZGET => core::mem::size_of::<u32>(),
                 _ => 0,
             }
         } else {
@@ -950,7 +961,7 @@ pub fn sys_ioctl(fd: usize, request: usize, argp: usize) -> SyscallResult {
         let slice = arg.try_into_mut_slice(len)?;
 
         let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
-        file.ioctl(request, slice.as_ptr() as usize)
+        file.ioctl(request32, slice.as_ptr() as usize)
     }
 }
 

@@ -413,6 +413,7 @@ impl dyn File {
         const LEN_BEFORE_NAME: usize = 19;
         let mut writen_len = 0;
         let mut buf_it = buf;
+        log::debug!("[read_dir] start");
         for dentry in self
             .dentry()
             .get_meta()

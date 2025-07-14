@@ -5,10 +5,10 @@ use strum::FromRepr;
 pub enum LoopIoctlCmd {
     SETFD = 0x4c00,
     CLRFD = 0x4c01,
-    GETSTATUS = 0x4c02,
-    SETSTATUS = 0x4c03,
-    GETSTATUS64 = 0x4c05,
+    SETSTATUS = 0x4c02,
+    GETSTATUS = 0x4c03,
     SETSTATUS64 = 0x4c04,
+    GETSTATUS64 = 0x4c05,
 }
 
 #[repr(C)]
@@ -49,3 +49,4 @@ impl Default for LoopInfo64 {
         }
     }
 }
+// fsetxattr01

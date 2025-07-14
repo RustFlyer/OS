@@ -228,6 +228,7 @@ pub fn usershell() {
 pub fn riscv_init() {
     mkdir("/bin");
     mkdir("/lib");
+    mkdir("/usr");
 
     close(2);
 

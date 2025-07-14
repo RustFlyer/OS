@@ -1,4 +1,7 @@
-use super::loopinfo::{LoopInfo64, LoopIoctlCmd};
+use super::{
+    blkinfo::BlkIoctlCmd,
+    loopinfo::{LoopInfo64, LoopIoctlCmd},
+};
 use crate::dev::loopx::externf::__KernelTableIf_mod;
 use alloc::{boxed::Box, sync::Arc};
 use async_trait::async_trait;
@@ -54,63 +57,103 @@ impl File for LoopFile {
     }
 
     fn ioctl(&self, cmd: usize, arg: usize) -> SyscallResult {
-        let Some(cmd) = LoopIoctlCmd::from_repr(cmd) else {
-            log::error!("[TtyFile::ioctl] cmd {cmd} not included");
-            unimplemented!()
-        };
-        match cmd {
-            LoopIoctlCmd::SETFD => {
-                let table = call_interface!(KernelTableIf::table());
-                let file = table.lock().get_file(arg)?;
-                let path = file.dentry().path();
-                *self.file.lock() = Some(file);
+        if let Some(cmd) = LoopIoctlCmd::from_repr(cmd) {
+            match cmd {
+                LoopIoctlCmd::SETFD => {
+                    let table = call_interface!(KernelTableIf::table());
+                    let file = table.lock().get_file(arg)?;
+                    let path = file.dentry().path();
+                    *self.file.lock() = Some(file);
 
-                let mut info = LoopInfo64::default();
+                    let mut info = LoopInfo64::default();
 
-                let bytes = path.as_bytes();
-                let len = bytes.len().min(63);
-                info.lo_file_name[..len].copy_from_slice(&bytes[..len]);
-                info.lo_file_name[len] = 0;
+                    let bytes = path.as_bytes();
+                    let len = bytes.len().min(63);
+                    info.lo_file_name[..len].copy_from_slice(&bytes[..len]);
+                    info.lo_file_name[len] = 0;
 
-                *self.inner.lock() = info;
-                Ok(0)
-            }
-            LoopIoctlCmd::CLRFD => {
-                *self.file.lock() = None;
-                Ok(0)
-            }
-            LoopIoctlCmd::SETSTATUS => {
-                let file = self.file.lock();
-                if file.is_none() {
-                    return Err(SysError::ENXIO);
-                }
-
-                unsafe {
-                    let info = *(arg as *const LoopInfo64);
                     *self.inner.lock() = info;
+                    Ok(0)
                 }
+                LoopIoctlCmd::CLRFD => {
+                    *self.file.lock() = None;
+                    Ok(0)
+                }
+                LoopIoctlCmd::SETSTATUS => {
+                    let file = self.file.lock();
+                    if file.is_none() {
+                        return Err(SysError::ENXIO);
+                    }
 
-                Ok(0)
-            }
-            LoopIoctlCmd::GETSTATUS => {
-                let info = *self.inner.lock();
-                log::debug!("loopinfo: {:?}", info);
-                unsafe {
-                    *(arg as *mut LoopInfo64) = info;
+                    unsafe {
+                        let info = *(arg as *const LoopInfo64);
+                        *self.inner.lock() = info;
+                    }
+
+                    Ok(0)
                 }
-                Ok(0)
-            }
-            LoopIoctlCmd::GETSTATUS64 => {
-                let info = *self.inner.lock();
-                unsafe {
-                    *(arg as *mut LoopInfo64) = info;
+                LoopIoctlCmd::GETSTATUS => {
+                    let file = self.file.lock();
+                    if file.is_none() {
+                        return Err(SysError::ENXIO);
+                    }
+
+                    let info = *self.inner.lock();
+                    log::debug!("loopinfo: {:?}", info);
+                    unsafe {
+                        *(arg as *mut LoopInfo64) = info;
+                    }
+                    Ok(0)
                 }
-                Ok(0)
+                LoopIoctlCmd::GETSTATUS64 => {
+                    let info = *self.inner.lock();
+                    unsafe {
+                        *(arg as *mut LoopInfo64) = info;
+                    }
+                    Ok(0)
+                }
+                e => {
+                    log::error!("not implement {:?}", e);
+                    Err(SysError::ENOTTY)
+                }
             }
-            e => {
-                log::error!("not implement {:?}", e);
-                Err(SysError::ENOTTY)
+        } else if let Some(cmd) = BlkIoctlCmd::from_repr(cmd) {
+            match cmd {
+                BlkIoctlCmd::BLKGETSIZE64 => {
+                    let file = self.file.lock();
+                    if let Some(ref f) = *file {
+                        let size = f.inode().size() as u64;
+                        unsafe {
+                            *(arg as *mut u64) = size;
+                        }
+                        Ok(0)
+                    } else {
+                        Err(SysError::ENXIO)
+                    }
+                }
+                BlkIoctlCmd::BLKSSZGET => {
+                    unsafe {
+                        *(arg as *mut u32) = 512;
+                    }
+                    Ok(0)
+                }
+                BlkIoctlCmd::BLKGETSIZE => {
+                    let file = self.file.lock();
+                    if let Some(ref f) = *file {
+                        let size = f.inode().size() as u64;
+                        unsafe {
+                            *(arg as *mut u32) = (size / 512) as u32;
+                        }
+                        Ok(0)
+                    } else {
+                        Err(SysError::ENXIO)
+                    }
+                }
+                BlkIoctlCmd::BLKFLSBUF => Ok(0),
             }
+        } else {
+            log::error!("[LoopFile::ioctl] cmd {cmd:#x} not included");
+            unimplemented!()
         }
     }
 }
