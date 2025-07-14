@@ -10,31 +10,36 @@ use file::TtyFile;
 use inode::TtyInode;
 use spin::Once;
 use systype::error::SysResult;
-use vfs::{dentry::Dentry, path::Path};
+use vfs::{file::File, path::Path};
 
 pub use ioctl::TtyIoctlCmd;
 
 use crate::sys_root_dentry;
 
-pub static TTY: Once<Arc<TtyFile>> = Once::new();
+pub static TTY0: Once<Arc<TtyFile>> = Once::new();
+pub static TTY1: Once<Arc<TtyFile>> = Once::new();
+pub static TTY2: Once<Arc<TtyFile>> = Once::new();
 
 pub fn init() -> SysResult<()> {
-    let path = String::from("/dev/tty");
-    let path = Path::new(sys_root_dentry(), path);
+    let file0 = create_tty_file(0)?;
+    let file1 = create_tty_file(1)?;
+    let file2 = create_tty_file(2)?;
+
+    TTY0.call_once(|| file0);
+    TTY1.call_once(|| file1);
+    TTY2.call_once(|| file2);
+
+    log::debug!("success init tty");
+    Ok(())
+}
+
+pub fn create_tty_file(id: u64) -> SysResult<Arc<TtyFile>> {
+    let path = Path::new(sys_root_dentry(), String::from("/dev/tty"));
     let tty_dentry = path.walk()?;
     let parent = tty_dentry.parent().unwrap();
     let weak_parent = Arc::downgrade(&parent);
-
-    let inode = TtyInode::new(parent.superblock().unwrap());
+    let inode = TtyInode::new(parent.superblock().unwrap(), id);
     let tty_dentry = TtyDentry::new("tty", Some(inode), Some(weak_parent));
     parent.add_child(tty_dentry.clone());
-
-    let sb = parent.clone().superblock();
-    let tty_inode = TtyInode::new(sb.clone().unwrap());
-    tty_dentry.set_inode(tty_inode);
-    let tty_file = TtyFile::new(tty_dentry.clone());
-
-    TTY.call_once(|| tty_file);
-    log::debug!("success init tty");
-    Ok(())
+    Ok(TtyFile::new(tty_dentry))
 }

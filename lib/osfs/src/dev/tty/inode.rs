@@ -12,6 +12,7 @@ use vfs::{
 pub struct TtyInode {
     meta: InodeMeta,
     pub char_dev: Arc<dyn CharDevice>,
+    pub exp_dev_id: u64,
 }
 
 pub fn get_char_device() -> Arc<dyn CharDevice> {
@@ -19,11 +20,15 @@ pub fn get_char_device() -> Arc<dyn CharDevice> {
 }
 
 impl TtyInode {
-    pub fn new(super_block: Arc<dyn SuperBlock>) -> Arc<Self> {
+    pub fn new(super_block: Arc<dyn SuperBlock>, exp_dev_id: u64) -> Arc<Self> {
         let meta = InodeMeta::new(alloc_ino(), super_block);
         meta.inner.lock().mode = InodeMode::CHAR;
         let char_dev = get_char_device();
-        Arc::new(Self { meta, char_dev })
+        Arc::new(Self {
+            meta,
+            char_dev,
+            exp_dev_id,
+        })
     }
 }
 
@@ -35,7 +40,7 @@ impl Inode for TtyInode {
     fn get_attr(&self) -> SysResult<Stat> {
         let inner = self.meta.inner.lock();
         Ok(Stat {
-            st_dev: 0,
+            st_dev: (4 << 8) | self.exp_dev_id,
             st_ino: self.meta.ino as u64,
             st_mode: inner.mode.bits(),
             st_nlink: 1,

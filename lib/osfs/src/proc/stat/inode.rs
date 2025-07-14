@@ -35,7 +35,7 @@ impl Inode for StatInode {
         let mode = inner.mode.bits();
         let len = inner.size;
         Ok(Stat {
-            st_dev: 0,
+            st_dev: self.superblock().dev_id(),
             st_ino: self.meta.ino as u64,
             st_mode: mode,
             st_nlink: 1,

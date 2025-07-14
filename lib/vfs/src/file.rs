@@ -191,6 +191,14 @@ pub trait File: Send + Sync + DowncastSync {
         Err(SysError::ENOTTY)
     }
 
+    fn dev_id(&self) -> (u32, u32) {
+        let inode = self.inode();
+        let dev_id = inode.dev_id();
+        let major = (dev_id >> 8) as u32;
+        let minor = (dev_id & 0xFF) as u32;
+        (major, minor)
+    }
+
     /// Given interested events, keep track of these events and return events
     /// that is ready.
     async fn base_poll(&self, events: PollEvents) -> PollEvents {

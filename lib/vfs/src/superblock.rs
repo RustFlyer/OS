@@ -7,18 +7,24 @@ use systype::error::SysResult;
 
 use crate::{dentry::Dentry, fstype::FileSystemType};
 
+static VIRTUAL_DEV_COUNTER: core::sync::atomic::AtomicU64 =
+    core::sync::atomic::AtomicU64::new(0x1000);
+
 pub struct SuperBlockMeta {
     pub device: Option<Arc<dyn BlockDevice>>,
     pub fs_type: Arc<dyn FileSystemType>,
     pub root_dentry: Once<Arc<dyn Dentry>>,
+    pub dev_id: u64,
 }
 
 impl SuperBlockMeta {
     pub fn new(device: Option<Arc<dyn BlockDevice>>, fs_type: Arc<dyn FileSystemType>) -> Self {
+        let dev_id = VIRTUAL_DEV_COUNTER.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
         Self {
             device,
             root_dentry: Once::new(),
             fs_type,
+            dev_id,
         }
     }
 }
@@ -32,6 +38,10 @@ pub trait SuperBlock: Send + Sync {
 
     fn set_root_dentry(&self, root_dentry: Arc<dyn Dentry>) {
         self.meta().root_dentry.call_once(|| root_dentry);
+    }
+
+    fn dev_id(&self) -> u64 {
+        self.meta().dev_id
     }
 }
 

@@ -8,7 +8,7 @@ use systype::{
 };
 use vfs::file::File;
 
-use crate::dev::tty::TTY;
+use crate::dev::tty::{TTY0, TTY1, TTY2};
 
 pub type Fd = usize;
 
@@ -50,13 +50,13 @@ impl FdTable {
     pub fn new() -> Self {
         let mut table: Vec<Option<FdInfo>> = Vec::with_capacity(MAX_FDS);
 
-        let fdinfo = FdInfo::new(TTY.get().unwrap().clone(), FdFlags::empty());
+        let fdinfo = FdInfo::new(TTY0.get().unwrap().clone(), FdFlags::empty());
         table.push(Some(fdinfo));
 
-        let fdinfo = FdInfo::new(TTY.get().unwrap().clone(), FdFlags::empty());
+        let fdinfo = FdInfo::new(TTY1.get().unwrap().clone(), FdFlags::empty());
         table.push(Some(fdinfo));
 
-        let fdinfo = FdInfo::new(TTY.get().unwrap().clone(), FdFlags::empty());
+        let fdinfo = FdInfo::new(TTY2.get().unwrap().clone(), FdFlags::empty());
         table.push(Some(fdinfo));
 
         Self {

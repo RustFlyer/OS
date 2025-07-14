@@ -39,7 +39,7 @@ impl Inode for ExtFileInode {
     fn get_attr(&self) -> SysResult<Stat> {
         let inner = self.meta.inner.lock();
         Ok(Stat {
-            st_dev: 0,
+            st_dev: self.superblock().dev_id(),
             st_ino: self.meta.ino as u64,
             st_mode: inner.mode.bits(),
             st_nlink: 1,

@@ -153,6 +153,10 @@ pub trait Inode: Send + Sync + DowncastSync {
         self.get_meta().inner.lock().size
     }
 
+    fn dev_id(&self) -> u64 {
+        self.get_attr().unwrap().st_dev
+    }
+
     fn symlink_target(&self) -> String {
         self.get_meta().inner.lock().symlink.clone().unwrap()
     }
