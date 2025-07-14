@@ -1,27 +1,28 @@
+               name                    total           pass
 - [ ] [   1] fanotify16                 845
 - [ ] [   2] splice07                   615
 - [ ] [   3] fanotify01                 442
 - [ ] [   4] fanotify14                 334
 - [ ] [   5] epoll_ctl03                256
 - [ ] [   6] fanotify13                 200
-- [x] [   7] access01                   199
+- [x] [   7] access01                   199             181    
 - [ ] [   8] memfd_create01             157
-- [x] [   9] waitpid01                  126
+- [x] [   9] waitpid01                  126             126
 - [ ] [  10] pkey01                     108
-- [x] [  11] getpid01                   100
+- [x] [  11] getpid01                   100             100
 - [ ] [  12] fsmount01                   96
 - [ ] [  13] chdir01                     92
 - [ ] [  14] fanotify09                  76
-- [ ] [  15] pipe11                      70
-- [ ] [  16] fsync01                     60
+- [x] [  15] pipe11                      70             70
+- [ ] [  16] fsync01                     60             30 half of all fs-type
 - [ ] [  17] mount07                     56
 - [ ] [  18] fanotify15                  55
 - [ ] [  19] memcontrol02                54
 - [ ] [  20] rename01                    48
 - [ ] [  21] rename03                    48
-- [x] [  22] fsetxattr01                 46
+- [x] [  22] fsetxattr01                 46             27
 - [ ] [  23] setxattr01                  46
-- [x] [  24] clock_getres01              44
+- [x] [  24] clock_getres01              44             44
 - [ ] [  25] mem                         42
 - [ ] [  26] mem                         42
 - [ ] [  27] statx08                     38
@@ -35,18 +36,18 @@
 - [ ] [  35] mq_timedsend01              34
 - [ ] [  36] utimensat01                 34
 - [ ] [  37] memcontrol04                33
-- [ ] [  38] chmod01                     32
+- [ ] [  38] chmod01                     32             32
 - [ ] [  39] creat09                     32
 - [ ] [  40] posix_fadvise03             32
 - [ ] [  41] posix_fadvise03             32
 - [ ] [  42] process_vm_readv03          32
-- [ ] [  43] getitimer01                 30
+- [ ] [  43] getitimer01                 30             26 to fix
 - [ ] [  44] move_mount02                30
 - [ ] [  45] mq_timedreceive01           30
-- [ ] [  46] signal03                    30
-- [ ] [  47] signal05                    30
+- [x] [  46] signal03                    30             31
+- [x] [  47] signal05                    30             31
 - [ ] [  48] open11                      28
-- [ ] [  49] signal04                    28
+- [x] [  49] signal04                    28             28
 - [ ] [  50] name_to_handle_at01         27
 - [ ] [  51] fsconfig02                  26
 - [ ] [  52] fgetxattr01                 25
@@ -87,9 +88,9 @@
 - [ ] [  87] pathconf01                  17
 - [ ] [  88] access02                    16
 - [ ] [  89] bind04                      16
-- [ ] [  90] clock_gettime01             16
+- [x] [  90] clock_gettime01             16         16
 - [ ] [  91] fanotify19                  16
-- [ ] [  92] getrlimit01                 16
+- [x] [  92] getrlimit01                 16         16
 - [ ] [  93] getrlimit03                 16
 - [ ] [  94] openat201                   16
 - [ ] [  95] pty04                       16
@@ -107,9 +108,9 @@
 - [ ] [ 107] rename13                    15
 - [ ] [ 108] statx04                     15
 - [ ] [ 109] swapoff02                   15
-- [ ] [ 110] utime01                     15
-- [ ] [ 111] utime02                     15
-- [ ] [ 112] utime04                     15
+- [ ] [ 110] utime01                     15         6
+- [ ] [ 111] utime02                     15         6
+- [ ] [ 112] utime04                     15         6
 - [ ] [ 113] utime05                     15
 - [ ] [ 114] af_alg01                    14
 - [ ] [ 115] bind05                      14
