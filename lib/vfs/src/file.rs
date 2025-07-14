@@ -242,10 +242,12 @@ impl dyn File {
 
         // log::error!("[read] {} {}", self.dentry().path(), inode.get_meta().ino);
 
-        let bytes_read = match inode.inotype() {
-            InodeType::File => self.read_through_page_cache(buf, position).await?,
-            _ => self.base_read(buf, position).await?,
-        };
+        let bytes_read =
+            if inode.inotype() == InodeType::File && self.dentry().inode().unwrap().dev_id() != 0 {
+                self.read_through_page_cache(buf, position).await?
+            } else {
+                self.base_read(buf, position).await?
+            };
 
         // log::trace!("read len = {}", bytes_read);
         self.set_pos(position + bytes_read);
@@ -348,10 +350,12 @@ impl dyn File {
             unimplemented!("Holes are not supported yet");
         }
 
-        let bytes_written = match inode.inotype() {
-            InodeType::File => self.write_through_page_cache(buf, position).await?,
-            _ => self.base_write(buf, position).await?,
-        };
+        let bytes_written =
+            if inode.inotype() == InodeType::File && self.dentry().inode().unwrap().dev_id() != 0 {
+                self.write_through_page_cache(buf, position).await?
+            } else {
+                self.base_write(buf, position).await?
+            };
         let new_position = position + bytes_written;
 
         self.set_pos(new_position);

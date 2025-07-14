@@ -15,11 +15,9 @@ pub struct InterruptsInode {
 
 impl InterruptsInode {
     pub fn new(super_block: Arc<dyn SuperBlock>) -> Arc<Self> {
-        let size = 256;
         let inode = Arc::new(Self {
             meta: InodeMeta::new(alloc_ino(), super_block),
         });
-        inode.set_size(size);
         inode.set_inotype(InodeType::File);
         inode
     }
@@ -35,7 +33,7 @@ impl Inode for InterruptsInode {
         let mode = inner.mode.bits();
         let len = inner.size;
         Ok(Stat {
-            st_dev: self.superblock().dev_id(),
+            st_dev: 0,
             st_ino: self.meta.ino as u64,
             st_mode: mode,
             st_nlink: 1,
