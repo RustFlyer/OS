@@ -2247,15 +2247,10 @@ pub fn sys_fsetxattr(
         cstring.into_string().map_err(|_| SysError::EINVAL)?
     };
 
-    if name.is_empty() {
+    if name.is_empty() || name.len() > 255 {
         return Err(SysError::ERANGE);
     }
 
-    if name.len() > 255 {
-        return Err(SysError::ERANGE);
-    }
-
-    // 检查 value 大小
     if size > 65536 {
         return Err(SysError::E2BIG);
     }
@@ -2303,15 +2298,18 @@ pub fn sys_fgetxattr(fd: usize, name_ptr: usize, value_ptr: usize, size: usize) 
         return Ok(value.len());
     }
 
-    let copy_len = core::cmp::min(size, value.len());
+    if size < value.len() {
+        return Err(SysError::ERANGE);
+    }
+
     let mut user_value_ptr = UserWritePtr::<u8>::new(value_ptr, &addr_space);
     unsafe {
         user_value_ptr
-            .try_into_mut_slice(copy_len)?
-            .copy_from_slice(&value[..copy_len]);
+            .try_into_mut_slice(value.len())?
+            .copy_from_slice(&value[..]);
     }
 
-    Ok(copy_len)
+    Ok(value.len())
 }
 
 pub fn sys_fremovexattr(fd: usize, name_ptr: usize) -> SyscallResult {

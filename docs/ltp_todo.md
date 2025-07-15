@@ -36,12 +36,12 @@
 - [ ] [  35] mq_timedsend01              34
 - [ ] [  36] utimensat01                 34
 - [ ] [  37] memcontrol04                33
-- [ ] [  38] chmod01                     32             32
+- [x] [  38] chmod01                     32             32
 - [ ] [  39] creat09                     32
 - [ ] [  40] posix_fadvise03             32
 - [ ] [  41] posix_fadvise03             32
 - [ ] [  42] process_vm_readv03          32
-- [ ] [  43] getitimer01                 30             26 to fix
+- [x] [  43] getitimer01                 30             26 to fix
 - [ ] [  44] move_mount02                30
 - [ ] [  45] mq_timedreceive01           30
 - [x] [  46] signal03                    30             31
