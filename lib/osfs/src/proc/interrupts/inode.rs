@@ -1,5 +1,6 @@
 use alloc::sync::Arc;
-use config::{device::BLOCK_SIZE, inode::InodeType};
+
+use config::inode::InodeType;
 use systype::error::SysResult;
 use vfs::{
     inode::{Inode, InodeMeta},
@@ -8,22 +9,21 @@ use vfs::{
     superblock::SuperBlock,
 };
 
-pub struct MountsInode {
+pub struct InterruptsInode {
     meta: InodeMeta,
 }
 
-impl MountsInode {
+impl InterruptsInode {
     pub fn new(super_block: Arc<dyn SuperBlock>) -> Arc<Self> {
         let inode = Arc::new(Self {
             meta: InodeMeta::new(alloc_ino(), super_block),
         });
-        inode.set_size(BLOCK_SIZE);
         inode.set_inotype(InodeType::File);
         inode
     }
 }
 
-impl Inode for MountsInode {
+impl Inode for InterruptsInode {
     fn get_meta(&self) -> &InodeMeta {
         &self.meta
     }

@@ -113,6 +113,7 @@ impl Dentry for SimpleDentry {
     }
 
     fn base_unlink(&self, dentry: &dyn Dentry) -> SysResult<()> {
+        check_permission(dentry)?;
         self.into_dyn_ref()
             .remove_child(dentry)
             .ok_or(SysError::ENOENT)
@@ -120,6 +121,7 @@ impl Dentry for SimpleDentry {
     }
 
     fn base_rmdir(&self, dentry: &dyn Dentry) -> SysResult<()> {
+        check_permission(dentry)?;
         if !dentry.get_meta().children.lock().is_empty() {
             return Err(SysError::ENOTEMPTY);
         }
@@ -129,10 +131,26 @@ impl Dentry for SimpleDentry {
 
     fn base_rename(
         &self,
-        _dentry: &dyn Dentry,
+        dentry: &dyn Dentry,
         _new_dir: &dyn Dentry,
-        _new_dentry: &dyn Dentry,
+        new_dentry: &dyn Dentry,
     ) -> SysResult<()> {
-        todo!()
+        check_permission(dentry)?;
+        new_dentry.set_inode(dentry.inode().unwrap());
+        dentry.unset_inode();
+        dentry.get_meta().children.lock().clear();
+        Ok(())
     }
+}
+
+/// Checks if the dentry can be unlinked or renamed.
+///
+/// Returns `SysError::EPERM` if the dentry is in a protected path.
+fn check_permission(dentry: &dyn Dentry) -> SysResult<()> {
+    let path = dentry.path();
+    let protected = ["/proc", "/sys", "/dev"];
+    if protected.iter().any(|p| path.starts_with(p)) {
+        return Err(SysError::EPERM);
+    }
+    Ok(())
 }

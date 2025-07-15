@@ -153,8 +153,14 @@ pub trait Inode: Send + Sync + DowncastSync {
         self.get_meta().inner.lock().size
     }
 
-    fn dev_id(&self) -> u64 {
+    fn dev_id_as_u64(&self) -> u64 {
         self.get_attr().unwrap().st_dev
+    }
+
+    // Returns the device ID as a tuple of (major, minor).
+    fn dev_id(&self) -> (u32, u32) {
+        let dev_id = self.dev_id_as_u64();
+        (dev_id as u32 >> 8, dev_id as u32 & 0xFF)
     }
 
     fn symlink_target(&self) -> String {

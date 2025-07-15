@@ -531,6 +531,14 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
             dentry
         }
     };
+    if dentry.is_negative() {
+        log::warn!("[sys_execve] file not found");
+        return Err(SysError::ENOENT);
+    }
+    if dentry.inode().unwrap().inotype() != InodeType::File {
+        log::warn!("[sys_execve] not a regular file");
+        return Err(SysError::EACCES);
+    }
 
     let filepath = dentry.path();
     let expath = filepath.rsplit_once('/').map(|x| x.0).unwrap_or("");
@@ -549,86 +557,55 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
         name.push(' ');
     });
 
-    if let Err(e) = task.execve(file.clone(), args.clone(), envs.clone(), name) {
-        match e {
-            SysError::ENOEXEC => {
-                let mut buf = vec![0; 128];
-
-                file.seek(config::vfs::SeekFrom::Start(0))?;
-                file.read(&mut buf).await?;
-                // log::debug!("[sys_execve] buf: {:?}", buf);
-
-                let firline = String::from_utf8(buf);
-                // log::debug!("[sys_execve] firline: {:?}", firline);
-                if firline.is_ok() && firline.clone().unwrap().starts_with("#!") {
-                    let mut firline = firline.unwrap();
-                    firline.remove(0);
-                    firline.remove(0);
-                    let idx = firline.find("\n").ok_or(SysError::ENOEXEC)?;
-                    firline.truncate(idx);
-
-                    let mut exargs: Vec<String> =
-                        firline.split_whitespace().map(|s| s.to_string()).collect();
-                    let path = exargs[0].clone();
-
-                    exargs.extend(args);
-                    log::debug!("[sys_execve] exargs: {:?}", exargs);
-
-                    let dentry = {
-                        let path = Path::new(sys_root_dentry(), path);
-                        let dentry = path.walk()?;
-                        if !dentry.is_negative()
-                            && dentry.inode().unwrap().inotype() == InodeType::SymLink
-                        {
-                            Path::resolve_symlink_through(Arc::clone(&dentry))?
-                        } else {
-                            dentry
-                        }
-                    };
-
-                    let file = <dyn File>::open(dentry)?;
-                    log::info!("[sys_execve]: open file");
-                    let mut name = String::new();
-                    exargs.iter().for_each(|arg| {
-                        name.push_str(arg);
-                        name.push(' ');
-                    });
-
-                    task.execve(file.clone(), exargs, envs, name)?;
-                } else if args[0].ends_with(".sh") {
-                    let mut exargs: Vec<String> = vec!["busybox".to_string(), "sh".to_string()];
-                    exargs.extend(args);
-
-                    let path = "busybox".to_string();
-                    let dentry = {
-                        let path = Path::new(sys_root_dentry(), path);
-                        let dentry = path.walk()?;
-                        if !dentry.is_negative()
-                            && dentry.inode().unwrap().inotype() == InodeType::SymLink
-                        {
-                            Path::resolve_symlink_through(Arc::clone(&dentry))?
-                        } else {
-                            dentry
-                        }
-                    };
-
-                    let file = <dyn File>::open(dentry)?;
-                    log::info!("[sys_execve]: open file");
-                    let mut name = String::new();
-                    exargs.iter().for_each(|arg| {
-                        name.push_str(arg);
-                        name.push(' ');
-                    });
-
-                    task.execve(file.clone(), exargs, envs, name)?;
-                } else {
-                    Err(SysError::ENOEXEC)?
-                }
-            }
-            e => Err(e)?,
+    let result = task.execve(file.clone(), args.clone(), envs.clone(), name);
+    if result == Err(SysError::ENOEXEC) {
+        let mut first_line = vec![0; 128];
+        file.seek(config::vfs::SeekFrom::Start(0))?;
+        file.read(&mut first_line).await?;
+        if let Some(index) = first_line.iter().position(|&b| b == b'\n') {
+            first_line.truncate(index);
         }
+
+        let interpreter_cmd = String::from_utf8(first_line).map_or(String::from("/bin/sh"), |s| {
+            s.strip_prefix("#!")
+                .map_or(String::from("/bin/sh"), |s| s.trim().to_string())
+        });
+
+        let mut interpreter_args: Vec<String> = interpreter_cmd
+            .split_whitespace()
+            .map(String::from)
+            .collect();
+        interpreter_args.extend(args);
+        if interpreter_args[0].ends_with("bash") {
+            // We don't have bash, so we substitute it with sh as a workaround
+            interpreter_args[0] = String::from("/bin/sh");
+        }
+
+        let interpreter_path = interpreter_args[0].clone();
+
+        log::info!("[sys_execve]: execute as a script: {:?}", interpreter_args);
+
+        let interpreter_dentry = {
+            let cwd = task.cwd().lock().clone();
+            let path = Path::new(cwd, interpreter_path.clone());
+            let dentry = path.walk()?;
+            if !dentry.is_negative() && dentry.inode().unwrap().inotype() == InodeType::SymLink {
+                Path::resolve_symlink_through(dentry)?
+            } else {
+                dentry
+            }
+        };
+        if interpreter_dentry.is_negative() {
+            log::warn!("[sys_execve]: interpreter not found: {}", interpreter_path);
+            return Err(SysError::ENOENT);
+        }
+
+        let interpreter_file = <dyn File>::open(interpreter_dentry)?;
+        let cmdline = interpreter_args.join(" ");
+        task.execve(interpreter_file, interpreter_args, envs, cmdline)?;
+    } else if let Err(e) = result {
+        return Err(e);
     }
-    log::info!("[sys_execve]: finish execve and convert to a new task");
 
     if let Some(parent) = task.vfork_parent.clone() {
         if let Some(task) = parent.upgrade() {

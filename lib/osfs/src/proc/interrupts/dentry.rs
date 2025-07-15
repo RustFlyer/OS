@@ -1,4 +1,5 @@
 use alloc::sync::{Arc, Weak};
+
 use systype::error::SysResult;
 use vfs::{
     dentry::{Dentry, DentryMeta},
@@ -6,27 +7,31 @@ use vfs::{
     inode::Inode,
 };
 
-use super::file::ExeFile;
+use super::file::InterruptsFile;
 
-pub struct ExeDentry {
+pub struct InterruptsDentry {
     meta: DentryMeta,
 }
 
-impl ExeDentry {
-    pub fn new(inode: Option<Arc<dyn Inode>>, parent: Option<Weak<dyn Dentry>>) -> Arc<Self> {
+impl InterruptsDentry {
+    pub fn new(
+        name: &str,
+        inode: Option<Arc<dyn Inode>>,
+        parent: Option<Weak<dyn Dentry>>,
+    ) -> Arc<Self> {
         Arc::new(Self {
-            meta: DentryMeta::new("exe", inode, parent),
+            meta: DentryMeta::new(name, inode, parent),
         })
     }
 }
 
-impl Dentry for ExeDentry {
+impl Dentry for InterruptsDentry {
     fn get_meta(&self) -> &DentryMeta {
         &self.meta
     }
 
     fn base_open(self: Arc<Self>) -> SysResult<Arc<dyn File>> {
-        Ok(Arc::new(ExeFile {
+        Ok(Arc::new(InterruptsFile {
             meta: FileMeta::new(self),
         }))
     }
@@ -48,7 +53,7 @@ impl Dentry for ExeDentry {
     }
 
     fn base_new_neg_child(self: Arc<Self>, _name: &str) -> Arc<dyn Dentry> {
-        panic!("ExeDentry does not support new_neg_child")
+        panic!("InterruptsDentry does not support new_neg_child")
     }
 
     fn base_rename(

@@ -1,29 +1,29 @@
+use alloc::boxed::Box;
 use core::cmp;
 
-use alloc::boxed::Box;
 use async_trait::async_trait;
+
 use systype::error::{SysError, SysResult};
 use vfs::{
     direntry::DirEntry,
     file::{File, FileMeta},
 };
 
-use super::MEM_INFO;
+use super::serialize_interrupts;
 
-pub struct MemInfoFile {
+pub struct InterruptsFile {
     pub(crate) meta: FileMeta,
 }
 
 #[async_trait]
-impl File for MemInfoFile {
+impl File for InterruptsFile {
     fn meta(&self) -> &FileMeta {
         &self.meta
     }
 
     async fn base_read(&self, buf: &mut [u8], pos: usize) -> SysResult<usize> {
-        let meminfo = MEM_INFO.lock();
-        let info = meminfo.serialize();
-        let len = cmp::min(info.len() - pos, buf.len());
+        let info = serialize_interrupts();
+        let len = cmp::min(info.len().saturating_sub(pos), buf.len());
         buf[..len].copy_from_slice(&info.as_bytes()[pos..pos + len]);
         Ok(len)
     }

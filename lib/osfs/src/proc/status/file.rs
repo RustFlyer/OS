@@ -39,10 +39,6 @@ impl File for StatusFile {
         Err(SysError::ENOTDIR)
     }
 
-    fn flush(&self) -> SysResult<usize> {
-        todo!()
-    }
-
     fn base_readlink(&self, buf: &mut [u8]) -> SysResult<usize> {
         let status = call_interface!(KernelProcIf::status());
         log::info!("[/proc/self/status] run {}", status);

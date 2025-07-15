@@ -8,7 +8,7 @@ use arch::{
 use mm::address::VirtAddr;
 use timer::TIMER_MANAGER;
 
-use crate::task::TaskState;
+use crate::{task::TaskState, trap::trap_handler::TRAP_STATS};
 
 #[unsafe(no_mangle)]
 pub fn kernel_trap_handler() {
@@ -30,6 +30,18 @@ fn kernel_interrupt_handler(i: Interrupt) {
             // log::debug!("kernel time interrupt");
             TIMER_MANAGER.check(get_time_duration());
             ticlr::clear_timer_interrupt();
+            TRAP_STATS.inc(i as usize);
+        }
+        Interrupt::HWI0
+        | Interrupt::HWI1
+        | Interrupt::HWI2
+        | Interrupt::HWI3
+        | Interrupt::HWI4
+        | Interrupt::HWI5
+        | Interrupt::HWI6
+        | Interrupt::HWI7 => {
+            log::info!("[kernel] receive external interrupt: {:?}", i);
+            TRAP_STATS.inc(i as usize);
         }
         _ => trap_panic(),
     }
