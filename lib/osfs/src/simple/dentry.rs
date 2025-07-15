@@ -113,7 +113,7 @@ impl Dentry for SimpleDentry {
     }
 
     fn base_unlink(&self, dentry: &dyn Dentry) -> SysResult<()> {
-        if dentry.inode().unwrap().dev_id() == 0 {
+        if dentry.inode().unwrap().dev_id().0 == 0 {
             return Err(SysError::EPERM);
         }
         self.into_dyn_ref()
@@ -126,7 +126,7 @@ impl Dentry for SimpleDentry {
         if !dentry.get_meta().children.lock().is_empty() {
             return Err(SysError::ENOTEMPTY);
         }
-        if dentry.inode().unwrap().dev_id() == 0 {
+        if dentry.inode().unwrap().dev_id().0 == 0 {
             return Err(SysError::EPERM);
         }
         self.remove_child(dentry).unwrap();
@@ -139,7 +139,7 @@ impl Dentry for SimpleDentry {
         _new_dir: &dyn Dentry,
         new_dentry: &dyn Dentry,
     ) -> SysResult<()> {
-        if dentry.inode().unwrap().dev_id() == 0 {
+        if dentry.inode().unwrap().dev_id().0 == 0 {
             return Err(SysError::EPERM);
         }
 

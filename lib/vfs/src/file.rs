@@ -191,14 +191,6 @@ pub trait File: Send + Sync + DowncastSync {
         Err(SysError::ENOTTY)
     }
 
-    fn dev_id(&self) -> (u32, u32) {
-        let inode = self.inode();
-        let dev_id = inode.dev_id();
-        let major = (dev_id >> 8) as u32;
-        let minor = (dev_id & 0xFF) as u32;
-        (major, minor)
-    }
-
     /// Given interested events, keep track of these events and return events
     /// that is ready.
     async fn base_poll(&self, events: PollEvents) -> PollEvents {
@@ -243,7 +235,7 @@ impl dyn File {
         // log::error!("[read] {} {}", self.dentry().path(), inode.get_meta().ino);
 
         let bytes_read =
-            if inode.inotype() == InodeType::File && self.dentry().inode().unwrap().dev_id() != 0 {
+            if inode.inotype() == InodeType::File && self.dentry().inode().unwrap().dev_id().0 != 0 {
                 self.read_through_page_cache(buf, position).await?
             } else {
                 self.base_read(buf, position).await?
@@ -351,7 +343,7 @@ impl dyn File {
         }
 
         let bytes_written =
-            if inode.inotype() == InodeType::File && self.dentry().inode().unwrap().dev_id() != 0 {
+            if inode.inotype() == InodeType::File && self.dentry().inode().unwrap().dev_id().0 != 0 {
                 self.write_through_page_cache(buf, position).await?
             } else {
                 self.base_write(buf, position).await?
