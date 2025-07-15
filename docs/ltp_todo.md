@@ -14,20 +14,20 @@
 - [ ] [  13] chdir01                     92
 - [ ] [  14] fanotify09                  76
 - [x] [  15] pipe11                      70             70
-- [ ] [  16] fsync01                     60             30 half of all fs-type
+- [x] [  16] fsync01                     60             30 half of all fs-type
 - [ ] [  17] mount07                     56
 - [ ] [  18] fanotify15                  55
 - [ ] [  19] memcontrol02                54
-- [ ] [  20] rename01                    48
-- [ ] [  21] rename03                    48
-- [x] [  22] fsetxattr01                 46             27
-- [x] [  23] setxattr01                  46             27
+- [x] [  20] rename01                    48             24 half
+- [x] [  21] rename03                    48             24 half
+- [x] [  22] fsetxattr01                 46             27 half
+- [x] [  23] setxattr01                  46             27 half
 - [x] [  24] clock_getres01              44             44
 - [ ] [  25] mem                         42
 - [ ] [  26] mem                         42
 - [ ] [  27] statx08                     38
 - [ ] [  28] can_filter                  36
-- [ ] [  29] mkdir09                     36
+- [x] [  29] mkdir09                     36             18 half
 - [ ] [  30] mount_setattr01             36
 - [ ] [  31] move_mount01                36
 - [ ] [  32] quotactl08                  36

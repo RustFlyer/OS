@@ -742,7 +742,7 @@ pub async fn sys_mount(
         .clone();
 
     if task.pid() > 0 {
-        log::error!("[sys_mount] mount call, unstable");
+        // log::error!("[sys_mount] mount call, unstable");
         let dev = if name2fstype.contains("ext4") || name2fstype.contains("tmpfs") {
             Some(BLOCK_DEVICE.get().unwrap().clone())
         } else {
