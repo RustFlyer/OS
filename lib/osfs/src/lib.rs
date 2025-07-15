@@ -159,6 +159,7 @@ pub fn init() {
     dev::zero::init().expect("dev-zero init fails");
     dev::urandom::init().expect("dev-urandom init fails");
     dev::loopx::init().expect("dev-loopx init fails");
+    dev::full::init().expect("dev-full init fails");
 
     <dyn File>::open(sys_root_dentry())
         .unwrap()

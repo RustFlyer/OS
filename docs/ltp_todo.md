@@ -50,7 +50,7 @@
 - [x] [  49] signal04                    28             28
 - [ ] [  50] name_to_handle_at01         27
 - [ ] [  51] fsconfig02                  26
-- [ ] [  52] fgetxattr01                 25
+- [x] [  52] fgetxattr01                 25             15
 - [ ] [  53] process_vm01                25
 - [ ] [  54] setns01                     25
 - [ ] [  55] clock_gettime03             24

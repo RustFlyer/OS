@@ -1,4 +1,10 @@
-use alloc::{boxed::Box, ffi::CString, string::ToString, sync::Arc, vec::Vec};
+use alloc::{
+    boxed::Box,
+    ffi::CString,
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
+};
 use core::{
     cmp, mem,
     pin::Pin,
@@ -714,21 +720,53 @@ pub async fn sys_mount(
     let flags = MountFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
     // let data = read_c_str(data)?;
 
-    log::info!(
+    log::error!(
         "[sys_mount] source:{source:?}, target:{target:?}, fstype:{fstype:?}, flags:{flags:?}, data:{data:?}",
     );
+
+    let name2fstype = if fstype.contains("ext") {
+        String::from("tmpfs")
+    } else if fstype.contains("fat") {
+        String::from("tmpfs")
+    } else if fstype.contains("tmp") {
+        String::from("tmpfs")
+    } else {
+        String::from("tmpfs")
+    };
 
     let ext4_type = FS_MANAGER.lock().get("ext4").unwrap().clone();
     let fs_type = FS_MANAGER
         .lock()
-        .get(&fstype)
+        .get(&name2fstype)
         .unwrap_or(&ext4_type.clone())
         .clone();
 
     if task.pid() > 0 {
+        log::error!("[sys_mount] mount call, unstable");
+        let dev = if name2fstype.contains("ext4") || name2fstype.contains("tmpfs") {
+            Some(BLOCK_DEVICE.get().unwrap().clone())
+        } else {
+            None
+        };
+        let (parent, name) = split_parent_and_name(&target);
+
+        let dname;
+        let pdentry = task.walk_at(AtFd::FdCwd, parent.to_string())?;
+        let parent: Arc<dyn Dentry>;
+        if name.is_none() {
+            dname = pdentry.name();
+            parent = pdentry.parent().ok_or(SysError::ENOENT)?;
+        } else {
+            dname = name.unwrap();
+            parent = pdentry.clone();
+        }
+
+        log::error!("[sys_mount] parent dentry is {}", parent.path());
+        let _ = fs_type.mount(dname, Some(parent), flags, dev);
         return Ok(0);
     }
 
+    // usused code
     let _fs_root = match fs_type.name().as_str() {
         name @ "ext4" => {
             log::debug!("[sys_mount] ext4 check pass");
