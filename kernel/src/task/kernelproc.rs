@@ -46,7 +46,7 @@ impl KernelProcIf for KernelProcIfImpl {
 struct KernelTableIfImpl;
 
 #[crate_interface::impl_interface]
-impl KernelTableIf for KernelProcIfImpl {
+impl KernelTableIf for KernelTableIfImpl {
     fn table() -> ShareMutex<FdTable> {
         let task = current_task();
         task.fdtable_mut()

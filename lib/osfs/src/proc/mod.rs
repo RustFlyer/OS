@@ -4,6 +4,7 @@ use config::{
     inode::{InodeMode, InodeType},
     vfs::OpenFlags,
 };
+use confreg::init_config_file;
 use exe::{dentry::ExeDentry, inode::ExeInode};
 use maps::{dentry::MapsDentry, inode::MapsInode};
 use meminfo::{dentry::MemInfoDentry, inode::MemInfoInode};
@@ -17,6 +18,7 @@ use crate::{
     simple::{dentry::SimpleDentry, inode::SimpleInode},
 };
 
+pub mod confreg;
 pub mod exe;
 pub mod maps;
 pub mod meminfo;
@@ -146,6 +148,26 @@ pub fn init_procfs(root_dentry: Arc<dyn Dentry>) -> SysResult<()> {
     let maps_dentry: Arc<dyn Dentry> =
         MapsDentry::new(Some(maps_inode), Some(Arc::downgrade(&self_dentry)));
     self_dentry.add_child(maps_dentry);
+
+    // /proc/config.gz
+    init_config_file(root_dentry.clone())?;
+
+    // /proc/self/ns
+    let ns_inode = SimpleInode::new(root_dentry.superblock().unwrap());
+    ns_inode.set_inotype(InodeType::Dir);
+    let ns_dentry: Arc<dyn Dentry> =
+        SimpleDentry::new("ns", Some(ns_inode), Some(Arc::downgrade(&self_dentry)));
+    self_dentry.add_child(ns_dentry.clone());
+
+    // /proc/self/ns/time_for_children
+    let time_for_children_inode = SimpleInode::new(root_dentry.superblock().unwrap());
+    time_for_children_inode.set_inotype(InodeType::Dir);
+    let time_for_children_dentry: Arc<dyn Dentry> = SimpleDentry::new(
+        "time_for_children",
+        Some(time_for_children_inode),
+        Some(Arc::downgrade(&ns_dentry)),
+    );
+    ns_dentry.add_child(time_for_children_dentry.clone());
 
     Ok(())
 }

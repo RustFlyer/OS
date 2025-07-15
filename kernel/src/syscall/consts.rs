@@ -11,8 +11,12 @@ use strum::FromRepr;
 #[repr(usize)]
 #[allow(non_camel_case_types)]
 pub enum SyscallNo {
+    SETXATTR = 5,
+    LSETXATTR = 6,
     FSETXATTR = 7,
+    GETXATTR = 8,
     FGETXATTR = 10,
+    REMOVEXATTR = 14,
     FREMOVEXATTR = 16,
     GETCWD = 17,
     DUP = 23,
@@ -175,8 +179,12 @@ impl SyscallNo {
     pub const fn as_str(&self) -> &'static str {
         use self::SyscallNo::*;
         match self {
+            SETXATTR => "setxattr",
+            LSETXATTR => ";setxattr",
             FSETXATTR => "fsetxattr",
+            GETXATTR => "getxattr",
             FGETXATTR => "fgetxattr",
+            REMOVEXATTR => "removexattr",
             FREMOVEXATTR => "fremovexattr",
             GETCWD => "getcwd",
             DUP => "dup",

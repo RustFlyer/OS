@@ -21,7 +21,7 @@
 - [ ] [  20] rename01                    48
 - [ ] [  21] rename03                    48
 - [x] [  22] fsetxattr01                 46             27
-- [ ] [  23] setxattr01                  46
+- [x] [  23] setxattr01                  46             27
 - [x] [  24] clock_getres01              44             44
 - [ ] [  25] mem                         42
 - [ ] [  26] mem                         42

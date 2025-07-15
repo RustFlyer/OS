@@ -226,6 +226,11 @@ pub fn usershell() {
 }
 
 pub fn riscv_init() {
+    if open(-100, "/bin/ls", OpenFlags::empty(), InodeMode::empty()) > 0 {
+        println!("The device has been initialized");
+        return;
+    }
+
     mkdir("/bin");
     mkdir("/lib");
     mkdir("/usr");
@@ -233,18 +238,18 @@ pub fn riscv_init() {
     close(2);
 
     chdir("musl");
-    run_cmd("./busybox cp /musl/lib/* /lib/");
-    println!("loading user lib: 20%");
-
     run_cmd("./busybox cp /musl/lib/libc.so /lib/ld-musl-riscv64-sf.so.1");
     run_cmd("./busybox cp /musl/lib/libc.so /lib/ld-musl-riscv64.so.1");
+    println!("loading user lib: 20%");
+
+    run_cmd("./busybox mv /musl/lib/* /lib/");
     println!("loading user lib: 40%");
 
-    run_cmd("./busybox cp /glibc/lib/* /lib/");
     run_cmd("./busybox cp /glibc/lib/libc.so /lib/libc.so.6");
+    run_cmd("./busybox cp /glibc/lib/libm.so /lib/libm.so.6");
     println!("loading user lib: 60%");
 
-    run_cmd("./busybox cp /glibc/lib/libm.so /lib/libm.so.6");
+    run_cmd("./busybox mv /glibc/lib/* /lib/");
     run_cmd("./busybox cp /glibc/busybox /bin/");
     println!("loading user lib: 80%");
 
@@ -261,6 +266,11 @@ pub fn riscv_init() {
 }
 
 pub fn loongarch_init() {
+    if open(-100, "/bin/ls", OpenFlags::empty(), InodeMode::empty()) > 0 {
+        println!("The device has been initialized");
+        return;
+    }
+
     mkdir("/bin");
     mkdir("/lib64");
     mkdir("/usr");

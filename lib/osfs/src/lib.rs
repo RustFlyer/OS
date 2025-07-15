@@ -63,8 +63,8 @@ pub fn register_dev() {
     let devfs = DevFsType::new();
     FS_MANAGER.lock().insert(devfs.name(), devfs);
 
-    let devfs2 = DiskFsTypeFat::new();
-    FS_MANAGER.lock().insert(devfs2.name(), devfs2);
+    let fatfs = DiskFsTypeFat::new();
+    FS_MANAGER.lock().insert(fatfs.name(), fatfs);
 
     let procfs = ProcFsType::new();
     FS_MANAGER.lock().insert(procfs.name(), procfs);

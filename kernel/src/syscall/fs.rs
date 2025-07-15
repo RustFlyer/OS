@@ -771,9 +771,17 @@ pub async fn sys_umount2(target: usize, flags: u32) -> SyscallResult {
     let task = current_task();
     let addr_space = task.addr_space();
     let mut ptr = UserReadPtr::<u8>::new(target, &addr_space);
-    let mount_path = ptr.read_c_string(256);
-    let _flags = MountFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
+    let mount_path = ptr.read_c_string(256)?;
     log::info!("[sys_umount2] umount path:{mount_path:?}");
+    let target = mount_path.into_string().map_err(|_| SysError::EINVAL)?;
+    let _flags = MountFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
+    let (parent, name) = split_parent_and_name(&target);
+
+    let parent = task.walk_at(AtFd::FdCwd, parent.to_string())?;
+    let child = parent.lookup(name.ok_or(SysError::ENOENT)?)?;
+
+    parent.remove_child(child.as_ref());
+
     Ok(0)
 }
 
@@ -2226,7 +2234,6 @@ pub fn sys_fsetxattr(
     let task = current_task();
     let addr_space = task.addr_space();
 
-    // 验证 flags
     const XATTR_CREATE: i32 = 1;
     const XATTR_REPLACE: i32 = 2;
 
@@ -2236,16 +2243,14 @@ pub fn sys_fsetxattr(
 
     let name = {
         let mut name_ptr = UserReadPtr::<u8>::new(name_ptr, &addr_space);
-        // 读取时限制最大长度，避免读取过长的字符串
         let cstring = name_ptr.read_c_string(257)?; // XATTR_NAME_MAX + 2
         cstring.into_string().map_err(|_| SysError::EINVAL)?
     };
 
-    // 检查 name 长度 - 关键修复点
     if name.is_empty() {
         return Err(SysError::ERANGE);
     }
-    // Linux 中 XATTR_NAME_MAX 是 255，包含前缀
+
     if name.len() > 255 {
         return Err(SysError::ERANGE);
     }
@@ -2265,9 +2270,7 @@ pub fn sys_fsetxattr(
     let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
     let inode = file.inode();
 
-    // 处理 XATTR_CREATE 和 XATTR_REPLACE 语义
     let exists = inode.get_xattr(&name).is_ok();
-
     if flags & XATTR_CREATE != 0 && exists {
         return Err(SysError::EEXIST);
     }
@@ -2446,4 +2449,203 @@ pub async fn sys_splice(
     }
 
     Ok(bytes_read)
+}
+
+pub fn sys_setxattr(
+    path_ptr: usize,
+    name_ptr: usize,
+    value_ptr: usize,
+    size: usize,
+    flags: i32,
+) -> SyscallResult {
+    let task = current_task();
+    let addr_space = task.addr_space();
+
+    const XATTR_CREATE: i32 = 1;
+    const XATTR_REPLACE: i32 = 2;
+
+    if flags & !(XATTR_CREATE | XATTR_REPLACE) != 0 {
+        return Err(SysError::EINVAL);
+    }
+
+    let path = {
+        let mut path_ptr = UserReadPtr::<u8>::new(path_ptr, &addr_space);
+        let cstring = path_ptr.read_c_string(4096)?; // PATH_MAX
+        cstring.into_string().map_err(|_| SysError::EINVAL)?
+    };
+
+    let name = {
+        let mut name_ptr = UserReadPtr::<u8>::new(name_ptr, &addr_space);
+        let cstring = name_ptr.read_c_string(257)?; // XATTR_NAME_MAX + 2
+        cstring.into_string().map_err(|_| SysError::EINVAL)?
+    };
+
+    log::debug!("[sys_setxattr] path: {path}, name: {name}");
+
+    if name.is_empty() || name.len() > 255 {
+        return Err(SysError::ERANGE);
+    }
+
+    if size > 65536 {
+        return Err(SysError::E2BIG);
+    }
+
+    let value = if size > 0 {
+        let mut value_ptr = UserReadPtr::<u8>::new(value_ptr, &addr_space);
+        unsafe { value_ptr.read_array(size)? }
+    } else {
+        Vec::new()
+    };
+
+    let dentry = task.walk_at(AtFd::FdCwd, path)?;
+    let inode = dentry.inode().ok_or(SysError::ENOENT)?;
+
+    let xattr_res = inode.get_xattr(&name);
+
+    let exists = match xattr_res {
+        Ok(_) => true,
+        Err(SysError::ENODATA) => false,
+        Err(e) => return Err(e),
+    };
+
+    if flags & XATTR_CREATE != 0 && exists {
+        return Err(SysError::EEXIST);
+    }
+    if flags & XATTR_REPLACE != 0 && !exists {
+        return Err(SysError::ENODATA);
+    }
+
+    inode.set_xattr(&name, &value, flags)?;
+
+    Ok(0)
+}
+
+pub fn sys_lsetxattr(
+    path_ptr: usize,
+    name_ptr: usize,
+    value_ptr: usize,
+    size: usize,
+    flags: i32,
+) -> SyscallResult {
+    let task = current_task();
+    let addr_space = task.addr_space();
+
+    const XATTR_CREATE: i32 = 1;
+    const XATTR_REPLACE: i32 = 2;
+
+    if flags & !(XATTR_CREATE | XATTR_REPLACE) != 0 {
+        return Err(SysError::EINVAL);
+    }
+
+    let path = {
+        let mut path_ptr = UserReadPtr::<u8>::new(path_ptr, &addr_space);
+        let cstring = path_ptr.read_c_string(4096)?;
+        cstring.into_string().map_err(|_| SysError::EINVAL)?
+    };
+
+    let name = {
+        let mut name_ptr = UserReadPtr::<u8>::new(name_ptr, &addr_space);
+        let cstring = name_ptr.read_c_string(257)?;
+        cstring.into_string().map_err(|_| SysError::EINVAL)?
+    };
+
+    if name.is_empty() || name.len() > 255 {
+        return Err(SysError::ERANGE);
+    }
+
+    if size > 65536 {
+        return Err(SysError::E2BIG);
+    }
+
+    let value = if size > 0 {
+        let mut value_ptr = UserReadPtr::<u8>::new(value_ptr, &addr_space);
+        unsafe { value_ptr.read_array(size)? }
+    } else {
+        Vec::new()
+    };
+
+    let dentry = task.walk_at(AtFd::FdCwd, path)?;
+    if !dentry.is_negative() && dentry.inode().unwrap().inotype().is_symlink() {
+        return Err(SysError::ELOOP);
+    }
+
+    let inode = dentry.inode().ok_or(SysError::ENOENT)?;
+
+    let exists = inode.get_xattr(&name).is_ok();
+    if flags & XATTR_CREATE != 0 && exists {
+        return Err(SysError::EEXIST);
+    }
+
+    if flags & XATTR_REPLACE != 0 && !exists {
+        return Err(SysError::ENODATA);
+    }
+
+    inode.set_xattr(&name, &value, flags)?;
+
+    Ok(0)
+}
+
+pub fn sys_getxattr(
+    path_ptr: usize,
+    name_ptr: usize,
+    value_ptr: usize,
+    size: usize,
+) -> SyscallResult {
+    let task = current_task();
+    let addr_space = task.addr_space();
+
+    let path = {
+        let mut path_ptr = UserReadPtr::<u8>::new(path_ptr, &addr_space);
+        let cstring = path_ptr.read_c_string(4096)?;
+        cstring.into_string().map_err(|_| SysError::EINVAL)?
+    };
+
+    let name = {
+        let mut name_ptr = UserReadPtr::<u8>::new(name_ptr, &addr_space);
+        let cstring = name_ptr.read_c_string(256)?;
+        cstring.into_string().map_err(|_| SysError::EINVAL)?
+    };
+
+    let dentry = task.walk_at(AtFd::FdCwd, path)?;
+    let inode = dentry.inode().ok_or(SysError::ENOENT)?;
+
+    let value = inode.get_xattr(&name)?;
+
+    if value_ptr == 0 {
+        return Ok(value.len());
+    }
+
+    let copy_len = core::cmp::min(size, value.len());
+    let mut user_value_ptr = UserWritePtr::<u8>::new(value_ptr, &addr_space);
+    unsafe {
+        user_value_ptr
+            .try_into_mut_slice(copy_len)?
+            .copy_from_slice(&value[..copy_len]);
+    }
+
+    Ok(copy_len)
+}
+
+pub fn sys_removexattr(path_ptr: usize, name_ptr: usize) -> SyscallResult {
+    let task = current_task();
+    let addr_space = task.addr_space();
+
+    let path = {
+        let mut path_ptr = UserReadPtr::<u8>::new(path_ptr, &addr_space);
+        let cstring = path_ptr.read_c_string(4096)?;
+        cstring.into_string().map_err(|_| SysError::EINVAL)?
+    };
+
+    let name = {
+        let mut name_ptr = UserReadPtr::<u8>::new(name_ptr, &addr_space);
+        let cstring = name_ptr.read_c_string(256)?;
+        cstring.into_string().map_err(|_| SysError::EINVAL)?
+    };
+
+    let dentry = task.walk_at(AtFd::FdCwd, path)?;
+    let inode = dentry.inode().ok_or(SysError::ENOENT)?;
+
+    inode.remove_xattr(&name)?;
+
+    Ok(0)
 }
