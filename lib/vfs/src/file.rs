@@ -505,9 +505,9 @@ impl dyn File {
         dst_off: Option<&mut u64>,
         len: usize,
     ) -> SysResult<usize> {
-        let mut total = 0usize;
+        let mut total = 0;
         let buf_size = 4096;
-        let mut buf = vec![0u8; buf_size];
+        let mut buf = vec![0; buf_size];
 
         let mut src_offset = src_off.as_ref().map(|r| **r);
         let mut dst_offset = dst_off.as_ref().map(|r| **r);
@@ -541,7 +541,7 @@ impl dyn File {
             }
         }
 
-        // Write back value if pointer provided
+        // Update offsets if they were provided
         if let Some(off) = src_off {
             if let Some(new_off) = src_offset {
                 *off = new_off;
