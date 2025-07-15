@@ -48,10 +48,6 @@ impl File for StatFile {
         Err(SysError::ENOTDIR)
     }
 
-    fn flush(&self) -> SysResult<usize> {
-        todo!()
-    }
-
     fn base_readlink(&self, buf: &mut [u8]) -> SysResult<usize> {
         let inode = self
             .inode()
@@ -64,7 +60,7 @@ impl File for StatFile {
             call_interface!(KernelProcIf::stat_from_tid(tid))
         };
         if buf.len() < stat.len() {
-            log::warn!("readlink buf not big enough");
+            log::warn!("readlink buffer not large enough");
             return Err(SysError::EINVAL);
         }
         buf[..stat.len()].copy_from_slice(stat.as_bytes());

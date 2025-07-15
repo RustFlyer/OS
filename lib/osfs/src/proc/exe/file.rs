@@ -31,10 +31,6 @@ impl File for ExeFile {
         Err(SysError::ENOTDIR)
     }
 
-    fn flush(&self) -> SysResult<usize> {
-        todo!()
-    }
-
     fn base_readlink(&self, buf: &mut [u8]) -> SysResult<usize> {
         let exe = call_interface!(KernelProcIf::exe());
         log::info!("[/proc/self/exe] run {}", exe);

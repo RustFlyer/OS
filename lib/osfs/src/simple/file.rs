@@ -28,12 +28,10 @@ impl File for SimpleDirFile {
     }
 
     async fn base_read(&self, _buf: &mut [u8], _pos: usize) -> SysResult<usize> {
-        log::error!("[SimpleDirFile] not implement simple file");
         Err(SysError::EISDIR)
     }
 
     async fn base_write(&self, _buf: &[u8], _offset: usize) -> SysResult<usize> {
-        log::error!("[SimpleDirFile] not implement simple file");
         Err(SysError::EISDIR)
     }
 

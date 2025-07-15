@@ -9,11 +9,13 @@ use mm::address::VirtAddr;
 use systype::memory_flags::MappingFlags;
 use timer::TIMER_MANAGER;
 
-use crate::processor::current_hart;
-use crate::task::signal::sig_info::{Sig, SigDetails, SigInfo};
-use crate::task::{Task, TaskState};
-use crate::trap::load_trap_handler;
-use crate::vm::user_ptr::UserReadPtr;
+use crate::{
+    task::{
+        Task,
+        signal::sig_info::{Sig, SigDetails, SigInfo},
+    },
+    trap::{load_trap_handler, trap_handler::TRAP_STATS},
+};
 
 /// handle exception or interrupt from a task, return if success.
 /// __trap_from_user saved TrapContext, then jump to
@@ -102,10 +104,12 @@ pub fn user_interrupt_handler(task: &Task, i: Interrupt) {
     match i {
         Interrupt::SupervisorTimer => {
             set_nx_timer_irq();
+            TRAP_STATS.inc(i.number());
         }
         Interrupt::SupervisorExternal => {
             log::info!("[kernel] receive externel interrupt");
             // driver::get_device_manager_mut().handle_irq();
+            TRAP_STATS.inc(i.number());
         }
         _ => {
             panic!("[trap_handler] Unsupported interrupt {:?}", i);

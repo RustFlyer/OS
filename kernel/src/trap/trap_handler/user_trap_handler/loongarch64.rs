@@ -23,7 +23,7 @@ use crate::{
         Task, TaskState,
         signal::sig_info::{Sig, SigDetails, SigInfo},
     },
-    trap::load_trap_handler,
+    trap::{load_trap_handler, trap_handler::TRAP_STATS},
     vm::user_ptr::UserReadPtr,
 };
 
@@ -136,6 +136,18 @@ pub fn user_interrupt_handler(task: &Task, i: Interrupt) {
             //     );
             //     task.set_is_yield(true);
             // }
+            TRAP_STATS.inc(i as usize);
+        }
+        Interrupt::HWI0
+        | Interrupt::HWI1
+        | Interrupt::HWI2
+        | Interrupt::HWI3
+        | Interrupt::HWI4
+        | Interrupt::HWI5
+        | Interrupt::HWI6
+        | Interrupt::HWI7 => {
+            log::info!("[kernel] receive external interrupt: {:?}", i);
+            TRAP_STATS.inc(i as usize);
         }
         _ => panic!("Unknown user interrupt: {:?}", i),
     }

@@ -1,4 +1,4 @@
-use alloc::{format, string::String, sync::Arc};
+use alloc::{collections::btree_map::BTreeMap, format, string::String, sync::Arc};
 
 use config::{
     inode::{InodeMode, InodeType},
@@ -6,6 +6,7 @@ use config::{
 };
 use confreg::init_config_file;
 use exe::{dentry::ExeDentry, inode::ExeInode};
+use interrupts::{dentry::InterruptsDentry, inode::InterruptsInode};
 use maps::{dentry::MapsDentry, inode::MapsInode};
 use meminfo::{dentry::MemInfoDentry, inode::MemInfoInode};
 use mounts::{dentry::MountsDentry, inode::MountsInode};
@@ -20,6 +21,7 @@ use crate::{
 
 pub mod confreg;
 pub mod exe;
+pub mod interrupts;
 pub mod maps;
 pub mod meminfo;
 pub mod mounts;
@@ -37,6 +39,7 @@ pub trait KernelProcIf {
     fn stat_from_tid(tid: usize) -> String;
     fn maps() -> String;
     fn maps_from_tid(tid: usize) -> String;
+    fn interrupts() -> BTreeMap<usize, usize>;
 }
 
 pub fn init_procfs(root_dentry: Arc<dyn Dentry>) -> SysResult<()> {
@@ -53,6 +56,15 @@ pub fn init_procfs(root_dentry: Arc<dyn Dentry>) -> SysResult<()> {
     let mounts_inode = MountsInode::new(root_dentry.superblock().unwrap());
     let mounts_dentry = MountsDentry::new(Some(mounts_inode), Some(Arc::downgrade(&root_dentry)));
     root_dentry.add_child(mounts_dentry);
+
+    // /proc/interrupts
+    let interrupts_inode = InterruptsInode::new(root_dentry.superblock().unwrap());
+    let interrupts_dentry = InterruptsDentry::new(
+        "interrupts",
+        Some(interrupts_inode),
+        Some(Arc::downgrade(&root_dentry)),
+    );
+    root_dentry.add_child(interrupts_dentry);
 
     // /proc/sys
     let sys_inode = SimpleInode::new(root_dentry.superblock().unwrap());

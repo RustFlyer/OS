@@ -1,10 +1,10 @@
-use alloc::string::String;
+use alloc::{collections::BTreeMap, string::String};
 
 use mutex::ShareMutex;
 use osfs::{dev::loopx::externf::KernelTableIf, fd_table::FdTable, proc::KernelProcIf};
 
 use super::manager::TASK_MANAGER;
-use crate::processor::current_task;
+use crate::{processor::current_task, trap::trap_handler::TRAP_STATS};
 
 struct KernelProcIfImpl;
 
@@ -40,6 +40,10 @@ impl KernelProcIf for KernelProcIfImpl {
         }
         log::error!("no task {}", tid);
         return String::new();
+    }
+
+    fn interrupts() -> BTreeMap<usize, usize> {
+        TRAP_STATS.get_all()
     }
 }
 

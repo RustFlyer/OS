@@ -2196,6 +2196,18 @@ pub async fn sys_copy_file_range(
     if !file_in.flags().readable() || !file_out.flags().writable() {
         return Err(SysError::EBADF);
     }
+    if file_out.flags().contains(OpenFlags::O_APPEND) {
+        return Err(SysError::EBADF);
+    }
+
+    let file_in_type = file_in.inode().inotype();
+    let file_out_type = file_out.inode().inotype();
+    if file_in_type.is_dir() || file_out_type.is_dir() {
+        return Err(SysError::EISDIR);
+    }
+    if !file_in_type.is_reg() || !file_out_type.is_reg() {
+        return Err(SysError::EINVAL);
+    }
 
     let mut off_in = if off_in_ptr == 0 {
         None
@@ -2208,6 +2220,18 @@ pub async fn sys_copy_file_range(
     } else {
         unsafe { Some(UserReadPtr::<u64>::new(off_out_ptr, &addr_space).read()?) }
     };
+
+    if ptr::eq(file_in.as_ref(), file_out.as_ref()) {
+        // If the two file descriptors refer to the same file, the source and destination
+        // range must not overlap.
+        let actual_off_in = off_in.unwrap_or_else(|| file_in.pos() as u64);
+        let actual_off_out = off_out.unwrap_or_else(|| file_out.pos() as u64);
+        if actual_off_in < actual_off_out + len as u64
+            && actual_off_out < actual_off_in + len as u64
+        {
+            return Err(SysError::EINVAL);
+        }
+    }
 
     let bytes_copied = file_out
         .copy_file_range(file_in.as_ref(), off_in.as_mut(), off_out.as_mut(), len)
@@ -2367,30 +2391,26 @@ pub async fn sys_splice(
         flags
     );
     let _flags = SpliceFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
-    let fd_in = current_task()
-        .with_mut_fdtable(|ft| ft.get_file(fd_in))
-        .map_err(|_| SysError::EBADF)?;
-    let fd_out = current_task()
-        .with_mut_fdtable(|ft| ft.get_file(fd_out))
-        .map_err(|_| SysError::EBADF)?;
+    let file_in = current_task().with_mut_fdtable(|ft| ft.get_file(fd_in))?;
+    let file_out = current_task().with_mut_fdtable(|ft| ft.get_file(fd_out))?;
 
-    if !fd_in.flags().readable() || !fd_out.flags().writable() {
+    if !file_in.flags().readable() || !file_out.flags().writable() {
         log::error!("[sys_splice] not readable/writable",);
         return Err(SysError::EBADF);
     }
-    if ptr::eq(fd_out.as_ref(), fd_in.as_ref()) {
+    if ptr::eq(file_out.as_ref(), file_in.as_ref()) {
         return Err(SysError::EINVAL);
     }
-    if fd_out.flags().contains(OpenFlags::O_APPEND) {
+    if file_out.flags().contains(OpenFlags::O_APPEND) {
         return Err(SysError::EINVAL);
     }
 
-    let fd_in_type = fd_in.inode().inotype();
-    let fd_out_type = fd_out.inode().inotype();
-    if !fd_in_type.is_fifo() && !fd_out_type.is_fifo() {
+    let file_in_type = file_in.inode().inotype();
+    let file_out_type = file_out.inode().inotype();
+    if !file_in_type.is_fifo() && !file_out_type.is_fifo() {
         return Err(SysError::EINVAL);
     }
-    if fd_in_type.is_fifo() && off_in_ptr != 0 || fd_out_type.is_fifo() && off_out_ptr != 0 {
+    if file_in_type.is_fifo() && off_in_ptr != 0 || file_out_type.is_fifo() && off_out_ptr != 0 {
         return Err(SysError::ESPIPE);
     }
 
@@ -2411,32 +2431,32 @@ pub async fn sys_splice(
 
     let mut buffer: Vec<u8> = vec![0; len];
 
-    let bytes_read = if fd_in_type.is_fifo() {
-        fd_in.read(buffer.as_mut_slice()).await?
+    let bytes_read = if file_in_type.is_fifo() {
+        file_in.read(buffer.as_mut_slice()).await?
     } else if let Some(offset) = off_in {
-        let pos = fd_in.pos();
-        fd_in.seek(SeekFrom::Start(offset as u64))?;
-        let bytes_read = fd_in.read(buffer.as_mut_slice()).await?;
-        fd_in.seek(SeekFrom::Start(pos as u64))?;
+        let pos = file_in.pos();
+        file_in.seek(SeekFrom::Start(offset as u64))?;
+        let bytes_read = file_in.read(buffer.as_mut_slice()).await?;
+        file_in.seek(SeekFrom::Start(pos as u64))?;
         bytes_read
     } else {
-        fd_in.read(buffer.as_mut_slice()).await?
+        file_in.read(buffer.as_mut_slice()).await?
     };
 
     if bytes_read == 0 {
         return Ok(0);
     }
 
-    let bytes_written = if fd_out_type.is_fifo() {
-        fd_out.write(buffer.as_slice()).await?
+    let bytes_written = if file_out_type.is_fifo() {
+        file_out.write(buffer.as_slice()).await?
     } else if let Some(offset) = off_out {
-        let pos = fd_out.pos();
-        fd_out.seek(SeekFrom::Start(offset as u64))?;
-        let bytes_written = fd_out.write(buffer.as_slice()).await?;
-        fd_out.seek(SeekFrom::Start(pos as u64))?;
+        let pos = file_out.pos();
+        file_out.seek(SeekFrom::Start(offset as u64))?;
+        let bytes_written = file_out.write(buffer.as_slice()).await?;
+        file_out.seek(SeekFrom::Start(pos as u64))?;
         bytes_written
     } else {
-        fd_out.write(buffer.as_slice()).await?
+        file_out.write(buffer.as_slice()).await?
     };
 
     if bytes_written != bytes_read {

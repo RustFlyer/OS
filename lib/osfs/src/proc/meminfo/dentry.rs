@@ -36,23 +36,23 @@ impl Dentry for MemInfoDentry {
     }
 
     fn base_create(&self, _dentry: &dyn Dentry, _mode: config::inode::InodeMode) -> SysResult<()> {
-        todo!()
+        Err(systype::error::SysError::EACCES)
     }
 
     fn base_link(&self, _dentry: &dyn Dentry, _old_dentry: &dyn Dentry) -> SysResult<()> {
-        todo!()
+        Err(systype::error::SysError::EACCES)
     }
 
     fn base_lookup(&self, _dentry: &dyn Dentry) -> SysResult<()> {
-        todo!()
+        Err(systype::error::SysError::ENOTDIR)
     }
 
     fn base_unlink(&self, _dentry: &dyn Dentry) -> SysResult<()> {
-        todo!()
+        Err(systype::error::SysError::EACCES)
     }
 
     fn base_new_neg_child(self: Arc<Self>, _name: &str) -> Arc<dyn Dentry> {
-        todo!()
+        panic!("MemInfoDentry does not support new_neg_child")
     }
 
     fn base_rename(
@@ -61,6 +61,6 @@ impl Dentry for MemInfoDentry {
         _new_dir: &dyn Dentry,
         _new_dentry: &dyn Dentry,
     ) -> SysResult<()> {
-        todo!()
+        Err(systype::error::SysError::EACCES)
     }
 }

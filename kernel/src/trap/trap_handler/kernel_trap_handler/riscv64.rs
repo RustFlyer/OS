@@ -1,4 +1,3 @@
-use mm::address::{PhysPageNum, VirtAddr};
 use riscv::{ExceptionNumber, InterruptNumber};
 use riscv::{
     interrupt::{Exception, Interrupt, Trap},
@@ -6,9 +5,10 @@ use riscv::{
 };
 
 use arch::time::{get_time_duration, set_nx_timer_irq};
+use mm::address::{PhysPageNum, VirtAddr};
 use timer::TIMER_MANAGER;
 
-use crate::osdriver::manager::device_manager;
+use crate::{osdriver::manager::device_manager, trap::trap_handler::TRAP_STATS};
 
 #[unsafe(no_mangle)]
 pub fn kernel_trap_handler() {
@@ -28,10 +28,12 @@ fn interrupt_handler(i: Interrupt) {
         Interrupt::SupervisorTimer => {
             TIMER_MANAGER.check(get_time_duration());
             set_nx_timer_irq();
+            TRAP_STATS.inc(i.number());
         }
         Interrupt::SupervisorExternal => {
             // log::error!("[kernel] receive externel interrupt");
             device_manager().handle_irq();
+            TRAP_STATS.inc(i.number());
         }
         _ => trap_panic(),
     }

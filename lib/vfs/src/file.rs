@@ -191,14 +191,6 @@ pub trait File: Send + Sync + DowncastSync {
         Err(SysError::ENOTTY)
     }
 
-    fn dev_id(&self) -> (u8, u8) {
-        let inode = self.inode();
-        let dev_id = inode.dev_id();
-        let major = (dev_id >> 8) as u8;
-        let minor = (dev_id & 0xFF) as u8;
-        (major, minor)
-    }
-
     /// Given interested events, keep track of these events and return events
     /// that is ready.
     async fn base_poll(&self, events: PollEvents) -> PollEvents {
@@ -242,10 +234,12 @@ impl dyn File {
 
         // log::error!("[read] {} {}", self.dentry().path(), inode.get_meta().ino);
 
-        let bytes_read = match inode.inotype() {
-            InodeType::File => self.read_through_page_cache(buf, position).await?,
-            _ => self.base_read(buf, position).await?,
-        };
+        let bytes_read =
+            if inode.inotype() == InodeType::File && self.dentry().inode().unwrap().dev_id().0 != 0 {
+                self.read_through_page_cache(buf, position).await?
+            } else {
+                self.base_read(buf, position).await?
+            };
 
         // log::trace!("read len = {}", bytes_read);
         self.set_pos(position + bytes_read);
@@ -348,10 +342,12 @@ impl dyn File {
             unimplemented!("Holes are not supported yet");
         }
 
-        let bytes_written = match inode.inotype() {
-            InodeType::File => self.write_through_page_cache(buf, position).await?,
-            _ => self.base_write(buf, position).await?,
-        };
+        let bytes_written =
+            if inode.inotype() == InodeType::File && self.dentry().inode().unwrap().dev_id().0 != 0 {
+                self.write_through_page_cache(buf, position).await?
+            } else {
+                self.base_write(buf, position).await?
+            };
         let new_position = position + bytes_written;
 
         self.set_pos(new_position);
@@ -501,9 +497,9 @@ impl dyn File {
         dst_off: Option<&mut u64>,
         len: usize,
     ) -> SysResult<usize> {
-        let mut total = 0usize;
+        let mut total = 0;
         let buf_size = 4096;
-        let mut buf = vec![0u8; buf_size];
+        let mut buf = vec![0; buf_size];
 
         let mut src_offset = src_off.as_ref().map(|r| **r);
         let mut dst_offset = dst_off.as_ref().map(|r| **r);
@@ -537,7 +533,7 @@ impl dyn File {
             }
         }
 
-        // Write back value if pointer provided
+        // Update offsets if they were provided
         if let Some(off) = src_off {
             if let Some(new_off) = src_offset {
                 *off = new_off;
