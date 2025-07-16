@@ -240,7 +240,7 @@ pub async fn sys_write(fd: usize, addr: usize, len: usize) -> SyscallResult {
 /// - This is a `async` syscall, which means that it likely `yield` or `suspend` when called. Therefore, use
 ///   `lock` carefully and do not pass the `lock` across `await` as possible.
 pub async fn sys_read(fd: usize, buf: usize, len: usize) -> SyscallResult {
-    // log::debug!("[sys_read] fd: {fd}, buf: {buf:#x}, len: {len:#x}");
+    log::debug!("[sys_read] fd: {fd}, buf: {buf:#x}, len: {len:#x}");
 
     let task = current_task();
     let addr_space = task.addr_space();
@@ -292,7 +292,7 @@ pub fn sys_readlinkat(dirfd: usize, pathname: usize, buf: usize, bufsiz: usize) 
 ///   the `size` of the file).  If data is **later written** at this point, **subsequent reads** of the data in
 ///   the gap (a "hole") return `null` bytes ('\0') until data is actually written into the gap.
 pub fn sys_lseek(fd: usize, offset: isize, whence: usize) -> SyscallResult {
-    // log::info!("[sys_lseek] fd: {fd}, offset: {offset}, whence: {whence}");
+    log::info!("[sys_lseek] fd: {fd}, offset: {offset}, whence: {whence}");
 
     #[derive(FromRepr)]
     #[repr(usize)]
@@ -1645,13 +1645,24 @@ pub fn sys_umask(_mask: i32) -> SyscallResult {
 ///
 /// With ftruncate(), the file must be open for writing; with truncate(), the file
 /// must be writable.
-pub fn sys_ftruncate(fd: usize, length: usize) -> SyscallResult {
+pub async fn sys_ftruncate(fd: usize, length: usize) -> SyscallResult {
+    log::debug!("[sys_ftruncate] fd: {fd}, length: {length}");
     let task = current_task();
     let file = task.with_mut_fdtable(|t| t.get_file(fd))?;
-
     let inode = file.dentry().inode().ok_or(SysError::ENOENT)?;
+    let old_size = file.size();
 
     inode.set_size(length);
+
+    if old_size > length && file.pos() > length {
+        file.set_pos(length);
+    }
+
+    if old_size < length {
+        let offset = old_size;
+        let len = length - offset;
+        file.fill_zeros(offset, len).await?;
+    }
 
     Ok(0)
 }
@@ -1834,6 +1845,7 @@ pub async fn sys_pselect6(
 ///
 /// The file offset is not changed.
 pub async fn sys_pread64(fd: usize, buf: usize, count: usize, offset: usize) -> SyscallResult {
+    // log::debug!("[sys_pread64] fd:{fd}, count: {count}, offset: {offset}");
     let task = current_task();
     let addr_space = task.addr_space();
     let mut buf = UserWritePtr::<u8>::new(buf, &addr_space);
@@ -1841,9 +1853,14 @@ pub async fn sys_pread64(fd: usize, buf: usize, count: usize, offset: usize) -> 
     let buf_ptr = unsafe { buf.try_into_mut_slice(count) }?;
 
     let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
-    file.seek(SeekFrom::Start(offset as u64))?;
 
-    file.read(buf_ptr).await
+    let old_pos = file.pos();
+
+    file.seek(SeekFrom::Start(offset as u64))?;
+    let bytes = file.read(buf_ptr).await?;
+    file.seek(SeekFrom::Start(old_pos as u64))?;
+
+    return Ok(bytes);
 }
 
 /// `pwrite()` writes up to `count` bytes from the buffer starting at `buf` to the file descriptor
@@ -2221,10 +2238,12 @@ pub async fn sys_copy_file_range(
     len: usize,
     flags: usize,
 ) -> SyscallResult {
+    type Offset = i64;
     if flags != 0 {
         return Err(SysError::EINVAL);
     }
 
+    log::debug!("[sys_copy_file_range] fdin: {fd_in}, fdout: {fd_out}");
     let task = current_task();
     let addr_space = task.addr_space();
 
@@ -2250,37 +2269,51 @@ pub async fn sys_copy_file_range(
     let mut off_in = if off_in_ptr == 0 {
         None
     } else {
-        unsafe { Some(UserReadPtr::<u64>::new(off_in_ptr, &addr_space).read()?) }
+        unsafe { Some(UserReadPtr::<Offset>::new(off_in_ptr, &addr_space).read()?) }
     };
 
     let mut off_out = if off_out_ptr == 0 {
         None
     } else {
-        unsafe { Some(UserReadPtr::<u64>::new(off_out_ptr, &addr_space).read()?) }
+        unsafe { Some(UserReadPtr::<Offset>::new(off_out_ptr, &addr_space).read()?) }
     };
 
     if ptr::eq(file_in.as_ref(), file_out.as_ref()) {
         // If the two file descriptors refer to the same file, the source and destination
         // range must not overlap.
-        let actual_off_in = off_in.unwrap_or_else(|| file_in.pos() as u64);
-        let actual_off_out = off_out.unwrap_or_else(|| file_out.pos() as u64);
-        if actual_off_in < actual_off_out + len as u64
-            && actual_off_out < actual_off_in + len as u64
+        let actual_off_in = off_in.unwrap_or_else(|| file_in.pos() as Offset);
+        let actual_off_out = off_out.unwrap_or_else(|| file_out.pos() as Offset);
+        if actual_off_in < actual_off_out + len as Offset
+            && actual_off_out < actual_off_in + len as Offset
         {
             return Err(SysError::EINVAL);
         }
     }
 
+    log::debug!("[sys_copy_file_range] off_in: {off_in:?}, off_out: {off_out:?}, len:{len}");
+    log::info!(
+        "[sys_copy_file_range] file_in pos: {:#x}, file_out pos: {:#x}",
+        file_in.pos(),
+        file_out.pos()
+    );
+
     let bytes_copied = file_out
         .copy_file_range(file_in.as_ref(), off_in.as_mut(), off_out.as_mut(), len)
         .await?;
 
+    log::info!(
+        "[sys_copy_file_range] after copy_file_range, file_in: {:#x}, file_out: {:#x}",
+        file_in.pos(),
+        file_out.pos()
+    );
+    log::info!("[sys_copy_file_range] bytes_copied: {bytes_copied:?}");
+
     if let Some(off) = off_in {
-        unsafe { UserWritePtr::<u64>::new(off_in_ptr, &addr_space).write(off)? };
+        unsafe { UserWritePtr::<Offset>::new(off_in_ptr, &addr_space).write(off)? };
     }
 
     if let Some(off) = off_out {
-        unsafe { UserWritePtr::<u64>::new(off_out_ptr, &addr_space).write(off)? };
+        unsafe { UserWritePtr::<Offset>::new(off_out_ptr, &addr_space).write(off)? };
     }
 
     Ok(bytes_copied)
@@ -2436,9 +2469,11 @@ pub async fn sys_splice(
         log::error!("[sys_splice] not readable/writable",);
         return Err(SysError::EBADF);
     }
+
     if ptr::eq(file_out.as_ref(), file_in.as_ref()) {
         return Err(SysError::EINVAL);
     }
+
     if file_out.flags().contains(OpenFlags::O_APPEND) {
         return Err(SysError::EINVAL);
     }
@@ -2448,6 +2483,7 @@ pub async fn sys_splice(
     if !file_in_type.is_fifo() && !file_out_type.is_fifo() {
         return Err(SysError::EINVAL);
     }
+
     if file_in_type.is_fifo() && off_in_ptr != 0 || file_out_type.is_fifo() && off_out_ptr != 0 {
         return Err(SysError::ESPIPE);
     }
@@ -2472,6 +2508,14 @@ pub async fn sys_splice(
     let bytes_read = if file_in_type.is_fifo() {
         file_in.read(buffer.as_mut_slice()).await?
     } else if let Some(offset) = off_in {
+        if offset < 0 {
+            return Err(SysError::EINVAL);
+        }
+
+        if offset > file_in.size() as i32 {
+            return Ok(0);
+        }
+
         let pos = file_in.pos();
         file_in.seek(SeekFrom::Start(offset as u64))?;
         let bytes_read = file_in.read(buffer.as_mut_slice()).await?;
@@ -2481,6 +2525,7 @@ pub async fn sys_splice(
         file_in.read(buffer.as_mut_slice()).await?
     };
 
+    buffer.truncate(bytes_read);
     if bytes_read == 0 {
         return Ok(0);
     }
@@ -2488,6 +2533,14 @@ pub async fn sys_splice(
     let bytes_written = if file_out_type.is_fifo() {
         file_out.write(buffer.as_slice()).await?
     } else if let Some(offset) = off_out {
+        if offset < 0 {
+            return Err(SysError::EINVAL);
+        }
+
+        if offset > file_in.size() as i32 {
+            return Ok(0);
+        }
+
         let pos = file_out.pos();
         file_out.seek(SeekFrom::Start(offset as u64))?;
         let bytes_written = file_out.write(buffer.as_slice()).await?;

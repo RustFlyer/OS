@@ -131,32 +131,28 @@ pub trait File: Send + Sync + DowncastSync {
     // TODO: On Linux, using lseek() on a terminal device fails with the error
     // ESPIPE. However, many function will use this Seek.
     fn seek(&self, pos: SeekFrom) -> SysResult<usize> {
-        let mut res_pos = self.pos();
+        let mut res_pos = self.pos() as i64;
         match pos {
             SeekFrom::Current(off) => {
-                if off < 0 {
-                    if res_pos as i64 - off.abs() < 0 {
-                        return Err(SysError::EINVAL);
-                    }
-                    res_pos -= off.unsigned_abs() as usize;
-                } else {
-                    res_pos += off as usize;
-                }
+                res_pos = res_pos.checked_add(off).ok_or(SysError::EINVAL)?;
             }
             SeekFrom::Start(off) => {
-                res_pos = off as usize;
+                let off = off as i64;
+                if off < 0 {
+                    return Err(SysError::EINVAL);
+                }
+                res_pos = off;
             }
             SeekFrom::End(off) => {
-                let size = self.size();
-                if off < 0 {
-                    res_pos = size - off.unsigned_abs() as usize;
-                } else {
-                    res_pos = size + off as usize;
-                }
+                let size = self.size() as i64;
+                res_pos = size.checked_add(off).ok_or(SysError::EINVAL)?;
             }
         }
-        self.set_pos(res_pos);
-        Ok(res_pos)
+        if res_pos < 0 {
+            return Err(SysError::EINVAL);
+        }
+        self.set_pos(res_pos as usize);
+        Ok(res_pos as usize)
     }
 
     fn pos(&self) -> usize {
@@ -234,14 +230,22 @@ impl dyn File {
 
         // log::error!("[read] {} {}", self.dentry().path(), inode.get_meta().ino);
 
-        let bytes_read =
-            if inode.inotype() == InodeType::File && self.dentry().inode().unwrap().dev_id().0 != 0 {
-                self.read_through_page_cache(buf, position).await?
-            } else {
-                self.base_read(buf, position).await?
-            };
+        let bytes_read = if inode.inotype() == InodeType::File
+            && self.dentry().inode().unwrap().dev_id().0 != 0
+        {
+            self.read_through_page_cache(buf, position).await?
+        } else {
+            self.base_read(buf, position).await?
+        };
 
-        // log::trace!("read len = {}", bytes_read);
+        if buf.len() > 10 {
+            let slice = &buf[..10];
+            log::debug!("read {} bytes, buf = {:?}", bytes_read, slice);
+            if buf.len() >= 1024 {
+                log::debug!("buf[0] = {:?}", buf[0]);
+                log::debug!("buf[1023] = {:?}", buf[1023]);
+            }
+        }
         self.set_pos(position + bytes_read);
         Ok(bytes_read)
     }
@@ -339,15 +343,30 @@ impl dyn File {
         }
 
         if position > size && inode.inotype() == InodeType::File {
-            unimplemented!("Holes are not supported yet");
+            log::info!(
+                "[fill_zeros] before fill, write at {:#x} when size is {:#X}",
+                position,
+                size
+            );
+            self.fill_zeros(size, position - size).await?;
+            inode.set_size(position);
+
+            let position = self.pos();
+            let size = self.size();
+            log::debug!(
+                "[fill_zeros] after fill, write at {:#x} when size is {:#X}",
+                position,
+                size
+            );
         }
 
-        let bytes_written =
-            if inode.inotype() == InodeType::File && self.dentry().inode().unwrap().dev_id().0 != 0 {
-                self.write_through_page_cache(buf, position).await?
-            } else {
-                self.base_write(buf, position).await?
-            };
+        let bytes_written = if inode.inotype() == InodeType::File
+            && self.dentry().inode().unwrap().dev_id().0 != 0
+        {
+            self.write_through_page_cache(buf, position).await?
+        } else {
+            self.base_write(buf, position).await?
+        };
         let new_position = position + bytes_written;
 
         self.set_pos(new_position);
@@ -355,6 +374,8 @@ impl dyn File {
             inode.set_size(usize::max(inode.size(), new_position));
         }
         inode.set_state(InodeState::DirtyAll);
+
+        log::debug!("write bytes: {}", bytes_written);
 
         Ok(bytes_written)
     }
@@ -480,6 +501,24 @@ impl dyn File {
         Ok(path)
     }
 
+    pub async fn fill_zeros(&self, start: usize, len: usize) -> SysResult<()> {
+        if len == 0 {
+            return Ok(());
+        }
+        let mut zeros = [0u8; 8192];
+        let mut written = 0;
+        let old_pos = self.pos();
+        while written < len {
+            let to_write = core::cmp::min(zeros.len(), len - written);
+            self.seek(SeekFrom::Start((start + written) as u64))?;
+            self.write_through_page_cache(&zeros[..to_write], start + written)
+                .await?;
+            written += to_write;
+        }
+        self.seek(SeekFrom::Start(old_pos as u64))?;
+        Ok(())
+    }
+
     /// Copies data from `src` file to `self` (destination file), using the most direct
     /// read/write methods available.
     ///
@@ -493,56 +532,81 @@ impl dyn File {
     pub async fn copy_file_range(
         &self,
         src: &dyn File,
-        src_off: Option<&mut u64>,
-        dst_off: Option<&mut u64>,
-        len: usize,
+        src_off: Option<&mut i64>,
+        dst_off: Option<&mut i64>,
+        mut len: usize,
     ) -> SysResult<usize> {
-        let mut total = 0;
+        let mut total = 0usize;
         let buf_size = 4096;
-        let mut buf = vec![0; buf_size];
+        let mut buf = vec![0u8; buf_size];
 
-        let mut src_offset = src_off.as_ref().map(|r| **r);
-        let mut dst_offset = dst_off.as_ref().map(|r| **r);
+        let orig_src_pos = if src_off.is_some() { src.pos() } else { 0 };
+        let orig_dst_pos = if dst_off.is_some() { self.pos() } else { 0 };
 
-        while total < len {
-            let to_read = core::cmp::min(buf_size, len - total);
+        let mut src_ptr = src_off.as_ref().map(|v| **v);
+        let mut dst_ptr = dst_off.as_ref().map(|v| **v);
 
-            // --- Source read ---
-            let n = if let Some(ref mut off) = src_offset {
-                let n = src.base_read(&mut buf[..to_read], *off as usize).await?;
-                *off += n as u64;
-                n
-            } else {
-                src.read(&mut buf[..to_read]).await?
+        while len > 0 {
+            let to_copy = core::cmp::min(buf_size, len);
+
+            if let Some(off) = src_ptr {
+                if src.seek(SeekFrom::Start(off as u64)).is_err() {
+                    let _ = src.seek(SeekFrom::Start(orig_src_pos as u64));
+                    let _ = self.seek(SeekFrom::Start(orig_dst_pos as u64));
+                    return Err(SysError::EINVAL);
+                }
+            }
+
+            let n = match src_ptr {
+                Some(_) => src.read(&mut buf[..to_copy]).await?,
+                None => src.read(&mut buf[..to_copy]).await?,
             };
+
             if n == 0 {
                 break;
             }
 
-            // --- Destination write ---
-            let m = if let Some(ref mut off) = dst_offset {
-                let m = self.base_write(&buf[..n], *off as usize).await?;
-                *off += m as u64;
-                m
-            } else {
-                self.write(&buf[..n]).await?
+            if let Some(off) = dst_ptr {
+                if self.seek(SeekFrom::Start(off as u64)).is_err() {
+                    let _ = src.seek(SeekFrom::Start(orig_src_pos as u64));
+                    let _ = self.seek(SeekFrom::Start(orig_dst_pos as u64));
+                    return Err(SysError::EINVAL);
+                }
+            }
+
+            let m = match dst_ptr {
+                Some(_) => self.write(&buf[..n]).await?,
+                None => self.write(&buf[..n]).await?,
             };
+
+            if let Some(ref mut pos) = src_ptr {
+                *pos += m as i64;
+            }
+
+            if let Some(ref mut pos) = dst_ptr {
+                *pos += m as i64;
+            }
+
             total += m;
+            len -= m;
+
             if m < n {
                 break;
             }
         }
 
-        // Update offsets if they were provided
-        if let Some(off) = src_off {
-            if let Some(new_off) = src_offset {
-                *off = new_off;
-            }
+        if src_off.is_some() {
+            let _ = src.seek(SeekFrom::Start(orig_src_pos as u64));
         }
-        if let Some(off) = dst_off {
-            if let Some(new_off) = dst_offset {
-                *off = new_off;
-            }
+        if dst_off.is_some() {
+            let _ = self.seek(SeekFrom::Start(orig_dst_pos as u64));
+        }
+
+        if let (Some(off), Some(new_pos)) = (src_off, src_ptr) {
+            *off = new_pos;
+        }
+        if let (Some(off), Some(new_pos)) = (dst_off, dst_ptr) {
+            *off = new_pos;
         }
 
         Ok(total)

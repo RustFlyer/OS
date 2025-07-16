@@ -124,7 +124,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         PRLIMIT64 => sys_prlimit64(args[0], args[1] as i32, args[2], args[3]),
         GETRANDOM => sys_getrandom(args[0], args[1], args[2] as i32),
         RT_SIGTIMEDWAIT => sys_rt_sigtimedwait(args[0], args[1], args[2]).await,
-        FTRUNCATE => sys_ftruncate(args[0], args[1]),
+        FTRUNCATE => sys_ftruncate(args[0], args[1]).await,
         FSYNC => sys_fsync(args[0]),
         FUTEX => {
             sys_futex(
