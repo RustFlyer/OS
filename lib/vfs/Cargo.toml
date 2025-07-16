@@ -14,6 +14,7 @@ simdebug = { path = "../simdebug" }
 
 
 async-trait = { workspace = true }
+bitflags = { workspace = true }
 downcast-rs = { workspace = true }
 elf = { workspace = true }
 hashbrown = { workspace = true }

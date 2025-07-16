@@ -11,6 +11,7 @@ use spin::Once;
 pub mod dcache;
 pub mod dentry;
 pub mod direntry;
+pub mod fanotify;
 pub mod file;
 pub mod fstype;
 pub mod inode;
