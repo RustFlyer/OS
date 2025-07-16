@@ -10,6 +10,8 @@ use core::{mem, ptr};
 
 use bitflags::bitflags;
 
+use config::vfs::OpenFlags;
+
 use super::constants::*;
 
 /// The `fanotify_event_metadata` structure in Linux.
@@ -236,5 +238,93 @@ bitflags! {
         /// It is reported in an event mask only if the fanotify group identifies
         /// filesystem objects by file handles.
         const ONDIR = FAN_ONDIR;
+
+        /// Events for the immediate children of marked directories shall be created.
+        const EVENT_ON_CHILD = FAN_EVENT_ON_CHILD;
+    }
+}
+
+bitflags! {
+    /// Flags for defining the behavior of the fanotify group to be initialized via the
+    /// `fanotify_init` system call.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    #[repr(transparent)]
+    pub struct FanInitFlags: u32 {
+        const CLASS_PRE_CONTENT = FAN_CLASS_PRE_CONTENT;
+        const CLASS_CONTENT = FAN_CLASS_CONTENT;
+        const CLASS_NOTIF = FAN_CLASS_NOTIF;
+
+        const CLOEXEC = FAN_CLOEXEC;
+        const NONBLOCK = FAN_NONBLOCK;
+        const UNLIMITED_QUEUE = FAN_UNLIMITED_QUEUE;
+        const UNLIMITED_MARKS = FAN_UNLIMITED_MARKS;
+        const REPORT_TID = FAN_REPORT_TID;
+        const ENABLE_AUDIT = FAN_ENABLE_AUDIT;
+        const REPORT_FD = FAN_REPORT_PIDFD;
+        const REPORT_DIR_FID = FAN_REPORT_DIR_FID;
+        const REPORT_NAME = FAN_REPORT_NAME;
+        const REPORT_TARGET_FID = FAN_REPORT_TARGET_FID;
+        const REPORT_DFID_NAME_TARGET = FAN_REPORT_DFID_NAME_TARGET;
+        const REPORT_PIDFD = FAN_REPORT_PIDFD;
+    }
+}
+
+bitflags! {
+    pub struct FanInitEventFFlags: u32 {
+        const RDONLY = OpenFlags::O_RDONLY.bits() as u32;
+        const WRONLY = OpenFlags::O_WRONLY.bits() as u32;
+        const RDWR = OpenFlags::O_RDWR.bits() as u32;
+        const LARGEFILE = OpenFlags::O_LARGEFILE.bits() as u32;
+        const CLOEXEC = OpenFlags::O_CLOEXEC.bits() as u32;
+        const APPEND = OpenFlags::O_APPEND.bits() as u32;
+        const DSYNC = OpenFlags::O_DSYNC.bits() as u32;
+        const NOATIME = OpenFlags::O_NOATIME.bits() as u32;
+        const NONBLOCK = OpenFlags::O_NONBLOCK.bits() as u32;
+        const SYNC = OpenFlags::O_SYNC.bits() as u32;
+    }
+}
+
+bitflags! {
+    /// Flags for modifying fanotify marks via the `fanotify_mark` system call.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    #[repr(transparent)]
+    pub struct FanMarkFlags: u32 {
+        /// Add a mark to the fanotify group.
+        const ADD = FAN_MARK_ADD;
+
+        /// Remove a mark from the fanotify group.
+        const REMOVE = FAN_MARK_REMOVE;
+
+        /// Remove either all marks for filesystems, all marks for mounts, or all marks
+        /// for directories and files from the fanotify group.
+        ///
+        /// This can be used in conjunction only with either `FAN_MARK_FILESYSTEM` or
+        /// `FAN_MARK_MOUNT`, which means that all marks for the specified filesystem or
+        /// mount will be removed. Otherwise, no other flags can be used with this flag,
+        /// and `fanotify_mark` will remove all marks for directories and files.
+        const FLUSH = FAN_MARK_FLUSH;
+
+        /// Mark the symbolic link itself, rather than the file it refers to.
+        const DONT_FOLLOW = FAN_MARK_DONT_FOLLOW;
+
+        /// Mark only directories. If the filesystem object to be marked is not a
+        /// directory, `fanotify_mark` will return `ENOTDIR`.
+        const ONLYDIR = FAN_MARK_ONLYDIR;
+
+        /// Mark the mount specified by `pathname`. If `pathname` is not a mount point,
+        /// the mount containing it will be marked. All directories, subdirectories, and
+        /// the contained files of the mount will be monitored.
+        const MOUNT = FAN_MARK_MOUNT;
+
+        const FILESYSTEM = FAN_MARK_FILESYSTEM;
+
+        /// The events in mask shall be added to or removed from the ignore mask.
+        const IGNORED_MASK = FAN_MARK_IGNORED_MASK;
+
+        const IGNORE = FAN_MARK_IGNORE;
+
+        const IGNORED_SURV_MODIFY = FAN_MARK_IGNORED_SURV_MODIFY;
+
+        const EVICTABLE = FAN_MARK_EVICTABLE;
     }
 }

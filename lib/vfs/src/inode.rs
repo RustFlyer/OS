@@ -23,7 +23,7 @@ use crate::{stat::Stat, superblock::SuperBlock};
 /// Data that is common to all inodes.
 pub struct InodeMeta {
     /// Inode number of the inode in its filesystem.
-    pub ino: usize,
+    pub ino: i32,
     /// Reference to the superblock of the filesystem this inode belongs to.
     pub superblock: Arc<dyn SuperBlock>,
     /// Page cache for the inode. If the inode is not a regular file or a block
@@ -65,7 +65,7 @@ pub struct InodeMetaInner {
 
 impl InodeMeta {
     /// Creates a default inode metadata. The caller should fill each field after this call.
-    pub fn new(ino: usize, superblock: Arc<dyn SuperBlock>) -> Self {
+    pub fn new(ino: i32, superblock: Arc<dyn SuperBlock>) -> Self {
         Self {
             ino,
             superblock,
@@ -141,7 +141,7 @@ pub trait Inode: Send + Sync + DowncastSync {
         self.get_meta().inner.lock().gid
     }
 
-    fn ino(&self) -> usize {
+    fn ino(&self) -> i32 {
         self.get_meta().ino
     }
 
