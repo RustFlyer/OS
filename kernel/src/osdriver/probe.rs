@@ -1,5 +1,5 @@
 use alloc::sync::Arc;
-use config::mm::KERNEL_MAP_OFFSET;
+use config::{board::HARTS_NUM, mm::KERNEL_MAP_OFFSET};
 use core::{
     mem::size_of,
     ptr::{self, NonNull},
@@ -31,7 +31,7 @@ use virtio_drivers::{
 };
 
 use crate::osdriver::{
-    ioremap_if_need, manager::device_manager, probe_char_device_by_serial, probe_plic,
+    ioremap_if_need, manager::device_manager, probe_char_device_by_serial, probe_cpu, probe_plic,
 };
 
 pub fn probe_tree(fdt: &Fdt) {
@@ -43,17 +43,21 @@ pub fn probe_tree(fdt: &Fdt) {
     if let Some(plic) = probe_plic(fdt) {
         device_manager().set_plic(plic);
         println!("[PLIC] INIT SUCCESS");
+
+        if let Some(serial) = probe_char_device_by_serial(fdt) {
+            device_manager().add_device(serial.dev_id(), serial.clone());
+            CHAR_DEVICE.call_once(|| serial);
+            println!("[SERIAL] INIT SUCCESS");
+        }
     } else {
         probe_char_device(fdt);
         println!("[CHAR] INIT SUCCESS");
     }
 
-    if let Some(serial) = probe_char_device_by_serial(fdt) {
-        if CHAR_DEVICE.get().is_none() {
-            device_manager().add_device(serial.dev_id(), serial.clone());
-            CHAR_DEVICE.call_once(|| serial);
-            println!("[SERIAL] INIT SUCCESS");
-        }
+    if let Some(cpus) = probe_cpu(&fdt) {
+        let len = cpus.len();
+        device_manager().set_cpus(cpus);
+        unsafe { HARTS_NUM = len };
     }
 
     for node in fdt.all_nodes() {

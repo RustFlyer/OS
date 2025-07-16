@@ -1,8 +1,8 @@
 pub mod manager;
 pub mod probe;
-use alloc::{boxed::Box, sync::Arc};
+use alloc::{boxed::Box, sync::Arc, vec::Vec};
 use driver::{
-    device::OSDevice,
+    cpu::CPU,
     plic::PLIC,
     println,
     serial::{Serial, uart8250::Uart},
@@ -20,6 +20,8 @@ use crate::vm::iomap::ioremap;
 #[allow(unused)]
 pub fn probe_device_tree() {
     let mut dtb_addr = unsafe { DTB_ADDR };
+
+    println!("[CONSOLE] INIT SUCCESS");
 
     init_device_manager();
 
@@ -41,6 +43,7 @@ pub fn probe_device_tree() {
         }
     }
 
+    println!("FIND DTB TREE {:?}", device_tree);
     probe_tree(&device_tree);
 
     let manager = device_manager();
@@ -183,4 +186,53 @@ fn probe_serial_console(stdout: &FdtNode) -> Serial {
         }
         _ => panic!("Unsupported serial console"),
     }
+}
+
+pub fn probe_cpu(root: &Fdt) -> Option<Vec<CPU>> {
+    let dtb_cpus = root.cpus();
+    for prop in root.find_node("/cpus").unwrap().properties() {
+        log::info!("{:?}", prop);
+    }
+    let mut cpus = Vec::new();
+    for dtb_cpu in dtb_cpus {
+        let mut cpu = CPU {
+            id: dtb_cpu.ids().unwrap().first().unwrap(),
+            usable: true,
+            clock_freq: dtb_cpu
+                .properties()
+                .find(|p| p.name == "clock-frequency")
+                .map(|p| {
+                    let mut a32: [u8; 4] = [0; 4];
+                    let mut a64: [u8; 8] = [0; 8];
+                    a32.copy_from_slice(p.value);
+                    a64.copy_from_slice(p.value);
+                    match p.value.len() {
+                        4 => u32::from_be_bytes(a32) as usize,
+                        8 => u64::from_be_bytes(a64) as usize,
+                        _ => unreachable!(),
+                    }
+                })
+                .unwrap_or(0),
+            timebase_freq: dtb_cpu.timebase_frequency().unwrap(),
+        };
+
+        // Mask CPU without MMU
+        // Get RISC-V ISA string
+        let isa = dtb_cpu.property("riscv,isa").expect("RISC-V ISA not found");
+        if isa.as_str().unwrap().contains('u') {
+            // Privleged mode is in ISA string
+            if !isa.as_str().unwrap().contains('s') {
+                cpu.usable = false;
+            }
+        }
+        // Check mmu type
+        let mmu_type = dtb_cpu.property("mmu-type");
+        if mmu_type.is_none() {
+            cpu.usable = false;
+        }
+        // Add to list
+        cpus.push(cpu);
+    }
+    log::info!("cpus: {cpus:?}");
+    Some(cpus)
 }

@@ -167,4 +167,8 @@ impl DeviceTreeManager {
     pub fn set_plic(&mut self, plic: PLIC) {
         self.plic = Some(plic);
     }
+
+    pub fn set_cpus(&mut self, cpus: Vec<CPU>) {
+        self.cpus = cpus;
+    }
 }

@@ -52,6 +52,7 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
 
     // SAFETY: Only the first hart will run this code block.
     if unsafe { !INITIALIZED } {
+        println!("print init");
         /* Initialize logger */
         logger::init();
 
@@ -85,6 +86,7 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
             fence();
             ptr::write_volatile(&raw mut INITIALIZED, true);
         }
+        println!("memory init");
 
         log::info!(
             "kernel physical memory: {:#x} - {:#x}",
@@ -122,6 +124,8 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
 
         osdriver::probe_device_tree();
         println!("[PROBE_DEV_TREE] INIT SUCCESS");
+
+        println!("device init");
 
         log::info!("hart {}: initialized driver", hart_id);
 
