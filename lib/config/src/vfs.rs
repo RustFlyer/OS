@@ -160,6 +160,62 @@ bitflags! {
     }
 }
 
+bitflags::bitflags! {
+    #[derive(Default, Clone, Copy, Debug, Eq, PartialEq)]
+    pub struct EpollEvents: u32 {
+        // poll/select 兼容事件
+        const IN        = 0x001;          // 可读
+        const PRI       = 0x002;          // 高优先级可读
+        const OUT       = 0x004;          // 可写
+        const ERR       = 0x008;          // 错误
+        const HUP       = 0x010;          // 对端关闭/挂起
+        const INVAL     = 0x020;          // 无效请求
+
+        // epoll 专有事件（需按 Linux 头文件定义补充位）
+        const RDNORMAL  = 0x040;          // 普通可读
+        const RDBAND    = 0x080;          // 带外可读
+        const WRBAND    = 0x100;          // 带外可写
+
+        // epoll 独有高位
+        const MSG       = 0x400;          // 消息可读
+        const ERR2      = 0x800;          // 冗余错误（兼容）
+
+        // epoll 特色
+        const ET        = 0x80000000;     // EPOLLET 边缘触发
+        const ONESHOT   = 0x40000000;     // EPOLLONESHOT 只触发一次
+        const WAKEUP    = 0x20000000;     // EPOLLWAKEUP 唤醒（很少用）
+        const EXCLUSIVE = 0x10000000;     // EPOLLEXCLUSIVE 独占
+    }
+}
+
+impl From<EpollEvents> for PollEvents {
+    fn from(value: EpollEvents) -> Self {
+        match value {
+            EpollEvents::IN => PollEvents::IN,
+            EpollEvents::PRI => PollEvents::PRI,
+            EpollEvents::OUT => PollEvents::OUT,
+            EpollEvents::ERR => PollEvents::ERR,
+            EpollEvents::HUP => PollEvents::HUP,
+            EpollEvents::INVAL => PollEvents::INVAL,
+            _ => PollEvents::empty(),
+        }
+    }
+}
+
+impl From<PollEvents> for EpollEvents {
+    fn from(value: PollEvents) -> Self {
+        match value {
+            PollEvents::IN => EpollEvents::IN,
+            PollEvents::PRI => EpollEvents::PRI,
+            PollEvents::OUT => EpollEvents::OUT,
+            PollEvents::ERR => EpollEvents::ERR,
+            PollEvents::HUP => EpollEvents::HUP,
+            PollEvents::INVAL => EpollEvents::INVAL,
+            _ => EpollEvents::empty(),
+        }
+    }
+}
+
 bitflags! {
     /// renameat flag
    pub struct RenameFlag: u32 {

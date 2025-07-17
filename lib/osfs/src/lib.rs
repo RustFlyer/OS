@@ -21,6 +21,7 @@ use etc::*;
 extern crate alloc;
 
 pub mod dev;
+pub mod epoll;
 pub mod etc;
 pub mod fd_table;
 pub mod passwd;

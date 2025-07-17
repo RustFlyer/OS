@@ -19,7 +19,10 @@ use arch::time::get_time_duration;
 use config::{
     device::BLOCK_SIZE,
     inode::InodeMode,
-    vfs::{AccessFlags, AtFd, AtFlags, MountFlags, OpenFlags, PollEvents, RenameFlags, SeekFrom},
+    vfs::{
+        AccessFlags, AtFd, AtFlags, EpollEvents, MountFlags, OpenFlags, PollEvents, RenameFlags,
+        SeekFrom,
+    },
 };
 use driver::BLOCK_DEVICE;
 use osfs::{
@@ -27,13 +30,17 @@ use osfs::{
     dev::{
         loopx::{
             blkinfo::{BlkIoctlCmd, HdGeometry},
-            loopinfo::{LoopInfo, LoopInfo64, LoopIoctlCmd},
+            loopinfo::{LoopInfo64, LoopIoctlCmd},
         },
         rtc::{RtcTime, ioctl::RtcIoctlCmd},
         tty::{
             TtyIoctlCmd,
             ioctl::{Pid, Termios, WinSize},
         },
+    },
+    epoll::{
+        event::{EpollCtlOp, EpollEvent},
+        file::EpollFile,
     },
     fd_table::{FdFlags, FdSet},
     pipe::{inode::PIPE_BUF_LEN, new_pipe},
