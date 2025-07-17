@@ -12,6 +12,7 @@ use core::{
     task::{Context, Poll},
     time::Duration,
 };
+use shm::id;
 
 use strum::FromRepr;
 
@@ -447,6 +448,22 @@ pub fn sys_close(fd: usize) -> SyscallResult {
     log::info!("[sys_close] fd: {fd}");
     let task = current_task();
     task.with_mut_fdtable(|table| table.remove(fd))?;
+
+    // relate to signalfd4 syscall
+    let lock = task.sigfd_queue_mut();
+    let mut queue = lock.lock();
+    if queue.len() > 0 {
+        let id = queue
+            .iter_mut()
+            .enumerate()
+            .find(|(_, f)| **f == fd)
+            .map(|(idx, _)| idx);
+
+        if let Some(id) = id {
+            queue.remove(id);
+        }
+    }
+
     Ok(0)
 }
 

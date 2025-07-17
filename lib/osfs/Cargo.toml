@@ -14,6 +14,7 @@ systype =  { path = "../systype" }
 vfs    = { path = "../vfs" }
 mm = { path = "../mm" }
 common = { path = "../common" }
+signal = { path = "../signal" }
 
 
 async-trait = { workspace = true }

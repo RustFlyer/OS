@@ -1,6 +1,11 @@
 use core::{iter, time::Duration};
 
 use config::{process::INIT_PROC_ID, vfs::OpenFlags};
+use osfs::{
+    fd_table::{FdFlags, FdInfo},
+    simple::{dentry::SimpleDentry, file::SimpleFileFile},
+    special::signalfd::{file::SignalFdFile, flag::SignalFdFlags},
+};
 use osfuture::suspend_now;
 use systype::{
     error::{SysError, SyscallResult},
@@ -750,6 +755,7 @@ pub async fn sys_rt_sigsuspend(mask: usize) -> SyscallResult {
 }
 
 pub fn sys_pidfd_open(pid: usize, flags: u32) -> SyscallResult {
+    log::debug!("[sys_pidfd_open] pid: {}, flags: {}", pid, flags);
     if flags != 0 {
         return Err(SysError::EINVAL);
     }
@@ -768,6 +774,13 @@ pub fn sys_pidfd_open(pid: usize, flags: u32) -> SyscallResult {
 
     let pf_table = PF_TABLE.get().unwrap();
     let pidfd = pf_table.new_pidfd(&task);
+
+    // stupid alloc
+    let d = SimpleDentry::new("s", None, None);
+    let f = SimpleFileFile::new(d);
+
+    let info = FdInfo::new(f, FdFlags::empty());
+    task.with_mut_fdtable(|table| table.put(pidfd, info))?;
 
     Ok(pidfd)
 }
@@ -911,4 +924,36 @@ pub fn sys_sigaltstack(new_stack_ptr: usize, old_stack_ptr: usize) -> SyscallRes
     }
 
     Ok(0)
+}
+
+pub async fn sys_signalfd4(
+    fd: isize,
+    mask_ptr: usize,
+    mask_size: usize,
+    flags: u32,
+) -> SyscallResult {
+    if mask_size < core::mem::size_of::<SigSet>() {
+        return Err(SysError::EINVAL);
+    }
+
+    let task = current_task();
+    let addrspace = task.addr_space();
+
+    let mut ptr = UserReadPtr::<SigSet>::new(mask_ptr, &addrspace);
+    let mask = unsafe { ptr.read() }?;
+    let flags = SignalFdFlags::from_bits_truncate(flags);
+    if fd == -1 {
+        let signal_fd = Arc::new(SignalFdFile::new(mask, flags).await);
+        let newfd = task.with_mut_fdtable(|table| table.alloc(signal_fd, OpenFlags::empty()))?;
+        task.register_sigfd(newfd);
+        Ok(newfd)
+    } else {
+        let f = task.with_mut_fdtable(|table| table.get_file(fd as usize))?;
+
+        f.downcast_arc::<SignalFdFile>()
+            .unwrap_or_else(|_| unreachable!())
+            .update_mask(mask);
+
+        Ok(fd as usize)
+    }
 }

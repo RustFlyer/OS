@@ -386,6 +386,10 @@ impl Task {
         Path::new(base_dir, path).walk_with_parents(list)
     }
 
+    pub fn register_sigfd(&self, fd: usize) {
+        self.sigfd_queue_mut().lock().push(fd);
+    }
+
     pub fn exit(self: &Arc<Self>) {
         // assert_ne!(
         //     self.tid(),

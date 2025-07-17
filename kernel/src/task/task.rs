@@ -13,7 +13,10 @@ use timer::Timer;
 
 use mm::address::VirtAddr;
 use mutex::{ShareMutex, SpinNoIrqLock, new_share_mutex};
-use osfs::{fd_table::FdTable, sys_root_dentry};
+use osfs::{
+    fd_table::{Fd, FdTable},
+    sys_root_dentry,
+};
 use systype::time::ITimer;
 use vfs::{dentry::Dentry, file::File};
 
@@ -145,6 +148,9 @@ pub struct Task {
     // find file by its fd and write or read it.
     fd_table: ShareMutex<FdTable>,
 
+    // store sig fd in fdtable
+    sigfd_queue: ShareMutex<Vec<Fd>>,
+
     // cwd is current working dentry. When AtFd::FdCwd is set,
     // task should use relative path with cwd.
     cwd: ShareMutex<Arc<dyn Dentry>>,
@@ -220,6 +226,7 @@ impl Task {
 
             tid_address: SyncUnsafeCell::new(TidAddress::new()),
             fd_table: new_share_mutex(FdTable::new()),
+            sigfd_queue: new_share_mutex(Vec::new()),
             cwd: new_share_mutex(sys_root_dentry()),
             root: new_share_mutex(sys_root_dentry()),
             elf: SyncUnsafeCell::new(elf_file),
@@ -312,6 +319,8 @@ impl Task {
 
             tid_address,
             fd_table,
+            sigfd_queue: new_share_mutex(Vec::new()),
+
             cwd,
             root,
             elf,
@@ -485,6 +494,10 @@ impl Task {
 
     pub fn fdtable_mut(&self) -> ShareMutex<FdTable> {
         self.fd_table.clone()
+    }
+
+    pub fn sigfd_queue_mut(&self) -> ShareMutex<Vec<Fd>> {
+        self.sigfd_queue.clone()
     }
 
     pub fn perm_mut(&self) -> ShareMutex<TaskPerm> {

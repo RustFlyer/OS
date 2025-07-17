@@ -32,6 +32,38 @@ pub enum SigDetails {
     },
 }
 
+impl SigDetails {
+    pub fn get_sender_pid(&self) -> usize {
+        match self {
+            Self::Kill {
+                siginfo: Some(info),
+                ..
+            } => info.si_pid as usize,
+            _ => 0,
+        }
+    }
+
+    pub fn get_sender_uid(&self) -> usize {
+        match self {
+            Self::Kill {
+                siginfo: Some(info),
+                ..
+            } => info.si_uid as usize,
+            _ => 0,
+        }
+    }
+
+    pub fn get_val(&self) -> usize {
+        match self {
+            Self::Kill {
+                siginfo: Some(info),
+                ..
+            } => info.si_value as usize,
+            _ => 0,
+        }
+    }
+}
+
 #[derive(Debug, Default, Copy, Clone)]
 #[repr(C)]
 pub struct LinuxSigInfo {

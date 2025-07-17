@@ -375,7 +375,7 @@ impl dyn File {
         }
         inode.set_state(InodeState::DirtyAll);
 
-        log::debug!("write bytes: {}", bytes_written);
+        // log::debug!("write bytes: {}", bytes_written);
 
         Ok(bytes_written)
     }

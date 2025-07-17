@@ -1,11 +1,25 @@
-use alloc::boxed::Box;
-use async_trait::async_trait;
-use config::vfs::PollEvents;
-use core::sync::atomic::{AtomicU64, Ordering};
-use systype::error::SysResult;
-use vfs::file::{File, FileMeta};
+use core::task::Waker;
 
-use crate::simple::anon::AnonDentry;
+use alloc::{boxed::Box, collections::vec_deque::VecDeque};
+use async_trait::async_trait;
+use config::{inode::InodeMode, vfs::OpenFlags};
+use mutex::SpinNoIrqLock;
+use osfuture::{suspend_now, take_waker};
+use signal::{SigInfo, SigSet};
+use systype::error::{SysError, SysResult};
+use vfs::{
+    dentry::Dentry,
+    file::{File, FileMeta},
+    inode::Inode,
+    sys_root_dentry,
+};
+
+use crate::{
+    pselect::has_expected_signal,
+    simple::{anon::AnonDentry, inode::SimpleInode},
+};
+
+use super::{flag::SignalFdFlags, info::SignalfdSiginfo};
 
 bitflags::bitflags! {
     #[derive(Clone, Copy)]
@@ -18,16 +32,42 @@ bitflags::bitflags! {
 
 pub struct SignalFdFile {
     pub(crate) meta: FileMeta,
-    value: AtomicU64,
+    pub mask: SpinNoIrqLock<SigSet>,         // watched sig set
+    queue: SpinNoIrqLock<VecDeque<SigInfo>>, // coming signals
+    flags: SignalFdFlags,
+    waker: Waker,
 }
 
 impl SignalFdFile {
-    pub fn new(initval: u64, flags: u32) -> Self {
+    pub async fn new(mask: SigSet, flags: SignalFdFlags) -> Self {
         let dentry = AnonDentry::new("signalfd");
-        Self {
+        let inode = SimpleInode::new(sys_root_dentry().superblock().unwrap());
+        inode.set_mode(InodeMode::CHAR);
+        dentry.set_inode(inode);
+
+        let f = Self {
             meta: FileMeta::new(dentry),
-            value: AtomicU64::new(initval),
+            mask: SpinNoIrqLock::new(mask),
+            queue: SpinNoIrqLock::new(VecDeque::new()),
+            flags,
+            waker: take_waker().await,
+        };
+
+        f.set_flags(OpenFlags::O_RDWR);
+        f
+    }
+
+    pub fn notify_signal(&self, siginfo: SigInfo) {
+        let mut queue = self.queue.lock();
+        queue.push_back(siginfo);
+
+        if !self.flags.contains(SignalFdFlags::NONBLOCK) {
+            self.waker.wake_by_ref();
         }
+    }
+
+    pub fn update_mask(&self, mask: SigSet) {
+        *self.mask.lock() = mask;
     }
 }
 
@@ -37,15 +77,35 @@ impl File for SignalFdFile {
         &self.meta
     }
 
+    /// read signal in queue and push them into buf
+    /// when queue is none, fd will suspend(BLOCK) or return AGIAN Err(NONBLOCK).
     async fn base_read(&self, buf: &mut [u8], _pos: usize) -> SysResult<usize> {
-        Ok(0)
-    }
+        loop {
+            {
+                let mut queue = self.queue.lock();
+                if let Some(siginfo) = queue.pop_front() {
+                    let sfdinfo = SignalfdSiginfo::from(&siginfo);
+                    let sfdinfo_bytes = unsafe {
+                        core::slice::from_raw_parts(
+                            &sfdinfo as *const SignalfdSiginfo as *const u8,
+                            core::mem::size_of::<SignalfdSiginfo>(),
+                        )
+                    };
+                    if buf.len() < sfdinfo_bytes.len() {
+                        return Err(SysError::EINVAL);
+                    }
+                    buf[..sfdinfo_bytes.len()].copy_from_slice(sfdinfo_bytes);
+                    return Ok(sfdinfo_bytes.len());
+                }
+            }
 
-    async fn base_write(&self, buf: &[u8], _pos: usize) -> SysResult<usize> {
-        Ok(0)
-    }
+            if self.flags.contains(SignalFdFlags::NONBLOCK) {
+                return Err(SysError::EAGAIN);
+            }
 
-    async fn base_poll(&self, events: PollEvents) -> PollEvents {
-        events
+            while !has_expected_signal(*self.mask.lock()) {
+                suspend_now().await;
+            }
+        }
     }
 }

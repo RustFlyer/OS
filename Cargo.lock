@@ -645,6 +645,7 @@ dependencies = [
  "mm",
  "mutex",
  "osfuture",
+ "signal",
  "spin",
  "strum",
  "systype",

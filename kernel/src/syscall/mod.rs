@@ -231,6 +231,8 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
             sys_epoll_pwait(args[0] as i32, args[1], args[2] as i32, args[3] as i32).await
         }
         EVENTFD2 => sys_eventfd2(args[0], args[1]),
+        SIGNALFD64 => sys_signalfd4(args[0] as isize, args[1], args[2], args[3] as u32).await,
+        TIMERFD_CREATE => sys_timerfd_create(args[0], args[1] as u32).await,
         _ => {
             println!("Syscall not implemented: {}", syscall_no.as_str());
             panic!("Syscall not implemented: {}", syscall_no.as_str());

@@ -1,6 +1,9 @@
 use alloc::{boxed::Box, vec::Vec};
 use async_trait::async_trait;
-use config::vfs::PollEvents;
+use config::{
+    inode::InodeMode,
+    vfs::{OpenFlags, PollEvents},
+};
 use core::{
     sync::atomic::{AtomicU64, Ordering},
     task::Waker,
@@ -8,9 +11,14 @@ use core::{
 use mutex::SpinNoIrqLock;
 use osfuture::{suspend_now, take_waker};
 use systype::error::{SysError, SysResult};
-use vfs::file::{File, FileMeta};
+use vfs::{
+    dentry::Dentry,
+    file::{File, FileMeta},
+    inode::Inode,
+    sys_root_dentry,
+};
 
-use crate::simple::anon::AnonDentry;
+use crate::simple::{anon::AnonDentry, inode::SimpleInode};
 
 bitflags::bitflags! {
     #[derive(Clone, Copy)]
@@ -32,13 +40,20 @@ pub struct EventFdFile {
 impl EventFdFile {
     pub fn new(initval: u64, flags: u32) -> Self {
         let dentry = AnonDentry::new("eventfd");
-        Self {
+        let inode = SimpleInode::new(sys_root_dentry().superblock().unwrap());
+        inode.set_mode(InodeMode::CHAR);
+        dentry.set_inode(inode);
+
+        let f = Self {
             meta: FileMeta::new(dentry),
             value: AtomicU64::new(initval),
             flags: flags,
             read_waiters: SpinNoIrqLock::new(Vec::new()),
             write_waiters: SpinNoIrqLock::new(Vec::new()),
-        }
+        };
+        f.set_flags(OpenFlags::O_RDWR);
+
+        f
     }
 }
 
