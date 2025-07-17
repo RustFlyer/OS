@@ -230,6 +230,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         EPOLL_PWAIT => {
             sys_epoll_pwait(args[0] as i32, args[1], args[2] as i32, args[3] as i32).await
         }
+        EVENTFD2 => sys_eventfd2(args[0], args[1]),
         _ => {
             println!("Syscall not implemented: {}", syscall_no.as_str());
             panic!("Syscall not implemented: {}", syscall_no.as_str());

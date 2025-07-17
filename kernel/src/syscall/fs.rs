@@ -19,10 +19,7 @@ use arch::time::get_time_duration;
 use config::{
     device::BLOCK_SIZE,
     inode::InodeMode,
-    vfs::{
-        AccessFlags, AtFd, AtFlags, EpollEvents, MountFlags, OpenFlags, PollEvents, RenameFlags,
-        SeekFrom,
-    },
+    vfs::{AccessFlags, AtFd, AtFlags, MountFlags, OpenFlags, PollEvents, RenameFlags, SeekFrom},
 };
 use driver::BLOCK_DEVICE;
 use osfs::{
@@ -38,13 +35,10 @@ use osfs::{
             ioctl::{Pid, Termios, WinSize},
         },
     },
-    epoll::{
-        event::{EpollCtlOp, EpollEvent},
-        file::EpollFile,
-    },
     fd_table::{FdFlags, FdSet},
     pipe::{inode::PIPE_BUF_LEN, new_pipe},
     pselect::{FilePollRet, PSelectFuture},
+    special::eventfd::file::EventFdFile,
 };
 use osfuture::{Select2Futures, SelectOutput};
 use systype::{
@@ -2764,4 +2758,18 @@ pub fn sys_removexattr(path_ptr: usize, name_ptr: usize) -> SyscallResult {
     inode.remove_xattr(&name)?;
 
     Ok(0)
+}
+
+pub fn sys_eventfd2(initval: usize, flags: usize) -> SyscallResult {
+    let eventfd = EventFdFile::new(initval as u64, flags as u32);
+
+    let fd_flags = if flags & 0x80000 != 0 {
+        OpenFlags::O_CLOEXEC
+    } else {
+        OpenFlags::empty()
+    };
+
+    let fd = current_task().with_mut_fdtable(|ft| ft.alloc(Arc::new(eventfd), fd_flags))?;
+
+    Ok(fd)
 }

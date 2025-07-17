@@ -2,7 +2,7 @@ use core::time::Duration;
 
 use alloc::sync::Arc;
 use config::vfs::{EpollEvents, OpenFlags};
-use osfs::epoll::{
+use osfs::special::epoll::{
     event::{EpollCtlOp, EpollEvent},
     file::{EpollFile, EpollFuture},
 };
@@ -12,7 +12,7 @@ use timer::{TimedTaskResult, TimeoutFuture};
 
 use crate::{
     processor::current_task,
-    task::sig_members::IntrBySignalFuture,
+    task::{TaskState, sig_members::IntrBySignalFuture},
     vm::user_ptr::{UserReadPtr, UserWritePtr},
 };
 
@@ -120,6 +120,9 @@ pub async fn sys_epoll_pwait(
     let epoll_future = EpollFuture::new(event, maxevents as usize);
     let intr_future = IntrBySignalFuture::new(task.clone(), task.get_sig_mask());
 
+    task.set_state(TaskState::Interruptible);
+    task.set_wake_up_signal(!task.get_sig_mask());
+
     let (inner, ret_vec) = if timeout >= 0 {
         match Select2Futures::new(
             TimeoutFuture::new(Duration::from_millis(timeout as u64), epoll_future),
@@ -143,6 +146,7 @@ pub async fn sys_epoll_pwait(
         }
     };
 
+    task.set_state(TaskState::Running);
     *epoll_file.inner.lock() = inner;
 
     let num_ready = ret_vec.len();

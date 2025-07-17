@@ -21,7 +21,6 @@ use etc::*;
 extern crate alloc;
 
 pub mod dev;
-pub mod epoll;
 pub mod etc;
 pub mod fd_table;
 pub mod passwd;
@@ -29,6 +28,7 @@ pub mod pipe;
 pub mod proc;
 pub mod pselect;
 pub mod simple;
+pub mod special;
 pub mod sys;
 pub mod tmp;
 pub mod var;
