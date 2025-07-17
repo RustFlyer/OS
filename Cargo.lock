@@ -467,6 +467,7 @@ dependencies = [
  "riscv-rt",
  "sbi-rt",
  "shm",
+ "signal",
  "simdebug",
  "smoltcp",
  "spin",
@@ -903,6 +904,13 @@ dependencies = [
  "mm",
  "mutex",
  "spin",
+]
+
+[[package]]
+name = "signal"
+version = "0.1.0"
+dependencies = [
+ "bitflags 2.9.1",
 ]
 
 [[package]]

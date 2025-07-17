@@ -10,7 +10,7 @@ use osfuture::{suspend_now, take_waker};
 use systype::error::{SysError, SysResult};
 use vfs::file::{File, FileMeta};
 
-use super::dentry::EventfdDentry;
+use crate::simple::anon::AnonDentry;
 
 bitflags::bitflags! {
     #[derive(Clone, Copy)]
@@ -31,7 +31,7 @@ pub struct EventFdFile {
 
 impl EventFdFile {
     pub fn new(initval: u64, flags: u32) -> Self {
-        let dentry = EventfdDentry::new();
+        let dentry = AnonDentry::new("eventfd");
         Self {
             meta: FileMeta::new(dentry),
             value: AtomicU64::new(initval),

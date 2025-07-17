@@ -519,9 +519,7 @@ pub fn sys_rt_sigaction(
                     task.get_name(),
                     entry
                 );
-                ActionType::User {
-                    entry,
-                }
+                ActionType::User { entry }
             }
         };
 
@@ -848,7 +846,10 @@ pub fn sys_pidfd_send_signal(
             thread.receive_siginfo(SigInfo {
                 sig,
                 code: SigInfo::USER,
-                details: SigDetails::Kill { pid: task.pid(), siginfo: Some(siginfo) },
+                details: SigDetails::Kill {
+                    pid: task.pid(),
+                    siginfo: Some(siginfo),
+                },
             });
         }
     });
@@ -882,7 +883,7 @@ pub fn sys_sigaltstack(new_stack_ptr: usize, old_stack_ptr: usize) -> SyscallRes
     let mut new_stack = UserReadPtr::<SignalStack>::new(new_stack_ptr, &addrspace);
     let mut old_stack = UserWritePtr::<SignalStack>::new(old_stack_ptr, &addrspace);
 
-    let mut sigaltstack = task.sig_stack_mut();
+    let sigaltstack = task.sig_stack_mut();
 
     if !old_stack.is_null() {
         unsafe {
