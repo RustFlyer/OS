@@ -12,6 +12,7 @@ pub mod dentry;
 pub mod direntry;
 pub mod file;
 pub mod fstype;
+pub mod handle;
 pub mod inode;
 pub mod inoid;
 pub mod kstat;

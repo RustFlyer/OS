@@ -2791,13 +2791,6 @@ pub fn sys_eventfd2(initval: usize, flags: usize) -> SyscallResult {
     Ok(fd)
 }
 
-#[repr(C)]
-pub struct FileHandle {
-    handle_bytes: u32, // input: buffer len, output: written len
-    handle_type: i32,  // output: handle type
-    f_handle: [u8],    // dyn nums, length = handle_bytes
-}
-
 pub fn sys_name_to_handle_at(
     dirfd: usize,
     pathname: usize,
