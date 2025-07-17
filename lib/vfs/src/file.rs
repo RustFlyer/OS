@@ -210,7 +210,21 @@ impl dyn File {
             log::debug!("dentry {} is negative", dentry.path());
             return Err(SysError::ENOENT);
         }
-        Arc::clone(&dentry).base_open()
+
+        dentry
+            .superblock()
+            .unwrap()
+            .fs_type()
+            .get_meta()
+            .inodes
+            .lock()
+            .push(Arc::downgrade(&dentry.inode().unwrap()));
+
+        let ret = Arc::clone(&dentry).base_open()?;
+
+        dentry.inode().unwrap().get_meta().inner.lock().file = Some(ret.clone());
+
+        Ok(ret)
     }
 
     /// Reads data from the file.

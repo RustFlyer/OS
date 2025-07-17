@@ -8,7 +8,7 @@ use crate::{
 /// Returns the real user ID of the calling process.
 pub fn sys_getuid() -> SyscallResult {
     let _cred = current_task().perm_mut();
-    let mut cred = _cred.lock();
+    let cred = _cred.lock();
 
     Ok(cred.ruid as usize)
 }
@@ -16,7 +16,7 @@ pub fn sys_getuid() -> SyscallResult {
 /// Returns the real group ID of the calling process.
 pub fn sys_getgid() -> SyscallResult {
     let _cred = current_task().perm_mut();
-    let mut cred = _cred.lock();
+    let cred = _cred.lock();
 
     Ok(cred.rgid as usize)
 }
@@ -50,7 +50,10 @@ pub fn sys_setreuid(ruid: usize, euid: usize) -> SyscallResult {
         cred_lock.ruid = ruid as u32;
         cred_lock.euid = euid as u32;
         cred_lock.suid = euid as u32;
-    } else if ruid as u32 == cred_lock.ruid || ruid as u32 == cred_lock.euid || ruid as u32 == cred_lock.suid {
+    } else if ruid as u32 == cred_lock.ruid
+        || ruid as u32 == cred_lock.euid
+        || ruid as u32 == cred_lock.suid
+    {
         cred_lock.euid = euid as u32;
     } else {
         return Err(SysError::EPERM);

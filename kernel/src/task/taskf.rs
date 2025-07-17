@@ -15,12 +15,12 @@ use config::{
     vfs::AtFd,
 };
 use mutex::{SpinNoIrqLock, new_share_mutex};
-use osfs::{proc::create_thread_stat_file, sys_root_dentry};
+use osfs::{FS_MANAGER, proc::create_thread_stat_file, sys_root_dentry};
 use osfuture::suspend_now;
 use shm::manager::SHARED_MEMORY_MANAGER;
 use systype::{error::SysResult, memory_flags::MappingFlags, time::ITimer};
 use timer::{TIMER_MANAGER, Timer};
-use vfs::{dentry::Dentry, file::File, path::Path};
+use vfs::{dentry::Dentry, file::File, fstype::FileSystemType, path::Path};
 
 use super::{
     futex::{FutexHashKey, futex_manager},
@@ -695,5 +695,25 @@ impl Task {
         }
 
         content
+    }
+
+    pub fn get_filesystem_by_fsid(fsid: u64) -> Option<Arc<dyn FileSystemType>> {
+        let name2path = |name: &str| match name {
+            "ext4" => "/",
+            "devfs" => "dev",
+            "procfs" => "proc",
+            "tmpfs" => "tmp",
+            "sysfs" => "sys",
+            "etcfs" => "etc",
+            _ => "b",
+        };
+
+        let fs = FS_MANAGER
+            .lock()
+            .values()
+            .find(|fs| fs.get_sb(name2path(&fs.name())).unwrap().dev_id() == fsid)
+            .map(|fs| fs.clone());
+
+        fs
     }
 }

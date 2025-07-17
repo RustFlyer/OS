@@ -58,7 +58,7 @@ use vfs::{
 use crate::{
     logging::enable_log,
     processor::current_task,
-    task::{TaskState, sig_members::IntrBySignalFuture, signal::sig_info::SigSet},
+    task::{Task, TaskState, sig_members::IntrBySignalFuture, signal::sig_info::SigSet},
     vm::user_ptr::{UserReadPtr, UserReadWritePtr, UserWritePtr},
 };
 
@@ -2789,4 +2789,127 @@ pub fn sys_eventfd2(initval: usize, flags: usize) -> SyscallResult {
     let fd = current_task().with_mut_fdtable(|ft| ft.alloc(Arc::new(eventfd), fd_flags))?;
 
     Ok(fd)
+}
+
+#[repr(C)]
+pub struct FileHandle {
+    handle_bytes: u32, // input: buffer len, output: written len
+    handle_type: i32,  // output: handle type
+    f_handle: [u8],    // dyn nums, length = handle_bytes
+}
+
+pub fn sys_name_to_handle_at(
+    dirfd: usize,
+    pathname: usize,
+    handleptr: usize,
+    mount_id_ptr: usize,
+    flags: i32,
+) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+
+    let path = {
+        let addr_space = task.addr_space();
+        let mut data_ptr = UserReadPtr::<u8>::new(pathname, &addr_space);
+        let cstring = data_ptr.read_c_string(256)?;
+        cstring.into_string().map_err(|_| SysError::EINVAL)?
+    };
+
+    log::info!("[sys_name_to_handle_at] dirfd: {dirfd:#x}, path: {path}");
+
+    let dentry = task.walk_at(AtFd::from(dirfd), path)?;
+    let inode = dentry.inode().ok_or(SysError::ENOENT)?;
+
+    // first, get inoid and fsid
+    let inode_number = inode.ino();
+    let fsid = inode.dev_id().0 as u64;
+
+    // handle info
+    let handle_type = 0x1ef;
+    let handle: [u8; 8] = inode_number.to_le_bytes();
+    let handle_len = handle.len() as u32;
+
+    let mut user_handle_bytes = UserWritePtr::<u32>::new(handleptr, &addrspace);
+    unsafe { user_handle_bytes.write(handle_len) }?;
+
+    // second, check whether user buffer is enough
+    let handle_bytes = unsafe { UserReadPtr::<u32>::new(handleptr, &addrspace).read() }?;
+    if handle_bytes < handle_len {
+        // user buffer is too small, so just update bytes, and return EOVERFLOW
+        return Err(SysError::EOVERFLOW);
+    }
+
+    let mut user_handle_type = UserWritePtr::<i32>::new(handleptr + 4, &addrspace);
+    let mut user_handle_datas = UserWritePtr::<u8>::new(handleptr + 8, &addrspace);
+    let mut user_mountid = UserWritePtr::<i32>::new(mount_id_ptr, &addrspace);
+
+    // third, write back handle info
+    unsafe { user_handle_type.write(handle_type) }?;
+    unsafe { user_handle_datas.write_array(&handle) }?;
+    unsafe { user_mountid.write(fsid as i32) }?;
+
+    Ok(0)
+}
+
+pub fn sys_open_by_handle_at(mount_id: i32, handleptr: usize, flags: i32) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+
+    let flags = OpenFlags::from_bits_truncate(flags);
+    let mut user_handle_bytes = UserReadPtr::<u32>::new(handleptr, &addrspace);
+    let handle_len = unsafe { user_handle_bytes.read()? };
+
+    if handle_len == 0 {
+        return Err(SysError::EINVAL);
+    }
+
+    let mut user_handle = UserReadPtr::<u8>::new(handleptr + 8, &addrspace);
+    let mut file_handle = [0u8; 8];
+
+    let arr = unsafe { user_handle.read_array(8) }?;
+    file_handle.copy_from_slice(&arr[..8]);
+
+    let fsid = mount_id as u64;
+    let inode_number = u64::from_le_bytes(file_handle);
+
+    log::info!("[sys_open_by_handle_at] mount_id: {fsid}, inode_number: {inode_number}");
+    let file_system = Task::get_filesystem_by_fsid(fsid).ok_or(SysError::ENOENT)?;
+    let inode = file_system
+        .get_inode_by_id(inode_number)
+        .ok_or(SysError::ENOENT)?;
+
+    let _cred = current_task().perm_mut();
+    let cred = _cred.lock();
+
+    if flags.writable()
+        && !inode.check_permission(cred.euid, cred.egid, &cred.groups, AccessFlags::W_OK)
+    {
+        return Err(SysError::EACCES);
+    }
+
+    let inode_type = inode.inotype();
+    if inode_type.is_dir() && flags.contains(OpenFlags::O_DIRECTORY) {
+        return Err(SysError::ENOTDIR);
+    }
+
+    if inode_type.is_reg() && flags.contains(OpenFlags::O_TRUNC) && flags.writable() {
+        inode.set_size(0);
+    }
+
+    let file = inode
+        .get_meta()
+        .inner
+        .lock()
+        .file
+        .clone()
+        .ok_or(SysError::ENOENT)?;
+
+    file.set_flags(flags);
+
+    log::debug!(
+        "[sys_open_by_handle_at] file opened, inode: {:?}",
+        inode.get_attr()
+    );
+
+    task.with_mut_fdtable(|ft| ft.alloc(file, flags))
 }
