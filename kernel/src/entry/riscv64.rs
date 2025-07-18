@@ -58,7 +58,7 @@ unsafe extern "C" fn _start(hart_id: usize, dtb_addr: usize) -> ! {
             // Set stack pointer to the virtual address of the upper bound of the boot stack
             "
             addi    t1, a0, 1
-            slli    t1, t1, 16              // t1 = (hart_id + 1) * KERNEL_STACK_SIZE
+            slli    t1, t1, 24              // t1 = (hart_id + 1) * KERNEL_STACK_SIZE 2M~21
             la      sp, {boot_stack_pa}
             add     sp, sp, t1
             add     sp, sp, t0

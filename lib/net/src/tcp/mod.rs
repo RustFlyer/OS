@@ -35,7 +35,12 @@ pub(crate) const STATE_CONNECTING: u8 = 2;
 pub(crate) const STATE_CONNECTED: u8 = 3;
 pub(crate) const STATE_LISTENING: u8 = 4;
 
-pub static LISTEN_TABLE: Lazy<ListenTable> = Lazy::new(ListenTable::new);
+lazy_static::lazy_static! {
+    pub static ref LISTEN_TABLE:  ListenTable = {
+        driver::println!("when LISTEN_TABLE init");
+        ListenTable::new()
+    };
+}
 
 #[crate_interface::def_interface]
 pub trait HasSignalIf: Send + Sync {

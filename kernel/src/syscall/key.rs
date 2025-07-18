@@ -5,7 +5,7 @@ use alloc::{
 };
 use hashbrown::HashMap;
 use mutex::{SpinNoIrqLock, new_share_mutex};
-use spin::lazy::Lazy;
+use spin::{lazy::Lazy, once::Once};
 use systype::error::{SysError, SyscallResult};
 
 use crate::{
@@ -86,14 +86,17 @@ impl KeyRing {
     }
 }
 
-static _KEY_RING: Lazy<Arc<SpinNoIrqLock<KeyRing>>> =
-    Lazy::new(|| Arc::new(SpinNoIrqLock::new(KeyRing::new())));
+static _KEY_RING: Once<Arc<SpinNoIrqLock<KeyRing>>> = Once::new();
 
-static KEYRING_TABLE: Lazy<SpinNoIrqLock<HashMap<u64, Arc<SpinNoIrqLock<KeyRing>>>>> =
-    Lazy::new(|| SpinNoIrqLock::new(HashMap::new()));
+static KEYRING_TABLE: Once<SpinNoIrqLock<HashMap<u64, Arc<SpinNoIrqLock<KeyRing>>>>> = Once::new();
+
+pub fn init_key() {
+    _KEY_RING.call_once(|| Arc::new(SpinNoIrqLock::new(KeyRing::new())));
+    KEYRING_TABLE.call_once(|| SpinNoIrqLock::new(HashMap::new()));
+}
 
 fn find_keyring_by_serial(serial: usize) -> Result<Arc<SpinNoIrqLock<KeyRing>>, SysError> {
-    let mut table = KEYRING_TABLE.lock();
+    let mut table = KEYRING_TABLE.get().unwrap().lock();
     let ret = table.get(&(serial as u64));
     let arc = if ret.is_some() {
         ret.unwrap()
@@ -215,7 +218,7 @@ pub fn sys_keyctl(
             };
 
             // if none and create == 1, then create
-            let mut table = KEYRING_TABLE.lock();
+            let mut table = KEYRING_TABLE.get().unwrap().lock();
             if !table.contains_key(&serial) {
                 if create {
                     table.insert(serial, Arc::new(SpinNoIrqLock::new(KeyRing::new())));
@@ -238,7 +241,7 @@ pub fn sys_keyctl(
                     .map_err(|_| SysError::EINVAL)?
             };
             let serial = 0x20000000 + (task.uid() as u64);
-            let mut table = KEYRING_TABLE.lock();
+            let mut table = KEYRING_TABLE.get().unwrap().lock();
             if !table.contains_key(&serial) {
                 table.insert(serial, Arc::new(SpinNoIrqLock::new(KeyRing::new())));
             }
@@ -281,7 +284,7 @@ pub fn sys_keyctl(
             let buffer_ptr = arg3;
             let buffer_len = arg4;
 
-            let table = KEYRING_TABLE.lock();
+            let table = KEYRING_TABLE.get().unwrap().lock();
             let key = table
                 .values()
                 .find_map(|ring| ring.lock().get_key(key_id).cloned())

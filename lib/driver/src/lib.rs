@@ -12,8 +12,8 @@ use core::{
 use device::OSDevice;
 use virtio_drivers::transport::{mmio::MmioTransport, pci::PciTransport};
 
-pub use console::console_print;
-use console::console_putchar;
+pub use arch::console::console_print;
+use arch::console::console_putchar;
 use qemu::QUartDevice;
 use spin::Once;
 
@@ -29,8 +29,6 @@ pub mod test;
 
 pub use uart_16550::MmioSerialPort;
 pub use virtio_drivers::transport::DeviceType;
-
-pub mod console;
 
 extern crate alloc;
 

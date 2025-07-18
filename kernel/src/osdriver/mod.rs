@@ -20,20 +20,21 @@ use crate::vm::iomap::ioremap;
 #[allow(unused)]
 pub fn probe_device_tree() {
     let mut dtb_addr = unsafe { DTB_ADDR };
-
     println!("[CONSOLE] INIT SUCCESS");
 
     init_device_manager();
+    println!("[DEVICE-MANAGER] INIT SUCCESS");
 
     #[cfg(target_arch = "riscv64")]
     ioremap(dtb_addr, 24 * 1024).expect("can not ioremap");
+
     #[cfg(target_arch = "loongarch64")]
     unsafe {
         dtb_addr = 0x00100000;
     }
 
     let device_tree = unsafe {
-        log::debug!("dt: {:#x}", dtb_addr + KERNEL_MAP_OFFSET);
+        println!("dt: {:#x}", dtb_addr + KERNEL_MAP_OFFSET);
         Fdt::from_ptr((dtb_addr + KERNEL_MAP_OFFSET) as *const u8).expect("Parse DTB failed")
     };
 

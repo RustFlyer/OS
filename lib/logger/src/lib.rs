@@ -1,6 +1,11 @@
 #![no_std]
 #![no_main]
 
+extern crate alloc;
+
+pub mod console;
+
+pub use console::*;
 use crate_interface::call_interface;
 use log::{Level, LevelFilter};
 
@@ -40,7 +45,7 @@ pub trait LogInterface: Send + Sync {
 /// 设置日志记录器和日志级别
 pub fn init() {
     static LOGGER: SimpleLogger = SimpleLogger;
-    log::set_logger(&LOGGER).unwrap();
+    log::set_logger(&LOGGER).ok();
     log::set_max_level(match option_env!("LOG") {
         Some("trace") => LevelFilter::Trace,
         Some("debug") => LevelFilter::Debug,
@@ -58,5 +63,19 @@ pub fn level2color(level: Level) -> u8 {
         Level::Info => 36,  // Blue
         Level::Debug => 32, // Green
         Level::Trace => 90, // BrightBlack
+    }
+}
+
+#[macro_export]
+macro_rules! lprint {
+    ($fmt: literal $(, $($arg: tt)+)?) => {
+        $crate::console_print(format_args!($fmt $(, $($arg)+)?))
+    }
+}
+
+#[macro_export]
+macro_rules! lprintln {
+    ($fmt: literal $(, $($arg: tt)+)?) => {
+        $crate::console_print(format_args!(concat!($fmt, "\n") $(, $($arg)+)?))
     }
 }

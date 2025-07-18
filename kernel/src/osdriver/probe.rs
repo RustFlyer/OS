@@ -147,20 +147,17 @@ pub fn enumerate_pci(pci_node: FdtNode, cam: Cam) {
         });
         for (device_function, info) in pci_root.enumerate_bus(0) {
             let (status, command) = pci_root.get_status_command(device_function);
-            log::info!(
+            println!(
                 "Found {} at {}, status {:?} command {:?}",
-                info,
-                device_function,
-                status,
-                command
+                info, device_function, status, command
             );
             if let Some(virtio_type) = virtio_device_type(&info) {
-                log::info!("  VirtIO {:?}", virtio_type);
+                println!("  VirtIO {:?}", virtio_type);
                 allocate_bars(&mut pci_root, device_function, &mut allocator);
                 dump_bar_contents(&mut pci_root, device_function, 4);
                 let mut transport =
                     PciTransport::new::<VirtHalImpl, _>(&mut pci_root, device_function).unwrap();
-                log::info!(
+                println!(
                     "Detected virtio PCI device with device type {:?}, features {:#018x}",
                     transport.device_type(),
                     transport.read_device_features(),

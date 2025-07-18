@@ -56,6 +56,7 @@ impl FutexAddr {
 }
 
 pub static FUTEX_MANAGER: Lazy<Vec<SpinNoIrqLock<FutexManager>>> = Lazy::new(|| {
+    driver::println!("when FUTEX_MANAGER init");
     let mut v = Vec::new();
     for i in 0..2 {
         let fm = SpinNoIrqLock::new(FutexManager::new(i == 1));

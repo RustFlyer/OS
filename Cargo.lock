@@ -319,6 +319,7 @@ dependencies = [
 name = "executor"
 version = "0.1.0"
 dependencies = [
+ "arch",
  "async-task",
  "config",
  "lazy_static",
@@ -525,6 +526,10 @@ version = "0.1.0"
 dependencies = [
  "crate_interface",
  "log",
+ "loongArch64",
+ "polyhal-macro",
+ "riscv",
+ "sbi-rt",
 ]
 
 [[package]]
@@ -590,6 +595,7 @@ version = "0.1.0"
 dependencies = [
  "bitflags 2.9.1",
  "log",
+ "logger",
  "loongArch64",
  "osfuture",
  "riscv",
@@ -603,6 +609,7 @@ dependencies = [
  "arch",
  "crate_interface",
  "driver",
+ "lazy_static",
  "log",
  "mutex",
  "osfuture",
@@ -633,6 +640,7 @@ checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
 name = "osfs"
 version = "0.1.0"
 dependencies = [
+ "arch",
  "async-trait",
  "bitflags 2.9.1",
  "common",

@@ -11,6 +11,8 @@ mod signal;
 mod time;
 mod user;
 
+pub use key::init_key;
+
 use consts::SyscallNo::{self, *};
 use driver::println;
 use fs::*;
