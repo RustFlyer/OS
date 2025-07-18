@@ -1,7 +1,10 @@
-use alloc::{collections::BTreeMap, string::String};
+use alloc::{collections::BTreeMap, string::String, sync::Arc};
 
+use config::vfs::OpenFlags;
 use mutex::ShareMutex;
 use osfs::{dev::loopx::externf::KernelTableIf, fd_table::FdTable, proc::KernelProcIf};
+use systype::error::SysResult;
+use vfs::{fanotify::kinterface::KernelFdTableOperations, file::File};
 
 use super::manager::TASK_MANAGER;
 use crate::{processor::current_task, trap::trap_handler::TRAP_STATS};
@@ -50,9 +53,22 @@ impl KernelProcIf for KernelProcIfImpl {
 struct KernelTableIfImpl;
 
 #[crate_interface::impl_interface]
-impl KernelTableIf for KernelProcIfImpl {
+impl KernelTableIf for KernelTableIfImpl {
     fn table() -> ShareMutex<FdTable> {
         let task = current_task();
         task.fdtable_mut()
+    }
+}
+
+struct KernelFdTableOperationsImpl;
+
+#[crate_interface::impl_interface]
+impl KernelFdTableOperations for KernelFdTableOperationsImpl {
+    fn add_file(file: Arc<dyn File>, flags: OpenFlags) -> SysResult<i32> {
+        let task = current_task();
+        task.fdtable_mut()
+            .lock()
+            .alloc(file, flags)
+            .map(|fd| fd as i32)
     }
 }

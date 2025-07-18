@@ -1,7 +1,7 @@
 use alloc::{
     collections::btree_map::BTreeMap,
     string::{String, ToString},
-    sync::Arc,
+    sync::{Arc, Weak},
     vec::Vec,
 };
 
@@ -18,7 +18,7 @@ use systype::{
     time::TimeSpec,
 };
 
-use crate::{stat::Stat, superblock::SuperBlock};
+use crate::{fanotify::FanotifyEntry, stat::Stat, superblock::SuperBlock};
 
 /// Data that is common to all inodes.
 pub struct InodeMeta {
@@ -57,10 +57,12 @@ pub struct InodeMetaInner {
     pub gid: u32,
     /// user define
     pub xattrs: BTreeMap<String, Vec<u8>>,
-    /// Reference to a symlink file.
+    /// String that contains the symlink target.
     ///
     /// This is only used for simplefs for now! Don't use it in other filesystems.
     pub symlink: Option<String>,
+    /// Registered fanotify entries on this inode.
+    pub fanotify_entries: Vec<Weak<FanotifyEntry>>,
 }
 
 impl InodeMeta {
@@ -82,6 +84,7 @@ impl InodeMeta {
                 gid: 0,
                 xattrs: BTreeMap::new(),
                 symlink: None,
+                fanotify_entries: Vec::new(),
             }),
         }
     }

@@ -4,7 +4,6 @@
 use alloc::{
     alloc::{Layout, alloc, dealloc},
     slice,
-    vec::Vec,
 };
 use core::{mem, ptr};
 
@@ -15,14 +14,14 @@ use config::vfs::OpenFlags;
 use super::constants::*;
 
 /// The `fanotify_event_metadata` structure in Linux.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub struct FanotifyEventMetadata {
     pub event_len: u32,
     pub vers: u8,
     pub reserved: u8,
     pub metadata_len: u16,
-    pub mask: FanEvent,
+    pub mask: FanEventMask,
     pub fd: i32,
     pub pid: i32,
 }
@@ -30,7 +29,7 @@ pub struct FanotifyEventMetadata {
 /// This structure holds the `fanotify_event_info_fid` structure in Linux.
 ///
 /// The original structure ends with a variable-length array `handle`, which is not
-/// allowed in Rust. Instead, we manually manage the memory using raw pointers.
+/// allowed in Rust. Instead, we manually manage the memory.
 ///
 /// The user should access the fields via methods provided by this struct, and get a
 /// Linux `fanotify_event_info_fid` struct as a byte array via the `as_bytes()` method.
@@ -43,7 +42,7 @@ pub struct FanotifyEventInfoFid {
 /// The `fanotify_event_info_fid` structure in Linux, without the `handle` field.
 ///
 /// The `handle` field is a variable-length array, so it is not included in this struct.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(C)]
 struct FanotifyEventInfoFidInner {
     hdr: FanotifyEventInfoHeader,
@@ -118,20 +117,36 @@ impl Drop for FanotifyEventInfoFid {
     }
 }
 
+unsafe impl Send for FanotifyEventInfoFid {}
+unsafe impl Sync for FanotifyEventInfoFid {}
+
+impl Clone for FanotifyEventInfoFid {
+    fn clone(&self) -> Self {
+        let size = self.size;
+        let align = align_of::<FanotifyEventInfoFidInner>();
+        let layout = unsafe { Layout::from_size_align_unchecked(size, align) };
+        let inner = unsafe { alloc(layout) };
+        unsafe {
+            ptr::copy_nonoverlapping(self.inner, inner, size);
+        }
+        Self { inner, size }
+    }
+}
+
 impl Default for FanotifyEventInfoFid {
     fn default() -> Self {
         Self::new()
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub struct FanotifyEventInfoPid {
     pub hdr: FanotifyEventInfoHeader,
     pub pidfd: i32,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub struct FanotifyEventInfoError {
     pub hdr: FanotifyEventInfoHeader,
@@ -139,8 +154,7 @@ pub struct FanotifyEventInfoError {
     pub error_count: u32,
 }
 
-// TODO: check the `Default` implementation.
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub struct FanotifyEventInfoHeader {
     pub info_type: u8,
@@ -148,11 +162,61 @@ pub struct FanotifyEventInfoHeader {
     pub len: u16,
 }
 
+/// Enum representing an fanotify metadata structure or an information record structure.
+#[derive(Debug, Clone)]
+pub enum FanotifyEventData {
+    Metadata(FanotifyEventMetadata),
+    Info(FanotifyEventInfoFid),
+    Pid(FanotifyEventInfoPid),
+    Error(FanotifyEventInfoError),
+}
+
+impl FanotifyEventData {
+    /// Returns a byte slice representation of the data.
+    pub fn as_slice(&self) -> &[u8] {
+        match self {
+            FanotifyEventData::Metadata(metadata) => unsafe {
+                slice::from_raw_parts(
+                    metadata as *const FanotifyEventMetadata as *const u8,
+                    mem::size_of::<FanotifyEventMetadata>(),
+                )
+            },
+            FanotifyEventData::Info(info) => info.as_bytes(),
+            FanotifyEventData::Pid(pid) => unsafe {
+                slice::from_raw_parts(
+                    pid as *const FanotifyEventInfoPid as *const u8,
+                    mem::size_of::<FanotifyEventInfoPid>(),
+                )
+            },
+            FanotifyEventData::Error(error) => unsafe {
+                slice::from_raw_parts(
+                    error as *const FanotifyEventInfoError as *const u8,
+                    mem::size_of::<FanotifyEventInfoError>(),
+                )
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(C)]
+pub struct FanotifyResponse {
+    pub fd: i32,
+    pub response: FanotifyResponseOption,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u32)]
+pub enum FanotifyResponseOption {
+    Allow = FAN_ALLOW,
+    Deny = FAN_DENY,
+}
+
 bitflags! {
     /// Mask for fanotify events.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     #[repr(transparent)]
-    pub struct FanEvent: u64 {
+    pub struct FanEventMask: u64 {
         // Each of the following constants is a bit corresponding to a fanotify
         // notification event.
 
@@ -270,7 +334,8 @@ bitflags! {
 }
 
 bitflags! {
-    pub struct FanInitEventFFlags: u32 {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct FanInitEventFileFlags: u32 {
         const RDONLY = OpenFlags::O_RDONLY.bits() as u32;
         const WRONLY = OpenFlags::O_WRONLY.bits() as u32;
         const RDWR = OpenFlags::O_RDWR.bits() as u32;
@@ -326,5 +391,38 @@ bitflags! {
         const IGNORED_SURV_MODIFY = FAN_MARK_IGNORED_SURV_MODIFY;
 
         const EVICTABLE = FAN_MARK_EVICTABLE;
+    }
+}
+
+impl FanotifyResponse {
+    /// Creates a FanotifyResponse from a byte buffer.
+    ///
+    /// The buffer should contain exactly 8 bytes. If the buffer is not of the correct
+    /// size or contains an invalid response value, this function returns `None`.
+    pub fn from_bytes(buf: &[u8]) -> Option<Self> {
+        if buf.len() != 8 {
+            return None;
+        }
+
+        let fd = i32::from_ne_bytes(buf[0..4].try_into().unwrap());
+        let response_val = u32::from_ne_bytes(buf[4..8].try_into().unwrap());
+
+        let response = match response_val {
+            FAN_ALLOW => FanotifyResponseOption::Allow,
+            FAN_DENY => FanotifyResponseOption::Deny,
+            _ => return None,
+        };
+
+        Some(FanotifyResponse { fd, response })
+    }
+
+    /// Returns true if this response allows the operation.
+    pub fn is_allow(&self) -> bool {
+        self.response == FanotifyResponseOption::Allow
+    }
+
+    /// Returns true if this response denies the operation.
+    pub fn is_deny(&self) -> bool {
+        self.response == FanotifyResponseOption::Deny
     }
 }

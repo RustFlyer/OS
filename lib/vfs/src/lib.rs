@@ -2,7 +2,7 @@
 #![no_main]
 #![feature(ptr_as_ref_unchecked)]
 #![feature(sync_unsafe_cell)]
-#![allow(unused)]
+#![feature(assert_matches)]
 
 use alloc::sync::Arc;
 use dentry::Dentry;
