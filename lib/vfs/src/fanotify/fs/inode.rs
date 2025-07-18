@@ -10,7 +10,7 @@ use crate::{
     superblock::SuperBlock,
 };
 
-use super::super::super::FanotifyGroup;
+use super::super::FanotifyGroup;
 
 /// Inode for an fanotify group file descriptor.
 ///

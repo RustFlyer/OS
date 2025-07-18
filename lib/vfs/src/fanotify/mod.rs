@@ -12,10 +12,7 @@ use crate::{
     superblock::SuperBlock,
 };
 
-use self::{
-    fs::group::{dentry::FanotifyGroupDentry, inode::FanotifyGroupInode},
-    types::{FanEventFileFlags, FanInitFlags},
-};
+use self::types::{FanEventFileFlags, FanInitFlags};
 
 pub mod fs;
 

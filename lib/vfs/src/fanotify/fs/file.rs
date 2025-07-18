@@ -7,7 +7,7 @@ use systype::error::{SysError, SysResult, SyscallResult};
 
 use crate::file::{File, FileMeta};
 
-use super::super::super::{FanotifyGroup, types::FanotifyEventData};
+use super::super::{FanotifyGroup, types::FanotifyEventData};
 use super::inode::FanotifyGroupInode;
 
 /// File implementation for fanotify group file descriptor.

@@ -12,7 +12,7 @@ use crate::{
     superblock::SuperBlock,
 };
 
-use super::group::dentry::FanotifyGroupDentry;
+use super::dentry::FanotifyGroupDentry;
 
 lazy_static! {
     /// The filesystem for fanotify files.
