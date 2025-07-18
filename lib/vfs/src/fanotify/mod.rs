@@ -1,6 +1,5 @@
 use alloc::{
     collections::{btree_map::BTreeMap, vec_deque::VecDeque},
-    string::String,
     sync::{Arc, Weak},
 };
 
@@ -15,7 +14,7 @@ use crate::{
 
 use self::{
     fs::group::{dentry::FanotifyGroupDentry, inode::FanotifyGroupInode},
-    types::{FanInitEventFileFlags, FanInitFlags},
+    types::{FanEventFileFlags, FanInitFlags},
 };
 
 pub mod fs;
@@ -50,12 +49,12 @@ pub struct FanotifyGroup {
 
     /// The file status flags that will be set on the file that are created for fanotify
     /// events.
-    event_file_flags: FanInitEventFileFlags,
+    event_file_flags: FanEventFileFlags,
 }
 
 impl FanotifyGroup {
     /// Creates a new fanotify group with the specified flags and event file flags.
-    pub fn new(flags: FanInitFlags, event_file_flags: FanInitEventFileFlags) -> Self {
+    pub fn new(flags: FanInitFlags, event_file_flags: FanEventFileFlags) -> Self {
         Self {
             entries: SpinNoIrqLock::new(BTreeMap::new()),
             flags,
@@ -71,22 +70,18 @@ impl FanotifyGroup {
     ///
     /// `object` must contains a valid weak reference to a filesystem object.
     ///
-    /// `path` is the path to the filesystem object.
-    ///
     /// The object must not already have an entry in the group.
     pub fn create_entry(
         self: &Arc<FanotifyGroup>,
         object: FsObject,
         mark: FanEventMask,
         ignore: FanEventMask,
-        path: String,
     ) {
         let entry = Arc::new(FanotifyEntry {
             group: Arc::downgrade(self),
             object,
             mark: SpinNoIrqLock::new(mark),
             ignore: SpinNoIrqLock::new(ignore),
-            path,
             event_queue: SpinNoIrqLock::new(VecDeque::new()),
             permission_queue: SpinNoIrqLock::new(VecDeque::new()),
         });
@@ -127,55 +122,6 @@ impl FanotifyGroup {
         );
     }
 
-    /// Sends an event to all relevant entries in the fanotify group.
-    ///
-    /// This method checks all entries in the group and sends the event to those
-    /// that have the appropriate mask and are not ignored.
-    pub fn send_event(&self, object_id: FsObjectId, event_mask: FanEventMask, pid: i32, fd: i32) {
-        let entries = self.entries.lock();
-
-        if let Some(entry) = entries.get(&object_id) {
-            let mark = *entry.mark.lock();
-            let ignore = *entry.ignore.lock();
-
-            // Check if this event should be reported (in mark mask and not in ignore mask)
-            if mark.intersects(event_mask) && !ignore.intersects(event_mask) {
-                use crate::fanotify::constants::FANOTIFY_METADATA_VERSION;
-                use crate::fanotify::types::FanotifyEventMetadata;
-
-                let metadata = FanotifyEventMetadata {
-                    event_len: core::mem::size_of::<FanotifyEventMetadata>() as u32,
-                    vers: FANOTIFY_METADATA_VERSION,
-                    reserved: 0,
-                    metadata_len: core::mem::size_of::<FanotifyEventMetadata>() as u16,
-                    mask: event_mask,
-                    fd,
-                    pid,
-                };
-
-                let event_data = FanotifyEventData::Metadata(metadata);
-
-                // Check if this is a permission event
-                if event_mask.intersects(
-                    FanEventMask::ACCESS_PERM
-                        | FanEventMask::OPEN_PERM
-                        | FanEventMask::OPEN_EXEC_PERM,
-                ) {
-                    // TODO: For permission events, we need to:
-                    // 1. Create a fanotify event file
-                    // 2. Get a file descriptor for it
-                    // 3. Add it to the process's fd table
-                    // 4. Create a FanotifyPermissionEvent with that fd
-                    // This requires access to the process's fd table which we don't have here
-                    // For now, we'll skip permission events
-                    log::warn!("Permission events not yet implemented");
-                } else {
-                    entry.event_queue.lock().push_back(event_data);
-                }
-            }
-        }
-    }
-
     /// Removes an entry from the fanotify group.
     pub fn remove_entry(&self, object_id: FsObjectId) -> Option<Arc<FanotifyEntry>> {
         self.entries.lock().remove(&object_id)
@@ -187,7 +133,7 @@ impl FanotifyGroup {
     }
 
     /// Gets the event file flags of the fanotify group.
-    pub fn event_file_flags(&self) -> FanInitEventFileFlags {
+    pub fn event_file_flags(&self) -> FanEventFileFlags {
         self.event_file_flags
     }
 }
@@ -200,11 +146,6 @@ impl FanotifyGroup {
 /// Each entry contains two bit masks: the mark mask and the ignore mask. The mark mask
 /// specifies the event kinds that the group is interested in for the filesystem object;
 /// the ignore mask specifies the event kinds that the group is not interested in.
-///
-/// It is associated with a specific filesystem object by its inode number or mount ID.
-/// In addition, it contains the path to the filesystem object when it was added to the
-/// group, which is used to create a `/proc/<pid>/fd/<fd>` file, which is a symbolic link
-/// to the filesystem object.
 pub struct FanotifyEntry {
     /// The fanotify group this entry belongs to.
     ///
@@ -230,9 +171,6 @@ pub struct FanotifyEntry {
     /// The ignore mask, which specifies the event kinds that the group is not interested
     /// in.
     ignore: SpinNoIrqLock<FanEventMask>,
-
-    /// The path to the filesystem object when it was added to the group.
-    path: String,
 
     /// Data of pending events on this entry.
     event_queue: SpinNoIrqLock<VecDeque<FanotifyEventData>>,
@@ -262,9 +200,13 @@ impl FanotifyEntry {
         *self.ignore.lock() &= !ignore;
     }
 
-    /// Inserts an event datum into the event queue of the entry.
-    pub fn insert_event(&self, event: FanotifyEventData) {
-        self.event_queue.lock().push_back(event);
+    /// Inserts an event or events into the event queue of the entry.
+    ///
+    /// This method takes an iterator of [`FanotifyEventData`] and insert them into the
+    /// event queue of this entry in order. Every event must start with an fanotify
+    /// event metadata, followed by zero or more information records.
+    pub fn insert_event(&self, events: impl Iterator<Item = FanotifyEventData>) {
+        self.event_queue.lock().extend(events);
     }
 }
 

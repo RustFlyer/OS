@@ -4,12 +4,15 @@
 use alloc::{
     alloc::{Layout, alloc, dealloc},
     slice,
+    sync::Arc,
 };
 use core::{mem, ptr};
 
 use bitflags::bitflags;
 
 use config::vfs::OpenFlags;
+
+use crate::file::File;
 
 use super::constants::*;
 
@@ -163,9 +166,12 @@ pub struct FanotifyEventInfoHeader {
 }
 
 /// Enum representing an fanotify metadata structure or an information record structure.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum FanotifyEventData {
-    Metadata(FanotifyEventMetadata),
+    /// Fanotify event metadata. The first element is an uncomplete metadata. The second
+    /// element is an open file to the monitored filesystem object, which is to be added
+    /// to the process's file descriptor table when the event is read.
+    Metadata((FanotifyEventMetadata, Arc<dyn File>)),
     Info(FanotifyEventInfoFid),
     Pid(FanotifyEventInfoPid),
     Error(FanotifyEventInfoError),
@@ -177,7 +183,7 @@ impl FanotifyEventData {
         match self {
             FanotifyEventData::Metadata(metadata) => unsafe {
                 slice::from_raw_parts(
-                    metadata as *const FanotifyEventMetadata as *const u8,
+                    &raw const metadata.0 as *const u8,
                     mem::size_of::<FanotifyEventMetadata>(),
                 )
             },
@@ -335,7 +341,7 @@ bitflags! {
 
 bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    pub struct FanInitEventFileFlags: u32 {
+    pub struct FanEventFileFlags: u32 {
         const RDONLY = OpenFlags::O_RDONLY.bits() as u32;
         const WRONLY = OpenFlags::O_WRONLY.bits() as u32;
         const RDWR = OpenFlags::O_RDWR.bits() as u32;
@@ -346,6 +352,18 @@ bitflags! {
         const NOATIME = OpenFlags::O_NOATIME.bits() as u32;
         const NONBLOCK = OpenFlags::O_NONBLOCK.bits() as u32;
         const SYNC = OpenFlags::O_SYNC.bits() as u32;
+    }
+}
+
+impl From<OpenFlags> for FanEventFileFlags {
+    fn from(flags: OpenFlags) -> Self {
+        Self::from_bits_truncate(flags.bits() as u32)
+    }
+}
+
+impl From<FanEventFileFlags> for OpenFlags {
+    fn from(flags: FanEventFileFlags) -> Self {
+        Self::from_bits_retain(flags.bits() as i32)
     }
 }
 

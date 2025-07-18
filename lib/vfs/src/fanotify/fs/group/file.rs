@@ -1,15 +1,13 @@
-use alloc::string::ToString;
 use alloc::{boxed::Box, sync::Arc};
 
 use async_trait::async_trait;
-
-use config::vfs::OpenFlags;
 use crate_interface::call_interface;
+
 use systype::error::{SysError, SysResult, SyscallResult};
 
 use crate::file::{File, FileMeta};
 
-use super::super::super::{FanotifyGroup, fs::event::create_event_file, types::FanotifyEventData};
+use super::super::super::{FanotifyGroup, types::FanotifyEventData};
 use super::inode::FanotifyGroupInode;
 
 /// File implementation for fanotify group file descriptor.
@@ -39,11 +37,12 @@ impl FanotifyGroupFile {
             let mut event_queue = entry.event_queue.lock();
 
             while let Some(mut event) = event_queue.pop_front() {
-                let metadata = if let FanotifyEventData::Metadata(metadata) = &mut event {
-                    metadata
-                } else {
-                    panic!("Expected FanotifyEventData::Metadata");
-                };
+                let (mut metadata, event_file) =
+                    if let FanotifyEventData::Metadata(metadata) = &mut event {
+                        (metadata.0, Arc::clone(&metadata.1))
+                    } else {
+                        panic!("Expected FanotifyEventData::Metadata");
+                    };
 
                 let mut event_read = 0;
                 let event_len = metadata.event_len as usize;
@@ -52,19 +51,11 @@ impl FanotifyGroupFile {
                     break;
                 }
 
-                // Create an fanotify event file.
-                let path = entry.path.clone();
-                let flags = OpenFlags::O_RDONLY;
-                let event_file = match create_event_file(Arc::clone(entry), path.to_string()) {
-                    Ok(file) => file,
-                    Err(e) => {
-                        event_queue.push_front(event);
-                        return Err(e);
-                    }
-                };
+                // Add the event file to the process's file descriptor table.
                 let fd = match call_interface!(
                     crate::fanotify::kinterface::KernelFdTableOperations::add_file(
-                        event_file, flags
+                        event_file,
+                        group.event_file_flags.into()
                     )
                 ) {
                     Ok(fd) => fd,

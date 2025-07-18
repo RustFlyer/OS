@@ -15,16 +15,16 @@ use super::filesystem::FILE_SYSTEM_TYPE;
 
 lazy_static! {
     /// The superblock for fanotify files.
-    pub static ref SUPERBLOCK: Arc<FanotifyEventFileSuperBlock>
-        = Arc::new(FanotifyEventFileSuperBlock::new(None, FILE_SYSTEM_TYPE.clone()));
+    pub static ref SUPERBLOCK: Arc<FanotifyGroupSuperBlock>
+        = Arc::new(FanotifyGroupSuperBlock::new(None, FILE_SYSTEM_TYPE.clone()));
 }
 
-pub struct FanotifyEventFileSuperBlock {
+pub struct FanotifyGroupSuperBlock {
     /// The superblock associated with the fanotify event file.
     meta: SuperBlockMeta,
 }
 
-impl FanotifyEventFileSuperBlock {
+impl FanotifyGroupSuperBlock {
     /// Creates a new fanotify event file superblock.
     pub fn new(device: Option<Arc<dyn BlockDevice>>, fs_type: Arc<dyn FileSystemType>) -> Self {
         let meta = SuperBlockMeta::new(device, fs_type);
@@ -32,7 +32,7 @@ impl FanotifyEventFileSuperBlock {
     }
 }
 
-impl SuperBlock for FanotifyEventFileSuperBlock {
+impl SuperBlock for FanotifyGroupSuperBlock {
     fn meta(&self) -> &SuperBlockMeta {
         &self.meta
     }

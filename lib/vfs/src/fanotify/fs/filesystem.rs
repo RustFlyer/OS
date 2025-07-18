@@ -12,18 +12,18 @@ use crate::{
     superblock::SuperBlock,
 };
 
-use super::event::dentry::FanotifyEventDentry;
+use super::group::dentry::FanotifyGroupDentry;
 
 lazy_static! {
     /// The filesystem for fanotify files.
-    pub static ref FILE_SYSTEM_TYPE: Arc<dyn FileSystemType> = FanotifyEventFsType::new();
+    pub static ref FILE_SYSTEM_TYPE: Arc<dyn FileSystemType> = FanotifyGroupFsType::new();
 }
 
-pub struct FanotifyEventFsType {
+pub struct FanotifyGroupFsType {
     meta: FileSystemTypeMeta,
 }
 
-impl FanotifyEventFsType {
+impl FanotifyGroupFsType {
     pub fn new() -> Arc<Self> {
         Arc::new(Self {
             meta: FileSystemTypeMeta::new("fanotify_eventfs"),
@@ -31,7 +31,7 @@ impl FanotifyEventFsType {
     }
 }
 
-impl FileSystemType for FanotifyEventFsType {
+impl FileSystemType for FanotifyGroupFsType {
     fn get_meta(&self) -> &FileSystemTypeMeta {
         &self.meta
     }
@@ -43,7 +43,7 @@ impl FileSystemType for FanotifyEventFsType {
         _flags: MountFlags,
         _dev: Option<Arc<dyn BlockDevice>>,
     ) -> SysResult<Arc<dyn Dentry>> {
-        Ok(FanotifyEventDentry::new(None, None))
+        Ok(FanotifyGroupDentry::new(None))
     }
 
     fn kill_sblk(&self, _sblk: Arc<dyn SuperBlock>) -> SysResult<()> {
