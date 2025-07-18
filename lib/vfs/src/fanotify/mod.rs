@@ -69,7 +69,7 @@ impl FanotifyGroup {
     ///
     /// The object must not already have an entry in the group.
     pub fn create_entry(
-        self: &Arc<FanotifyGroup>,
+        self: &Arc<Self>,
         object: FsObject,
         mark: FanEventMask,
         ignore: FanEventMask,
@@ -117,6 +117,14 @@ impl FanotifyGroup {
             "Fanotify entry for object {:?} already exists in the fanotify group",
             object_id
         );
+    }
+
+    /// Gets an entry in the fanotify group by its object ID.
+    pub fn get_entry(
+        &self,
+        object_id: FsObjectId,
+    ) -> Option<Arc<FanotifyEntry>> {
+        self.entries.lock().get(&object_id).cloned()
     }
 
     /// Removes an entry from the fanotify group.

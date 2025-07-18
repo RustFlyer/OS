@@ -17,7 +17,7 @@ pub struct FanotifyGroupFile {
 
 impl FanotifyGroupFile {
     /// Gets the associated fanotify group from the inode.
-    fn group(&self) -> Arc<FanotifyGroup> {
+    pub fn group(&self) -> Arc<FanotifyGroup> {
         let inode = self
             .inode()
             .downcast_arc::<FanotifyGroupInode>()

@@ -330,7 +330,7 @@ bitflags! {
         const UNLIMITED_MARKS = FAN_UNLIMITED_MARKS;
         const REPORT_TID = FAN_REPORT_TID;
         const ENABLE_AUDIT = FAN_ENABLE_AUDIT;
-        const REPORT_FD = FAN_REPORT_PIDFD;
+        const REPORT_FID = FAN_REPORT_FID;
         const REPORT_DIR_FID = FAN_REPORT_DIR_FID;
         const REPORT_NAME = FAN_REPORT_NAME;
         const REPORT_TARGET_FID = FAN_REPORT_TARGET_FID;

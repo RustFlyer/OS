@@ -12,6 +12,7 @@ mod time;
 mod user;
 
 use consts::SyscallNo::{self, *};
+use fanotify::*;
 use fs::*;
 use key::*;
 use misc::{sys_getrandom, sys_sysinfo, sys_syslog, sys_uname};
@@ -24,7 +25,7 @@ use systype::error::SysError;
 use time::*;
 use user::*;
 
-use crate::syscall::{fanotify::sys_fanotify_init, time::{sys_adjtimex, sys_clock_adjtime, sys_clock_getres, sys_clock_settime}};
+use crate::syscall::time::{sys_adjtimex, sys_clock_adjtime, sys_clock_getres, sys_clock_settime};
 
 pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
     let Some(syscall_no) = SyscallNo::from_repr(syscall_no) else {
@@ -220,6 +221,13 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         FADVISE64_64 => sys_fadvise64_64(args[0], args[1], args[2], args[3] as i32),
         SPLICE => sys_splice(args[0], args[1], args[2], args[3], args[4], args[5] as i32).await,
         FANOTIFY_INIT => sys_fanotify_init(args[0] as u32, args[1] as u32),
+        FANOTIFY_MARK => sys_fanotify_mark(
+            args[0] as i32,
+            args[1] as u32,
+            args[2] as u64,
+            args[3] as i32,
+            args[4],
+        ),
         _ => {
             log::error!("Syscall not implemented: {}", syscall_no.as_str());
             panic!("Syscall not implemented: {}", syscall_no.as_str());
