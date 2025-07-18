@@ -25,7 +25,7 @@ impl ExtSuperBlock {
         let inner =
             Ext4BlockWrapper::<Disk>::new(disk).expect("failed to initialize EXT4 filesystem");
         log::debug!("initialize EXT4 filesystem");
-        Arc::new(Self { meta: meta, inner })
+        Arc::new(Self { meta, inner })
     }
 }
 
