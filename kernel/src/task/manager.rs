@@ -32,7 +32,7 @@ impl TaskManager {
         self.0.lock().insert(task.tid(), Arc::downgrade(task));
 
         log::debug!("Add task {}", task.tid());
-        // log::debug!("Task list:");
+        log::debug!("Task list:");
         let _ = self.for_each(|t| {
             let t = t.tid();
             // simdebug::stop();

@@ -178,7 +178,7 @@ pub async fn task_executor_unit(task: Arc<Task>) {
         TIMER_MANAGER.check(get_time_duration());
 
         if task.timer_mut().schedule_time_out()
-        // && executor::has_waiting_task_alone(current_hart().id)
+            && executor::has_waiting_task_alone(current_hart().id)
         {
             // log::debug!(
             //     "[user_trap_handler] task {} [{}] should yield, contain signal: {:?}",
