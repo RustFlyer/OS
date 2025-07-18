@@ -339,6 +339,19 @@ bitflags! {
     }
 }
 
+impl From<FanInitFlags> for OpenFlags {
+    fn from(flags: FanInitFlags) -> Self {
+        let mut open_flags = Self::O_RDWR;
+        if flags.contains(FanInitFlags::CLOEXEC) {
+            open_flags |= OpenFlags::O_CLOEXEC;
+        }
+        if flags.contains(FanInitFlags::NONBLOCK) {
+            open_flags |= OpenFlags::O_NONBLOCK;
+        }
+        open_flags
+    }
+}
+
 bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct FanEventFileFlags: u32 {

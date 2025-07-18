@@ -241,10 +241,8 @@ pub trait Inode: Send + Sync + DowncastSync {
         let mode = meta.mode.bits();
 
         if euid == 0 {
-            if access.contains(AccessFlags::X_OK) {
-                if mode & 0o111 == 0 {
-                    return false;
-                }
+            if access.contains(AccessFlags::X_OK) && mode & 0o111 == 0 {
+                return false;
             }
             return true;
         }

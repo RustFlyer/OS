@@ -2,11 +2,11 @@ use alloc::sync::Arc;
 
 use systype::error::SysResult;
 
-use crate::{dentry::Dentry, file::File, superblock::SuperBlock};
+use crate::{dentry::Dentry, file::File};
 
 use super::{
     FanotifyGroup,
-    fs::{dentry::FanotifyGroupDentry, inode::FanotifyGroupInode},
+    fs::{dentry::FanotifyGroupDentry, inode::FanotifyGroupInode, superblock::SUPERBLOCK},
 };
 
 pub mod dentry;
@@ -19,10 +19,8 @@ pub mod superblock;
 ///
 /// This method creates the necessary VFS objects to represent the fanotify group
 /// as a file descriptor that can be used to read events and write responses.
-pub fn create_group_file(
-    group: &Arc<FanotifyGroup>,
-    superblock: Arc<dyn SuperBlock>,
-) -> SysResult<Arc<dyn File>> {
+pub fn create_group_file(group: &Arc<FanotifyGroup>) -> SysResult<Arc<dyn File>> {
+    let superblock = SUPERBLOCK.clone();
     let inode = FanotifyGroupInode::new(superblock, group.clone());
     let dentry = FanotifyGroupDentry::new(Some(inode));
     dentry.base_open()
