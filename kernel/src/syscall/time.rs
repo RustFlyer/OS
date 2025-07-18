@@ -1,6 +1,8 @@
 use alloc::sync::Arc;
+use config::vfs::OpenFlags;
 use core::time::Duration;
 use mutex::SpinNoIrqLock;
+use osfs::special::timerfd::{file::TimerFdFile, flag::TimerFdFlags};
 
 use arch::time::{get_time_duration, get_time_ms, get_time_us};
 use osfuture::{Select2Futures, SelectOutput, yield_now};
@@ -836,4 +838,16 @@ pub fn sys_timer_settime(
     TIMER_MANAGER.add_timer(timer.clone());
 
     Ok(0)
+}
+
+pub async fn sys_timerfd_create(clockid: usize, flags: u32) -> SyscallResult {
+    if clockid != CLOCK_REALTIME && clockid != CLOCK_MONOTONIC {
+        return Err(SysError::EINVAL);
+    }
+    let task = current_task();
+    let flags = TimerFdFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
+    let timerfd = TimerFdFile::new(clockid as i32, flags).await;
+    let fd = task.with_mut_fdtable(|table| table.alloc(Arc::new(timerfd), OpenFlags::empty()))?;
+
+    Ok(fd)
 }

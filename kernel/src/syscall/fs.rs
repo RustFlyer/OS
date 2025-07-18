@@ -12,6 +12,7 @@ use core::{
     task::{Context, Poll},
     time::Duration,
 };
+use shm::id;
 
 use strum::FromRepr;
 
@@ -27,7 +28,7 @@ use osfs::{
     dev::{
         loopx::{
             blkinfo::{BlkIoctlCmd, HdGeometry},
-            loopinfo::{LoopInfo, LoopInfo64, LoopIoctlCmd},
+            loopinfo::{LoopInfo64, LoopIoctlCmd},
         },
         rtc::{RtcTime, ioctl::RtcIoctlCmd},
         tty::{
@@ -38,6 +39,7 @@ use osfs::{
     fd_table::{FdFlags, FdSet},
     pipe::{inode::PIPE_BUF_LEN, new_pipe},
     pselect::{FilePollRet, PSelectFuture},
+    special::eventfd::file::EventFdFile,
 };
 use osfuture::{Select2Futures, SelectOutput};
 use systype::{
@@ -56,7 +58,7 @@ use vfs::{
 use crate::{
     logging::enable_log,
     processor::current_task,
-    task::{TaskState, sig_members::IntrBySignalFuture, signal::sig_info::SigSet},
+    task::{Task, TaskState, sig_members::IntrBySignalFuture, signal::sig_info::SigSet},
     vm::user_ptr::{UserReadPtr, UserReadWritePtr, UserWritePtr},
 };
 
@@ -240,7 +242,7 @@ pub async fn sys_write(fd: usize, addr: usize, len: usize) -> SyscallResult {
 /// - This is a `async` syscall, which means that it likely `yield` or `suspend` when called. Therefore, use
 ///   `lock` carefully and do not pass the `lock` across `await` as possible.
 pub async fn sys_read(fd: usize, buf: usize, len: usize) -> SyscallResult {
-    // log::debug!("[sys_read] fd: {fd}, buf: {buf:#x}, len: {len:#x}");
+    log::debug!("[sys_read] fd: {fd}, buf: {buf:#x}, len: {len:#x}");
 
     let task = current_task();
     let addr_space = task.addr_space();
@@ -292,7 +294,7 @@ pub fn sys_readlinkat(dirfd: usize, pathname: usize, buf: usize, bufsiz: usize) 
 ///   the `size` of the file).  If data is **later written** at this point, **subsequent reads** of the data in
 ///   the gap (a "hole") return `null` bytes ('\0') until data is actually written into the gap.
 pub fn sys_lseek(fd: usize, offset: isize, whence: usize) -> SyscallResult {
-    // log::info!("[sys_lseek] fd: {fd}, offset: {offset}, whence: {whence}");
+    log::info!("[sys_lseek] fd: {fd}, offset: {offset}, whence: {whence}");
 
     #[derive(FromRepr)]
     #[repr(usize)]
@@ -446,6 +448,22 @@ pub fn sys_close(fd: usize) -> SyscallResult {
     log::info!("[sys_close] fd: {fd}");
     let task = current_task();
     task.with_mut_fdtable(|table| table.remove(fd))?;
+
+    // relate to signalfd4 syscall
+    let lock = task.sigfd_queue_mut();
+    let mut queue = lock.lock();
+    if queue.len() > 0 {
+        let id = queue
+            .iter_mut()
+            .enumerate()
+            .find(|(_, f)| **f == fd)
+            .map(|(idx, _)| idx);
+
+        if let Some(id) = id {
+            queue.remove(id);
+        }
+    }
+
     Ok(0)
 }
 
@@ -1645,13 +1663,24 @@ pub fn sys_umask(_mask: i32) -> SyscallResult {
 ///
 /// With ftruncate(), the file must be open for writing; with truncate(), the file
 /// must be writable.
-pub fn sys_ftruncate(fd: usize, length: usize) -> SyscallResult {
+pub async fn sys_ftruncate(fd: usize, length: usize) -> SyscallResult {
+    log::debug!("[sys_ftruncate] fd: {fd}, length: {length}");
     let task = current_task();
     let file = task.with_mut_fdtable(|t| t.get_file(fd))?;
-
     let inode = file.dentry().inode().ok_or(SysError::ENOENT)?;
+    let old_size = file.size();
 
     inode.set_size(length);
+
+    if old_size > length && file.pos() > length {
+        file.set_pos(length);
+    }
+
+    if old_size < length {
+        let offset = old_size;
+        let len = length - offset;
+        file.fill_zeros(offset, len).await?;
+    }
 
     Ok(0)
 }
@@ -1834,6 +1863,7 @@ pub async fn sys_pselect6(
 ///
 /// The file offset is not changed.
 pub async fn sys_pread64(fd: usize, buf: usize, count: usize, offset: usize) -> SyscallResult {
+    // log::debug!("[sys_pread64] fd:{fd}, count: {count}, offset: {offset}");
     let task = current_task();
     let addr_space = task.addr_space();
     let mut buf = UserWritePtr::<u8>::new(buf, &addr_space);
@@ -1841,9 +1871,14 @@ pub async fn sys_pread64(fd: usize, buf: usize, count: usize, offset: usize) -> 
     let buf_ptr = unsafe { buf.try_into_mut_slice(count) }?;
 
     let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
-    file.seek(SeekFrom::Start(offset as u64))?;
 
-    file.read(buf_ptr).await
+    let old_pos = file.pos();
+
+    file.seek(SeekFrom::Start(offset as u64))?;
+    let bytes = file.read(buf_ptr).await?;
+    file.seek(SeekFrom::Start(old_pos as u64))?;
+
+    return Ok(bytes);
 }
 
 /// `pwrite()` writes up to `count` bytes from the buffer starting at `buf` to the file descriptor
@@ -2221,10 +2256,12 @@ pub async fn sys_copy_file_range(
     len: usize,
     flags: usize,
 ) -> SyscallResult {
+    type Offset = i64;
     if flags != 0 {
         return Err(SysError::EINVAL);
     }
 
+    log::debug!("[sys_copy_file_range] fdin: {fd_in}, fdout: {fd_out}");
     let task = current_task();
     let addr_space = task.addr_space();
 
@@ -2250,37 +2287,51 @@ pub async fn sys_copy_file_range(
     let mut off_in = if off_in_ptr == 0 {
         None
     } else {
-        unsafe { Some(UserReadPtr::<u64>::new(off_in_ptr, &addr_space).read()?) }
+        unsafe { Some(UserReadPtr::<Offset>::new(off_in_ptr, &addr_space).read()?) }
     };
 
     let mut off_out = if off_out_ptr == 0 {
         None
     } else {
-        unsafe { Some(UserReadPtr::<u64>::new(off_out_ptr, &addr_space).read()?) }
+        unsafe { Some(UserReadPtr::<Offset>::new(off_out_ptr, &addr_space).read()?) }
     };
 
     if ptr::eq(file_in.as_ref(), file_out.as_ref()) {
         // If the two file descriptors refer to the same file, the source and destination
         // range must not overlap.
-        let actual_off_in = off_in.unwrap_or_else(|| file_in.pos() as u64);
-        let actual_off_out = off_out.unwrap_or_else(|| file_out.pos() as u64);
-        if actual_off_in < actual_off_out + len as u64
-            && actual_off_out < actual_off_in + len as u64
+        let actual_off_in = off_in.unwrap_or_else(|| file_in.pos() as Offset);
+        let actual_off_out = off_out.unwrap_or_else(|| file_out.pos() as Offset);
+        if actual_off_in < actual_off_out + len as Offset
+            && actual_off_out < actual_off_in + len as Offset
         {
             return Err(SysError::EINVAL);
         }
     }
 
+    log::debug!("[sys_copy_file_range] off_in: {off_in:?}, off_out: {off_out:?}, len:{len}");
+    log::info!(
+        "[sys_copy_file_range] file_in pos: {:#x}, file_out pos: {:#x}",
+        file_in.pos(),
+        file_out.pos()
+    );
+
     let bytes_copied = file_out
         .copy_file_range(file_in.as_ref(), off_in.as_mut(), off_out.as_mut(), len)
         .await?;
 
+    log::info!(
+        "[sys_copy_file_range] after copy_file_range, file_in: {:#x}, file_out: {:#x}",
+        file_in.pos(),
+        file_out.pos()
+    );
+    log::info!("[sys_copy_file_range] bytes_copied: {bytes_copied:?}");
+
     if let Some(off) = off_in {
-        unsafe { UserWritePtr::<u64>::new(off_in_ptr, &addr_space).write(off)? };
+        unsafe { UserWritePtr::<Offset>::new(off_in_ptr, &addr_space).write(off)? };
     }
 
     if let Some(off) = off_out {
-        unsafe { UserWritePtr::<u64>::new(off_out_ptr, &addr_space).write(off)? };
+        unsafe { UserWritePtr::<Offset>::new(off_out_ptr, &addr_space).write(off)? };
     }
 
     Ok(bytes_copied)
@@ -2436,9 +2487,11 @@ pub async fn sys_splice(
         log::error!("[sys_splice] not readable/writable",);
         return Err(SysError::EBADF);
     }
+
     if ptr::eq(file_out.as_ref(), file_in.as_ref()) {
         return Err(SysError::EINVAL);
     }
+
     if file_out.flags().contains(OpenFlags::O_APPEND) {
         return Err(SysError::EINVAL);
     }
@@ -2448,6 +2501,7 @@ pub async fn sys_splice(
     if !file_in_type.is_fifo() && !file_out_type.is_fifo() {
         return Err(SysError::EINVAL);
     }
+
     if file_in_type.is_fifo() && off_in_ptr != 0 || file_out_type.is_fifo() && off_out_ptr != 0 {
         return Err(SysError::ESPIPE);
     }
@@ -2472,6 +2526,14 @@ pub async fn sys_splice(
     let bytes_read = if file_in_type.is_fifo() {
         file_in.read(buffer.as_mut_slice()).await?
     } else if let Some(offset) = off_in {
+        if offset < 0 {
+            return Err(SysError::EINVAL);
+        }
+
+        if offset > file_in.size() as i32 {
+            return Ok(0);
+        }
+
         let pos = file_in.pos();
         file_in.seek(SeekFrom::Start(offset as u64))?;
         let bytes_read = file_in.read(buffer.as_mut_slice()).await?;
@@ -2481,6 +2543,7 @@ pub async fn sys_splice(
         file_in.read(buffer.as_mut_slice()).await?
     };
 
+    buffer.truncate(bytes_read);
     if bytes_read == 0 {
         return Ok(0);
     }
@@ -2488,6 +2551,14 @@ pub async fn sys_splice(
     let bytes_written = if file_out_type.is_fifo() {
         file_out.write(buffer.as_slice()).await?
     } else if let Some(offset) = off_out {
+        if offset < 0 {
+            return Err(SysError::EINVAL);
+        }
+
+        if offset > file_in.size() as i32 {
+            return Ok(0);
+        }
+
         let pos = file_out.pos();
         file_out.seek(SeekFrom::Start(offset as u64))?;
         let bytes_written = file_out.write(buffer.as_slice()).await?;
@@ -2704,4 +2775,134 @@ pub fn sys_removexattr(path_ptr: usize, name_ptr: usize) -> SyscallResult {
     inode.remove_xattr(&name)?;
 
     Ok(0)
+}
+
+pub fn sys_eventfd2(initval: usize, flags: usize) -> SyscallResult {
+    let eventfd = EventFdFile::new(initval as u64, flags as u32);
+
+    let fd_flags = if flags & 0x80000 != 0 {
+        OpenFlags::O_CLOEXEC
+    } else {
+        OpenFlags::empty()
+    };
+
+    let fd = current_task().with_mut_fdtable(|ft| ft.alloc(Arc::new(eventfd), fd_flags))?;
+
+    Ok(fd)
+}
+
+pub fn sys_name_to_handle_at(
+    dirfd: usize,
+    pathname: usize,
+    handleptr: usize,
+    mount_id_ptr: usize,
+    flags: i32,
+) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+
+    let path = {
+        let addr_space = task.addr_space();
+        let mut data_ptr = UserReadPtr::<u8>::new(pathname, &addr_space);
+        let cstring = data_ptr.read_c_string(256)?;
+        cstring.into_string().map_err(|_| SysError::EINVAL)?
+    };
+
+    log::info!("[sys_name_to_handle_at] dirfd: {dirfd:#x}, path: {path}");
+
+    let dentry = task.walk_at(AtFd::from(dirfd), path)?;
+    let inode = dentry.inode().ok_or(SysError::ENOENT)?;
+
+    // first, get inoid and fsid
+    let inode_number = inode.ino();
+    let fsid = inode.dev_id().0 as u64;
+
+    // handle info
+    let handle_type = 0x1ef;
+    let handle: [u8; 8] = inode_number.to_le_bytes();
+    let handle_len = handle.len() as u32;
+
+    let mut user_handle_bytes = UserWritePtr::<u32>::new(handleptr, &addrspace);
+    unsafe { user_handle_bytes.write(handle_len) }?;
+
+    // second, check whether user buffer is enough
+    let handle_bytes = unsafe { UserReadPtr::<u32>::new(handleptr, &addrspace).read() }?;
+    if handle_bytes < handle_len {
+        // user buffer is too small, so just update bytes, and return EOVERFLOW
+        return Err(SysError::EOVERFLOW);
+    }
+
+    let mut user_handle_type = UserWritePtr::<i32>::new(handleptr + 4, &addrspace);
+    let mut user_handle_datas = UserWritePtr::<u8>::new(handleptr + 8, &addrspace);
+    let mut user_mountid = UserWritePtr::<i32>::new(mount_id_ptr, &addrspace);
+
+    // third, write back handle info
+    unsafe { user_handle_type.write(handle_type) }?;
+    unsafe { user_handle_datas.write_array(&handle) }?;
+    unsafe { user_mountid.write(fsid as i32) }?;
+
+    Ok(0)
+}
+
+pub fn sys_open_by_handle_at(mount_id: i32, handleptr: usize, flags: i32) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+
+    let flags = OpenFlags::from_bits_truncate(flags);
+    let mut user_handle_bytes = UserReadPtr::<u32>::new(handleptr, &addrspace);
+    let handle_len = unsafe { user_handle_bytes.read()? };
+
+    if handle_len == 0 {
+        return Err(SysError::EINVAL);
+    }
+
+    let mut user_handle = UserReadPtr::<u8>::new(handleptr + 8, &addrspace);
+    let mut file_handle = [0u8; 8];
+
+    let arr = unsafe { user_handle.read_array(8) }?;
+    file_handle.copy_from_slice(&arr[..8]);
+
+    let fsid = mount_id as u64;
+    let inode_number = u64::from_le_bytes(file_handle);
+
+    log::info!("[sys_open_by_handle_at] mount_id: {fsid}, inode_number: {inode_number}");
+    let file_system = Task::get_filesystem_by_fsid(fsid).ok_or(SysError::ENOENT)?;
+    let inode = file_system
+        .get_inode_by_id(inode_number)
+        .ok_or(SysError::ENOENT)?;
+
+    let _cred = current_task().perm_mut();
+    let cred = _cred.lock();
+
+    if flags.writable()
+        && !inode.check_permission(cred.euid, cred.egid, &cred.groups, AccessFlags::W_OK)
+    {
+        return Err(SysError::EACCES);
+    }
+
+    let inode_type = inode.inotype();
+    if inode_type.is_dir() && flags.contains(OpenFlags::O_DIRECTORY) {
+        return Err(SysError::ENOTDIR);
+    }
+
+    if inode_type.is_reg() && flags.contains(OpenFlags::O_TRUNC) && flags.writable() {
+        inode.set_size(0);
+    }
+
+    let file = inode
+        .get_meta()
+        .inner
+        .lock()
+        .file
+        .clone()
+        .ok_or(SysError::ENOENT)?;
+
+    file.set_flags(flags);
+
+    log::debug!(
+        "[sys_open_by_handle_at] file opened, inode: {:?}",
+        inode.get_attr()
+    );
+
+    task.with_mut_fdtable(|ft| ft.alloc(file, flags))
 }

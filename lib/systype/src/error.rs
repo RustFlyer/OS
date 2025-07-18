@@ -102,6 +102,8 @@ pub enum SysError {
     ENINODE = 40,
     /// no data
     ENODATA = 61,
+    // too much data
+    EOVERFLOW = 75,
     /// Socket operation on non-socket
     ENOTSOCK = 88,
     /// Protocol not available
@@ -179,6 +181,7 @@ impl SysError {
             ENOTEMPTY => "Directory not empty",
             ENINODE => "Inode is null",
             ENODATA => "no data",
+            EOVERFLOW => "too much data",
             ENOTSOCK => "Socket operation on non-socket",
             ENOPROTOOPT => "Protocol not available",
             EPROTONOSUPPORT => "Protocol not supported",

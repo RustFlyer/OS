@@ -7,7 +7,7 @@ use systype::error::SysResult;
 
 use crate::{dentry::Dentry, fstype::FileSystemType};
 
-static VIRTUAL_DEV_COUNTER: core::sync::atomic::AtomicU64 =
+static _VIRTUAL_DEV_COUNTER: core::sync::atomic::AtomicU64 =
     core::sync::atomic::AtomicU64::new(0x1000);
 
 pub struct SuperBlockMeta {
@@ -18,8 +18,12 @@ pub struct SuperBlockMeta {
 }
 
 impl SuperBlockMeta {
-    pub fn new(device: Option<Arc<dyn BlockDevice>>, fs_type: Arc<dyn FileSystemType>) -> Self {
-        let dev_id = VIRTUAL_DEV_COUNTER.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
+    pub fn new(
+        device: Option<Arc<dyn BlockDevice>>,
+        fs_type: Arc<dyn FileSystemType>,
+        dev_id: u64,
+    ) -> Self {
+        // let dev_id = VIRTUAL_DEV_COUNTER.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
         Self {
             device,
             root_dentry: Once::new(),

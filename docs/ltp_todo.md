@@ -3,7 +3,7 @@
 - [ ] [   2] splice07                   615
 - [ ] [   3] fanotify01                 442
 - [ ] [   4] fanotify14                 334
-- [ ] [   5] epoll_ctl03                256
+- [x] [   5] epoll_ctl03                256             256
 - [ ] [   6] fanotify13                 200
 - [x] [   7] access01                   199             181    
 - [ ] [   8] memfd_create01             157

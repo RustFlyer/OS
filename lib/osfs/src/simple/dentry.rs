@@ -5,8 +5,6 @@ use vfs::{
     dentry::{Dentry, DentryMeta},
     file::File,
     inode::Inode,
-    path::Path,
-    sys_root_dentry,
 };
 
 use super::{

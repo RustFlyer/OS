@@ -183,7 +183,7 @@ copy-software:
 	@echo "Finished copying software."
 
 PHONY += fs-img
-fs-img: user copy-software
+fs-img: user  
 	@echo "building fs-img ext4..."
 	@echo $(FS_IMG)
 	rm -rf $(FS_IMG)
@@ -203,6 +203,7 @@ fs-img: user copy-software
 	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/netperf/* emnt/
 	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/libcbench/* emnt/
 	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/lmbench/* emnt/
+	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/final/* emnt/
 	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/vim/* emnt/
 	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/git/* emnt/
 

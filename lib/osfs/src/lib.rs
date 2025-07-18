@@ -28,6 +28,7 @@ pub mod pipe;
 pub mod proc;
 pub mod pselect;
 pub mod simple;
+pub mod special;
 pub mod sys;
 pub mod tmp;
 pub mod var;

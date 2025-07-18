@@ -18,7 +18,7 @@ use systype::{
     time::TimeSpec,
 };
 
-use crate::{stat::Stat, superblock::SuperBlock};
+use crate::{file::File, stat::Stat, superblock::SuperBlock};
 
 /// Data that is common to all inodes.
 pub struct InodeMeta {
@@ -61,6 +61,10 @@ pub struct InodeMetaInner {
     ///
     /// This is only used for simplefs for now! Don't use it in other filesystems.
     pub symlink: Option<String>,
+    /// open file
+    ///
+    /// why this is important? now, we can not access file or dentry through inode.
+    pub file: Option<Arc<dyn File>>,
 }
 
 impl InodeMeta {
@@ -82,6 +86,7 @@ impl InodeMeta {
                 gid: 0,
                 xattrs: BTreeMap::new(),
                 symlink: None,
+                file: None,
             }),
         }
     }

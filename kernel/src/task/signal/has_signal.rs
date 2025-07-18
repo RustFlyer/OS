@@ -23,4 +23,9 @@ impl PSFHasSignalIf for PSFHasSignalIfImpl {
         let mask = *task.sig_mask_mut() & !SigSet::SIGKILL;
         task.with_mut_sig_manager(|manager| manager.has_expect_signals(!mask))
     }
+
+    fn has_expected_signal(sigset: SigSet) -> bool {
+        let task = current_task();
+        task.with_mut_sig_manager(|manager| manager.has_expect_signals(sigset))
+    }
 }

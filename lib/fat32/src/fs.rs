@@ -35,7 +35,7 @@ impl FileSystemType for FatFsType {
         dev: Option<Arc<dyn BlockDevice>>,
     ) -> SysResult<Arc<dyn Dentry>> {
         debug_assert!(dev.is_some());
-        let sb = FatSuperBlock::new(SuperBlockMeta::new(dev, self.clone()));
+        let sb = FatSuperBlock::new(SuperBlockMeta::new(dev, self.clone(), 0x99));
         let sblk = sb.clone();
         let sb = Box::leak(Box::new(sb));
 

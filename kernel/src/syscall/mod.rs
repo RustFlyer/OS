@@ -4,6 +4,7 @@ mod key;
 mod misc;
 mod mm;
 mod net;
+mod poll;
 mod process;
 mod sche;
 mod signal;
@@ -17,6 +18,7 @@ use key::*;
 use misc::{sys_getrandom, sys_sysinfo, sys_syslog, sys_uname};
 use mm::*;
 use net::*;
+use poll::*;
 use process::*;
 use sche::*;
 use signal::*;
@@ -124,7 +126,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         PRLIMIT64 => sys_prlimit64(args[0], args[1] as i32, args[2], args[3]),
         GETRANDOM => sys_getrandom(args[0], args[1], args[2] as i32),
         RT_SIGTIMEDWAIT => sys_rt_sigtimedwait(args[0], args[1], args[2]).await,
-        FTRUNCATE => sys_ftruncate(args[0], args[1]),
+        FTRUNCATE => sys_ftruncate(args[0], args[1]).await,
         FSYNC => sys_fsync(args[0]),
         FUTEX => {
             sys_futex(
@@ -223,6 +225,18 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         LSETXATTR => sys_lsetxattr(args[0], args[1], args[2], args[3], args[4] as i32),
         GETXATTR => sys_getxattr(args[0], args[1], args[2], args[3]),
         REMOVEXATTR => sys_removexattr(args[0], args[1]),
+        EPOLL_CREATE1 => sys_epoll_create1(args[0] as i32),
+        EPOLL_CTL => sys_epoll_ctl(args[0] as i32, args[1] as i32, args[2] as i32, args[3]),
+        EPOLL_PWAIT => {
+            sys_epoll_pwait(args[0] as i32, args[1], args[2] as i32, args[3] as i32).await
+        }
+        EVENTFD2 => sys_eventfd2(args[0], args[1]),
+        SIGNALFD64 => sys_signalfd4(args[0] as isize, args[1], args[2], args[3] as u32).await,
+        TIMERFD_CREATE => sys_timerfd_create(args[0], args[1] as u32).await,
+        NAME_TO_HANDLE_AT => {
+            sys_name_to_handle_at(args[0], args[1], args[2], args[3], args[4] as i32)
+        }
+        OPEN_BY_HANDLE_AT => sys_open_by_handle_at(args[0] as i32, args[1], args[2] as i32),
         _ => {
             println!("Syscall not implemented: {}", syscall_no.as_str());
             panic!("Syscall not implemented: {}", syscall_no.as_str());

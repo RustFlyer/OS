@@ -8,6 +8,7 @@ use alloc::collections::vec_deque::VecDeque;
 use bitflags::bitflags;
 
 use alloc::sync::Arc;
+use osfs::special::signalfd::file::SignalFdFile;
 
 use crate::task::{TaskState, signal::sig_info::*};
 
@@ -65,6 +66,13 @@ impl Task {
         //     self.tid(),
         //     self.sig_handlers_mut().lock().get(si.sig)
         // );
+
+        for fd in self.sigfd_queue_mut().lock().iter() {
+            let f = self.with_mut_fdtable(|table| table.get_file(*fd)).unwrap();
+            f.downcast_arc::<SignalFdFile>()
+                .unwrap_or_else(|_| unreachable!())
+                .notify_signal(si);
+        }
 
         let manager = self.sig_manager_mut();
         manager.add(si);
