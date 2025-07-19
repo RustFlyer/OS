@@ -2814,12 +2814,12 @@ pub fn sys_name_to_handle_at(
     let inode = dentry.inode().ok_or(SysError::ENOENT)?;
 
     // first, get inoid and fsid
-    let inode_number = inode.ino();
+    let path = dentry.path();
     let fsid = inode.dev_id().0 as u64;
 
     // handle info
     let handle_type = 0x1ef;
-    let handle: [u8; 8] = inode_number.to_le_bytes();
+    let handle = path.as_bytes();
     let handle_len = handle.len() as u32;
 
     let mut user_handle_bytes = UserWritePtr::<u32>::new(handleptr, &addrspace);
@@ -2852,28 +2852,29 @@ pub fn sys_open_by_handle_at(mount_id: i32, handleptr: usize, flags: i32) -> Sys
     let mut user_handle_bytes = UserReadPtr::<u32>::new(handleptr, &addrspace);
     let handle_len = unsafe { user_handle_bytes.read()? };
 
+    // check len
     if handle_len == 0 {
         return Err(SysError::EINVAL);
     }
 
     let mut user_handle = UserReadPtr::<u8>::new(handleptr + 8, &addrspace);
-    let mut file_handle = [0u8; 8];
-
-    let arr = unsafe { user_handle.read_array(8) }?;
-    file_handle.copy_from_slice(&arr[..8]);
+    let file_path = user_handle
+        .read_c_string(256)?
+        .into_string()
+        .map_err(|_| SysError::EINVAL)?;
 
     let fsid = mount_id as u64;
-    let inode_number = u64::from_le_bytes(file_handle);
 
-    log::info!("[sys_open_by_handle_at] mount_id: {fsid}, inode_number: {inode_number}");
-    let file_system = Task::get_filesystem_by_fsid(fsid).ok_or(SysError::ENOENT)?;
-    let inode = file_system
-        .get_inode_by_id(inode_number)
-        .ok_or(SysError::ENOENT)?;
+    log::info!("[sys_open_by_handle_at] mount_id: {fsid}, file_path: {file_path}");
+
+    // look for file by handle data.
+    let dentry = task.walk_at(AtFd::FdCwd, file_path)?;
+    let inode = dentry.inode().ok_or(SysError::ENOENT)?;
 
     let _cred = current_task().perm_mut();
     let cred = _cred.lock();
 
+    // check file write permission
     if flags.writable()
         && !inode.check_permission(cred.euid, cred.egid, &cred.groups, AccessFlags::W_OK)
     {
@@ -2881,7 +2882,7 @@ pub fn sys_open_by_handle_at(mount_id: i32, handleptr: usize, flags: i32) -> Sys
     }
 
     let inode_type = inode.inotype();
-    if inode_type.is_dir() && flags.contains(OpenFlags::O_DIRECTORY) {
+    if !inode_type.is_dir() && flags.contains(OpenFlags::O_DIRECTORY) {
         return Err(SysError::ENOTDIR);
     }
 
@@ -2898,11 +2899,5 @@ pub fn sys_open_by_handle_at(mount_id: i32, handleptr: usize, flags: i32) -> Sys
         .ok_or(SysError::ENOENT)?;
 
     file.set_flags(flags);
-
-    log::debug!(
-        "[sys_open_by_handle_at] file opened, inode: {:?}",
-        inode.get_attr()
-    );
-
     task.with_mut_fdtable(|ft| ft.alloc(file, flags))
 }
