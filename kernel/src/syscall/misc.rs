@@ -21,7 +21,7 @@ impl UtsName {
         Self {
             sysname: Self::from_str("Linux"),
             nodename: Self::from_str("Linux"),
-            release: Self::from_str("5.19.0-42-generic"),
+            release: Self::from_str("6.8.2-42-generic"),
             version: Self::from_str(
                 "#43~22.04.1-Ubuntu SMP PREEMPT_DYNAMIC Fri Apr 21 16:51:08 UTC 2",
             ),

@@ -1,0 +1,40 @@
+use alloc::sync::Arc;
+use config::{inode::InodeMode, vfs::OpenFlags};
+use osfuture::block_on;
+use systype::error::SysResult;
+use vfs::{dentry::Dentry, inode::Inode};
+
+use crate::simple::{dentry::SimpleDentry, inode::SimpleInode};
+
+// ltp resolve /proc/config.gz with zcat
+// so we need a zip config
+// ❯ echo -e "CONFIG_POSIX_TIMERS=y\nCONFIG_TIME_NS=y..." | gzip -c > config.gz
+// ❯ xxd -i config.gz
+
+const _KERNEL_CONFIG_NAME: &str = "config.gz";
+const _KERNEL_CONFIG_GZ: &[u8] = &[
+    0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x73, 0xf6, 0xf7, 0x73, 0xf3, 0x74,
+    0x8f, 0x0f, 0xf0, 0x0f, 0xf6, 0x8c, 0x88, 0x0f, 0xf1, 0xf4, 0x75, 0x0d, 0x0a, 0xb6, 0xad, 0xe4,
+    0x72, 0x86, 0x88, 0x82, 0xf8, 0xf1, 0x7e, 0x20, 0x01, 0x00, 0x4c, 0x56, 0x09, 0xa5, 0x27, 0x00,
+    0x00, 0x00,
+];
+
+pub fn init_config_file(proc: Arc<dyn Dentry>) -> SysResult<()> {
+    let inode = SimpleInode::new(proc.superblock().unwrap());
+    inode.set_mode(InodeMode::REG);
+
+    let dentry = SimpleDentry::new(
+        _KERNEL_CONFIG_NAME,
+        Some(inode),
+        Some(Arc::downgrade(&proc)),
+    );
+
+    proc.add_child(dentry.clone());
+
+    let file = dentry.base_open()?;
+    file.set_flags(OpenFlags::O_RDWR);
+
+    block_on(async { file.write(_KERNEL_CONFIG_GZ).await })?;
+
+    Ok(())
+}

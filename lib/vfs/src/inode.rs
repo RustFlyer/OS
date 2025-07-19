@@ -63,6 +63,10 @@ pub struct InodeMetaInner {
     pub symlink: Option<String>,
     /// Registered fanotify entries on this inode.
     pub fanotify_entries: Vec<Weak<FanotifyEntry>>,
+    /// open file
+    ///
+    /// why this is important? now, we can not access file or dentry through inode.
+    pub file: Option<Arc<dyn File>>,
 }
 
 impl InodeMeta {
@@ -85,6 +89,7 @@ impl InodeMeta {
                 xattrs: BTreeMap::new(),
                 symlink: None,
                 fanotify_entries: Vec::new(),
+                file: None,
             }),
         }
     }

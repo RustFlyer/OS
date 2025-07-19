@@ -28,6 +28,7 @@ pub mod pipe;
 pub mod proc;
 pub mod pselect;
 pub mod simple;
+pub mod special;
 pub mod sys;
 pub mod tmp;
 pub mod var;
@@ -63,8 +64,8 @@ pub fn register_dev() {
     let devfs = DevFsType::new();
     FS_MANAGER.lock().insert(devfs.name(), devfs);
 
-    let devfs2 = DiskFsTypeFat::new();
-    FS_MANAGER.lock().insert(devfs2.name(), devfs2);
+    let fatfs = DiskFsTypeFat::new();
+    FS_MANAGER.lock().insert(fatfs.name(), fatfs);
 
     let procfs = ProcFsType::new();
     FS_MANAGER.lock().insert(procfs.name(), procfs);
@@ -159,6 +160,7 @@ pub fn init() {
     dev::zero::init().expect("dev-zero init fails");
     dev::urandom::init().expect("dev-urandom init fails");
     dev::loopx::init().expect("dev-loopx init fails");
+    dev::full::init().expect("dev-full init fails");
 
     <dyn File>::open(sys_root_dentry())
         .unwrap()

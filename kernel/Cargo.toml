@@ -22,6 +22,7 @@ osfuture = { path = "../lib/osfuture" }
 net = { path = "../lib/net" }
 polyhal-macro = { path = "../lib/polyhal-macro" }
 simdebug = { path = "../lib/simdebug/" }
+signal = { path = "../lib/signal/" }
 
 async-trait = { workspace = true }
 hashbrown = { workspace = true }

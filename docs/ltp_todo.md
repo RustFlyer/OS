@@ -3,7 +3,7 @@
 - [ ] [   2] splice07                   615
 - [ ] [   3] fanotify01                 442
 - [ ] [   4] fanotify14                 334
-- [ ] [   5] epoll_ctl03                256
+- [x] [   5] epoll_ctl03                256             256
 - [ ] [   6] fanotify13                 200
 - [x] [   7] access01                   199             181    
 - [ ] [   8] memfd_create01             157
@@ -14,20 +14,20 @@
 - [ ] [  13] chdir01                     92
 - [ ] [  14] fanotify09                  76
 - [x] [  15] pipe11                      70             70
-- [ ] [  16] fsync01                     60             30 half of all fs-type
+- [x] [  16] fsync01                     60             30 half of all fs-type
 - [ ] [  17] mount07                     56
 - [ ] [  18] fanotify15                  55
 - [ ] [  19] memcontrol02                54
-- [ ] [  20] rename01                    48
-- [ ] [  21] rename03                    48
-- [x] [  22] fsetxattr01                 46             27
-- [ ] [  23] setxattr01                  46
+- [x] [  20] rename01                    48             24 half
+- [x] [  21] rename03                    48             24 half
+- [x] [  22] fsetxattr01                 46             27 half
+- [x] [  23] setxattr01                  46             27 half
 - [x] [  24] clock_getres01              44             44
 - [ ] [  25] mem                         42
 - [ ] [  26] mem                         42
 - [ ] [  27] statx08                     38
 - [ ] [  28] can_filter                  36
-- [ ] [  29] mkdir09                     36
+- [x] [  29] mkdir09                     36             18 half
 - [ ] [  30] mount_setattr01             36
 - [ ] [  31] move_mount01                36
 - [ ] [  32] quotactl08                  36
@@ -36,12 +36,12 @@
 - [ ] [  35] mq_timedsend01              34
 - [ ] [  36] utimensat01                 34
 - [ ] [  37] memcontrol04                33
-- [ ] [  38] chmod01                     32             32
+- [x] [  38] chmod01                     32             32
 - [ ] [  39] creat09                     32
 - [ ] [  40] posix_fadvise03             32
 - [ ] [  41] posix_fadvise03             32
 - [ ] [  42] process_vm_readv03          32
-- [ ] [  43] getitimer01                 30             26 to fix
+- [x] [  43] getitimer01                 30             26 to fix
 - [ ] [  44] move_mount02                30
 - [ ] [  45] mq_timedreceive01           30
 - [x] [  46] signal03                    30             31
@@ -50,7 +50,7 @@
 - [x] [  49] signal04                    28             28
 - [ ] [  50] name_to_handle_at01         27
 - [ ] [  51] fsconfig02                  26
-- [ ] [  52] fgetxattr01                 25
+- [x] [  52] fgetxattr01                 25             15
 - [ ] [  53] process_vm01                25
 - [ ] [  54] setns01                     25
 - [ ] [  55] clock_gettime03             24

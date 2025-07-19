@@ -86,7 +86,7 @@ impl KeyRing {
     }
 }
 
-static KEY_RING: Lazy<Arc<SpinNoIrqLock<KeyRing>>> =
+static _KEY_RING: Lazy<Arc<SpinNoIrqLock<KeyRing>>> =
     Lazy::new(|| Arc::new(SpinNoIrqLock::new(KeyRing::new())));
 
 static KEYRING_TABLE: Lazy<SpinNoIrqLock<HashMap<u64, Arc<SpinNoIrqLock<KeyRing>>>>> =

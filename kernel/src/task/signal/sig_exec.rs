@@ -178,7 +178,10 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
                         }
                     }
                 } else {
-                    log::error!("[sig_exec] SigDetail should be Kill, but got: {:?}", si.details);
+                    log::error!(
+                        "[sig_exec] SigDetail should be Kill, but got: {:?}",
+                        si.details
+                    );
                     panic!("sig_exec: unexpected siginfo details");
                 };
                 new_sp -= size_of::<LinuxSigInfo>();

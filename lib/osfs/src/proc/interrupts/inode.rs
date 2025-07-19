@@ -32,7 +32,7 @@ impl Inode for InterruptsInode {
         let inner = self.meta.inner.lock();
         let mode = inner.mode.bits();
         Ok(Stat {
-            st_dev: 0,
+            st_dev: 0, // non-real-file
             st_ino: self.meta.ino as u64,
             st_mode: mode,
             st_nlink: 1,

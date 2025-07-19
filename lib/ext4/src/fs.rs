@@ -38,7 +38,7 @@ impl FileSystemType for ExtFsType {
         dev: Option<Arc<dyn driver::BlockDevice>>,
     ) -> SysResult<Arc<dyn Dentry>> {
         assert!(dev.is_some());
-        let meta = SuperBlockMeta::new(dev, self.clone());
+        let meta = SuperBlockMeta::new(dev, self.clone(), 0x1);
         let superblock = ExtSuperBlock::new(meta);
         let root_dir = ExtDir::open(CString::new("/").unwrap().as_c_str())?;
         let root_inode = ExtDirInode::new(superblock.clone(), root_dir);

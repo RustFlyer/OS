@@ -1,7 +1,8 @@
 use alloc::{
     collections::BTreeMap,
     string::{String, ToString},
-    sync::Arc,
+    sync::{Arc, Weak},
+    vec::Vec,
 };
 
 use config::vfs::MountFlags;
@@ -9,11 +10,12 @@ use driver::BlockDevice;
 use mutex::SpinNoIrqLock;
 use systype::error::{SysError, SysResult};
 
-use crate::{dentry::Dentry, superblock::SuperBlock};
+use crate::{dentry::Dentry, inode::Inode, superblock::SuperBlock};
 
 pub struct FileSystemTypeMeta {
     name: String,
     pub sblks: SpinNoIrqLock<BTreeMap<String, Arc<dyn SuperBlock>>>,
+    pub inodes: SpinNoIrqLock<Vec<Weak<dyn Inode>>>,
 }
 
 impl FileSystemTypeMeta {
@@ -21,6 +23,7 @@ impl FileSystemTypeMeta {
         Self {
             name: name.to_string(),
             sblks: SpinNoIrqLock::new(BTreeMap::new()),
+            inodes: SpinNoIrqLock::new(Vec::new()),
         }
     }
 }
@@ -47,6 +50,41 @@ pub trait FileSystemType: Send + Sync {
 
     fn name(&self) -> String {
         self.get_meta().name.clone()
+    }
+
+    /// this function can look for inode in queue in each filesystem and
+    /// return the inode which has inodeid.
+    ///
+    /// when a dentry is opened, the related inode is pushed into the queue.
+    fn get_inode_by_id(&self, inodeid: u64) -> Option<Arc<dyn Inode>> {
+        let lock = &self.get_meta().inodes;
+        let mut inodes = lock.lock();
+
+        let mut rm_vec = Vec::new();
+        let mut ret_inode = None;
+
+        // find specified inode
+        for (id, inode) in inodes.iter().enumerate() {
+            let inode = inode.upgrade();
+            if inode.is_some() {
+                let inode = inode.unwrap();
+                if inode.ino() == inodeid as usize {
+                    ret_inode = Some(inode);
+                    break;
+                }
+                continue;
+            }
+
+            rm_vec.push(id);
+        }
+
+        // remove dead inode
+        rm_vec.reverse();
+        for id in rm_vec {
+            inodes.remove(id);
+        }
+
+        ret_inode
     }
 }
 

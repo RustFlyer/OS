@@ -14,6 +14,7 @@ use vfs::{
 
 use crate::simple::{dentry::SimpleDentry, inode::SimpleInode};
 
+pub mod full;
 pub mod loopx;
 pub mod null;
 pub mod rtc;
@@ -80,7 +81,7 @@ impl DevSuperBlock {
         fs_type: Arc<dyn FileSystemType>,
     ) -> Arc<Self> {
         Arc::new(Self {
-            meta: SuperBlockMeta::new(device, fs_type),
+            meta: SuperBlockMeta::new(device, fs_type, 1),
         })
     }
 }

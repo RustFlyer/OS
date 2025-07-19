@@ -17,7 +17,7 @@ impl EtcSuperBlock {
         fs_type: Arc<dyn FileSystemType>,
     ) -> Arc<Self> {
         Arc::new(Self {
-            meta: SuperBlockMeta::new(device, fs_type),
+            meta: SuperBlockMeta::new(device, fs_type, 3),
         })
     }
 }
