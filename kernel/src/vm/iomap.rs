@@ -1,7 +1,6 @@
 use alloc::collections::btree_map::BTreeMap;
 
 use config::mm::{KERNEL_MAP_OFFSET, PAGE_SIZE};
-use driver::println;
 use mm::address::VirtAddr;
 use mutex::SpinNoIrqLock;
 use systype::{error::SysResult, memory_flags::MappingFlags};
@@ -24,13 +23,8 @@ pub fn ioremap(paddr: usize, length: usize) -> SysResult<()> {
     let prot = MappingFlags::R | MappingFlags::W;
     let area = VmArea::new_kernel(start_va, end_va, prot);
 
-    println!("KERNEL_PAGE_TABLE map(by lock)");
     OffsetArea::map(&area, &mut KERNEL_PAGE_TABLE.lock());
-    println!("KERNEL_PAGE_TABLE map(by lock) over");
-
-    println!("IO_MAPPINGS map(by lock)");
     IO_MAPPINGS.lock().insert(start_va, length);
-    println!("IO_MAPPINGS insert(by lock) over");
 
     log::debug!("I/O memory mapped at {:#x} with size {:#x}", paddr, length);
 

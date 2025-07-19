@@ -29,7 +29,7 @@ use arch::{
     mm::{fence, tlb_flush_all},
     trap::disable_interrupt,
 };
-use config::mm::{DTB_END, DTB_START};
+use config::mm::{DTB_ADDR, DTB_END, DTB_START};
 use driver::println;
 use logging::{disable_log, enable_log};
 use mm::{self, frame, heap};
@@ -53,19 +53,22 @@ pub static NIGHTHAWK_OS_BANNER: &str = r#"
 
 pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
     disable_interrupt();
-    println!("hart id: {}", hart_id);
+    println!("hart id: {}, dtb_addr: {:#x}", hart_id, dtb_addr);
     executor::init(hart_id);
     logger::init();
     enable_log();
-    tlb_flush_all();
 
     // SAFETY: Only the first hart will run this code block.
     if unsafe { !INITIALIZED } {
         println!("print init");
         /* Initialize logger */
 
+        println!("hart id: {}, dtb_addr: {:#p}", hart_id, &dtb_addr);
+        boot::clear_bss();
+
         // too much log delay, cut up!
         disable_log();
+        println!("hart id: {}, dtb_addr: {:#p}", hart_id, &dtb_addr);
 
         println!("disable_log");
 
@@ -81,10 +84,10 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         println!("mem init");
         /* Initialize heap allocator and page table */
         unsafe {
-            config::mm::DTB_ADDR = dtb_addr;
-            log::info!("hart {}: initialized DTB_ADDR {:#x}", hart_id, dtb_addr);
+            DTB_ADDR = dtb_addr;
 
             println!("try to init heap");
+
             heap::init_heap_allocator();
             log::info!("hart {}: initialized heap allocator", hart_id);
             println!("init_heap_allocator");
@@ -96,39 +99,38 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
             vm::switch_to_kernel_page_table();
             log::info!("hart {}: switched to kernel page table", hart_id);
             println!("switch_to_kernel_page_table");
-            tlb_flush_all();
 
             fence();
             ptr::write_volatile(&raw mut INITIALIZED, true);
         }
         println!("memory init success");
 
-        log::info!(
+        println!(
             "kernel physical memory: {:#x} - {:#x}",
             config::mm::KERNEL_START_PHYS,
             config::mm::kernel_end_phys(),
         );
-        log::info!(
+        println!(
             "kernel virtual memory: {:#x} - {:#x}",
             config::mm::KERNEL_START,
             config::mm::kernel_end()
         );
-        log::info!(
+        println!(
             ".text {:#x} - {:#x}",
             config::mm::text_start(),
             config::mm::text_end()
         );
-        log::info!(
+        println!(
             ".rodata {:#x} - {:#x}",
             config::mm::rodata_start(),
             config::mm::rodata_end()
         );
-        log::info!(
+        println!(
             ".data {:#x} - {:#x}",
             config::mm::data_start(),
             config::mm::data_end()
         );
-        log::info!(
+        println!(
             ".bss {:#x} - {:#x}",
             config::mm::bss_start(),
             config::mm::bss_end()
@@ -166,6 +168,7 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
             config::board::HARTS_NUM += 1;
         }
         println!("[HART {}] INIT SUCCESS", hart_id);
+        panic!("multi-core unsupported");
     }
 
     #[cfg(target_arch = "loongarch64")]

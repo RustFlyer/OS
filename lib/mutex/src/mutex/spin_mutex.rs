@@ -57,7 +57,11 @@ impl<T, S: MutexSupport> SpinMutex<T, S> {
         let support_guard = S::before_lock();
 
         loop {
-            // logger::lprintln!("one unlock and take {}", self.lock.load(Ordering::Relaxed));
+            // logger::lprintln!(
+            //     "Lock address: {:p}, value: {}",
+            //     &self.lock,
+            //     self.lock.load(Ordering::Relaxed)
+            // );
             self.wait_unlock();
 
             if self

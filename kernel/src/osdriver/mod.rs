@@ -19,6 +19,7 @@ use crate::vm::iomap::ioremap;
 
 #[allow(unused)]
 pub fn probe_device_tree() {
+    println!("DTB_ADDR: {:#x}", unsafe { DTB_ADDR });
     let mut dtb_addr = unsafe { DTB_ADDR };
     println!("[CONSOLE] INIT SUCCESS");
 
@@ -26,7 +27,7 @@ pub fn probe_device_tree() {
     println!("[DEVICE-MANAGER] INIT SUCCESS");
 
     #[cfg(target_arch = "riscv64")]
-    ioremap(dtb_addr, 24 * 1024).expect("can not ioremap");
+    ioremap(dtb_addr, 0xe865).expect("can not ioremap");
 
     #[cfg(target_arch = "loongarch64")]
     unsafe {
