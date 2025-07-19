@@ -105,10 +105,15 @@ pub fn sys_fanotify_mark(
     if flags.contains(FanMarkFlags::MOUNT)
         && !mask
             .intersection(
-                FanEventMask::CREATE
-                    | FanEventMask::ATTRIB
-                    | FanEventMask::MOVE
-                    | FanEventMask::DELETE_SELF,
+                FanEventMask::ATTRIB
+                    | FanEventMask::CREATE
+                    | FanEventMask::DELETE
+                    | FanEventMask::DELETE_SELF
+                    | FanEventMask::FS_ERROR
+                    | FanEventMask::MOVED_FROM
+                    | FanEventMask::MOVED_TO
+                    | FanEventMask::RENAME
+                    | FanEventMask::MOVE_SELF,
             )
             .is_empty()
     {
@@ -195,7 +200,7 @@ pub fn sys_fanotify_mark(
     } else {
         // Create a new entry for the object in the fanotify group.
         if flags.contains(FanMarkFlags::ADD) {
-            group.create_entry(object, mark, ignore);
+            group.add_entry(object, mark, ignore);
         } else {
             return Err(SysError::ENOENT);
         }

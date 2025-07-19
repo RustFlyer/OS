@@ -59,8 +59,11 @@ impl FanotifyGroup {
         }
     }
 
-    /// Creates an fanotify entry for the specified filesystem object in the group,
-    /// and registers it on the object.
+    /// Subscribes to events on a filesystem object.
+    ///
+    /// This method creates an entry in the fanotify group for the specified filesystem
+    /// object, with the specified mark and ignore masks. After this call, the group will
+    /// receive events of interest for the object.
     ///
     /// `object_id` is the identifier for `object`, which is used as the key in the
     /// fanotify group's entry map.
@@ -68,12 +71,7 @@ impl FanotifyGroup {
     /// `object` must contains a valid weak reference to a filesystem object.
     ///
     /// The object must not already have an entry in the group.
-    pub fn create_entry(
-        self: &Arc<Self>,
-        object: FsObject,
-        mark: FanEventMask,
-        ignore: FanEventMask,
-    ) {
+    pub fn add_entry(self: &Arc<Self>, object: FsObject, mark: FanEventMask, ignore: FanEventMask) {
         let entry = Arc::new(FanotifyEntry {
             group: Arc::downgrade(self),
             object,
@@ -120,14 +118,12 @@ impl FanotifyGroup {
     }
 
     /// Gets an entry in the fanotify group by its object ID.
-    pub fn get_entry(
-        &self,
-        object_id: FsObjectId,
-    ) -> Option<Arc<FanotifyEntry>> {
+    pub fn get_entry(&self, object_id: FsObjectId) -> Option<Arc<FanotifyEntry>> {
         self.entries.lock().get(&object_id).cloned()
     }
 
-    /// Removes an entry from the fanotify group.
+    /// Unsubscribes from events on a filesystem object. After this call, the group
+    /// will no longer receive events for the object.
     pub fn remove_entry(&self, object_id: FsObjectId) -> Option<Arc<FanotifyEntry>> {
         self.entries.lock().remove(&object_id)
     }
