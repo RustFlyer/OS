@@ -98,11 +98,11 @@ pub enum SysError {
     ENOSYS = 38,
     /// Directory not empty
     ENOTEMPTY = 39,
-    /// Inode is null
-    ENINODE = 40,
-    /// no data
+    /// Trap in Infinite loop
+    ELOOP = 40,
+    /// No data
     ENODATA = 61,
-    // too much data
+    /// Too much data
     EOVERFLOW = 75,
     /// Socket operation on non-socket
     ENOTSOCK = 88,
@@ -129,10 +129,10 @@ pub enum SysError {
     /// The socket is nonblocking and the connection cannot be completed
     /// immediately.(connect.2)
     EINPROGRESS = 115,
+    /// Stale file.
+    ESTALE = 116,
     /// UTF-8 Convert Failed
     EUTFFAIL = 188,
-    /// Trap in Infinite loop
-    ELOOP = 1001,
 }
 
 impl SysError {
@@ -179,8 +179,9 @@ impl SysError {
             ENOLCK => "No record locks available",
             ENOSYS => "Invalid system call number",
             ENOTEMPTY => "Directory not empty",
-            ENINODE => "Inode is null",
+            ESTALE => "Inode is null",
             ENODATA => "no data",
+            ELOOP => "Trap in Infinite loop",
             EOVERFLOW => "too much data",
             ENOTSOCK => "Socket operation on non-socket",
             ENOPROTOOPT => "Protocol not available",
@@ -194,8 +195,8 @@ impl SysError {
             ECONNREFUSED => "Connection refused",
             ECONNRESET => "Connection reset",
             EINPROGRESS => "Operation now in progress",
+            ESTALE => "Stale file handle",
             EUTFFAIL => "UTF-8 Convert Failed",
-            ELOOP => "Trap in Infinite loop",
         }
     }
 

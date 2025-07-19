@@ -50,7 +50,7 @@ use timer::{TimedTaskResult, TimeoutFuture};
 use vfs::{
     dentry::Dentry,
     file::File,
-    handle::{FileHandle, FileHandleData, FileHandleHeader},
+    handle::{FileHandle, FileHandleData, FileHandleHeader, HANDLE_LEN},
     kstat::Kstat,
     path::{Path, split_parent_and_name},
 };
@@ -58,7 +58,7 @@ use vfs::{
 use crate::{
     logging::enable_log,
     processor::current_task,
-    task::{TaskState, sig_members::IntrBySignalFuture, signal::sig_info::SigSet},
+    task::{sig_members::IntrBySignalFuture, signal::sig_info::SigSet, TaskState},
     vm::user_ptr::{UserReadPtr, UserReadWritePtr, UserWritePtr},
 };
 
@@ -2812,7 +2812,7 @@ pub fn sys_name_to_handle_at(
     // Check the flags.
     let flags = AtFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
     if !flags
-        .intersection(AtFlags::AT_HANDLE_FID | AtFlags::AT_EMPTY_PATH | AtFlags::AT_SYMLINK_FOLLOW)
+        .difference(AtFlags::AT_HANDLE_FID | AtFlags::AT_EMPTY_PATH | AtFlags::AT_SYMLINK_FOLLOW)
         .is_empty()
     {
         return Err(SysError::EINVAL);
@@ -2859,7 +2859,7 @@ pub fn sys_name_to_handle_at(
             handle.handle_bytes()
         );
         // Return the required size in the header.
-        user_handle_header.set_handle_bytes(handle.handle_bytes());
+        user_handle_header.set_handle_bytes(HANDLE_LEN as u32);
         unsafe {
             UserWritePtr::<FileHandleHeader>::new(handle_ptr, &addrspace)
                 .write(user_handle_header)?;
@@ -2884,11 +2884,41 @@ pub fn sys_name_to_handle_at(
     Ok(0)
 }
 
-pub fn sys_open_by_handle_at(mount_id: i32, handle_ptr: usize, flags: i32) -> SyscallResult {
+pub fn sys_open_by_handle_at(mount_fd: i32, handle_ptr: usize, flags: i32) -> SyscallResult {
     let task = current_task();
     let addrspace = task.addr_space();
 
     let flags = OpenFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
+
+    log::info!("[sys_open_by_handle_at] mount_fd: {}", mount_fd);
+
+    if !task.capability().effective[0] & (1 << 2) != 0 {
+        log::warn!("[sys_open_by_handle_at] permission denied: CAP_DAC_READ_SEARCH not set");
+        return Err(SysError::EPERM);
+    }
+
+    let mount_atfd = AtFd::from(mount_fd as isize);
+    let mount_dentry = match mount_atfd {
+        AtFd::FdCwd => task.cwd().lock().clone(),
+        AtFd::Normal(fd) => task.with_mut_fdtable(|t| t.get_file(fd))?.dentry(),
+    };
+    let mount_fs = mount_dentry
+        .inode()
+        .unwrap()
+        .get_meta()
+        .superblock
+        .fs_type();
+    match mount_fs.name().as_ref() {
+        "ext4" | "tmpfs" => {}
+        _ => {
+            // These filesystems do not support open by handle.
+            log::warn!(
+                "[sys_open_by_handle_at] unsupported filesystem: {}",
+                mount_fs.name()
+            );
+            return Err(SysError::ESTALE);
+        }
+    }
 
     // Read the file handle header
     let handle_header = {
@@ -2901,7 +2931,7 @@ pub fn sys_open_by_handle_at(mount_id: i32, handle_ptr: usize, flags: i32) -> Sy
     let handle_type = handle_header.handle_type();
 
     // Validate handle parameters.
-    if handle_bytes == 0 {
+    if handle_bytes == 0 || handle_bytes > HANDLE_LEN as u32 {
         return Err(SysError::EINVAL);
     }
 
@@ -2917,23 +2947,23 @@ pub fn sys_open_by_handle_at(mount_id: i32, handle_ptr: usize, flags: i32) -> Sy
         FileHandleData::from_raw_bytes(handle_data_bytes)?
     };
 
-    // Validate the mount ID. Currently, we only have mount ID 0.
-    let mount_atfd = AtFd::from(mount_id as isize);
-    if let AtFd::Normal(fd) = mount_atfd {
-        if fd != 0 {
-            return Err(SysError::EINVAL);
-        }
-    }
-
     log::info!(
-        "[sys_open_by_handle_at] mount_id: {}, file_path: {}",
-        mount_id,
-        handle_data.path()
+        "[sys_open_by_handle_at] file handle path: {}, flags: {:?}",
+        handle_data.path(),
+        flags
     );
 
     // Find the dentry for the file path.
-    let dentry = task.walk_at(AtFd::FdCwd, handle_data.path().to_string())?;
-    let inode = dentry.inode().ok_or(SysError::ENOENT)?;
+    let dentry = task
+        .walk_at(AtFd::FdCwd, handle_data.path().to_string())
+        .map_err(|err| match err {
+            SysError::ENOENT => SysError::ESTALE,
+            _ => err,
+        })?;
+    let inode = dentry.inode().ok_or(SysError::ESTALE)?;
+    if inode.inotype().is_symlink() && !flags.contains(OpenFlags::O_PATH) {
+        return Err(SysError::ELOOP);
+    }
 
     let _cred = task.perm_mut();
     let cred = _cred.lock();
