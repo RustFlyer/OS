@@ -234,7 +234,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         SIGNALFD64 => sys_signalfd4(args[0] as isize, args[1], args[2], args[3] as u32).await,
         TIMERFD_CREATE => sys_timerfd_create(args[0], args[1] as u32).await,
         NAME_TO_HANDLE_AT => {
-            sys_name_to_handle_at(args[0], args[1], args[2], args[3], args[4] as i32)
+            sys_name_to_handle_at(args[0] as i32, args[1], args[2], args[3], args[4] as i32)
         }
         OPEN_BY_HANDLE_AT => sys_open_by_handle_at(args[0] as i32, args[1], args[2] as i32),
         _ => {
