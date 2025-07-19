@@ -3,7 +3,7 @@ use alloc::{collections::BTreeMap, string::String, sync::Arc};
 use config::vfs::OpenFlags;
 use mutex::ShareMutex;
 use osfs::{dev::loopx::externf::KernelTableIf, fd_table::FdTable, proc::KernelProcIf};
-use systype::error::SysResult;
+use systype::{error::SysResult, kinterface::KernelTaskOperations};
 use vfs::{fanotify::kinterface::KernelFdTableOperations, file::File};
 
 use super::manager::TASK_MANAGER;
@@ -70,5 +70,18 @@ impl KernelFdTableOperations for KernelFdTableOperationsImpl {
             .lock()
             .alloc(file, flags)
             .map(|fd| fd as i32)
+    }
+}
+
+struct KernelTaskOperationsImpl;
+
+#[crate_interface::impl_interface]
+impl KernelTaskOperations for KernelTaskOperationsImpl {
+    fn current_pid() -> i32 {
+        current_task().pid() as i32
+    }
+
+    fn current_tid() -> i32 {
+        current_task().tid() as i32
     }
 }

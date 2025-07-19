@@ -168,9 +168,9 @@ pub struct FanotifyEventInfoHeader {
 /// Enum representing an fanotify metadata structure or an information record structure.
 #[derive(Clone)]
 pub enum FanotifyEventData {
-    /// Fanotify event metadata. The first element is an uncomplete metadata. The second
-    /// element is an open file to the monitored filesystem object, which is to be added
-    /// to the process's file descriptor table when the event is read.
+    /// Fanotify event metadata. The first element is an incomplete metadata. The second
+    /// element is an open file to the filesystem object which triggered the event, which
+    /// is to be added to the process's file descriptor table when the event is read.
     Metadata((FanotifyEventMetadata, Arc<dyn File>)),
     Info(FanotifyEventInfoFid),
     Pid(FanotifyEventInfoPid),
@@ -229,11 +229,24 @@ bitflags! {
         /// A file or a directory was accessed (read).
         const ACCESS = FAN_ACCESS;
 
+        /// A file was modified.
+        const MODIFY = FAN_MODIFY;
+
+        /// A file or directory was opened for writing (`O_WRONLY` or `O_RDWR`) was
+        /// closed.
+        const CLOSE_WRITE = FAN_CLOSE_WRITE;
+
+        /// A file or directory that was opened read-only (`O_RDONLY`) was closed.
+        const CLOSE_NOWRITE = FAN_CLOSE_NOWRITE;
+
         /// A file or a directory was opened.
         const OPEN = FAN_OPEN;
 
         /// A file or a directory was opened with the intent to be executed.
         const OPEN_EXEC = FAN_OPEN_EXEC;
+
+        // The following flags requires the fanotify group to identify filesystem objects
+        // by file handles.
 
         /// A file or a directory metadata was changed.
         const ATTRIB = FAN_ATTRIB;
@@ -250,35 +263,21 @@ bitflags! {
         /// A filesystem error was detected.
         const FS_ERROR = FAN_FS_ERROR;
 
-        /// A file or directory has been moved to or from a watched parent directory.
-        const RENAME = FAN_RENAME;
-
         /// A file or directory has been moved from a watched parent directory.
         const MOVED_FROM = FAN_MOVED_FROM;
 
         /// A file or directory has been moved to a watched parent directory.
         const MOVED_TO = FAN_MOVED_TO;
 
+        /// A file or directory has been moved to or from a watched parent directory.
+        const RENAME = FAN_RENAME;
+
         /// A watched file or directory was modified.
         const MOVE_SELF = FAN_MOVE_SELF;
 
-        /// A file was modified.
-        const MODIFY = FAN_MODIFY;
-
-        /// A file or directory was opened for writing (`O_WRONLY` or `O_RDWR`) was
-        /// closed.
-        const CLOSE_WRITE = FAN_CLOSE_WRITE;
-
-        /// A file or directory that was opened read-only (`O_RDONLY`) was closed.
-        const CLOSE_NOWRITE = FAN_CLOSE_NOWRITE;
-
-        /// The event queue exceeded the limit on number of events. This limit can be
-        /// overridden by specifying the `FAN_UNLIMITED_QUEUE` flag when calling
-        /// `fanotify_init`.
-        const Q_OVERFLOW = FAN_Q_OVERFLOW;
-
-        // Each of the following constants is a bit corresponding to a fanotify
-        // permission event.
+        // The following constants is a bit corresponding to a fanotify permission event.
+        // They require the fanotify group to be initialized with `FAN_CLASS_CONTENT` or
+        // `FAN_CLASS_PRE_CONTENT`.
 
         /// An application wants to read a file or directory, for example using `read`
         /// or `readdir`. The reader must write a response that determines whether the
@@ -311,6 +310,12 @@ bitflags! {
 
         /// Events for the immediate children of marked directories shall be created.
         const EVENT_ON_CHILD = FAN_EVENT_ON_CHILD;
+
+        /// This flag is not an event, but a special flag that indicates that the
+        /// event queue has exceeded the limit on the number of events. This limit can be
+        /// overridden by specifying the `FAN_UNLIMITED_QUEUE` flag when calling
+        /// `fanotify_init`.
+        const Q_OVERFLOW = FAN_Q_OVERFLOW;
     }
 }
 

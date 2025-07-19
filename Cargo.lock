@@ -985,6 +985,7 @@ name = "systype"
 version = "0.1.0"
 dependencies = [
  "bitflags 2.9.1",
+ "crate_interface",
  "strum",
 ]
 
