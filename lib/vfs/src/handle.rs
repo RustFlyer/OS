@@ -61,13 +61,21 @@ impl FileHandleHeader {
         self.handle_bytes
     }
 
+    pub fn set_handle_bytes(&mut self, handle_bytes: u32) {
+        self.handle_bytes = handle_bytes;
+    }
+
     pub fn handle_type(&self) -> i32 {
         self.handle_type
     }
 
     /// Converts the `handle_bytes` and `handle_type` fields of the Linux `file_handle`
     /// structure as bytes to a [`FileHandleHeader`].
-    pub fn from_raw_bytes(bytes: &[u8; 8]) -> Self {
+    ///
+    /// `bytes` must be 8 bytes long.
+    pub fn from_raw_bytes(bytes: &[u8]) -> Self {
+        debug_assert!(bytes.len() == 8);
+
         let handle_bytes = u32::from_ne_bytes(bytes[0..4].try_into().unwrap());
         let handle_type = i32::from_ne_bytes(bytes[4..8].try_into().unwrap());
         FileHandleHeader {
@@ -85,7 +93,7 @@ pub struct FileHandleData {
 }
 
 impl FileHandleData {
-    pub fn path(&self) -> &String {
+    pub fn path(&self) -> &str {
         &self.path
     }
 
