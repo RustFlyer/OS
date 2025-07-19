@@ -27,7 +27,7 @@ pub struct FanotifyGroupSuperBlock {
 impl FanotifyGroupSuperBlock {
     /// Creates a new fanotify event file superblock.
     pub fn new(device: Option<Arc<dyn BlockDevice>>, fs_type: Arc<dyn FileSystemType>) -> Self {
-        let meta = SuperBlockMeta::new(device, fs_type);
+        let meta = SuperBlockMeta::new(device, fs_type, 0);
         Self { meta }
     }
 }

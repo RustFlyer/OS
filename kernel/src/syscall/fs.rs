@@ -2819,7 +2819,7 @@ pub fn sys_name_to_handle_at(
 
     // handle info
     let handle_type = 0x1ef;
-    let handle: [u8; 8] = inode_number.to_le_bytes();
+    let handle: [u8; 4] = inode_number.to_le_bytes();
     let handle_len = handle.len() as u32;
 
     let mut user_handle_bytes = UserWritePtr::<u32>::new(handleptr, &addrspace);

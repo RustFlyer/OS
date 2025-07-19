@@ -18,7 +18,7 @@ use systype::{
     time::TimeSpec,
 };
 
-use crate::{fanotify::FanotifyEntry, stat::Stat, superblock::SuperBlock};
+use crate::{fanotify::FanotifyEntry, file::File, stat::Stat, superblock::SuperBlock};
 
 /// Data that is common to all inodes.
 pub struct InodeMeta {
