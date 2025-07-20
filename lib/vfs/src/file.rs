@@ -211,14 +211,14 @@ impl dyn File {
             return Err(SysError::ENOENT);
         }
 
-        dentry
-            .superblock()
-            .unwrap()
-            .fs_type()
-            .get_meta()
-            .inodes
-            .lock()
-            .push(Arc::downgrade(&dentry.inode().unwrap()));
+        // dentry
+        //     .superblock()
+        //     .unwrap()
+        //     .fs_type()
+        //     .get_meta()
+        //     .inodes
+        //     .lock()
+        //     .push(Arc::downgrade(&dentry.inode().unwrap()));
 
         Arc::clone(&dentry).base_open()
     }

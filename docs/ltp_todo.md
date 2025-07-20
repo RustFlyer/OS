@@ -5,7 +5,7 @@
 - [ ] [   4] fanotify14                 334
 - [x] [   5] epoll_ctl03                256             256
 - [ ] [   6] fanotify13                 200
-- [x] [   7] access01                   199             181    
+- [x] [   7] access01                   199             181
 - [ ] [   8] memfd_create01             157
 - [x] [   9] waitpid01                  126             126
 - [ ] [  10] pkey01                     108
@@ -48,7 +48,7 @@
 - [x] [  47] signal05                    30             31
 - [ ] [  48] open11                      28
 - [x] [  49] signal04                    28             28
-- [ ] [  50] name_to_handle_at01         27
+- [x] [  50] name_to_handle_at01         27
 - [ ] [  51] fsconfig02                  26
 - [x] [  52] fgetxattr01                 25             15
 - [ ] [  53] process_vm01                25

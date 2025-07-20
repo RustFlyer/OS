@@ -77,7 +77,7 @@ impl Task {
         let manager = self.sig_manager_mut();
         manager.add(si);
 
-        log::warn!("[Task::recv] tid {} received signal {}", self.tid(), si.sig,);
+        log::info!("[Task::recv] tid {} received signal {}", self.tid(), si.sig,);
 
         if matches!(
             si.sig,

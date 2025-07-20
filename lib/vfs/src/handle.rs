@@ -1,6 +1,10 @@
-use alloc::{string::String, vec::Vec};
+use core::ffi::CStr;
+
+use alloc::{string::{String, ToString}, vec::Vec};
 
 use systype::error::{SysError, SysResult};
+
+pub const HANDLE_LEN: usize = 128;
 
 /// Internal representation of a Linux `file_handle` structure.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -14,7 +18,7 @@ impl FileHandle {
     pub fn new(handle_type: i32, path: String) -> Self {
         FileHandle {
             header: FileHandleHeader {
-                handle_bytes: path.len() as u32,
+                handle_bytes: HANDLE_LEN as u32,
                 handle_type,
             },
             data: FileHandleData { path },
@@ -35,10 +39,13 @@ impl FileHandle {
 
     /// Converts the `FileHandle` to Linux `file_handle` structure as a byte vector.
     pub fn to_raw_bytes(&self) -> Vec<u8> {
-        let mut bytes = Vec::with_capacity(8 + self.header.handle_bytes as usize);
-        bytes.extend_from_slice(&self.header.handle_bytes.to_ne_bytes());
-        bytes.extend_from_slice(&self.header.handle_type.to_ne_bytes());
-        bytes.extend_from_slice(self.data.path.as_bytes());
+        debug_assert!(self.data.path.len() < HANDLE_LEN, "Path length exceeds HANDLE_LEN bytes");
+
+        let mut bytes = vec![0; 8 + HANDLE_LEN];
+        bytes[0..4].copy_from_slice(&self.header.handle_bytes.to_ne_bytes());
+        bytes[4..8].copy_from_slice(&self.header.handle_type.to_ne_bytes());
+        bytes[8..8 + self.data.path.len()].copy_from_slice(self.data.path.as_bytes());
+        bytes[8 + self.data.path.len()] = 0; // Null-terminate
         bytes
     }
 }
@@ -48,10 +55,6 @@ impl FileHandle {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub struct FileHandleHeader {
-    /// The number of bytes in the handle, excluding the `handle_bytes` and `handle_type`
-    /// fields. This field is properly initialized when the [`FileHandle`] is created via
-    /// [`FileHandle::new`], and is set arbitrarily when it is converted from a Linux
-    /// `file_handle` structure via [`FileHandle::from_linux_file_handle`].
     handle_bytes: u32,
     handle_type: i32,
 }
@@ -100,7 +103,11 @@ impl FileHandleData {
     /// Converts the `handle` field of the Linux `file_handle` structure as bytes to a
     /// [`FileHandleData`].
     pub fn from_raw_bytes(bytes: &[u8]) -> SysResult<Self> {
-        let path = String::from_utf8(bytes.to_vec()).or(Err(SysError::EINVAL))?;
+        let cstr = CStr::from_bytes_until_nul(bytes)
+            .map_err(|_| SysError::EINVAL)?;
+        let path = cstr.to_str()
+            .map_err(|_| SysError::EINVAL)?
+            .to_string();
         Ok(FileHandleData { path })
     }
 }
