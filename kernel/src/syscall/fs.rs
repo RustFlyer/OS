@@ -2823,10 +2823,14 @@ pub fn sys_name_to_handle_at(
 
     // Find the target dentry.
     let dirfd = AtFd::from(dirfd as isize);
-    let mut dentry = if path.is_empty() && flags.contains(AtFlags::AT_EMPTY_PATH) {
-        match dirfd {
-            AtFd::FdCwd => task.cwd().lock().clone(),
-            AtFd::Normal(fd) => task.with_mut_fdtable(|t| t.get_file(fd))?.dentry(),
+    let mut dentry = if path.is_empty() {
+        if flags.contains(AtFlags::AT_EMPTY_PATH) {
+            match dirfd {
+                AtFd::FdCwd => task.cwd().lock().clone(),
+                AtFd::Normal(fd) => task.with_mut_fdtable(|t| t.get_file(fd))?.dentry(),
+            }
+        } else {
+            return Err(SysError::ENOENT);
         }
     } else {
         task.walk_at(dirfd, path)?
@@ -2841,17 +2845,31 @@ pub fn sys_name_to_handle_at(
         return Err(SysError::ENOENT);
     }
 
+    // Write the mount ID to the user space.
+    let mount_id = 0;
+    unsafe {
+        UserWritePtr::<i32>::new(mount_id_ptr, &addrspace).write(mount_id)?;
+    }
+
     // Create the file handle.
     let handle_type = 0x1ef;
     let path = dentry.path();
     let handle = FileHandle::new(handle_type, path);
 
-    // Check if the user buffer is large enough.
+    // Check if `handle_bytes` in the file handler provided by the user is valid.
     let mut user_handle_header = {
         let mut user_ptr = UserReadPtr::<u8>::new(handle_ptr, &addrspace);
         let header = unsafe { user_ptr.try_into_slice(8)? };
         FileHandleHeader::from_raw_bytes(header)
     };
+    if user_handle_header.handle_bytes() > HANDLE_LEN as u32 {
+        log::warn!(
+            "[sys_name_to_handle_at] handle_bytes too large: {}, max: {}",
+            user_handle_header.handle_bytes(),
+            HANDLE_LEN
+        );
+        return Err(SysError::EINVAL);
+    }
     if user_handle_header.handle_bytes() < handle.handle_bytes() {
         log::warn!(
             "[sys_name_to_handle_at] handle_bytes too small: {}, required: {}",
@@ -2873,12 +2891,6 @@ pub fn sys_name_to_handle_at(
         UserWritePtr::<u8>::new(handle_ptr, &addrspace)
             .try_into_mut_slice(file_handle_bytes.len())?
             .copy_from_slice(&file_handle_bytes);
-    }
-
-    // Write the mount ID to the user space.
-    let mount_id = 0;
-    unsafe {
-        UserWritePtr::<i32>::new(mount_id_ptr, &addrspace).write(mount_id)?;
     }
 
     Ok(0)
