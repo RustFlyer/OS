@@ -9,7 +9,7 @@ use alloc::{
 };
 use config::vfs::MountFlags;
 use dev::DevFsType;
-use driver::{BLOCK_DEVICE, BlockDevice};
+use driver::{BLOCK_DEVICE, BlockDevice, println};
 use mutex::SpinNoIrqLock;
 use proc::{fs::ProcFsType, init_procfs};
 use systype::error::{SysError, SysResult};
@@ -87,15 +87,15 @@ pub fn init() {
     register_dev();
 
     let diskfs = FS_MANAGER.lock().get(DISK_FS_NAME).unwrap().clone();
-    log::debug!("get ext4 diskfs");
+    println!("Get Ext4 Diskfs");
 
     let block_device = Some(BLOCK_DEVICE.get().unwrap().clone());
-    log::debug!("get BLOCK_DEVICE");
+    println!("Get BLOCK_DEVICE");
 
     let diskfs_root = diskfs
         .mount("/", None, MountFlags::empty(), block_device)
         .unwrap();
-    log::debug!("success mount diskfs");
+    println!("success mount diskfs");
 
     // let block_device2 = Some(BLOCK_DEVICE.get().unwrap().clone());
     // log::debug!("get BLOCK_DEVICE2");
@@ -115,20 +115,20 @@ pub fn init() {
     devfs
         .mount("dev", Some(diskfs_root.clone()), MountFlags::empty(), None)
         .unwrap();
-    log::debug!("success mount devfs");
+    println!("success mount devfs");
 
     let procfs = FS_MANAGER.lock().get("procfs").unwrap().clone();
     let procfs_dentry = procfs
         .mount("proc", Some(diskfs_root.clone()), MountFlags::empty(), None)
         .unwrap();
     init_procfs(procfs_dentry).unwrap();
-    log::debug!("success mount procfs");
+    println!("success mount procfs");
 
     let tmpfs = FS_MANAGER.lock().get("tmpfs").unwrap().clone();
     tmpfs
         .mount("tmp", Some(diskfs_root.clone()), MountFlags::empty(), None)
         .unwrap();
-    log::debug!("success mount tmpfs");
+    println!("success mount tmpfs");
 
     // let varfs = FS_MANAGER.lock().get("varfs").unwrap().clone();
     // varfs
@@ -141,17 +141,17 @@ pub fn init() {
         .mount("sys", Some(diskfs_root.clone()), MountFlags::empty(), None)
         .unwrap();
     init_sysfs(sysfs_dentry).unwrap();
-    log::debug!("success mount sysfs");
+    println!("success mount sysfs");
 
     let etcfs = FS_MANAGER.lock().get("etcfs").unwrap().clone();
     let etcfs_dentry = etcfs
         .mount("etc", Some(diskfs_root.clone()), MountFlags::empty(), None)
         .unwrap();
     init_etcfs(etcfs_dentry).unwrap();
-    log::debug!("success mount etcfs");
+    println!("success mount etcfs");
 
     SYS_ROOT_DENTRY.call_once(|| diskfs_root);
-    log::debug!("success init disk root");
+    println!("success init disk root");
 
     dev::tty::init().expect("dev-tty init fails");
     dev::rtc::init().expect("dev-rtc init fails");

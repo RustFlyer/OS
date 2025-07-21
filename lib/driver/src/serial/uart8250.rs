@@ -9,7 +9,7 @@ use core::fmt::Write;
 use bitflags::{Flags, bitflags};
 use log::info;
 
-use crate::wait_for;
+use crate::{println, wait_for};
 
 use super::UartDriver;
 
@@ -39,6 +39,7 @@ bitflags! {
 
 bitflags! {
     /// Line status flags
+    #[derive(Debug)]
     struct LineStsFlags: u8 {
         const INPUT_FULL = 1;
         // 1 to 4 unknown
@@ -169,7 +170,7 @@ impl Uart {
             // Enable interrupts now
             reg.byte_add(IER << self.reg_shift).write_volatile(0x01);
         }
-        info!("IER register: 0b{:b}", unsafe {
+        log::info!("IER register: 0b{:b}", unsafe {
             reg.byte_add(IER << self.reg_shift).read_volatile()
         });
     }

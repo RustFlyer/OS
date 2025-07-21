@@ -11,3 +11,7 @@ pub fn enable_external_interrupt() {
         );
     }
 }
+
+pub fn is_interrupt_on() -> bool {
+    true
+}

@@ -15,10 +15,14 @@ impl From<TrapMode> for RiscvTrapMode {
 
 pub fn init() {
     unsafe {
+        log::debug!("Enable timer interrupt");
         // Enable timer interrupt
         riscv::register::sie::set_stimer();
+
+        log::debug!("Enable interrupt");
         // Enable interrupt
         riscv::register::sstatus::set_sie();
+        // enable_interrupt()
     }
 }
 

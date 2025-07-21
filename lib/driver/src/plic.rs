@@ -23,6 +23,7 @@ impl PLIC {
     }
 
     pub fn enable_irq(&self, irq: usize, ctx_id: usize) {
+        log::error!("enable irq {irq}, ctx_id: {ctx_id}");
         let plic = (self.mmio_base + KERNEL_MAP_OFFSET) as *mut plic::Plic;
 
         // Setup PLIC

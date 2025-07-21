@@ -139,7 +139,11 @@ impl OSDevice for Serial {
 #[async_trait]
 impl CharDevice for Serial {
     async fn read(&self, buf: &mut [u8]) -> usize {
+        // println!("try to read");
         while !self.poll_in().await {
+            // println!("suspend whe read");
+            // log::error!("interrupt open: {}", arch::interrupt::is_interrupt_on());
+            // arch::interrupt::enable_external_interrupt();
             suspend_now().await;
             // spin_loop();
         }

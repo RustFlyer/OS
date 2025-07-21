@@ -32,6 +32,7 @@ use virtio_drivers::{
 
 use crate::osdriver::{
     ioremap_if_need, manager::device_manager, probe_char_device_by_serial, probe_cpu, probe_plic,
+    probe_sdio_blk,
 };
 
 pub fn probe_tree(fdt: &Fdt) {
@@ -49,15 +50,19 @@ pub fn probe_tree(fdt: &Fdt) {
             CHAR_DEVICE.call_once(|| serial);
             println!("[SERIAL] INIT SUCCESS");
         }
+
+        if let Some(sdio) = probe_sdio_blk(fdt) {
+            device_manager().add_device(sdio.dev_id(), sdio.clone());
+            BLOCK_DEVICE.call_once(|| sdio.clone());
+            println!("[SDIOBLK] INIT SUCCESS");
+        }
     } else {
         probe_char_device(fdt);
         println!("[CHAR] INIT SUCCESS");
     }
 
     if let Some(cpus) = probe_cpu(&fdt) {
-        let len = cpus.len();
         device_manager().set_cpus(cpus);
-        unsafe { HARTS_NUM = len };
     }
 
     for node in fdt.all_nodes() {
@@ -91,16 +96,20 @@ pub fn probe_tree(fdt: &Fdt) {
 fn handle_mmio_device(transport: MmioTransport<'static>) {
     match transport.device_type() {
         DeviceType::Block => {
-            log::info!("Init virtio-blk");
-            BLOCK_DEVICE.call_once(|| Arc::new(QVirtBlkDevice::new(transport)));
+            if BLOCK_DEVICE.get().is_none() {
+                println!("Init virtio-blk");
+                BLOCK_DEVICE.call_once(|| Arc::new(QVirtBlkDevice::new(transport)));
+            } else {
+                println!("virtio has been initialized!");
+            }
         }
         DeviceType::Network => {
-            log::info!("Init virtio-net");
+            println!("Init virtio-net");
             let dev = create_virt_net_dev(transport).expect("create virt net failed");
             init_network(dev, false);
         }
         DeviceType::Console => {
-            log::info!("Init virtio-console (char)");
+            println!("Init virtio-console (char)");
         }
         _ => log::warn!("Unknown MMIO device: {:?}", transport.device_type()),
     }

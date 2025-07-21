@@ -252,14 +252,6 @@ impl dyn File {
             self.base_read(buf, position).await?
         };
 
-        if buf.len() > 10 {
-            let slice = &buf[..10];
-            log::debug!("read {} bytes, buf = {:?}", bytes_read, slice);
-            if buf.len() >= 1024 {
-                log::debug!("buf[0] = {:?}", buf[0]);
-                log::debug!("buf[1023] = {:?}", buf[1023]);
-            }
-        }
         self.set_pos(position + bytes_read);
         Ok(bytes_read)
     }

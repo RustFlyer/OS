@@ -9,6 +9,8 @@ use mm::address::VirtAddr;
 use systype::memory_flags::MappingFlags;
 use timer::TIMER_MANAGER;
 
+use crate::osdriver;
+use crate::osdriver::manager::device_manager;
 use crate::{
     task::{
         Task,
@@ -101,15 +103,15 @@ pub fn user_exception_handler(task: &Task, e: Exception, stval: usize, sepc: usi
 }
 
 pub fn user_interrupt_handler(task: &Task, i: Interrupt) {
-    driver::println!("interrupt! {:?}", i);
+    log::error!("interrupt! {:?}", i);
     match i {
         Interrupt::SupervisorTimer => {
             set_nx_timer_irq();
             TRAP_STATS.inc(i.number());
         }
         Interrupt::SupervisorExternal => {
-            log::info!("[kernel] receive externel interrupt");
-            // driver::get_device_manager_mut().handle_irq();
+            log::error!("[user] receive externel interrupt");
+            device_manager().handle_irq();
             TRAP_STATS.inc(i.number());
         }
         _ => {

@@ -184,7 +184,10 @@ pub fn usershell() {
     let mut argstring = String::new();
     let mut isinit = false;
 
-    println!("{}", CMD_HELP);
+    // println!("{}", CMD_HELP);
+    CMD_HELP.split('\n').for_each(|s| {
+        println!("{}", s);
+    });
 
     loop {
         unsafe { PWD = current_working_path() };
@@ -231,13 +234,19 @@ pub fn riscv_init() {
         return;
     }
 
+    if chdir("musl") < 0 {
+        println!("The device uses disk-rv");
+        mkdir("/bin");
+        run_cmd("./busybox --install -s /bin");
+        return;
+    }
+
     mkdir("/bin");
     mkdir("/lib");
     mkdir("/usr");
 
     close(2);
 
-    chdir("musl");
     run_cmd("./busybox cp /musl/lib/libc.so /lib/ld-musl-riscv64-sf.so.1");
     run_cmd("./busybox cp /musl/lib/libc.so /lib/ld-musl-riscv64.so.1");
     println!("loading user lib: 20%");
@@ -271,6 +280,13 @@ pub fn loongarch_init() {
         return;
     }
 
+    if chdir("musl") < 0 {
+        println!("The device uses disk-la");
+        mkdir("/bin");
+        run_cmd("./busybox --install -s /bin");
+        return;
+    }
+
     mkdir("/bin");
     mkdir("/lib64");
     mkdir("/usr");
@@ -278,7 +294,6 @@ pub fn loongarch_init() {
 
     close(2);
 
-    chdir("/musl");
     run_cmd("./busybox cp /musl/lib/* /lib64/");
     println!("loading user lib: 20%");
 
