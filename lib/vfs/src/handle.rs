@@ -7,6 +7,15 @@ use systype::error::{SysError, SysResult};
 pub const HANDLE_LEN: usize = 128;
 
 /// Internal representation of a Linux `file_handle` structure.
+///
+/// The external representation is defined as:
+/// ```c
+/// struct file_handle {
+///     u32 handle_bytes; // size of the handle field in bytes
+///     i32 handle_type;  // type of the handle
+///     char handle[128]; // path to the file, null-terminated
+/// };
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FileHandle {
     header: FileHandleHeader,
@@ -15,7 +24,10 @@ pub struct FileHandle {
 
 impl FileHandle {
     /// Creates a new `FileHandle` with the specified handle type and file path.
-    pub fn new(handle_type: i32, path: String) -> Self {
+    ///
+    /// This function is crate-private; external code should call [`Dentry::file_handle`]
+    /// to create a [`FileHandle`] instead.
+    pub(crate) fn new(handle_type: i32, path: String) -> Self {
         FileHandle {
             header: FileHandleHeader {
                 handle_bytes: HANDLE_LEN as u32,
