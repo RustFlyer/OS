@@ -7,7 +7,11 @@ use systype::error::{SysError, SysResult, SyscallResult};
 
 use crate::file::{File, FileMeta};
 
-use super::super::{FanotifyGroup, types::FanotifyEventData};
+use super::super::{
+    FanotifyGroup,
+    constants::FAN_NOFD,
+    types::{FanInitFlags, FanotifyEventData},
+};
 use super::inode::FanotifyGroupInode;
 
 /// File implementation for fanotify group file descriptor.
@@ -52,16 +56,23 @@ impl FanotifyGroupFile {
                 }
 
                 // Add the event file to the process's file descriptor table.
-                let fd = match call_interface!(
-                    crate::fanotify::kinterface::KernelFdTableOperations::add_file(
-                        event_file,
-                        group.event_file_flags.into()
-                    )
-                ) {
-                    Ok(fd) => fd,
-                    Err(e) => {
-                        event_queue.push_front(event);
-                        return Err(e);
+                let fd = if group
+                    .flags
+                    .intersects(FanInitFlags::REPORT_FID | FanInitFlags::REPORT_DIR_FID)
+                {
+                    FAN_NOFD
+                } else {
+                    match call_interface!(
+                        crate::fanotify::kinterface::KernelFdTableOperations::add_file(
+                            event_file,
+                            group.event_file_flags.into()
+                        )
+                    ) {
+                        Ok(fd) => fd,
+                        Err(e) => {
+                            event_queue.push_front(event);
+                            return Err(e);
+                        }
                     }
                 };
 

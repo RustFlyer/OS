@@ -2852,9 +2852,7 @@ pub fn sys_name_to_handle_at(
     }
 
     // Create the file handle.
-    let handle_type = 0x1ef;
-    let path = dentry.path();
-    let handle = FileHandle::new(handle_type, path);
+    let handle = dentry.file_handle();
 
     // Check if `handle_bytes` in the file handler provided by the user is valid.
     let mut user_handle_header = {

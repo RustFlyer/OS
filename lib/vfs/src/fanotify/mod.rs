@@ -1,18 +1,24 @@
 use alloc::{
     collections::{btree_map::BTreeMap, vec_deque::VecDeque},
+    string::{String, ToString},
     sync::{Arc, Weak},
 };
+use core::mem;
+
+use crate_interface::call_interface;
 
 use mutex::SpinNoIrqLock;
 
-use crate::{
-    fanotify::types::{FanEventMask, FanotifyEventData},
-    file::File,
-    inode::Inode,
-    superblock::SuperBlock,
-};
+use crate::{dentry::Dentry, file::File, inode::Inode, superblock::SuperBlock};
 
-use self::types::{FanEventFileFlags, FanInitFlags};
+use self::{
+    constants::FANOTIFY_METADATA_VERSION,
+    types::{
+        FanEventFileFlags, FanEventMask, FanInitFlags, FanotifyEventData, FanotifyEventInfoFid,
+        FanotifyEventInfoFidInner, FanotifyEventInfoHeader, FanotifyEventInfoType,
+        FanotifyEventMetadata,
+    },
+};
 
 pub mod fs;
 
@@ -127,16 +133,6 @@ impl FanotifyGroup {
     pub fn remove_entry(&self, object_id: FsObjectId) -> Option<Arc<FanotifyEntry>> {
         self.entries.lock().remove(&object_id)
     }
-
-    /// Gets the flags of the fanotify group.
-    pub fn flags(&self) -> FanInitFlags {
-        self.flags
-    }
-
-    /// Gets the event file flags of the fanotify group.
-    pub fn event_file_flags(&self) -> FanEventFileFlags {
-        self.event_file_flags
-    }
 }
 
 /// An entry in a fanotify group.
@@ -201,13 +197,198 @@ impl FanotifyEntry {
         *self.ignore.lock() &= !ignore;
     }
 
-    /// Inserts an event or events into the event queue of the entry.
+    /// Publishes an event to the fanotify entry's event queue.
     ///
-    /// This method takes an iterator of [`FanotifyEventData`] and insert them into the
-    /// event queue of this entry in order. Every event must start with an fanotify
-    /// event metadata, followed by zero or more information records.
-    pub fn insert_event(&self, events: impl Iterator<Item = FanotifyEventData>) {
-        self.event_queue.lock().extend(events);
+    /// This method is called when the current task performs a filesystem action on a
+    /// filesystem object that may be monitored by this fanotify entry. A detailed
+    /// description of when this method should be called is provided below.
+    ///
+    /// This method checks whether the action is of interest to the entry (i.e., whether
+    /// it is in the mark mask and not in the ignore mask), and if so, it creates event
+    /// data for the action and adds them to the entry's event queue. The event data
+    /// starts with an fanotify event metadata, followed by zero or more information
+    /// records.
+    ///
+    /// # Parameters
+    ///
+    /// `object` is a reference to the filesystem object's dentry on which the event
+    /// occurred. By “occur on”, we mean:
+    /// - For file events occurred on a file (FAN_OPEN, FAN_ACCESS, FAN_CLOSE_NOWRITE,
+    ///   FAN_CLOSE_WRITE, etc.), this is the dentry of the accessed file.
+    /// - For file events occurred on a directory (FAN_OPEN, FAN_ACCESS,
+    ///   FAN_CLOSE_NOWRITE, etc.), this is the dentry of the accessed directory.
+    /// - For directory events occurred on a directory (FAN_CREATE, FAN_DELETE, etc.),
+    ///   this is the dentry of the directory whose dentries were modified.
+    /// - Some file events cannot occur on a directory, such as FAN_CLOSE_WRITE. All
+    ///   directory events cannot occur on a file. For these events, this method
+    ///   must not be called.
+    ///
+    /// `event` must contain one bit set, which specifies the event kind that occurred.
+    /// Additionally, it should contain FAN_ONDIR for file events which occurred on a
+    /// directory and for directory events where the directory's modified dentry is a
+    /// directory. Additionally, it should contain FAN_EVENT_ON_CHILD for file events
+    /// that occurred on a child of the directory that this fanotify entry is marked on.
+    ///
+    /// `old_name` and `new_name` are set as follows:
+    /// - For file events occurred on a file, both of them are the name of the accessed
+    ///   file.
+    /// - For file events occurred on a directory, both of them are `.`.
+    /// - For directory events occurred on a directory, both of them are the name of the
+    ///   directory's modified dentry that was modified. As a special case, for rename
+    ///   events, `old_name` and `new_name` are the names of the directory's dentry
+    ///   before and after being renamed, respectively.
+    ///
+    /// # Circumstances for calling this method
+    ///
+    /// If an event occurs on a filesystem object, then this method should be called
+    /// exactly on the following fanotify entries if they exist:
+    /// - The fanotify entry marked on the filesystem object itself.
+    /// - The fanotify entry marked on the parent directory of the filesystem object, if
+    ///   the event is a file event. FAN_EVENT_ON_CHILD is set in `event` in and only in
+    ///   this case.
+    /// - The fanotify entry marked on the mount that the filesystem object belongs to.
+    /// - The fanotify entry marked on the filesystem that the filesystem object belongs
+    ///   to.
+    pub fn publish(
+        &self,
+        object: &Arc<dyn Dentry>,
+        event: FanEventMask,
+        old_name: &str,
+        new_name: &str,
+    ) {
+        let mark = *self.mark.lock();
+        let ignore = *self.ignore.lock();
+
+        if !mark.difference(ignore).contains(event) {
+            return;
+        }
+
+        let group = self.group.upgrade().unwrap();
+        let group_flags = group.flags;
+
+        let mut event_data = VecDeque::new();
+        let event_file = <dyn File>::open(Arc::clone(object)).unwrap();
+
+        // Metadata.
+        let metadata = Self::create_metadata(group_flags, event);
+        event_data.push_back(FanotifyEventData::Metadata((metadata, event_file)));
+
+        // Information records.
+        if group_flags.contains(FanInitFlags::REPORT_FID) {
+            let info = Self::create_fid_info(object, FanotifyEventInfoType::Fid, None);
+            event_data.push_back(FanotifyEventData::Info(info));
+        }
+        if group_flags.contains(FanInitFlags::REPORT_DIR_FID) {
+            let reported_object = if object.inode().unwrap().inotype().is_dir() {
+                Some(Arc::clone(object))
+            } else {
+                object.parent()
+            };
+            if let Some(reported_object) = reported_object {
+                if !group_flags.contains(FanInitFlags::REPORT_NAME) {
+                    let info =
+                        Self::create_fid_info(&reported_object, FanotifyEventInfoType::Dfid, None);
+                    event_data.push_back(FanotifyEventData::Info(info));
+                } else if event.contains(FanEventMask::RENAME) {
+                    let info_old = Self::create_fid_info(
+                        &reported_object,
+                        FanotifyEventInfoType::OldDfidName,
+                        Some(old_name.to_string()),
+                    );
+                    let info_new = Self::create_fid_info(
+                        &reported_object,
+                        FanotifyEventInfoType::NewDfidName,
+                        Some(new_name.to_string()),
+                    );
+                    event_data.push_back(FanotifyEventData::Info(info_old));
+                    event_data.push_back(FanotifyEventData::Info(info_new));
+                } else {
+                    let info = Self::create_fid_info(
+                        &reported_object,
+                        FanotifyEventInfoType::DfidName,
+                        Some(old_name.to_string()),
+                    );
+                    event_data.push_back(FanotifyEventData::Info(info));
+                }
+            }
+        }
+
+        // Other information records should be added here...
+
+        // Set the event length in the metadata.
+        let event_len = event_data
+            .iter()
+            .map(|data| data.as_slice().len())
+            .sum::<usize>() as u32;
+        if let FanotifyEventData::Metadata((ref mut metadata, _)) = event_data[0] {
+            metadata.event_len = event_len;
+        } else {
+            unreachable!()
+        }
+
+        // Add the event data to the entry's event queue.
+        let mut event_queue = self.event_queue.lock();
+        event_queue.extend(event_data);
+
+    }
+
+    /// Creates an fanotify event metadata for the specified group flags and event mask.
+    ///
+    /// The following two field are not set in this function:
+    /// * `event_len` should be set before the metadata is inserted into the event queue.
+    /// * `fd` should be set when the event is read by the user monitor process.
+    fn create_metadata(group_flags: FanInitFlags, mask: FanEventMask) -> FanotifyEventMetadata {
+        FanotifyEventMetadata {
+            event_len: 0,
+            vers: FANOTIFY_METADATA_VERSION,
+            reserved: 0,
+            metadata_len: mem::size_of::<FanotifyEventMetadata>() as u16,
+            fd: 0,
+            pid: if group_flags.contains(FanInitFlags::REPORT_TID) {
+                call_interface!(systype::kinterface::KernelTaskOperations::current_pid())
+            } else {
+                call_interface!(systype::kinterface::KernelTaskOperations::current_tid())
+            },
+            mask,
+        }
+    }
+
+    /// Creates an information record of structure type [`FanotifyEventInfoType`]
+    /// containing a file handle for the specified filesystem object.
+    ///
+    /// `file_name` is only used for creating the [`FanotifyEventInfoFid`] of type
+    /// [`FanotifyEventInfoType::DfidName`], [`FanotifyEventInfoType::OldDfidName`],
+    /// or [`FanotifyEventInfoType::NewDfidName`].
+    fn create_fid_info(
+        object: &Arc<dyn Dentry>,
+        info_type: FanotifyEventInfoType,
+        file_name: Option<String>,
+    ) -> FanotifyEventInfoFid {
+        debug_assert!(
+            file_name.is_none()
+                || info_type == FanotifyEventInfoType::DfidName
+                || info_type == FanotifyEventInfoType::OldDfidName
+                || info_type == FanotifyEventInfoType::NewDfidName,
+        );
+
+        let mut handle_bytes = object.file_handle().to_raw_bytes();
+        if let Some(name) = file_name {
+            handle_bytes.extend_from_slice(name.as_bytes());
+            handle_bytes.push(0); // Null terminator
+        }
+
+        let header = FanotifyEventInfoHeader {
+            info_type,
+            pad: 0,
+            len: (mem::size_of::<FanotifyEventInfoFidInner>() + handle_bytes.len()) as u16,
+        };
+        let fsid = [0; 2];
+
+        let mut info = FanotifyEventInfoFid::new(handle_bytes.len());
+        info.set_hdr(header);
+        info.set_fsid(fsid);
+        info.handle_mut().copy_from_slice(handle_bytes.as_slice());
+        info
     }
 }
 

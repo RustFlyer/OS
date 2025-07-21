@@ -32,13 +32,15 @@ pub struct FanotifyEventMetadata {
 /// This structure holds the `fanotify_event_info_fid` structure in Linux.
 ///
 /// The original structure ends with a variable-length array `handle`, which is not
-/// allowed in Rust. Instead, we manually manage the memory.
+/// allowed in Rust. Instead, we manually manage the memory. The pointer `inner` points
+/// to a [`FanotifyEventInfoFidInner`] structure, followed by zero or more bytes which
+/// contain the `handle` field.
 ///
 /// The user should access the fields via methods provided by this struct, and get a
 /// Linux `fanotify_event_info_fid` struct as a byte array via the `as_bytes()` method.
 #[derive(Debug)]
 pub struct FanotifyEventInfoFid {
-    inner: *mut u8,
+    memory: *mut u8,
     size: usize,
 }
 
@@ -47,24 +49,24 @@ pub struct FanotifyEventInfoFid {
 /// The `handle` field is a variable-length array, so it is not included in this struct.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(C)]
-struct FanotifyEventInfoFidInner {
+pub struct FanotifyEventInfoFidInner {
     hdr: FanotifyEventInfoHeader,
     fsid: FsId,
 }
 
-type FsId = [i32; 2];
+pub type FsId = [i32; 2];
 
 impl FanotifyEventInfoFid {
-    /// Creates an `FanotifyEventInfoFid` instance with an empty `handle` field.
-    pub fn new() -> Self {
-        let size = size_of::<FanotifyEventInfoFidInner>();
+    /// Creates an empty `FanotifyEventInfoFid` instance.
+    pub fn new(handle_len: usize) -> Self {
+        let size = size_of::<FanotifyEventInfoFidInner>() + handle_len;
         let align = align_of::<FanotifyEventInfoFidInner>();
         let layout = unsafe { Layout::from_size_align_unchecked(size, align) };
-        let inner = unsafe { alloc(layout) };
+        let memory = unsafe { alloc(layout) };
         unsafe {
-            *inner = Default::default();
+            ptr::write_bytes(memory, 0, size);
         }
-        Self { inner, size }
+        Self { memory, size }
     }
 
     pub fn hdr(&self) -> FanotifyEventInfoHeader {
@@ -84,38 +86,38 @@ impl FanotifyEventInfoFid {
     }
 
     pub fn handle(&self) -> &[u8] {
-        let handle_ptr = unsafe { self.inner.add(size_of::<FanotifyEventInfoFidInner>()) };
+        let handle_ptr = unsafe { self.memory.add(size_of::<FanotifyEventInfoFidInner>()) };
         let handle_len = self.size - size_of::<FanotifyEventInfoFidInner>();
         unsafe { slice::from_raw_parts(handle_ptr, handle_len) }
     }
 
     pub fn handle_mut(&mut self) -> &mut [u8] {
-        let handle_ptr = unsafe { self.inner.add(size_of::<FanotifyEventInfoFidInner>()) };
+        let handle_ptr = unsafe { self.memory.add(size_of::<FanotifyEventInfoFidInner>()) };
         let handle_len = self.size - size_of::<FanotifyEventInfoFidInner>();
         unsafe { slice::from_raw_parts_mut(handle_ptr, handle_len) }
     }
 
     /// Returns the `fanotify_event_info_fid` structure it holds as a byte slice.
     pub fn as_bytes(&self) -> &[u8] {
-        unsafe { slice::from_raw_parts(self.inner, self.size) }
+        unsafe { slice::from_raw_parts(self.memory, self.size) }
     }
 
     fn as_inner(&self) -> &FanotifyEventInfoFidInner {
-        unsafe { &*(self.inner as *const FanotifyEventInfoFidInner) }
+        unsafe { &*(self.memory as *const FanotifyEventInfoFidInner) }
     }
 
     fn as_inner_mut(&mut self) -> &mut FanotifyEventInfoFidInner {
-        unsafe { &mut *(self.inner as *mut FanotifyEventInfoFidInner) }
+        unsafe { &mut *(self.memory as *mut FanotifyEventInfoFidInner) }
     }
 }
 
 impl Drop for FanotifyEventInfoFid {
     fn drop(&mut self) {
-        if !self.inner.is_null() {
+        if !self.memory.is_null() {
             let size = self.size;
             let align = align_of::<FanotifyEventInfoFidInner>();
             let layout = unsafe { Layout::from_size_align_unchecked(size, align) };
-            unsafe { dealloc(self.inner, layout) };
+            unsafe { dealloc(self.memory, layout) };
         }
     }
 }
@@ -130,15 +132,12 @@ impl Clone for FanotifyEventInfoFid {
         let layout = unsafe { Layout::from_size_align_unchecked(size, align) };
         let inner = unsafe { alloc(layout) };
         unsafe {
-            ptr::copy_nonoverlapping(self.inner, inner, size);
+            ptr::copy_nonoverlapping(self.memory, inner, size);
         }
-        Self { inner, size }
-    }
-}
-
-impl Default for FanotifyEventInfoFid {
-    fn default() -> Self {
-        Self::new()
+        Self {
+            memory: inner,
+            size,
+        }
     }
 }
 
@@ -160,9 +159,21 @@ pub struct FanotifyEventInfoError {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub struct FanotifyEventInfoHeader {
-    pub info_type: u8,
+    pub info_type: FanotifyEventInfoType,
     pub pad: u8,
     pub len: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum FanotifyEventInfoType {
+    Fid = FAN_EVENT_INFO_TYPE_FID,
+    Dfid = FAN_EVENT_INFO_TYPE_DFID,
+    DfidName = FAN_EVENT_INFO_TYPE_DFID_NAME,
+    OldDfidName = FAN_EVENT_INFO_TYPE_OLD_DFID_NAME,
+    NewDfidName = FAN_EVENT_INFO_TYPE_NEW_DFID_NAME,
+    PidFd = FAN_EVENT_INFO_TYPE_PIDFD,
+    Error = FAN_EVENT_INFO_TYPE_ERROR,
 }
 
 /// Enum representing an fanotify metadata structure or an information record structure.

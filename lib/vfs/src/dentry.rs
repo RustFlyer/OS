@@ -8,6 +8,7 @@ use mutex::SpinNoIrqLock;
 use systype::error::{SysError, SysResult};
 
 use crate::file::File;
+use crate::handle::FileHandle;
 use crate::inode::Inode;
 use crate::superblock::SuperBlock;
 
@@ -404,4 +405,10 @@ impl dyn Dentry {
         debug_assert!(self.inode().unwrap().inotype().is_dir());
         Arc::clone(self).base_new_neg_child(name)
     }
+
+    /// Returns a file handle for this dentry.
+    pub fn file_handle(&self) -> FileHandle {
+        FileHandle::new(0x1ef, self.path())
+    }
+
 }

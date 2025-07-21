@@ -15,12 +15,12 @@ pub fn sys_fanotify_init(flags: u32, event_f_flags: u32) -> SyscallResult {
     let flags = FanInitFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
     let event_f_flags = FanEventFileFlags::from_bits(event_f_flags).ok_or(SysError::EINVAL)?;
 
+    log::info!("sys_fanotify_init: flags={flags:?}, event_f_flags={event_f_flags:?}");
+
     if flags.contains(FanInitFlags::CLASS_PRE_CONTENT | FanInitFlags::CLASS_CONTENT) {
         return Err(SysError::EINVAL);
     }
-    if !flags
-        .intersection(FanInitFlags::CLASS_PRE_CONTENT | FanInitFlags::CLASS_CONTENT)
-        .is_empty()
+    if flags.intersects(FanInitFlags::CLASS_PRE_CONTENT | FanInitFlags::CLASS_CONTENT)
         && flags.contains(FanInitFlags::REPORT_FID)
     {
         return Err(SysError::EINVAL);
@@ -39,22 +39,15 @@ pub fn sys_fanotify_init(flags: u32, event_f_flags: u32) -> SyscallResult {
         return Err(SysError::EINVAL);
     }
 
-    if !flags
-        .intersection(
+    if flags.intersects(
             FanInitFlags::CLASS_PRE_CONTENT
                 | FanInitFlags::CLASS_CONTENT
                 | FanInitFlags::UNLIMITED_QUEUE
                 | FanInitFlags::UNLIMITED_MARKS
-                | FanInitFlags::REPORT_TID
                 | FanInitFlags::ENABLE_AUDIT
-                | FanInitFlags::REPORT_FID
-                | FanInitFlags::REPORT_DIR_FID
-                | FanInitFlags::REPORT_NAME
                 | FanInitFlags::REPORT_TARGET_FID
                 | FanInitFlags::REPORT_PIDFD,
-        )
-        .is_empty()
-    {
+    ) {
         unimplemented!("Unsupported fanotify flags: {flags:?}");
     }
 
@@ -88,6 +81,10 @@ pub fn sys_fanotify_mark(
     let flags = FanMarkFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
     let mask = FanEventMask::from_bits(mask).ok_or(SysError::EINVAL)?;
 
+    log::info!(
+        "sys_fanotify_mark: flags={flags:?}, mask={mask:?}, dirfd={dirfd}, pathname={pathname:#x}"
+    );
+
     if flags
         .intersection(FanMarkFlags::ADD | FanMarkFlags::REMOVE | FanMarkFlags::FLUSH)
         .bits()
@@ -103,8 +100,7 @@ pub fn sys_fanotify_mark(
         return Err(SysError::EINVAL);
     }
     if flags.contains(FanMarkFlags::MOUNT)
-        && !mask
-            .intersection(
+        && mask.intersects(
                 FanEventMask::ATTRIB
                     | FanEventMask::CREATE
                     | FanEventMask::DELETE
@@ -115,12 +111,21 @@ pub fn sys_fanotify_mark(
                     | FanEventMask::RENAME
                     | FanEventMask::MOVE_SELF,
             )
-            .is_empty()
     {
         return Err(SysError::EINVAL);
     }
 
-    if flags.contains(FanMarkFlags::FLUSH) {
+    if flags.intersects(
+        FanMarkFlags::FLUSH
+            | FanMarkFlags::MOUNT
+            | FanMarkFlags::FILESYSTEM
+            | FanMarkFlags::DONT_FOLLOW
+            | FanMarkFlags::ONLYDIR
+            | FanMarkFlags::IGNORED_MASK
+            | FanMarkFlags::IGNORE
+            | FanMarkFlags::IGNORED_SURV_MODIFY
+            | FanMarkFlags::EVICTABLE,
+    ) {
         unimplemented!("Unsupported fanotify flags: {flags:?}");
     }
     if mask.contains(
