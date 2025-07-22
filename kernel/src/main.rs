@@ -176,6 +176,8 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
     // println!("init_timer");
     arch::time::init_timer();
 
+    vfs::path::test_split_parent_and_name();
+
     // hart::init(hart_id);
     log::info!("hart {}: running", hart_id);
     osfuture::block_on(async { test_serial_output().await });
