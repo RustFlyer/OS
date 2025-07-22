@@ -11,23 +11,23 @@
 - [ ] [  10] pkey01                     108
 - [x] [  11] getpid01                   100             100
 - [ ] [  12] fsmount01                   96
-- [ ] [  13] chdir01                     92             135 all fs-type
+- [x] [  13] chdir01                     92             135 all fs-type
 - [ ] [  14] fanotify09                  76
 - [x] [  15] pipe11                      70             70
-- [x] [  16] fsync01                     60             30 half of all fs-type  90
+- [x] [  16] fsync01                     60             90
 - [ ] [  17] mount07                     56
 - [ ] [  18] fanotify15                  55
 - [ ] [  19] memcontrol02                54
-- [x] [  20] rename01                    48             24 half                 72
-- [x] [  21] rename03                    48             24 half                 72
-- [x] [  22] fsetxattr01                 46             27 half                 81
-- [x] [  23] setxattr01                  46             27 half                 81
+- [x] [  20] rename01                    48             72  all
+- [x] [  21] rename03                    48             72  all
+- [x] [  22] fsetxattr01                 46             81  all
+- [x] [  23] setxattr01                  46             81  all
 - [x] [  24] clock_getres01              44             44
 - [ ] [  25] mem                         42
 - [ ] [  26] mem                         42
 - [ ] [  27] statx08                     38
 - [ ] [  28] can_filter                  36
-- [x] [  29] mkdir09                     36             18 half                 54
+- [x] [  29] mkdir09                     36             54  all
 - [ ] [  30] mount_setattr01             36
 - [ ] [  31] move_mount01                36
 - [ ] [  32] quotactl08                  36
@@ -50,7 +50,7 @@
 - [x] [  49] signal04                    28             28
 - [x] [  50] name_to_handle_at01         27
 - [ ] [  51] fsconfig02                  26
-- [x] [  52] fgetxattr01                 25             15 half                 45
+- [x] [  52] fgetxattr01                 25             45  all
 - [ ] [  53] process_vm01                25
 - [ ] [  54] setns01                     25
 - [ ] [  55] clock_gettime03             24
@@ -80,13 +80,13 @@
 - [ ] [  79] fanotify06                  18
 - [ ] [  80] fsmount02                   18
 - [ ] [  81] fspick02                    18
-- [ ] [  82] llseek03                    18
+- [x] [  82] llseek03                    18         18
 - [ ] [  83] open_tree02                 18
 - [ ] [  84] prctl02                     18
 - [ ] [  85] setitimer01                 18
 - [ ] [  86] statvfs01                   18
 - [ ] [  87] pathconf01                  17
-- [ ] [  88] access02                    16
+- [x] [  88] access02                    16         16
 - [ ] [  89] bind04                      16
 - [x] [  90] clock_gettime01             16         16
 - [ ] [  91] fanotify19                  16
@@ -98,7 +98,7 @@
 - [ ] [  97] semctl07                    16
 - [ ] [  98] semctl09                    16
 - [ ] [  99] fremovexattr02              15
-- [ ] [ 100] lseek02                     15
+- [x] [ 100] lseek02                     15         16
 - [ ] [ 101] lseek11                     15
 - [ ] [ 102] msgrcv07                    15
 - [ ] [ 103] preadv03                    15

@@ -4,8 +4,8 @@ use config::{
     inode::{InodeMode, InodeType},
     vfs::OpenFlags,
 };
-use confreg::init_config_file;
 use exe::{dentry::ExeDentry, inode::ExeInode};
+use gconfig::init_config_file;
 use interrupts::{dentry::InterruptsDentry, inode::InterruptsInode};
 use maps::{dentry::MapsDentry, inode::MapsInode};
 use meminfo::{dentry::MemInfoDentry, inode::MemInfoInode};
@@ -19,8 +19,8 @@ use crate::{
     simple::{dentry::SimpleDentry, inode::SimpleInode},
 };
 
-pub mod confreg;
 pub mod exe;
+pub mod gconfig;
 pub mod interrupts;
 pub mod maps;
 pub mod meminfo;
