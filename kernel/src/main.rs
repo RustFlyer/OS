@@ -25,10 +25,7 @@ mod vm;
 
 use core::ptr;
 
-use arch::{
-    mm::{fence, tlb_flush_all},
-    trap::disable_interrupt,
-};
+use arch::mm::fence;
 use config::mm::{DTB_ADDR, DTB_END, DTB_START};
 use driver::println;
 use logging::{disable_log, enable_log};

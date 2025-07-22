@@ -36,7 +36,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         panic!("Syscall number not included: {syscall_no}");
     };
 
-    log::info!(
+    log::warn!(
         "task {} call [{}]",
         crate::processor::current_task().tid(),
         syscall_no.as_str(),
@@ -78,7 +78,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
             )
             .await
         }
-        MKDIR => sys_mkdirat(args[0], args[1], args[2] as u32).await,
+        MKDIRAT => sys_mkdirat(args[0], args[1], args[2] as u32).await,
         CHDIR => sys_chdir(args[0]).await,
         FCHDIR => sys_fchdir(args[0]).await,
         BRK => sys_brk(args[0]).await,
@@ -239,6 +239,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
             sys_name_to_handle_at(args[0] as i32, args[1], args[2], args[3], args[4] as i32)
         }
         OPEN_BY_HANDLE_AT => sys_open_by_handle_at(args[0] as i32, args[1], args[2] as i32),
+        MKNODAT => sys_mknodat(args[0], args[1], args[2] as u32, args[3] as u32),
         _ => {
             println!("Syscall not implemented: {}", syscall_no.as_str());
             panic!("Syscall not implemented: {}", syscall_no.as_str());

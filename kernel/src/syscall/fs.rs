@@ -761,6 +761,7 @@ pub async fn sys_mount(
 
     if task.pid() > 0 {
         // log::error!("[sys_mount] mount call, unstable");
+        let mdentry = task.walk_at(AtFd::FdCwd, target.clone())?;
         let dev = if name2fstype.contains("ext4") || name2fstype.contains("tmpfs") {
             Some(BLOCK_DEVICE.get().unwrap().clone())
         } else {
@@ -781,7 +782,9 @@ pub async fn sys_mount(
         }
 
         log::error!("[sys_mount] parent dentry is {}", parent.path());
-        let _ = fs_type.mount(&dname, Some(parent), flags, dev);
+        let d = fs_type.mount(&dname, Some(parent), flags, dev)?;
+        d.store_mount_dentry(mdentry);
+
         return Ok(0);
     }
 
@@ -846,7 +849,14 @@ pub async fn sys_umount2(target: usize, flags: u32) -> SyscallResult {
     let parent = task.walk_at(AtFd::FdCwd, parent.to_string())?;
     let child = parent.lookup(&name.ok_or(SysError::ENOENT)?)?;
 
+    let mdentry = child.fetch_mount_dentry();
     parent.remove_child(child.as_ref());
+
+    if let Some(mdentry) = mdentry {
+        parent.add_child(mdentry);
+    } else {
+        log::warn!("[sys_umount2] fail to restore mounted dentry");
+    }
 
     Ok(0)
 }
@@ -1622,7 +1632,7 @@ pub fn sys_symlinkat(target: usize, newdirfd: usize, linkpath: usize) -> Syscall
     let target = ctarget.into_string().map_err(|_| SysError::EINVAL)?;
     let linkpath = clinkpath.into_string().map_err(|_| SysError::EINVAL)?;
 
-    log::info!("[sys_symlinkat] target: {target}, newdirfd: {newdirfd:?}, linkpath: {linkpath}");
+    log::info!("[sys_symlinkat] target: {target}, newdirfd: {newdirfd:#x}, linkpath: {linkpath}");
 
     let newdirfd = AtFd::from(newdirfd);
 
@@ -3017,4 +3027,99 @@ pub fn sys_open_by_handle_at(mount_fd: i32, handle_ptr: usize, flags: i32) -> Sy
     let file = <dyn File>::open(dentry)?;
     file.set_flags(flags);
     task.with_mut_fdtable(|ft| ft.alloc(file, flags))
+}
+
+/// The `mknod`() system call creates a filesystem node (file, device special file, or named pipe)
+/// named `pathname`, with attributes specified by `mode` and (for special files) `dev`.
+///
+/// # Returns
+/// On success, returns 0. On error, returns -1 and sets errno appropriately.
+///
+/// # Tips
+/// - `mode` specifies both the permissions and the type of node to be created. Common types:
+///   - `S_IFREG`: regular file
+///   - `S_IFCHR`: character device
+///   - `S_IFBLK`: block device
+///   - `S_IFIFO`: FIFO (named pipe)
+/// - Only privileged users (root) can create device special files via `mknod`.
+/// - Use of `dev` is only meaningful for device nodes.
+///
+/// # Safety
+/// - Race conditions can occur between existence check and create.
+/// - Ensure pathname is validated for length and access.
+///
+pub fn sys_mknodat(dirfd: usize, pathname: usize, mode: u32, dev: u32) -> SyscallResult {
+    let task = current_task();
+    let uid = task.uid();
+    let gid = task.get_pgid();
+
+    log::debug!("[sys_mknod] dirfd: {}, pathname: {:#x}", dirfd, pathname);
+
+    // 1. Copy and validate path
+    let addr_space = task.addr_space();
+    let mut data_ptr = UserReadPtr::<u8>::new(pathname, &addr_space);
+    let path = data_ptr.read_c_string(256)?;
+    let path = path.into_string().map_err(|_| SysError::EINVAL)?;
+    log::info!(
+        "[sys_mknod] path: {}, mode: {:#o}, dev: {:#x}",
+        path,
+        mode,
+        dev
+    );
+
+    // 2. Parse mode into file type and file permissions
+    let mode = InodeMode::from_bits_truncate(mode);
+
+    // 3. Walk parent path and acquire parent dentry
+    let (parent_dir, name) = split_parent_and_name(&path);
+    let mut parent_dentry = task.walk_at(AtFd::from(dirfd), parent_dir)?;
+
+    let name = if name.is_none() {
+        let pname = parent_dentry.name().to_string();
+        parent_dentry = task.walk_at(AtFd::FdCwd, ".".to_string())?;
+        pname
+    } else {
+        name.unwrap()
+    };
+
+    // 4. Check if file already exists
+    if parent_dentry.lookup(&name).is_ok() {
+        return Err(SysError::EEXIST);
+    }
+
+    // 5. Permission check: parent directory must be writable and executable
+    let _cred = task.perm_mut();
+    let groups = &_cred.lock().groups;
+    if !parent_dentry.inode().unwrap().check_permission(
+        uid as u32,
+        gid as u32,
+        groups,
+        AccessFlags::W_OK | AccessFlags::X_OK,
+    ) {
+        return Err(SysError::EACCES);
+    }
+
+    // 6. Special privilege check for creating device nodes
+    if (mode == InodeMode::CHAR || mode == InodeMode::BLOCK) && uid != 0 {
+        return Err(SysError::EPERM);
+    }
+
+    let dentry = task.walk_at(AtFd::FdCwd, path)?;
+    // 7. Create inode according to nodetype
+    match mode {
+        InodeMode::REG => {
+            parent_dentry.create(dentry.as_ref(), InodeMode::REG)?;
+        }
+        InodeMode::FIFO => {
+            parent_dentry.create(dentry.as_ref(), InodeMode::FIFO)?;
+        }
+        InodeMode::CHAR => {
+            parent_dentry.create(dentry.as_ref(), InodeMode::CHAR)?;
+        }
+        InodeMode::BLOCK => {
+            parent_dentry.create(dentry.as_ref(), InodeMode::BLOCK)?;
+        }
+        _ => return Err(SysError::EINVAL),
+    }
+    Ok(0)
 }
