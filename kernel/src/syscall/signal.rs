@@ -581,7 +581,7 @@ pub fn sys_rt_sigmask(
         unsafe {
             let input = input_mask.read()?;
             // log::debug!("[sys_rt_sigmask] task {} input:{input:#x}", task.get_name());
-            log::warn!("[sys_rt_sigmask] how: {how:#x}");
+            log::debug!("[sys_rt_sigmask] how: {how:#x}");
 
             match how {
                 SIGBLOCK => {

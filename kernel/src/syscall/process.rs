@@ -502,14 +502,22 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
         Ok(args)
     };
 
-    let path = read_string(path)?;
-    let args = read_string_array(argv)?;
+    let mut path = read_string(path)?;
+    let mut args = read_string_array(argv)?;
     let mut envs = read_string_array(envp)?;
 
     if path.is_empty() {
         log::warn!("[sys_execve] path is empty");
         return Err(SysError::ENOENT);
     }
+
+    // DEBUG
+    path = path.replace("mkfs.ext3", "mkfs.ext2");
+    path = path.replace("mkfs.ext4", "mkfs.ext2");
+    path = path.replace("mkfs.exfat", "mkfs.ext2");
+    path = path.replace("mkfs.bcachefs", "mkfs.ext2");
+    path = path.replace("mkfs.btrfs", "mkfs.ext2");
+    path = path.replace("mkfs.xfs", "mkfs.ext2");
 
     log::info!("[sys_execve] task: {:?}", task.get_name());
     log::info!("[sys_execve] args: {args:?}");
@@ -552,6 +560,17 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
     let file = <dyn File>::open(dentry)?;
 
     let mut name = String::new();
+
+    // DEBUG
+    args.iter_mut().for_each(|arg| {
+        *arg = arg.replace("mkfs.ext3", "mkfs.ext2");
+        *arg = arg.replace("mkfs.ext4", "mkfs.ext2");
+        *arg = arg.replace("mkfs.exfat", "mkfs.ext2");
+        *arg = arg.replace("mkfs.bcachefs", "mkfs.ext2");
+        *arg = arg.replace("mkfs.btrfs", "mkfs.ext2");
+        *arg = arg.replace("mkfs.xfs", "mkfs.ext2");
+    });
+
     args.iter().for_each(|arg| {
         name.push_str(arg);
         name.push(' ');

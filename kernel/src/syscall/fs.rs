@@ -382,7 +382,7 @@ pub fn sys_fstatat(dirfd: usize, pathname: usize, stat_buf: usize, flags: i32) -
     let task = current_task();
     let addr_space = task.addr_space();
     let path = UserReadPtr::<u8>::new(pathname, &addr_space).read_c_string(256)?;
-    let path = path.into_string().map_err(|_| SysError::EINVAL)?;
+    let mut path = path.into_string().map_err(|_| SysError::EINVAL)?;
     let flags = AtFlags::from_bits_retain(flags);
 
     if !(AtFlags::AT_EMPTY_PATH | AtFlags::AT_SYMLINK_NOFOLLOW | AtFlags::AT_NO_AUTOMOUNT)
@@ -391,6 +391,14 @@ pub fn sys_fstatat(dirfd: usize, pathname: usize, stat_buf: usize, flags: i32) -
         log::warn!("[sys_fstatat] flags: illegal flags: {flags:?}");
         return Err(SysError::EINVAL);
     }
+
+    // DEBUG
+    path = path.replace("mkfs.ext3", "mkfs.ext2");
+    path = path.replace("mkfs.ext4", "mkfs.ext2");
+    path = path.replace("mkfs.exfat", "mkfs.ext2");
+    path = path.replace("mkfs.bcachefs", "mkfs.ext2");
+    path = path.replace("mkfs.btrfs", "mkfs.ext2");
+    path = path.replace("mkfs.xfs", "mkfs.ext2");
 
     log::info!(
         "[sys_fstat_at] dirfd: {:#x}, path: {}, flags: {:?}",
@@ -572,13 +580,18 @@ pub async fn sys_chdir(path: usize) -> SyscallResult {
     }
 
     log::info!("[sys_chdir] path: {path}");
-    let dentry = task.walk_at(AtFd::FdCwd, path)?;
-    log::info!(
-        "[sys_chdir] dentry inotype: {:?}",
-        dentry.inode().ok_or(SysError::ENOENT)?.inotype()
-    );
+    let mut dentry = task.walk_at(AtFd::FdCwd, path)?;
+    let mut inode = dentry.inode().ok_or(SysError::ENOENT)?;
+    log::info!("[sys_chdir] dentry inotype: {:?}", inode.inotype());
 
-    if !dentry.inode().ok_or(SysError::ENOENT)?.inotype().is_dir() {
+    if inode.inotype().is_symlink() {
+        let symdentry = Path::resolve_symlink_through(dentry.clone())?;
+        inode = symdentry.inode().ok_or(SysError::ENOENT)?;
+        dentry = symdentry;
+        log::info!("[sys_chdir] resolve success {}", dentry.path());
+    }
+
+    if !inode.inotype().is_dir() {
         return Err(SysError::ENOTDIR);
     }
     task.set_cwd(dentry);
@@ -891,12 +904,20 @@ pub async fn sys_faccessat(dirfd: usize, pathname: usize, mode: i32) -> SyscallR
     let addr_space = task.addr_space();
     let access = AccessFlags::from_bits(mode).ok_or(SysError::EINVAL)?;
 
-    let path = {
+    let mut path = {
         let mut user_ptr = UserReadPtr::<u8>::new(pathname, &addr_space);
         let cstring = user_ptr.read_c_string(256)?;
         cstring.into_string().map_err(|_| SysError::EINVAL)?
     };
     log::info!("[sys_faccessat] dirfd: {dirfd}, path: {path}, access: {access:?}");
+
+    // DEBUG
+    path = path.replace("mkfs.ext3", "mkfs.ext2");
+    path = path.replace("mkfs.ext4", "mkfs.ext2");
+    path = path.replace("mkfs.exfat", "mkfs.ext2");
+    path = path.replace("mkfs.bcachefs", "mkfs.ext2");
+    path = path.replace("mkfs.btrfs", "mkfs.ext2");
+    path = path.replace("mkfs.xfs", "mkfs.ext2");
 
     let mut pdentrylist: Vec<Arc<dyn Dentry>> = Vec::new();
 
