@@ -174,6 +174,7 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
     arch::time::init_timer();
 
     vfs::path::test_split_parent_and_name();
+    common::atomicflags::test_atomicflags::test_atomicflags();
 
     // hart::init(hart_id);
     log::info!("hart {}: running", hart_id);

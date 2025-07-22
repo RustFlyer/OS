@@ -42,6 +42,9 @@ visionfive2-sd = { git = "https://github.com/os-module/visionfive2-sd.git" }
 bitfield-struct = "0.8"
 byte-slice-cast = { version = "1.2.2", default-features = false }
 
+paste = "1.0"
+
+
 [workspace.dependencies.smoltcp]
 git = "https://github.com/EchudeT/smoltcp.git"
 default-features = false

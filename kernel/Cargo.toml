@@ -23,6 +23,7 @@ net = { path = "../lib/net" }
 polyhal-macro = { path = "../lib/polyhal-macro" }
 simdebug = { path = "../lib/simdebug/" }
 signal = { path = "../lib/signal/" }
+common = { path = "../lib/common/" }
 
 async-trait = { workspace = true }
 hashbrown = { workspace = true }

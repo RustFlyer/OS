@@ -337,36 +337,36 @@ pub fn sys_mremap(
 ) -> SyscallResult {
     log::error!("[sys_mremap] not implemented");
     return Ok(0);
-    if old_addr & (PAGE_SIZE - 1) != 0 {
-        return Err(SysError::EINVAL);
-    }
-    if new_size == 0 {
-        return Err(SysError::EINVAL);
-    }
+    // if old_addr & (PAGE_SIZE - 1) != 0 {
+    //     return Err(SysError::EINVAL);
+    // }
+    // if new_size == 0 {
+    //     return Err(SysError::EINVAL);
+    // }
 
-    let task = current_task();
-    let src_va = VirtAddr::new(old_addr);
-    let copy_size = usize::min(old_size, new_size);
+    // let task = current_task();
+    // let src_va = VirtAddr::new(old_addr);
+    // let copy_size = usize::min(old_size, new_size);
 
-    let new_addr = task.addr_space().map_file(
-        None,
-        MmapFlags::MAP_ANONYMOUS | MmapFlags::MAP_PRIVATE,
-        MappingFlags::R | MappingFlags::W,
-        VirtAddr::new(0),
-        new_size,
-        0,
-    )?;
+    // let new_addr = task.addr_space().map_file(
+    //     None,
+    //     MmapFlags::MAP_ANONYMOUS | MmapFlags::MAP_PRIVATE,
+    //     MappingFlags::R | MappingFlags::W,
+    //     VirtAddr::new(0),
+    //     new_size,
+    //     0,
+    // )?;
 
-    if copy_size > 0 {
-        unsafe {
-            let src_ptr = old_addr as *const u8;
-            let dst_ptr = new_addr as *mut u8;
-            core::ptr::copy_nonoverlapping(src_ptr, dst_ptr, copy_size);
-        }
-    }
+    // if copy_size > 0 {
+    //     unsafe {
+    //         let src_ptr = old_addr as *const u8;
+    //         let dst_ptr = new_addr as *mut u8;
+    //         core::ptr::copy_nonoverlapping(src_ptr, dst_ptr, copy_size);
+    //     }
+    // }
 
-    task.addr_space().remove_mapping(src_va, old_size);
-    Ok(new_addr)
+    // task.addr_space().remove_mapping(src_va, old_size);
+    // Ok(new_addr)
 }
 
 pub fn sys_mlock(_addr: usize, _len: usize) -> SyscallResult {
