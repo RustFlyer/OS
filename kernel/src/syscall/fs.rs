@@ -58,7 +58,7 @@ use vfs::{
 use crate::{
     logging::enable_log,
     processor::current_task,
-    task::{sig_members::IntrBySignalFuture, signal::sig_info::SigSet, TaskState},
+    task::{TaskState, sig_members::IntrBySignalFuture, signal::sig_info::SigSet},
     vm::user_ptr::{UserReadPtr, UserReadWritePtr, UserWritePtr},
 };
 
@@ -767,12 +767,13 @@ pub async fn sys_mount(
             None
         };
         let (parent, name) = split_parent_and_name(&target);
+        log::debug!("[sys_mount] parent: {}, name: {:?}", parent, name);
 
         let dname;
         let pdentry = task.walk_at(AtFd::FdCwd, parent.to_string())?;
         let parent: Arc<dyn Dentry>;
         if name.is_none() {
-            dname = pdentry.name();
+            dname = pdentry.name().to_string();
             parent = pdentry.parent().ok_or(SysError::ENOENT)?;
         } else {
             dname = name.unwrap();
@@ -780,7 +781,7 @@ pub async fn sys_mount(
         }
 
         log::error!("[sys_mount] parent dentry is {}", parent.path());
-        let _ = fs_type.mount(dname, Some(parent), flags, dev);
+        let _ = fs_type.mount(&dname, Some(parent), flags, dev);
         return Ok(0);
     }
 
@@ -795,10 +796,14 @@ pub async fn sys_mount(
                 None
             };
             let (parent, name) = split_parent_and_name(&target);
-            log::debug!("[sys_mount] start mount [{}], [{}]", parent, name.unwrap());
+            log::debug!(
+                "[sys_mount] start mount [{}], [{}]",
+                parent,
+                name.clone().unwrap()
+            );
             let parent = task.walk_at(AtFd::FdCwd, parent.to_string())?;
             log::debug!("[sys_mount] parent dentry is {}", parent.path());
-            fs_type.mount(name.unwrap(), Some(parent), flags, dev)?
+            fs_type.mount(name.unwrap().as_str(), Some(parent), flags, dev)?
         }
         name @ "fat32" => {
             log::debug!("[sys_mount] fat32 check pass");
@@ -809,10 +814,14 @@ pub async fn sys_mount(
                 None
             };
             let (parent, name) = split_parent_and_name(&target);
-            log::debug!("[sys_mount] start mount [{}], [{}]", parent, name.unwrap());
+            log::debug!(
+                "[sys_mount] start mount [{}], [{}]",
+                parent,
+                name.clone().unwrap()
+            );
             let parent = task.walk_at(AtFd::FdCwd, parent.to_string())?;
             log::debug!("[sys_mount] parent dentry is {}", parent.path());
-            fs_type.mount(name.unwrap(), Some(parent), flags, dev)?
+            fs_type.mount(name.unwrap().as_str(), Some(parent), flags, dev)?
         }
         _ => return Err(SysError::EINVAL),
     };
@@ -832,9 +841,10 @@ pub async fn sys_umount2(target: usize, flags: u32) -> SyscallResult {
     let target = mount_path.into_string().map_err(|_| SysError::EINVAL)?;
     let _flags = MountFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
     let (parent, name) = split_parent_and_name(&target);
+    log::info!("[sys_umount2] parent: {}, name: {:?}", parent, name);
 
     let parent = task.walk_at(AtFd::FdCwd, parent.to_string())?;
-    let child = parent.lookup(name.ok_or(SysError::ENOENT)?)?;
+    let child = parent.lookup(&name.ok_or(SysError::ENOENT)?)?;
 
     parent.remove_child(child.as_ref());
 

@@ -90,7 +90,7 @@ pub fn push_in_available_line(runnable: Runnable, info: ScheduleInfo) {
             }
         }
     }
-    log::debug!("push task into [{}] line", available_line_id);
+    // log::debug!("push task into [{}] line", available_line_id);
 
     unsafe {
         if info.woken_while_running {
