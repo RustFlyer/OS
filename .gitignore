@@ -2,7 +2,7 @@
 /target/
 /vendor/
 /fsimg/
-board
+/board
 *.img
 *.bak
 kernel-la

@@ -1,8 +1,8 @@
 use alloc::boxed::Box;
 use alloc::sync::{Arc, Weak};
+use arch::console::console_getchar;
 use async_trait::async_trait;
 use config::inode::InodeType;
-use driver::console::console_getchar;
 use systype::error::SysResult;
 use vfs::stat::Stat;
 use vfs::{

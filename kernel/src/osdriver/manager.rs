@@ -1,6 +1,6 @@
 use alloc::{collections::btree_map::BTreeMap, sync::Arc, vec::Vec};
 use arch::{interrupt::enable_external_interrupt, trap::disable_interrupt};
-use config::board;
+use config::{board, device::MAX_HARTS};
 use driver::{
     cpu::CPU,
     device::{OSDevId, OSDevice, OSDeviceMajor, OSDeviceMeta},
@@ -77,8 +77,6 @@ impl DeviceTreeManager {
         }
     }
 
-    /// Retrieves a reference to the PLIC instance. Panics if PLIC is not
-    /// initialized.
     fn plic(&self) -> &PLIC {
         self.plic.as_ref().unwrap()
     }
@@ -106,16 +104,21 @@ impl DeviceTreeManager {
             return;
         }
 
-        let total = unsafe { board::HARTS_NUM };
+        let total = MAX_HARTS;
         for i in 0..total * 2 {
+            // for irq in 1..=64 {
+            //     self.plic().enable_irq(irq, i);
+            // }
+
             for dev in self.devices.values() {
                 if let Some(irq) = dev.irq_no() {
                     self.plic().enable_irq(irq, i);
-                    log::info!("Enable external interrupt:{irq}, context:{i}");
+                    let name = dev.name();
+                    log::warn!("Enable external interrupt: {irq}, context:{i}, name: {name}");
                 }
             }
         }
-        enable_external_interrupt()
+        enable_external_interrupt();
     }
 
     pub fn handle_irq(&mut self) {
@@ -128,12 +131,8 @@ impl DeviceTreeManager {
 
         // First clain interrupt from PLIC
         if let Some(irq_number) = self.plic().claim_irq(self.irq_context()) {
+            // log::warn!("new interrupt: {}", irq_number);
             if let Some(dev) = self.irq_map.get(&irq_number) {
-                // log::trace!(
-                //     "Handling interrupt from device: {:?}, irq: {}",
-                //     dev.name(),
-                //     irq_number
-                // );
                 dev.handle_irq();
                 // Complete interrupt when done
                 self.plic().complete_irq(irq_number, self.irq_context());
@@ -166,5 +165,9 @@ impl DeviceTreeManager {
 
     pub fn set_plic(&mut self, plic: PLIC) {
         self.plic = Some(plic);
+    }
+
+    pub fn set_cpus(&mut self, cpus: Vec<CPU>) {
+        self.cpus = cpus;
     }
 }

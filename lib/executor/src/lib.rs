@@ -107,11 +107,6 @@ where
     F::Output: Send + 'static,
 {
     let schedule = move |runnable: Runnable, info: ScheduleInfo| {
-        // if info.woken_while_running {
-        //     TASKLINE.push(runnable);
-        // } else {
-        //     TASKLINE.push_front(runnable);
-        // }
         push_in_available_line(runnable, info);
     };
     let (runnable, handle) = async_task::spawn(future, WithInfo(schedule));
@@ -152,7 +147,6 @@ pub fn init(hart_id: usize) {
 
 pub fn fetch_one(hart_id: usize) -> Option<Runnable> {
     unsafe {
-        // log::debug!("HART_TASKS_LINE: {:?}", HART_TASKS_LINES[0].length());
         if let Some(task) = HART_TASKS_LINES[hart_id].fetch() {
             return Some(task);
         }

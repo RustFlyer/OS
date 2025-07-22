@@ -5,7 +5,11 @@
 //! from a path string, and then call [`Path::walk`] to resolve it to a dentry.
 //! Symlinks are supported and the user can decide whether to resolve them or not.
 
-use alloc::{string::String, sync::Arc, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
+};
 
 use config::inode::InodeType;
 use systype::error::{SysError, SysResult};
@@ -205,9 +209,54 @@ impl Path {
     }
 }
 
-pub fn split_parent_and_name(path: &str) -> (&str, Option<&str>) {
-    let trimmed_path = path.trim_start_matches('/');
-    trimmed_path.find('/').map_or((trimmed_path, None), |n| {
-        (&trimmed_path[..n], Some(&trimmed_path[n + 1..]))
-    })
+pub fn split_parent_and_name(path: &str) -> (String, Option<String>) {
+    let mut trimmed_path = path.trim_start_matches('/').to_string();
+
+    if let Some(n) = trimmed_path.rfind('/') {
+        let mut m = n;
+        if path.starts_with('/') {
+            trimmed_path.insert(0, '/');
+            m = m + 1;
+        }
+        (
+            trimmed_path[..m].to_string(),
+            Some(trimmed_path[m + 1..].to_string()),
+        )
+    } else {
+        if path.starts_with('/') {
+            trimmed_path.insert(0, '/');
+        }
+        (trimmed_path, None)
+    }
+}
+
+pub fn test_split_parent_and_name() {
+    struct PName {
+        path: String,
+        parent: String,
+        child: Option<String>,
+    }
+
+    let create_test = |p: &str, pr: &str, ch: Option<&str>| PName {
+        path: p.to_string(),
+        parent: pr.to_string(),
+        child: ch.map(|c| c.to_string()),
+    };
+
+    let tests = [
+        create_test("/abs/ac", "/abs", Some("ac")), // 常规路径
+        create_test("foo/bar/baz", "foo/bar", Some("baz")), // 多级相对路径
+        create_test("/single", "/single", None),    // 只有一个路径元素
+        create_test("/", "/", None),                // 只有根路径
+        create_test("", "", None),                  // 空字符串
+    ];
+
+    for test in &tests {
+        let (pr, ch) = split_parent_and_name(&test.path);
+
+        assert_eq!(pr, test.parent, "Failed for path: {:?}", test.path);
+        assert_eq!(ch, test.child, "Failed for path: {:?}", test.path);
+    }
+
+    log::info!("pass test_split_parent_and_name");
 }

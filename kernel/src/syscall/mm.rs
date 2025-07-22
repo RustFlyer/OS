@@ -369,17 +369,89 @@ pub fn sys_mremap(
     Ok(new_addr)
 }
 
-pub fn sys_mlock(addr: usize, len: usize) -> SyscallResult {
+pub fn sys_mlock(_addr: usize, _len: usize) -> SyscallResult {
     log::warn!("[sys_mlock] swap page mechanism not implemented");
     Ok(0)
 }
 
-pub fn sys_munlock(addr: usize, len: usize) -> SyscallResult {
+pub fn sys_munlock(_addr: usize, _len: usize) -> SyscallResult {
     log::warn!("[sys_munlock] swap page mechanism not implemented");
     Ok(0)
 }
 
-pub fn sys_msync(addr: usize, len: usize, flags: usize) -> SyscallResult {
+pub fn sys_msync(_addr: usize, _len: usize, _flags: usize) -> SyscallResult {
     log::warn!("[sys_msync] swap page mechanism not implemented");
+    Ok(0)
+}
+
+/// pkey_alloc - allocate a protection key
+pub fn sys_pkey_alloc(flags: u32, access_rights: u32) -> SyscallResult {
+    log::info!("[sys_pkey_alloc] flags: {flags:#x}, access_rights: {access_rights:#x}");
+
+    if flags != 0 {
+        log::warn!("[sys_pkey_alloc] Invalid flags: {flags:#x}, must be 0");
+        return Err(SysError::EINVAL);
+    }
+
+    const PKEY_DISABLE_ACCESS: u32 = 0x1; // Disable all access
+    const PKEY_DISABLE_WRITE: u32 = 0x2; // Disable write access
+
+    const VALID_ACCESS_RIGHTS: u32 = PKEY_DISABLE_ACCESS | PKEY_DISABLE_WRITE;
+    if access_rights & !VALID_ACCESS_RIGHTS != 0 {
+        log::warn!("[sys_pkey_alloc] Invalid access_rights: {access_rights:#x}");
+        return Err(SysError::EINVAL);
+    }
+
+    let task = current_task();
+    let pkey = task.alloc_pkey(access_rights)?;
+
+    log::info!("[sys_pkey_alloc] allocated pkey: {pkey}");
+    Ok(pkey as usize)
+}
+
+/// pkey_free - free a protection key
+pub fn sys_pkey_free(pkey: i32) -> SyscallResult {
+    log::info!("[sys_pkey_free] pkey: {pkey}");
+
+    // pkey 0 is the default key and cannot be freed
+    if pkey <= 0 {
+        return Err(SysError::EINVAL);
+    }
+
+    let task = current_task();
+    task.free_pkey(pkey as u32)?;
+
+    log::info!("[sys_pkey_free] freed pkey: {pkey}");
+    Ok(0)
+}
+
+/// pkey_mprotect - set protection and protection key on a region of memory
+pub fn sys_pkey_mprotect(addr: usize, len: usize, prot: i32, pkey: i32) -> SyscallResult {
+    log::info!("[sys_pkey_mprotect] addr: {addr:#x}, len: {len:#x}, prot: {prot:#x}, pkey: {pkey}");
+
+    // Address must be page-aligned
+    if addr % PAGE_SIZE != 0 {
+        return Err(SysError::EINVAL);
+    }
+
+    // Validate pkey range (typically 0-15 on x86)
+    if pkey < 0 || pkey > 15 {
+        return Err(SysError::EINVAL);
+    }
+
+    let task = current_task();
+
+    // Validate protection flags
+    let prot_flags = MmapProt::from_bits(prot).ok_or(SysError::EINVAL)?;
+
+    // Change protection and assign protection key
+    task.change_prot_with_pkey(
+        VirtAddr::new(addr),
+        len,
+        MappingFlags::from(prot_flags),
+        pkey as u32,
+    )?;
+
+    log::info!("[sys_pkey_mprotect] protection updated successfully");
     Ok(0)
 }

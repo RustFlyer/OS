@@ -6,6 +6,8 @@ edition = "2024"
 [dependencies]
 osfuture = { path = "../osfuture" }
 simdebug = { path = "../simdebug" }
+logger = { path = "../logger" }
+
 bitflags = { workspace = true }
 log = { workspace = true }
 

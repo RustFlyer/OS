@@ -23,6 +23,8 @@ pub struct DentryMeta {
     /// Inode that this dentry points to. This field is `None` if this dentry is a negative
     /// dentry.
     pub inode: SpinNoIrqLock<Option<Arc<dyn Inode>>>,
+    /// Dentry before mount. This field is `None` if this dentry has been not mounted.
+    pub mdentry: SpinNoIrqLock<Option<Arc<dyn Dentry>>>,
 }
 
 impl DentryMeta {
@@ -38,6 +40,7 @@ impl DentryMeta {
             parent,
             children: SpinNoIrqLock::new(BTreeMap::new()),
             inode: SpinNoIrqLock::new(inode),
+            mdentry: SpinNoIrqLock::new(None),
         }
     }
 }
@@ -411,4 +414,17 @@ impl dyn Dentry {
         FileHandle::new(0x1ef, self.path())
     }
 
+    /// Stores dentry which is mounted.
+    pub fn store_mount_dentry(self: &Arc<Self>, dentry: Arc<dyn Dentry>) {
+        *self.get_meta().mdentry.lock() = Some(dentry);
+    }
+
+    /// Fetches dentry which is stored when mounted and reset mdentry as None.
+    pub fn fetch_mount_dentry(self: &Arc<Self>) -> Option<Arc<dyn Dentry>> {
+        let mut lock = self.get_meta().mdentry.lock();
+        let dentry = lock.clone();
+        *lock = None;
+
+        dentry
+    }
 }

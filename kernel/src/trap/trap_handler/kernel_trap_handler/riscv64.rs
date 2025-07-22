@@ -1,3 +1,4 @@
+use driver::println;
 use riscv::{ExceptionNumber, InterruptNumber};
 use riscv::{
     interrupt::{Exception, Interrupt, Trap},
@@ -24,6 +25,7 @@ fn exception_handler(_e: Exception) {
 }
 
 fn interrupt_handler(i: Interrupt) {
+    // log::error!("interrupt! {:?}", i);
     match i {
         Interrupt::SupervisorTimer => {
             TIMER_MANAGER.check(get_time_duration());
@@ -31,7 +33,7 @@ fn interrupt_handler(i: Interrupt) {
             TRAP_STATS.inc(i.number());
         }
         Interrupt::SupervisorExternal => {
-            // log::error!("[kernel] receive externel interrupt");
+            // log::error!("[kernel] receive externel interrupt {}", i.number());
             device_manager().handle_irq();
             TRAP_STATS.inc(i.number());
         }
@@ -51,6 +53,5 @@ fn trap_panic() -> ! {
         satp::read().bits(),
     );
     log::error!("{}", msg);
-    simdebug::stop0();
     panic!("{}", msg);
 }

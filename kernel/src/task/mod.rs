@@ -4,6 +4,7 @@ pub mod future;
 pub mod kernelproc;
 pub mod manager;
 pub mod mask;
+pub mod pkey;
 pub mod process_manager;
 pub mod sig_members;
 pub mod signal;

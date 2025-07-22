@@ -9,6 +9,7 @@ use core::{
     sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering},
     task::Waker,
 };
+use id_allocator::VecIdAllocator;
 use timer::Timer;
 
 use mm::address::VirtAddr;
@@ -21,11 +22,11 @@ use systype::time::ITimer;
 use vfs::{dentry::Dentry, file::File};
 
 use super::{
+    pkey::PKeyTable,
     sig_members::{SigHandlers, SigManager, SignalStack},
     signal::sig_info::SigSet,
     threadgroup::ThreadGroup,
-    tid::{PGid, Pid, TidAddress},
-    tid::{Tid, TidHandle, tid_alloc},
+    tid::{PGid, Pid, Tid, TidAddress, TidHandle, tid_alloc},
     time_stat::TaskTimeStat,
 };
 use crate::{
@@ -148,6 +149,9 @@ pub struct Task {
     // find file by its fd and write or read it.
     fd_table: ShareMutex<FdTable>,
 
+    // allocate pkey for address
+    pkey_table: ShareMutex<PKeyTable>,
+
     // store sig fd in fdtable
     sigfd_queue: ShareMutex<Vec<Fd>>,
 
@@ -226,6 +230,7 @@ impl Task {
 
             tid_address: SyncUnsafeCell::new(TidAddress::new()),
             fd_table: new_share_mutex(FdTable::new()),
+            pkey_table: new_share_mutex(PKeyTable::new()),
             sigfd_queue: new_share_mutex(Vec::new()),
             cwd: new_share_mutex(sys_root_dentry()),
             root: new_share_mutex(sys_root_dentry()),
@@ -319,6 +324,8 @@ impl Task {
 
             tid_address,
             fd_table,
+            pkey_table: new_share_mutex(PKeyTable::new()),
+
             sigfd_queue: new_share_mutex(Vec::new()),
 
             cwd,
@@ -510,6 +517,10 @@ impl Task {
 
     pub fn timers_mut(&self) -> ShareMutex<Vec<Option<Timer>>> {
         self.timers.clone()
+    }
+
+    pub fn pkeytable_mut(&self) -> ShareMutex<PKeyTable> {
+        self.pkey_table.clone()
     }
 
     pub fn get_waker(&self) -> Waker {

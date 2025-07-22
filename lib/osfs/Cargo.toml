@@ -15,6 +15,7 @@ vfs    = { path = "../vfs" }
 mm = { path = "../mm" }
 common = { path = "../common" }
 signal = { path = "../signal" }
+arch = { path = "../arch" }
 
 
 async-trait = { workspace = true }

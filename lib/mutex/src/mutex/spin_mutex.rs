@@ -42,7 +42,7 @@ impl<T, S: MutexSupport> SpinMutex<T, S> {
     #[inline(always)]
     fn wait_unlock(&self) {
         let mut try_count = 0usize;
-        while self.lock.load(Ordering::Relaxed) {
+        while self.lock.load(Ordering::SeqCst) {
             core::hint::spin_loop();
             try_count += 1;
             if try_count == 0x10000000 {
@@ -55,18 +55,21 @@ impl<T, S: MutexSupport> SpinMutex<T, S> {
     #[inline(always)]
     pub fn lock(&self) -> impl DerefMut<Target = T> + '_ {
         let support_guard = S::before_lock();
-        // unsafe {
-        //     (*self.debug_cnt.get()) += 1;
-        //     println!("debug cnt addr {:#x}", self.debug_cnt.get() as usize);
-        //     println!("debug cnt {}", (*self.debug_cnt.get()));
-        // }
+
         loop {
+            // logger::lprintln!(
+            //     "Lock address: {:p}, value: {}",
+            //     &self.lock,
+            //     self.lock.load(Ordering::Relaxed)
+            // );
             self.wait_unlock();
+
             if self
                 .lock
-                .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+                .compare_exchange(false, true, Ordering::SeqCst, Ordering::Relaxed)
                 .is_ok()
             {
+                // logger::lprintln!("one lock");
                 break;
             }
         }

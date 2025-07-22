@@ -16,6 +16,7 @@ smoltcp = { workspace = true }
 spin = { workspace = true }
 log = { workspace = true }
 crate_interface = { workspace = true }
+lazy_static = { workspace = true }
 
 [features]
 smoltcp = []

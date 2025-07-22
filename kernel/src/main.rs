@@ -6,6 +6,7 @@
 #![allow(clippy::module_inception)]
 #![feature(stmt_expr_attributes)]
 #![feature(slice_as_array)]
+#![feature(core_intrinsics)]
 // #![allow(dead_code)]
 // #![allow(unused)]
 
@@ -25,10 +26,11 @@ mod vm;
 use core::ptr;
 
 use arch::mm::fence;
-use config::mm::{DTB_END, DTB_START};
+use config::mm::{DTB_ADDR, DTB_END, DTB_START};
 use driver::println;
 use logging::{disable_log, enable_log};
 use mm::{self, frame, heap};
+use osdriver::test_serial_output;
 
 #[macro_use]
 extern crate alloc;
@@ -48,18 +50,20 @@ pub static NIGHTHAWK_OS_BANNER: &str = r#"
 "#;
 
 pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
-    executor::init(hart_id);
-
+    println!("hart id: {}, dtb_addr: {:#x}", hart_id, dtb_addr);
     // SAFETY: Only the first hart will run this code block.
     if unsafe { !INITIALIZED } {
+        println!("print init");
         /* Initialize logger */
-        logger::init();
+
+        println!("hart id: {}, dtb_addr: {:#p}", hart_id, &dtb_addr);
+        boot::clear_bss();
 
         // too much log delay, cut up!
-        disable_log();
-        // enable_log();
+        // disable_log();
+        logger::init();
+        enable_log();
 
-        log::info!("hart {}: initializing kernel", hart_id);
         log::info!("dtb_addr: {:#x}", dtb_addr);
 
         #[cfg(target_arch = "loongarch64")]
@@ -68,50 +72,56 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         #[cfg(target_arch = "riscv64")]
         log::warn!("ARCH: riscv64");
 
+        println!("mem init");
         /* Initialize heap allocator and page table */
         unsafe {
-            config::mm::DTB_ADDR = dtb_addr;
-            log::info!("hart {}: initialized DTB_ADDR {:#x}", hart_id, dtb_addr);
+            DTB_ADDR = dtb_addr;
+
+            println!("try to init heap");
 
             heap::init_heap_allocator();
             log::info!("hart {}: initialized heap allocator", hart_id);
+            println!("init_heap_allocator");
 
             frame::init_frame_allocator();
             log::info!("hart {}: initialized frame allocator", hart_id);
+            println!("init_frame_allocator");
 
             vm::switch_to_kernel_page_table();
             log::info!("hart {}: switched to kernel page table", hart_id);
+            println!("switch_to_kernel_page_table");
 
             fence();
             ptr::write_volatile(&raw mut INITIALIZED, true);
         }
+        println!("memory init success");
 
-        log::info!(
+        println!(
             "kernel physical memory: {:#x} - {:#x}",
             config::mm::KERNEL_START_PHYS,
             config::mm::kernel_end_phys(),
         );
-        log::info!(
+        println!(
             "kernel virtual memory: {:#x} - {:#x}",
             config::mm::KERNEL_START,
             config::mm::kernel_end()
         );
-        log::info!(
+        println!(
             ".text {:#x} - {:#x}",
             config::mm::text_start(),
             config::mm::text_end()
         );
-        log::info!(
+        println!(
             ".rodata {:#x} - {:#x}",
             config::mm::rodata_start(),
             config::mm::rodata_end()
         );
-        log::info!(
+        println!(
             ".data {:#x} - {:#x}",
             config::mm::data_start(),
             config::mm::data_end()
         );
-        log::info!(
+        println!(
             ".bss {:#x} - {:#x}",
             config::mm::bss_start(),
             config::mm::bss_end()
@@ -120,8 +130,11 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         log::info!("device tree blob PA start: {:#x}", dtb_addr);
         log::info!("====== kernel memory layout end ======");
 
+        println!("[PROBE_DEV_TREE] try to init");
         osdriver::probe_device_tree();
         println!("[PROBE_DEV_TREE] INIT SUCCESS");
+
+        println!("device init");
 
         log::info!("hart {}: initialized driver", hart_id);
 
@@ -131,32 +144,41 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
 
         // boot::start_harts(hart_id);
         loader::init();
+        syscall::init_key();
 
+        executor::init(hart_id);
         task::init();
         println!("[USER_APP] INIT SUCCESS");
         println!("[HART {}] INIT SUCCESS", hart_id);
         println!("{}", NIGHTHAWK_OS_BANNER);
     } else {
+        executor::init(hart_id);
         log::info!("hart {}: enabling page table", hart_id);
         // SAFETY: Only after the first hart has initialized the heap allocator and page table,
         // do the other harts enable the kernel page table.
         unsafe {
             vm::switch_to_kernel_page_table();
-            config::board::HARTS_NUM += 1;
         }
         println!("[HART {}] INIT SUCCESS", hart_id);
+        panic!("multi-core unsupported");
     }
 
     #[cfg(target_arch = "loongarch64")]
     trap::trap_handler::tlb_init();
 
+    // println!("init trap");
     arch::trap::init();
+    // println!("set_kernel_trap_entry");
     trap::trap_env::set_kernel_trap_entry();
+    // println!("init_timer");
     arch::time::init_timer();
+
+    vfs::path::test_split_parent_and_name();
 
     // hart::init(hart_id);
     log::info!("hart {}: running", hart_id);
-
+    osfuture::block_on(async { test_serial_output().await });
+    println!("Begin to run shell..");
     loop {
         executor::task_run_always_alone(hart_id);
     }

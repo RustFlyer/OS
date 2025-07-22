@@ -5,3 +5,7 @@ pub fn enable_external_interrupt() {
         sie::set_sext();
     }
 }
+
+pub fn is_interrupt_on() -> bool {
+    riscv::register::sstatus::read().sie()
+}

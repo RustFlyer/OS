@@ -1,5 +1,5 @@
 use alloc::sync::Arc;
-use config::mm::KERNEL_MAP_OFFSET;
+use config::{board::HARTS_NUM, mm::KERNEL_MAP_OFFSET};
 use core::{
     mem::size_of,
     ptr::{self, NonNull},
@@ -31,7 +31,8 @@ use virtio_drivers::{
 };
 
 use crate::osdriver::{
-    ioremap_if_need, manager::device_manager, probe_char_device_by_serial, probe_plic,
+    ioremap_if_need, manager::device_manager, probe_char_device_by_serial, probe_cpu, probe_plic,
+    probe_sdio_blk,
 };
 
 pub fn probe_tree(fdt: &Fdt) {
@@ -43,17 +44,25 @@ pub fn probe_tree(fdt: &Fdt) {
     if let Some(plic) = probe_plic(fdt) {
         device_manager().set_plic(plic);
         println!("[PLIC] INIT SUCCESS");
+
+        if let Some(serial) = probe_char_device_by_serial(fdt) {
+            device_manager().add_device(serial.dev_id(), serial.clone());
+            CHAR_DEVICE.call_once(|| serial);
+            println!("[SERIAL] INIT SUCCESS");
+        }
+
+        if let Some(sdio) = probe_sdio_blk(fdt) {
+            device_manager().add_device(sdio.dev_id(), sdio.clone());
+            BLOCK_DEVICE.call_once(|| sdio.clone());
+            println!("[SDIOBLK] INIT SUCCESS");
+        }
     } else {
         probe_char_device(fdt);
         println!("[CHAR] INIT SUCCESS");
     }
 
-    if let Some(serial) = probe_char_device_by_serial(fdt) {
-        if CHAR_DEVICE.get().is_none() {
-            device_manager().add_device(serial.dev_id(), serial.clone());
-            CHAR_DEVICE.call_once(|| serial);
-            println!("[SERIAL] INIT SUCCESS");
-        }
+    if let Some(cpus) = probe_cpu(&fdt) {
+        device_manager().set_cpus(cpus);
     }
 
     for node in fdt.all_nodes() {
@@ -87,16 +96,20 @@ pub fn probe_tree(fdt: &Fdt) {
 fn handle_mmio_device(transport: MmioTransport<'static>) {
     match transport.device_type() {
         DeviceType::Block => {
-            log::info!("Init virtio-blk");
-            BLOCK_DEVICE.call_once(|| Arc::new(QVirtBlkDevice::new(transport)));
+            if BLOCK_DEVICE.get().is_none() {
+                println!("Init virtio-blk");
+                BLOCK_DEVICE.call_once(|| Arc::new(QVirtBlkDevice::new(transport)));
+            } else {
+                println!("virtio has been initialized!");
+            }
         }
         DeviceType::Network => {
-            log::info!("Init virtio-net");
+            println!("Init virtio-net");
             let dev = create_virt_net_dev(transport).expect("create virt net failed");
             init_network(dev, false);
         }
         DeviceType::Console => {
-            log::info!("Init virtio-console (char)");
+            println!("Init virtio-console (char)");
         }
         _ => log::warn!("Unknown MMIO device: {:?}", transport.device_type()),
     }
@@ -143,20 +156,17 @@ pub fn enumerate_pci(pci_node: FdtNode, cam: Cam) {
         });
         for (device_function, info) in pci_root.enumerate_bus(0) {
             let (status, command) = pci_root.get_status_command(device_function);
-            log::info!(
+            println!(
                 "Found {} at {}, status {:?} command {:?}",
-                info,
-                device_function,
-                status,
-                command
+                info, device_function, status, command
             );
             if let Some(virtio_type) = virtio_device_type(&info) {
-                log::info!("  VirtIO {:?}", virtio_type);
+                println!("  VirtIO {:?}", virtio_type);
                 allocate_bars(&mut pci_root, device_function, &mut allocator);
                 dump_bar_contents(&mut pci_root, device_function, 4);
                 let mut transport =
                     PciTransport::new::<VirtHalImpl, _>(&mut pci_root, device_function).unwrap();
-                log::info!(
+                println!(
                     "Detected virtio PCI device with device type {:?}, features {:#018x}",
                     transport.device_type(),
                     transport.read_device_features(),

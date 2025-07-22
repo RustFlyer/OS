@@ -59,12 +59,15 @@ pub struct PageTable {
 }
 
 #[cfg(target_arch = "riscv64")]
-lazy_static::lazy_static! {
-    /// The kernel page table.
-    pub static ref KERNEL_PAGE_TABLE: SpinLock<PageTable> = SpinLock::new(unsafe {
-        PageTable::build_kernel_page_table()
-    });
-}
+/// The kernel page table.
+pub static KERNEL_PAGE_TABLE: spin::lazy::Lazy<SpinLock<PageTable>> = spin::lazy::Lazy::new(|| {
+    SpinLock::new(unsafe {
+        driver::println!("when KERNEL_PAGE_TABLE init");
+        let r = PageTable::build_kernel_page_table();
+        driver::println!("after KERNEL_PAGE_TABLE init");
+        r
+    })
+});
 
 impl PageTable {
     /// Builds a new `PageTable` with an empty root page table.
@@ -526,7 +529,8 @@ impl PageTableMem {
 /// This function must be called after the kernel page table is set up.
 #[cfg(target_arch = "riscv64")]
 pub unsafe fn switch_to_kernel_page_table() {
-    arch::mm::switch_page_table(KERNEL_PAGE_TABLE.lock().root().to_usize());
+    let root = KERNEL_PAGE_TABLE.lock().root.to_usize();
+    arch::mm::switch_page_table(root);
 }
 
 /// Switch to the kernel page table.

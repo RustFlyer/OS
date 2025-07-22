@@ -1,37 +1,54 @@
 pub mod manager;
 pub mod probe;
-use alloc::{boxed::Box, sync::Arc};
+use core::ptr::NonNull;
+
+use alloc::{boxed::Box, sync::Arc, vec::Vec};
 use driver::{
+    CHAR_DEVICE, DeviceType,
+    block::{dw_mshc::MMC, virtblk::VirtBlkDevice},
+    cpu::CPU,
     device::OSDevice,
     plic::PLIC,
     println,
     serial::{Serial, uart8250::Uart},
 };
 use manager::{device_manager, init_device_manager};
+use mm::address::PhysAddr;
 use probe::*;
 
 use flat_device_tree::{Fdt, node::FdtNode};
 
-use config::mm::{DTB_ADDR, KERNEL_MAP_OFFSET};
+use config::{
+    board::CLOCK_FREQ,
+    mm::{DTB_ADDR, KERNEL_MAP_OFFSET},
+};
+use virtio_drivers::transport::{
+    Transport,
+    mmio::{MmioTransport, VirtIOHeader},
+};
 
 #[cfg(target_arch = "riscv64")]
 use crate::vm::iomap::ioremap;
 
 #[allow(unused)]
 pub fn probe_device_tree() {
+    println!("DTB_ADDR: {:#x}", unsafe { DTB_ADDR });
     let mut dtb_addr = unsafe { DTB_ADDR };
+    println!("[CONSOLE] INIT SUCCESS");
 
     init_device_manager();
+    println!("[DEVICE-MANAGER] INIT SUCCESS");
 
     #[cfg(target_arch = "riscv64")]
-    ioremap(dtb_addr, 24 * 1024).expect("can not ioremap");
+    ioremap(dtb_addr, 0xe865).expect("can not ioremap");
+
     #[cfg(target_arch = "loongarch64")]
     unsafe {
         dtb_addr = 0x00100000;
     }
 
     let device_tree = unsafe {
-        log::debug!("dt: {:#x}", dtb_addr + KERNEL_MAP_OFFSET);
+        println!("dt: {:#x}", dtb_addr + KERNEL_MAP_OFFSET);
         Fdt::from_ptr((dtb_addr + KERNEL_MAP_OFFSET) as *const u8).expect("Parse DTB failed")
     };
 
@@ -41,13 +58,24 @@ pub fn probe_device_tree() {
         }
     }
 
+    unsafe {
+        CLOCK_FREQ = device_tree
+            .cpus()
+            .next()
+            .unwrap()
+            .timebase_frequency()
+            .unwrap()
+    }
+    log::warn!("clock freq set to {} Hz", unsafe { CLOCK_FREQ });
+
+    println!("FIND DTB TREE {:?}", device_tree);
     probe_tree(&device_tree);
 
     let manager = device_manager();
     manager.map_devices();
     manager.initialize_devices();
-    manager.enable_device_interrupts();
     manager.map_devices_interrupt();
+    manager.enable_device_interrupts();
 }
 
 pub fn ioremap_if_need(paddr: usize, size: usize) -> usize {
@@ -68,7 +96,7 @@ pub fn probe_plic(root: &Fdt) -> Option<PLIC> {
         let plic_reg = plic_node.reg().next().unwrap();
         let mmio_base = plic_reg.starting_address as usize;
         let mmio_size = plic_reg.size.unwrap();
-        log::info!("plic base_address:{mmio_base:#x}, size:{mmio_size:#x}");
+        log::info!("plic base_address: {mmio_base:#x}, size: {mmio_size:#x}");
         ioremap_if_need(mmio_base, mmio_size);
         Some(PLIC::new(mmio_base, mmio_size))
     } else {
@@ -134,7 +162,7 @@ fn probe_serial_console(stdout: &FdtNode) -> Serial {
     let size = reg.size.unwrap();
     let base_vaddr = base_paddr + KERNEL_MAP_OFFSET;
     let irq_number = stdout.property("interrupts").unwrap().as_usize().unwrap();
-    log::info!("IRQ number: {}", irq_number);
+    log::warn!("[probe_serial_console] IRQ number: {}", irq_number);
     let first_compatible = stdout
         .compatible()
         .unwrap()
@@ -163,8 +191,8 @@ fn probe_serial_console(stdout: &FdtNode) -> Serial {
                     .as_usize()
                     .expect("Parse reg-shift to usize failed");
             }
-            log::info!(
-                "uart: base_paddr:{base_paddr:#x}, size:{size:#x}, reg_io_width:{reg_io_width}, reg_shift:{reg_shift}"
+            log::error!(
+                "uart: base_paddr:{base_paddr:#x}, size:{size:#x}, reg_io_width:{reg_io_width}, reg_shift:{reg_shift}, first_compatible:{first_compatible}"
             );
 
             ioremap_if_need(base_paddr, size);
@@ -183,4 +211,72 @@ fn probe_serial_console(stdout: &FdtNode) -> Serial {
         }
         _ => panic!("Unsupported serial console"),
     }
+}
+
+pub fn probe_cpu(root: &Fdt) -> Option<Vec<CPU>> {
+    let dtb_cpus = root.cpus();
+    for prop in root.find_node("/cpus").unwrap().properties() {
+        log::info!("{:?}", prop);
+    }
+    let mut cpus = Vec::new();
+    for dtb_cpu in dtb_cpus {
+        let mut cpu = CPU {
+            id: dtb_cpu.ids().unwrap().first().unwrap(),
+            usable: true,
+            clock_freq: dtb_cpu
+                .properties()
+                .find(|p| p.name == "clock-frequency")
+                .map(|p| {
+                    let mut a32: [u8; 4] = [0; 4];
+                    let mut a64: [u8; 8] = [0; 8];
+                    a32.copy_from_slice(p.value);
+                    a64.copy_from_slice(p.value);
+                    match p.value.len() {
+                        4 => u32::from_be_bytes(a32) as usize,
+                        8 => u64::from_be_bytes(a64) as usize,
+                        _ => unreachable!(),
+                    }
+                })
+                .unwrap_or(0),
+            timebase_freq: dtb_cpu.timebase_frequency().unwrap(),
+        };
+
+        // Mask CPU without MMU
+        // Get RISC-V ISA string
+        let isa = dtb_cpu.property("riscv,isa").expect("RISC-V ISA not found");
+        if isa.as_str().unwrap().contains('u') {
+            // Privleged mode is in ISA string
+            if !isa.as_str().unwrap().contains('s') {
+                cpu.usable = false;
+            }
+        }
+        // Check mmu type
+        let mmu_type = dtb_cpu.property("mmu-type");
+        if mmu_type.is_none() {
+            cpu.usable = false;
+        }
+        // Add to list
+        cpus.push(cpu);
+    }
+    log::info!("cpus: {cpus:?}");
+    Some(cpus)
+}
+
+pub fn probe_sdio_blk(root: &Fdt) -> Option<Arc<MMC>> {
+    // Parse SD Card Host Controller
+    if let Some(sdhci) = root.find_node("/soc/sdio1@16020000") {
+        let base_address = sdhci.reg().next().unwrap().starting_address as usize;
+        let size = sdhci.reg().next().unwrap().size.unwrap();
+        let irq_number = 33; // Hard-coded from JH7110
+        let sdcard = MMC::new(base_address, size, irq_number);
+        log::info!("SD Card Host Controller found at 0x{:x}", base_address);
+        return Some(Arc::new(sdcard));
+    }
+    log::warn!("SD Card Host Controller not found");
+    None
+}
+
+pub async fn test_serial_output() {
+    let buf = "Test Serial Output\n";
+    CHAR_DEVICE.get().unwrap().write(buf.as_bytes()).await;
 }
