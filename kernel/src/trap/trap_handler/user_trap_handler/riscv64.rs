@@ -103,7 +103,7 @@ pub fn user_exception_handler(task: &Task, e: Exception, stval: usize, sepc: usi
 }
 
 pub fn user_interrupt_handler(task: &Task, i: Interrupt) {
-    log::error!("interrupt! {:?}", i);
+    // log::error!("interrupt! {:?}", i);
     match i {
         Interrupt::SupervisorTimer => {
             set_nx_timer_irq();

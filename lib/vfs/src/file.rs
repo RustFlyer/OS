@@ -211,20 +211,16 @@ impl dyn File {
             return Err(SysError::ENOENT);
         }
 
-        dentry
-            .superblock()
-            .unwrap()
-            .fs_type()
-            .get_meta()
-            .inodes
-            .lock()
-            .push(Arc::downgrade(&dentry.inode().unwrap()));
+        // dentry
+        //     .superblock()
+        //     .unwrap()
+        //     .fs_type()
+        //     .get_meta()
+        //     .inodes
+        //     .lock()
+        //     .push(Arc::downgrade(&dentry.inode().unwrap()));
 
-        let ret = Arc::clone(&dentry).base_open()?;
-
-        dentry.inode().unwrap().get_meta().inner.lock().file = Some(ret.clone());
-
-        Ok(ret)
+        Arc::clone(&dentry).base_open()
     }
 
     /// Reads data from the file.

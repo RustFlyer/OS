@@ -19,7 +19,7 @@ impl TimerManager {
     }
 
     pub fn add_timer(&self, timer: Timer) {
-        log::warn!("[TimerManager] add a new timer {:?}", timer);
+        log::info!("[TimerManager] add a new timer {:?}", timer);
         self.timers.lock().push(Reverse(timer));
     }
 

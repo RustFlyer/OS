@@ -366,6 +366,8 @@ bitflags! {
         const AT_REMOVEDIR = 0x200;
         /// Empty Path
         const AT_EMPTY_PATH  = 0x1000;
+
+        const AT_HANDLE_FID = 0x200;
     }
 }
 

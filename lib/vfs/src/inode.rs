@@ -61,10 +61,6 @@ pub struct InodeMetaInner {
     ///
     /// This is only used for simplefs for now! Don't use it in other filesystems.
     pub symlink: Option<String>,
-    /// open file
-    ///
-    /// why this is important? now, we can not access file or dentry through inode.
-    pub file: Option<Arc<dyn File>>,
 }
 
 impl InodeMeta {
@@ -86,7 +82,6 @@ impl InodeMeta {
                 gid: 0,
                 xattrs: BTreeMap::new(),
                 symlink: None,
-                file: None,
             }),
         }
     }
@@ -243,12 +238,11 @@ pub trait Inode: Send + Sync + DowncastSync {
         let mode = meta.mode.bits();
 
         if euid == 0 {
-            if access.contains(AccessFlags::X_OK) {
-                if mode & 0o111 == 0 {
-                    return false;
-                }
+            if access.contains(AccessFlags::X_OK) && mode & 0o111 == 0 {
+                return false;
+            } else {
+                return true;
             }
-            return true;
         }
 
         let is_owner = euid == meta.uid;
