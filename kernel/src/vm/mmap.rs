@@ -2,6 +2,7 @@ use alloc::sync::Arc;
 
 use config::mm::{MMAP_END, MMAP_START, PAGE_SIZE};
 use mm::address::VirtAddr;
+use osfs::special::memfd::flags::MemfdSeals;
 use systype::{
     error::{SysError, SysResult},
     memory_flags::{MappingFlags, MmapFlags},
@@ -33,6 +34,7 @@ impl AddrSpace {
         mut addr: VirtAddr,
         length: usize,
         offset: usize,
+        seals: Option<MemfdSeals>,
     ) -> SysResult<usize> {
         if !flags.contains(MmapFlags::MAP_FIXED) {
             addr = self
@@ -67,6 +69,7 @@ impl AddrSpace {
                 Arc::clone(&file),
                 offset,
                 length,
+                seals,
             ),
             None => VmArea::new_anonymous(va_start, va_end, vma_flags, prot),
         };

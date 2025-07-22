@@ -38,7 +38,15 @@ use osfs::{
     fd_table::{FdFlags, FdSet},
     pipe::{inode::PIPE_BUF_LEN, new_pipe},
     pselect::{FilePollRet, PSelectFuture},
-    special::eventfd::file::EventFdFile,
+    special::{
+        eventfd::file::EventFdFile,
+        memfd::{
+            dentry::MemDentry,
+            file::MemFile,
+            flags::{MemfdFlags, MemfdSeals},
+            inode::MemInode,
+        },
+    },
 };
 use osfuture::{Select2Futures, SelectOutput};
 use systype::{
@@ -53,6 +61,7 @@ use vfs::{
     handle::{FileHandle, FileHandleData, FileHandleHeader, HANDLE_LEN},
     kstat::Kstat,
     path::{Path, split_parent_and_name},
+    sys_root_dentry,
 };
 
 use crate::{
@@ -372,6 +381,7 @@ pub fn sys_fstat(fd: usize, stat_buf: usize) -> SyscallResult {
     let addr_space = task.addr_space();
     let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
     let kstat = Kstat::from_vfs_inode(file.inode())?;
+    log::error!("[sys_fstat] kstat: {:?}", kstat);
     unsafe {
         UserWritePtr::<Kstat>::new(stat_buf, &addr_space).write(kstat)?;
     }
@@ -1140,6 +1150,8 @@ pub async fn sys_sendfile64(
 pub enum FcntlOp {
     F_DUPFD = 0,
     F_DUPFD_CLOEXEC = 1030,
+    F_ADD_SEALS = 1033,
+    F_GET_SEALS = 1034,
     F_GETFD = 1,
     F_SETFD = 2,
     F_GETFL = 3,
@@ -1166,9 +1178,10 @@ pub enum FcntlOp {
 pub fn sys_fcntl(fd: usize, op: isize, arg: usize) -> SyscallResult {
     use FcntlOp::*;
     let task = current_task();
+    log::error!("[sys_fcntl] fd: {fd}, op: {op:?}, arg: {arg:#x}");
     let op = FcntlOp::from_repr(op).unwrap_or_default();
-    log::debug!("[sys_fcntl] fd: {fd}, op: {op:?}, arg: {arg:#x}");
     match op {
+        F_DUPFD => task.with_mut_fdtable(|table| table.dup_with_bound(fd, arg, OpenFlags::empty())),
         F_DUPFD_CLOEXEC => {
             task.with_mut_fdtable(|table| table.dup_with_bound(fd, arg, OpenFlags::O_CLOEXEC))
         }
@@ -1189,6 +1202,38 @@ pub fn sys_fcntl(fd: usize, op: isize, arg: usize) -> SyscallResult {
                 fd_info.set_flags(fd_flags);
                 Ok(0)
             })
+        }
+        F_GET_SEALS => {
+            let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
+            let memfile = file
+                .downcast_arc::<MemFile>()
+                .map_err(|_| SysError::ENOENT)?;
+
+            let meminode = memfile
+                .inode()
+                .downcast_arc::<MemInode>()
+                .map_err(|_| SysError::ENOENT)?;
+
+            Ok(meminode.get_seals().bits() as usize)
+        }
+        F_ADD_SEALS => {
+            let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
+            let memfile = file
+                .downcast_arc::<MemFile>()
+                .map_err(|_| SysError::ENOENT)?;
+
+            let meminode = memfile
+                .inode()
+                .downcast_arc::<MemInode>()
+                .map_err(|_| SysError::ENOENT)?;
+
+            let seals = meminode.get_seals();
+            if seals.contains(MemfdSeals::SEAL) {
+                return Err(SysError::EPERM);
+            }
+            meminode.add_seals(MemfdSeals::from_bits(arg as u32).ok_or(SysError::EINVAL)?);
+
+            Ok(0)
         }
         _ => {
             log::error!("[sys_fcntl] not implemented {op:?}");
@@ -3143,4 +3188,41 @@ pub fn sys_mknodat(dirfd: usize, pathname: usize, mode: u32, dev: u32) -> Syscal
         _ => return Err(SysError::EINVAL),
     }
     Ok(0)
+}
+
+pub fn sys_memfd_create(name_ptr: usize, flags: u32) -> SyscallResult {
+    use vfs::inode::Inode;
+
+    let task = current_task();
+    let name = {
+        let addr_space = task.addr_space();
+        let mut data_ptr = UserReadPtr::<u8>::new(name_ptr, &addr_space);
+        let cstring = data_ptr.read_c_string(256)?;
+        cstring.into_string().map_err(|_| SysError::EINVAL)?
+    };
+
+    let mfd_flags = MemfdFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
+    let seals = if mfd_flags.contains(MemfdFlags::ALLOW_SEALING) {
+        MemfdSeals::empty()
+    } else {
+        MemfdSeals::SEAL
+    };
+
+    // if mfd_flags.contains(MemfdFlags::NOEXEC_SEAL) {
+    //     seals |= MemfdSeals::EXEC;
+    // }
+
+    let inode = MemInode::new(seals);
+    inode.set_mode(InodeMode::REG);
+
+    let dentry = MemDentry::new(&name, Some(inode), None);
+    let file = MemFile::new(dentry);
+    file.set_flags(OpenFlags::O_RDWR);
+
+    let mut file_flags = OpenFlags::O_RDWR;
+    if mfd_flags.contains(MemfdFlags::CLOEXEC) {
+        file_flags |= OpenFlags::O_CLOEXEC;
+    }
+
+    task.with_mut_fdtable(|ft| ft.alloc(file, file_flags))
 }

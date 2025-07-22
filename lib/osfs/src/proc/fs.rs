@@ -39,7 +39,7 @@ impl FileSystemType for ProcFsType {
     ) -> SysResult<Arc<dyn Dentry>> {
         let sb = ProcSuperBlock::new(dev, self.clone());
         let mount_inode = SimpleInode::new(sb.clone());
-        mount_inode.set_size(0);
+        mount_inode.set_size(0).unwrap();
         mount_inode.set_inotype(InodeType::Dir);
         let mount_dentry = SimpleDentry::new(
             name,

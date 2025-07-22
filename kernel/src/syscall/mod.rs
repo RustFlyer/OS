@@ -36,7 +36,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         panic!("Syscall number not included: {syscall_no}");
     };
 
-    log::trace!(
+    log::debug!(
         "task {} call [{}]",
         crate::processor::current_task().tid(),
         syscall_no.as_str(),
@@ -243,6 +243,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         PKEY_ALLOC => sys_pkey_alloc(args[0] as u32, args[1] as u32),
         PKEY_FREE => sys_pkey_free(args[0] as i32),
         PKEY_MPROTECT => sys_pkey_mprotect(args[0], args[1], args[2] as i32, args[3] as i32),
+        MEMFD_CREATE => sys_memfd_create(args[0], args[1] as u32),
         _ => {
             println!("Syscall not implemented: {}", syscall_no.as_str());
             panic!("Syscall not implemented: {}", syscall_no.as_str());

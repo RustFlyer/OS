@@ -151,7 +151,7 @@ pub trait File: Send + Sync + DowncastSync {
         if res_pos < 0 {
             return Err(SysError::EINVAL);
         }
-        self.set_pos(res_pos as usize);
+        self.set_pos(res_pos as usize)?;
         Ok(res_pos as usize)
     }
 
@@ -159,8 +159,9 @@ pub trait File: Send + Sync + DowncastSync {
         self.meta().pos.load(Ordering::Relaxed)
     }
 
-    fn set_pos(&self, pos: usize) {
-        self.meta().pos.store(pos, Ordering::Relaxed)
+    fn set_pos(&self, pos: usize) -> SysResult<()> {
+        self.meta().pos.store(pos, Ordering::Relaxed);
+        Ok(())
     }
 
     fn dentry(&self) -> Arc<dyn Dentry> {
@@ -248,7 +249,7 @@ impl dyn File {
             self.base_read(buf, position).await?
         };
 
-        self.set_pos(position + bytes_read);
+        self.set_pos(position + bytes_read)?;
         Ok(bytes_read)
     }
 
@@ -332,7 +333,7 @@ impl dyn File {
             return Err(SysError::EBADF);
         }
         if self.flags().contains(OpenFlags::O_APPEND) {
-            self.set_pos(self.size());
+            self.set_pos(self.size())?;
         }
 
         let inode = self.inode();
@@ -351,7 +352,7 @@ impl dyn File {
                 size
             );
             self.fill_zeros(size, position - size).await?;
-            inode.set_size(position);
+            inode.set_size(position)?;
 
             let position = self.pos();
             let size = self.size();
@@ -371,9 +372,9 @@ impl dyn File {
         };
         let new_position = position + bytes_written;
 
-        self.set_pos(new_position);
+        self.set_pos(new_position)?;
         if inode.inotype() != InodeType::BlockDevice {
-            inode.set_size(usize::max(inode.size(), new_position));
+            inode.set_size(usize::max(inode.size(), new_position))?;
         }
         inode.set_state(InodeState::DirtyAll);
 
@@ -507,7 +508,7 @@ impl dyn File {
         if len == 0 {
             return Ok(());
         }
-        let mut zeros = [0u8; 8192];
+        let zeros = [0u8; 8192];
         let mut written = 0;
         let old_pos = self.pos();
         while written < len {

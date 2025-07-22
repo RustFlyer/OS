@@ -2,6 +2,7 @@ use config::mm::PAGE_SIZE;
 use id_allocator::IdAllocator;
 use mm::address::VirtAddr;
 use mutex::new_share_mutex;
+use osfs::special::memfd::{file::MemFile, flags::MemfdSeals};
 use shm::{
     SharedMemory,
     flags::{ShmAtFlags, ShmGetFlags},
@@ -63,21 +64,38 @@ pub async fn sys_mmap(
     let flags = MmapFlags::from_bits_truncate(flags);
     let prot = MmapProt::from_bits_truncate(prot);
     let va = VirtAddr::new(addr);
+    let mut seals = None;
     let file = if !flags.contains(MmapFlags::MAP_ANONYMOUS) {
-        Some(task.with_mut_fdtable(|table| table.get_file(fd as usize))?)
+        let f = task.with_mut_fdtable(|table| table.get_file(fd as usize))?;
+        // check memfd file seal-write permisson
+        if let Some(memf) = f.clone().downcast_arc::<MemFile>().ok() {
+            seals = Some(memf.seals());
+            if memf.seals().contains(MemfdSeals::WRITE)
+                && prot.contains(MmapProt::PROT_WRITE)
+                && flags.contains(MmapFlags::MAP_SHARED)
+            {
+                return Err(SysError::EPERM);
+            }
+        }
+        Some(f)
     } else {
         None
     };
 
     log::info!("[sys_mmap] addr: {addr:#x}, length: {length:#x}, flags: {flags:?}, fd: {fd}");
-
     if addr == 0 && flags.contains(MmapFlags::MAP_FIXED) {
         return Err(SysError::EINVAL);
     }
 
-    let result =
-        task.addr_space()
-            .map_file(file, flags, MappingFlags::from(prot), va, length, offset);
+    let result = task.addr_space().map_file(
+        file,
+        flags,
+        MappingFlags::from(prot),
+        va,
+        length,
+        offset,
+        seals,
+    );
     log::info!("[sys_mmap] allocated at: {:#x}", result?);
     result
 }
@@ -122,9 +140,9 @@ pub fn sys_mprotect(addr: usize, len: usize, prot: i32) -> SyscallResult {
     let addr_space = task.addr_space();
     let prot = MmapProt::from_bits(prot).ok_or(SysError::EINVAL)?;
 
-    log::info!("[sys_mprotect] addr: {addr:#x}, len: {len:#x}, prot: {prot:?}");
+    log::error!("[sys_mprotect] addr: {addr:#x}, len: {len:#x}, prot: {prot:?}");
 
-    addr_space.change_prot(VirtAddr::new(addr), len, MappingFlags::from(prot));
+    addr_space.change_prot(VirtAddr::new(addr), len, MappingFlags::from(prot))?;
     Ok(0)
 }
 

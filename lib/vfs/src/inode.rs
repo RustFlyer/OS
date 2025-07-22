@@ -167,8 +167,9 @@ pub trait Inode: Send + Sync + DowncastSync {
         self.get_meta().inner.lock().symlink.clone().unwrap()
     }
 
-    fn set_size(&self, size: usize) {
+    fn set_size(&self, size: usize) -> SysResult<()> {
         self.get_meta().inner.lock().size = size;
+        Ok(())
     }
 
     fn state(&self) -> InodeState {

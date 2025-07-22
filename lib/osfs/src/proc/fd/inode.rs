@@ -8,22 +8,24 @@ use vfs::{
     superblock::SuperBlock,
 };
 
-pub struct MountsInode {
+pub struct FdInode {
     meta: InodeMeta,
+    pub(crate) fd: usize,
 }
 
-impl MountsInode {
-    pub fn new(super_block: Arc<dyn SuperBlock>) -> Arc<Self> {
+impl FdInode {
+    pub fn new(super_block: Arc<dyn SuperBlock>, fd: usize) -> Arc<Self> {
         let inode = Arc::new(Self {
             meta: InodeMeta::new(alloc_ino(), super_block),
+            fd,
         });
         inode.set_size(BLOCK_SIZE).unwrap();
-        inode.set_inotype(InodeType::File);
+        inode.set_inotype(InodeType::SymLink);
         inode
     }
 }
 
-impl Inode for MountsInode {
+impl Inode for FdInode {
     fn get_meta(&self) -> &InodeMeta {
         &self.meta
     }
@@ -33,7 +35,7 @@ impl Inode for MountsInode {
         let mode = inner.mode.bits();
         let len = inner.size;
         Ok(Stat {
-            st_dev: 0,
+            st_dev: 0, // non-real-file
             st_ino: self.meta.ino as u64,
             st_mode: mode,
             st_nlink: 1,

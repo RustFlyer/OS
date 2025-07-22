@@ -25,6 +25,7 @@
 
 use alloc::{collections::btree_map::BTreeMap, sync::Arc, vec::Vec};
 use core::{cmp, fmt::Debug, mem};
+use osfs::special::memfd::flags::MemfdSeals;
 
 use bitflags::bitflags;
 
@@ -223,6 +224,7 @@ impl VmArea {
         file: Arc<dyn File>,
         offset: usize,
         len: usize,
+        seals: Option<MemfdSeals>,
     ) -> Self {
         debug_assert!(
             (len == end_va.to_usize() - start_va.to_usize())
@@ -249,7 +251,7 @@ impl VmArea {
             },
             prot,
             pages: BTreeMap::new(),
-            map_type: TypedArea::FileBacked(FileBackedArea::new(file, offset, len)),
+            map_type: TypedArea::FileBacked(FileBackedArea::new(file, offset, len, seals)),
             handler: Some(FileBackedArea::fault_handler),
         }
     }
@@ -655,6 +657,27 @@ impl VmArea {
         self.start
     }
 
+    /// Checks seal permission in fileback Area specially.
+    ///
+    /// Returns Ok when seal eqs to `prot`.Otherwise, return EPERM.
+    /// Now `Write` is supported only.
+    pub fn check_seals(&self, prot: MappingFlags) -> SysResult<()> {
+        if !prot.contains(MappingFlags::W) {
+            return Ok(());
+        }
+
+        use crate::vm::vm_area::TypedArea::FileBacked;
+        if let FileBacked(area) = &self.map_type {
+            if let Some(seals) = area.seals {
+                // log::error!("area: {:?}, seals: {:?}", area, seals);
+                if seals.contains(MemfdSeals::WRITE) {
+                    return Err(SysError::EPERM);
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Sets the starting virtual address of the VMA.
     ///
     /// # Safety
@@ -881,6 +904,8 @@ pub struct FileBackedArea {
     offset: usize,
     /// The length of the mapped region in the file.
     len: usize,
+    /// The memseals of the mapped region in the file (if file is memfd).
+    seals: Option<MemfdSeals>,
 }
 
 impl FileBackedArea {
@@ -897,13 +922,14 @@ impl FileBackedArea {
     /// If the user wants to load a segment from an executable file, `offset` and
     /// `len` should just be the starting offset and length of the segment; the
     /// user need not worry about alignment.
-    pub fn new(file: Arc<dyn File>, offset: usize, len: usize) -> Self {
+    pub fn new(file: Arc<dyn File>, offset: usize, len: usize, seals: Option<MemfdSeals>) -> Self {
         let offset_aligned = offset / PAGE_SIZE * PAGE_SIZE;
         let len_aligned = len + offset % PAGE_SIZE;
         Self {
             file,
             offset: offset_aligned,
             len: len_aligned,
+            seals,
         }
     }
 
@@ -913,6 +939,7 @@ impl FileBackedArea {
             ref file,
             offset,
             len: region_len,
+            ..
         } = match &area.map_type {
             TypedArea::FileBacked(file_backed) => file_backed,
             _ => panic!("FileBackedArea::fault_handler: not a file-backed area"),

@@ -197,6 +197,7 @@ impl AddrSpace {
                 Arc::clone(&elf_file),
                 offset,
                 segment.p_filesz as usize,
+                None,
             );
             self.add_area(area)?;
         }

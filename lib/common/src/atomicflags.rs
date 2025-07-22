@@ -22,7 +22,6 @@
 ///    println!("{:?}", current);
 /// }
 ///```
-
 #[macro_export]
 macro_rules! atomic_bitflags {
     ($name:ident, $atomic_ty:ident) => {

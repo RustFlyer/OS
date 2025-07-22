@@ -5,6 +5,7 @@ use config::{
     vfs::OpenFlags,
 };
 use exe::{dentry::ExeDentry, inode::ExeInode};
+use fd::dirdentry::FdDirDentry;
 use gconfig::init_config_file;
 use interrupts::{dentry::InterruptsDentry, inode::InterruptsInode};
 use maps::{dentry::MapsDentry, inode::MapsInode};
@@ -20,6 +21,7 @@ use crate::{
 };
 
 pub mod exe;
+pub mod fd;
 pub mod gconfig;
 pub mod interrupts;
 pub mod maps;
@@ -40,6 +42,7 @@ pub trait KernelProcIf {
     fn maps() -> String;
     fn maps_from_tid(tid: usize) -> String;
     fn interrupts() -> BTreeMap<usize, usize>;
+    fn fd(fd: usize) -> String;
 }
 
 pub fn init_procfs(root_dentry: Arc<dyn Dentry>) -> SysResult<()> {
@@ -136,6 +139,13 @@ pub fn init_procfs(root_dentry: Arc<dyn Dentry>) -> SysResult<()> {
     let exe_dentry: Arc<dyn Dentry> =
         ExeDentry::new(Some(exe_inode), Some(Arc::downgrade(&self_dentry)));
     self_dentry.add_child(exe_dentry);
+
+    // /proc/self/fd
+    let fd_inode = SimpleInode::new(root_dentry.superblock().unwrap());
+    fd_inode.set_inotype(InodeType::Dir);
+    let fd_dentry: Arc<dyn Dentry> =
+        SimpleDentry::new("fd", Some(fd_inode), Some(Arc::downgrade(&self_dentry)));
+    self_dentry.add_child(fd_dentry.clone());
 
     // /proc/self/status
     let status_inode = StatusInode::new(root_dentry.superblock().unwrap());

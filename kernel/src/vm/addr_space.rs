@@ -238,7 +238,7 @@ impl AddrSpace {
     /// should be a valid address.
     ///
     /// `prot` needs to have `RWX` bits set; other bits must be zero.
-    pub fn change_prot(&self, addr: VirtAddr, length: usize, prot: MappingFlags) {
+    pub fn change_prot(&self, addr: VirtAddr, length: usize, prot: MappingFlags) -> SysResult<()> {
         let length = VirtAddr::new(length).round_up().to_usize();
         let end_addr = VirtAddr::new(addr.to_usize() + length);
         let mut vm_areas_lock = self.vm_areas.lock();
@@ -267,6 +267,11 @@ impl AddrSpace {
                 vm_areas_lock.insert(vma_low.start_va(), vma_low);
             }
             if let Some(mut vma_mid) = vma_mid {
+                // Special Check (for memfd)
+                if let Err(e) = vma_mid.check_seals(prot) {
+                    vm_areas_lock.insert(vma_mid.start_va(), vma_mid);
+                    return Err(e);
+                }
                 vma_mid.change_prot(&self.page_table, prot);
                 vm_areas_lock.insert(vma_mid.start_va(), vma_mid);
             }
@@ -274,6 +279,7 @@ impl AddrSpace {
                 vm_areas_lock.insert(vma_high.start_va(), vma_high);
             }
         }
+        Ok(())
     }
 
     /// Clones the address space.

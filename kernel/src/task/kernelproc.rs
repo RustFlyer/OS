@@ -45,6 +45,10 @@ impl KernelProcIf for KernelProcIfImpl {
     fn interrupts() -> BTreeMap<usize, usize> {
         TRAP_STATS.get_all()
     }
+
+    fn fd(fd: usize) -> String {
+        current_task().with_mut_fdtable(|table| table.get_file(fd).unwrap().dentry().path())
+    }
 }
 
 struct KernelTableIfImpl;

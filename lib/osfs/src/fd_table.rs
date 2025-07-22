@@ -96,6 +96,7 @@ impl FdTable {
         let fdinfo = FdInfo::new(file, flags.into());
         if let Some(fd) = self.get_available_slot(0) {
             log::info!("alloc fd [{}]", fd);
+            crate::proc::fd::create_self_fd_file(fd)?;
             self.table[fd] = Some(fdinfo);
             Ok(fd)
         } else {
