@@ -2,6 +2,7 @@ use bitflags::bitflags;
 use common::atomic_bitflags;
 
 bitflags! {
+    #[derive(Debug,Clone, Copy)]
     pub struct MemfdFlags: u32 {
         /// Close-on-exec (set the fd as O_CLOEXEC)
         const CLOEXEC         = 0x0001; // MFD_CLOEXEC

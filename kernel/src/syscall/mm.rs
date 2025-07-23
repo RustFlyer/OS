@@ -1,3 +1,4 @@
+use arch::mm::tlb_flush_all;
 use config::mm::PAGE_SIZE;
 use id_allocator::IdAllocator;
 use mm::address::VirtAddr;
@@ -14,7 +15,10 @@ use systype::{
     memory_flags::{MappingFlags, MmapFlags, MmapProt},
 };
 
-use crate::{processor::current_task, vm::user_ptr::UserWritePtr};
+use crate::{
+    processor::current_task,
+    vm::{trace_page_table_lookup, user_ptr::UserWritePtr},
+};
 
 /// `mmap()` creates a new mapping in the virtual address space of the calling process.
 /// The starting address for the new mapping is specified in addr. The `length` argument
@@ -76,13 +80,21 @@ pub async fn sys_mmap(
             {
                 return Err(SysError::EPERM);
             }
+
+            if prot.contains(MmapProt::PROT_WRITE) && flags.contains(MmapFlags::MAP_SHARED) {
+                memf.mapseals(MemfdSeals::WRITE);
+            }
         }
+
         Some(f)
     } else {
         None
     };
 
-    log::info!("[sys_mmap] addr: {addr:#x}, length: {length:#x}, flags: {flags:?}, fd: {fd}");
+    log::info!(
+        "[sys_mmap] addr: {addr:#x}, length: {length:#x}, flags: {flags:?}, fd: {fd}, prot: {prot:?}, seals: {seals:?}"
+    );
+
     if addr == 0 && flags.contains(MmapFlags::MAP_FIXED) {
         return Err(SysError::EINVAL);
     }
@@ -96,6 +108,21 @@ pub async fn sys_mmap(
         offset,
         seals,
     );
+
+    // if let Ok(ptr) = result {
+    //     if prot.contains(MmapProt::PROT_WRITE) {
+    //         unsafe {
+    //             tlb_flush_all();
+    //             trace_page_table_lookup(
+    //                 task.addr_space().page_table.root(),
+    //                 VirtAddr::new(ptr + length / 2),
+    //             );
+
+    //             *((ptr + length / 2) as *mut u8) = 0;
+    //         }
+    //     }
+    // }
+
     log::info!("[sys_mmap] allocated at: {:#x}", result?);
     result
 }

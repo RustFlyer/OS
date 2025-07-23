@@ -145,7 +145,7 @@ pub fn init_procfs(root_dentry: Arc<dyn Dentry>) -> SysResult<()> {
     fd_inode.set_inotype(InodeType::Dir);
     let fd_dentry: Arc<dyn Dentry> =
         SimpleDentry::new("fd", Some(fd_inode), Some(Arc::downgrade(&self_dentry)));
-    self_dentry.add_child(fd_dentry.clone());
+    self_dentry.add_child(fd_dentry);
 
     // /proc/self/status
     let status_inode = StatusInode::new(root_dentry.superblock().unwrap());

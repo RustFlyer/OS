@@ -7,6 +7,8 @@ use vfs::{
     inode::Inode,
 };
 
+use super::file::MemFile;
+
 pub struct MemDentry {
     meta: DentryMeta,
 }
@@ -37,7 +39,7 @@ impl Dentry for MemDentry {
     }
 
     fn base_open(self: Arc<Self>) -> SysResult<Arc<dyn File>> {
-        todo!()
+        Ok(MemFile::new(self.clone()))
     }
 
     fn base_create(&self, _dentry: &dyn Dentry, _mode: InodeMode) -> SysResult<()> {

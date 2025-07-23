@@ -60,9 +60,9 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         boot::clear_bss();
 
         // too much log delay, cut up!
-        // disable_log();
         logger::init();
-        enable_log();
+        disable_log();
+        // enable_log();
 
         log::info!("dtb_addr: {:#x}", dtb_addr);
 

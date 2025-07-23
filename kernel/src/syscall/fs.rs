@@ -9,6 +9,7 @@ use core::{
     cmp, mem,
     pin::Pin,
     ptr,
+    sync::atomic::{AtomicU8, AtomicU64},
     task::{Context, Poll},
     time::Duration,
 };
@@ -201,7 +202,7 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
     }
 
     if inode_type.is_reg() && flags.contains(OpenFlags::O_TRUNC) && flags.writable() {
-        inode.set_size(0);
+        inode.set_size(0).unwrap();
     }
 
     let file = <dyn File>::open(dentry)?;
@@ -381,7 +382,7 @@ pub fn sys_fstat(fd: usize, stat_buf: usize) -> SyscallResult {
     let addr_space = task.addr_space();
     let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
     let kstat = Kstat::from_vfs_inode(file.inode())?;
-    log::error!("[sys_fstat] kstat: {:?}", kstat);
+    log::debug!("[sys_fstat] kstat: {:?}", kstat);
     unsafe {
         UserWritePtr::<Kstat>::new(stat_buf, &addr_space).write(kstat)?;
     }
@@ -1228,10 +1229,19 @@ pub fn sys_fcntl(fd: usize, op: isize, arg: usize) -> SyscallResult {
                 .map_err(|_| SysError::ENOENT)?;
 
             let seals = meminode.get_seals();
+
             if seals.contains(MemfdSeals::SEAL) {
                 return Err(SysError::EPERM);
             }
-            meminode.add_seals(MemfdSeals::from_bits(arg as u32).ok_or(SysError::EINVAL)?);
+
+            let pseals = meminode.get_pseals();
+            let nseals = MemfdSeals::from_bits(arg as u32).ok_or(SysError::EINVAL)?;
+
+            if pseals.intersects(nseals) {
+                return Err(SysError::EPERM);
+            }
+
+            meminode.add_seals(nseals);
 
             Ok(0)
         }
@@ -2529,23 +2539,82 @@ pub fn sys_fremovexattr(fd: usize, name_ptr: usize) -> SyscallResult {
     Ok(0)
 }
 
-pub fn sys_fallocate(fd: usize, mode: usize, offset: usize, len: usize) -> SyscallResult {
-    log::debug!("[sys_fallocate] fd: {fd}, mode: {mode}, offset: {offset}, len: {len}");
-    if mode != 0 {
-        return Err(SysError::EOPNOTSUPP);
+bitflags::bitflags! {
+    /// Fallocate mode flags. See man 2 fallocate.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct FallocateMode: u32 {
+        const NONE           = 0;
+        const KEEP_SIZE      = 0x01; // FALLOC_FL_KEEP_SIZE
+        const PUNCH_HOLE     = 0x02; // FALLOC_FL_PUNCH_HOLE (must with KEEP_SIZE)
+        const COLLAPSE_RANGE = 0x08; // FALLOC_FL_COLLAPSE_RANGE
+        const ZERO_RANGE     = 0x10; // FALLOC_FL_ZERO_RANGE
+        const INSERT_RANGE   = 0x20; // FALLOC_FL_INSERT_RANGE
+        const UNSHARE_RANGE  = 0x40; // FALLOC_FL_UNSHARE_RANGE
     }
+}
+const FALLOC_VALID_FLAGS: u32 = FallocateMode::KEEP_SIZE.bits()
+    | FallocateMode::PUNCH_HOLE.bits()
+    | FallocateMode::COLLAPSE_RANGE.bits()
+    | FallocateMode::ZERO_RANGE.bits()
+    | FallocateMode::INSERT_RANGE.bits()
+    | FallocateMode::UNSHARE_RANGE.bits();
+
+pub async fn sys_fallocate(fd: usize, mode: usize, offset: usize, len: usize) -> SyscallResult {
+    log::debug!("[sys_fallocate] fd: {fd}, mode: {mode:#x}, offset: {offset}, len: {len}");
+
+    // 检查是否有未知bit
+    if mode as u32 & !FALLOC_VALID_FLAGS != 0 {
+        return Err(SysError::EINVAL);
+    }
+    let mode = FallocateMode::from_bits_truncate(mode as u32);
 
     let task = current_task();
     let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
-
     let inode = file.inode();
 
-    let size = inode.size().max(offset + len);
-    inode.set_size(size);
+    if mode.is_empty() {
+        // mode = 0，普通预分配（扩容并分配空间，等价于扩文件）
+        let size = inode.size().max(offset + len);
+        inode.set_size(size)?;
+        return Ok(0);
+    }
+    // 虚拟内存文件（比如 memfd）不支持以下操作。你可以根据 inode 类型用 match 支持更多类型。
+    // 处理常见组合旗标
+    if mode.contains(FallocateMode::PUNCH_HOLE) {
+        if !mode.contains(FallocateMode::KEEP_SIZE) {
+            // PUNCH_HOLE必须与KEEP_SIZE配合
+            return Err(SysError::EINVAL);
+        }
+        // (0) 校验参数是否合法，比如offset+len没有超出文件范围，否则EINVAL
+        let file_size = inode.size();
+        // Linux允许offset==file_size且len==0，但否则offset+len>file_size算EINVAL
+        if offset > file_size || len == 0 || offset + len > file_size {
+            return Err(SysError::EINVAL);
+        }
+        // (1) punch_hole 操作
+        file.fill_zeros(offset, len).await;
+        return Ok(0);
+    }
 
-    Ok(0)
+    // 其它 flag 也不支持
+    if mode.intersects(
+        FallocateMode::COLLAPSE_RANGE
+            | FallocateMode::ZERO_RANGE
+            | FallocateMode::INSERT_RANGE
+            | FallocateMode::UNSHARE_RANGE,
+    ) {
+        return Err(SysError::EOPNOTSUPP);
+    }
+
+    // 理论上，如果有 KEEP_SIZE 但不带其它 flag (即 mode==KEEP_SIZE), 就是告诉不增大 size，但要预分配空间
+    if mode == FallocateMode::KEEP_SIZE {
+        // 提示：目前为简化，直接OK
+        return Ok(0);
+    }
+
+    // 理论上到不了这里
+    Err(SysError::EOPNOTSUPP)
 }
-
 pub async fn sys_splice(
     fd_in: usize,
     off_in_ptr: usize,
@@ -3072,6 +3141,7 @@ pub fn sys_open_by_handle_at(mount_fd: i32, handle_ptr: usize, flags: i32) -> Sy
     {
         return Err(SysError::EACCES);
     }
+
     if flags.writable()
         && !inode.check_permission(cred.euid, cred.egid, &cred.groups, AccessFlags::W_OK)
     {
@@ -3087,7 +3157,7 @@ pub fn sys_open_by_handle_at(mount_fd: i32, handle_ptr: usize, flags: i32) -> Sy
     }
 
     if inode_type.is_reg() && flags.contains(OpenFlags::O_TRUNC) && flags.writable() {
-        inode.set_size(0);
+        inode.set_size(0).unwrap();
     }
 
     let file = <dyn File>::open(dentry)?;
@@ -3193,8 +3263,9 @@ pub fn sys_mknodat(dirfd: usize, pathname: usize, mode: u32, dev: u32) -> Syscal
 pub fn sys_memfd_create(name_ptr: usize, flags: u32) -> SyscallResult {
     use vfs::inode::Inode;
 
+    static mut NAME_INC: AtomicU8 = AtomicU8::new(0);
     let task = current_task();
-    let name = {
+    let mut name = {
         let addr_space = task.addr_space();
         let mut data_ptr = UserReadPtr::<u8>::new(name_ptr, &addr_space);
         let cstring = data_ptr.read_c_string(256)?;
@@ -3208,14 +3279,21 @@ pub fn sys_memfd_create(name_ptr: usize, flags: u32) -> SyscallResult {
         MemfdSeals::SEAL
     };
 
-    // if mfd_flags.contains(MemfdFlags::NOEXEC_SEAL) {
-    //     seals |= MemfdSeals::EXEC;
-    // }
+    #[allow(static_mut_refs)]
+    {
+        let mut cnt = unsafe { NAME_INC.load(core::sync::atomic::Ordering::Relaxed) };
+        cnt = cnt + 1;
+        name.push(cnt as char);
+    }
+
+    log::debug!("[sys_memfd_create] name: {name}, flags: {:?}", mfd_flags);
 
     let inode = MemInode::new(seals);
     inode.set_mode(InodeMode::REG);
 
-    let dentry = MemDentry::new(&name, Some(inode), None);
+    let dentry = MemDentry::new(&name, Some(inode), Some(Arc::downgrade(&sys_root_dentry())));
+    sys_root_dentry().add_child(dentry.clone());
+
     let file = MemFile::new(dentry);
     file.set_flags(OpenFlags::O_RDWR);
 

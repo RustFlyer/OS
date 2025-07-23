@@ -59,12 +59,9 @@ pub fn probe_device_tree() {
     }
 
     unsafe {
-        CLOCK_FREQ = device_tree
-            .cpus()
-            .next()
-            .unwrap()
-            .timebase_frequency()
-            .unwrap()
+        if let Ok(freq) = device_tree.cpus().next().unwrap().timebase_frequency() {
+            CLOCK_FREQ = freq;
+        }
     }
     log::warn!("clock freq set to {} Hz", unsafe { CLOCK_FREQ });
 
@@ -238,7 +235,9 @@ pub fn probe_cpu(root: &Fdt) -> Option<Vec<CPU>> {
                     }
                 })
                 .unwrap_or(0),
-            timebase_freq: dtb_cpu.timebase_frequency().unwrap(),
+            timebase_freq: dtb_cpu
+                .timebase_frequency()
+                .unwrap_or(unsafe { CLOCK_FREQ }),
         };
 
         // Mask CPU without MMU

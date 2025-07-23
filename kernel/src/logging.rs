@@ -8,8 +8,10 @@ use logger::LogInterface;
 use mutex::SpinNoIrqLock;
 
 static mut LOGOUT: AtomicBool = AtomicBool::new(false);
-
+static mut FILTEROUT: AtomicBool = AtomicBool::new(false);
 static LOG_LOCK: SpinNoIrqLock<()> = SpinNoIrqLock::new(());
+
+static FLITER_LIST: &[&str] = &["/fd/3"];
 
 pub fn print_in_color(args: fmt::Arguments, color_code: u8) {
     print!("\u{1B}[{}m{}\u{1B}[0m", color_code, args);
@@ -24,6 +26,18 @@ impl LogInterface for LogInterfaceImpl {
 
         if !can_log() {
             return;
+        }
+
+        if can_filter() {
+            let s = format!("{}", record.args());
+            if FLITER_LIST
+                .iter()
+                .filter(|x| s.contains(*x))
+                .last()
+                .is_none()
+            {
+                return;
+            }
         }
 
         print_in_color(
@@ -53,4 +67,20 @@ pub fn enable_log() {
 #[allow(static_mut_refs)]
 pub fn disable_log() {
     unsafe { LOGOUT.store(false, Ordering::Relaxed) }
+}
+
+#[allow(static_mut_refs)]
+pub fn can_filter() -> bool {
+    unsafe { FILTEROUT.load(Ordering::Relaxed) }
+}
+
+#[allow(static_mut_refs)]
+pub fn enable_filter() {
+    log::debug!("Filter Enable");
+    unsafe { FILTEROUT.store(true, Ordering::Relaxed) };
+}
+
+#[allow(static_mut_refs)]
+pub fn disable_filter() {
+    unsafe { FILTEROUT.store(false, Ordering::Relaxed) }
 }

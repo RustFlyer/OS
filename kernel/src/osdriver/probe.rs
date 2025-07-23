@@ -61,6 +61,7 @@ pub fn probe_tree(fdt: &Fdt) {
         println!("[CHAR] INIT SUCCESS");
     }
 
+    #[cfg(target_arch = "riscv64")]
     if let Some(cpus) = probe_cpu(&fdt) {
         device_manager().set_cpus(cpus);
     }

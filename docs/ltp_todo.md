@@ -6,7 +6,7 @@
 - [x] [   5] epoll_ctl03                256             256
 - [ ] [   6] fanotify13                 200
 - [x] [   7] access01                   199             181
-- [ ] [   8] memfd_create01             157
+- [x] [   8] memfd_create01             157             134
 - [x] [   9] waitpid01                  126             126
 - [ ] [  10] pkey01                     108
 - [x] [  11] getpid01                   100             100

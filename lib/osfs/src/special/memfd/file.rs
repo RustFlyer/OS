@@ -32,6 +32,13 @@ impl MemFile {
             .unwrap_or_else(|_| unreachable!())
             .get_seals()
     }
+
+    pub fn mapseals(&self, prot: MemfdSeals) {
+        self.inode()
+            .downcast_arc::<MemInode>()
+            .unwrap_or_else(|_| unreachable!())
+            .map_seals(prot)
+    }
 }
 
 #[async_trait]

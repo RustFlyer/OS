@@ -193,7 +193,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         KEYCTL => sys_keyctl(args[0], args[1], args[2], args[3], args[4]),
         ADJTIMEX => sys_adjtimex(args[0]),
         BPF => Err(SysError::ENOSYS),
-        FALLOCATE => sys_fallocate(args[0], args[1], args[2], args[3]),
+        FALLOCATE => sys_fallocate(args[0], args[1], args[2], args[3]).await,
         CAPGET => sys_capget(args[0], args[1]),
         CAPSET => sys_capset(args[0], args[1]),
         PRCTL => sys_prctl(args[0], args[1], args[2], args[3], args[4]),

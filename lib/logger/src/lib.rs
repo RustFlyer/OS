@@ -3,9 +3,9 @@
 
 extern crate alloc;
 
-pub mod console;
+// pub mod console;
 
-pub use console::*;
+// pub use console::*;
 use crate_interface::call_interface;
 use log::{Level, LevelFilter};
 

@@ -9,7 +9,7 @@ use vfs::{
 
 use crate::simple::inode::SimpleInode;
 
-use super::{create_self_fd_file, dentry::FdDentry, inode::FdInode};
+use super::{dentry::FdDentry, inode::FdInode};
 
 /// FdDirDentry can generate sub-dentry when lookup
 ///
@@ -73,6 +73,7 @@ impl Dentry for FdDirDentry {
     }
 
     fn base_new_neg_child(self: Arc<Self>, name: &str) -> Arc<dyn Dentry> {
+        todo!();
         let n = name.parse::<u64>().unwrap_or(0);
         let dentry = FdDentry::new(None, Some(Arc::downgrade(&self.into_dyn())), n as usize);
         dentry

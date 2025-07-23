@@ -12,6 +12,8 @@ use super::flags::{AtomicMemfdSeals, MemfdSeals};
 pub struct MemInode {
     meta: InodeMeta,
     seals: AtomicMemfdSeals,
+    /// if map, record it here
+    pseals: AtomicMemfdSeals,
 }
 
 impl MemInode {
@@ -19,6 +21,7 @@ impl MemInode {
         Arc::new(Self {
             meta: InodeMeta::new(alloc_ino(), sys_root_dentry().superblock().unwrap()),
             seals: AtomicMemfdSeals::new(seals),
+            pseals: AtomicMemfdSeals::new(MemfdSeals::empty()),
         })
     }
 
@@ -29,6 +32,24 @@ impl MemInode {
     pub fn add_seals(&self, seals: MemfdSeals) {
         let mut nseals = self.seals.load(core::sync::atomic::Ordering::Relaxed);
         nseals = nseals | seals;
+        self.seals
+            .store(nseals, core::sync::atomic::Ordering::Relaxed);
+    }
+
+    pub fn get_pseals(&self) -> MemfdSeals {
+        self.pseals.load(core::sync::atomic::Ordering::Relaxed)
+    }
+
+    pub fn map_seals(&self, seals: MemfdSeals) {
+        let mut nseals = self.pseals.load(core::sync::atomic::Ordering::Relaxed);
+        nseals = nseals | seals;
+        self.pseals
+            .store(nseals, core::sync::atomic::Ordering::Relaxed);
+    }
+
+    pub fn unmap_seals(&self, seals: MemfdSeals) {
+        let mut nseals = self.seals.load(core::sync::atomic::Ordering::Relaxed);
+        nseals = nseals & !seals;
         self.seals
             .store(nseals, core::sync::atomic::Ordering::Relaxed);
     }
