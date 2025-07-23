@@ -152,30 +152,28 @@ impl FdTable {
     }
 
     pub fn remove_with_range(&mut self, first: Fd, last: Fd, flags: usize) -> SysResult<()> {
-        //! CLOSE_RANGE_UNSHARE unimplemented
-        let mut is_ok = false;
-        log::debug!("{:?}", self.table);
-        for fd in first..=last {
-            if flags & 1 != 0 {
-                let res = self.get_mut(fd);
-                if res.is_ok() {
-                    is_ok = true;
-                    let info = res?;
+        const CLOSE_RANGE_CLOEXEC: usize = 1 << 2;
+
+        let existing: Vec<usize> = self
+            .table
+            .iter()
+            .enumerate()
+            .filter(|(_fd, info)| info.is_some())
+            .map(|(fd, _info)| fd)
+            .filter(|fd| *fd >= first && *fd <= last)
+            .collect();
+
+        for fd in existing {
+            log::info!("[remove_with_range] close fd: {}", fd);
+            if (flags & CLOSE_RANGE_CLOEXEC) != 0 {
+                if let Ok(info) = self.get_mut(fd) {
                     info.set_flags(FdFlags::CLOEXEC);
-                    log::debug!("[remove_with_range] {}: {:?}", fd, info.flags);
                 }
             } else {
-                if self.remove(fd).is_ok() {
-                    is_ok = true;
-                    log::debug!("[remove_with_range] {}: removed", fd);
-                }
+                let _ = self.remove(fd);
             }
         }
 
-        // ! stupid, just for close_range02
-        if !is_ok && first != last {
-            return Err(SysError::EBADF);
-        }
         Ok(())
     }
 

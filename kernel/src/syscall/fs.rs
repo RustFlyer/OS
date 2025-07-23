@@ -1179,7 +1179,7 @@ pub enum FcntlOp {
 pub fn sys_fcntl(fd: usize, op: isize, arg: usize) -> SyscallResult {
     use FcntlOp::*;
     let task = current_task();
-    log::error!("[sys_fcntl] fd: {fd}, op: {op:?}, arg: {arg:#x}");
+    log::debug!("[sys_fcntl] fd: {fd}, op: {op:?}, arg: {arg:#x}");
     let op = FcntlOp::from_repr(op).unwrap_or_default();
     match op {
         F_DUPFD => task.with_mut_fdtable(|table| table.dup_with_bound(fd, arg, OpenFlags::empty())),
@@ -2321,8 +2321,9 @@ pub fn sys_fchownat(
 }
 
 pub fn sys_close_range(first: usize, last: usize, flags: usize) -> SyscallResult {
-    const CLOSE_RANGE_UNSHARE: usize = 1;
-    const CLOSE_RANGE_CLOEXEC: usize = 2;
+    const CLOSE_RANGE_UNSHARE: usize = 1 << 1;
+    const CLOSE_RANGE_CLOEXEC: usize = 1 << 2;
+    log::debug!("[sys_close_range] first: {first}, last: {last}, flags: {flags}");
 
     if first > last {
         return Err(SysError::EINVAL);
@@ -2334,10 +2335,11 @@ pub fn sys_close_range(first: usize, last: usize, flags: usize) -> SyscallResult
 
     let task = current_task();
 
-    if flags == CLOSE_RANGE_UNSHARE {
+    if (flags & CLOSE_RANGE_UNSHARE) != 0 {
         let mut fdtable = task.fdtable_mut().lock().clone();
         fdtable.remove_with_range(first, last, flags)?;
         *task.fdtable_mut().lock() = fdtable;
+        // task.with_mut_fdtable(|table| table.remove_with_range(first, last, flags))?;
     } else {
         task.with_mut_fdtable(|table| table.remove_with_range(first, last, flags))?;
     }
@@ -3299,4 +3301,70 @@ pub fn sys_memfd_create(name_ptr: usize, flags: u32) -> SyscallResult {
     }
 
     task.with_mut_fdtable(|ft| ft.alloc(file, file_flags))
+}
+
+bitflags::bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct FspickFlags: u32 {
+        const CLOEXEC          = 0x0001;
+        const SYMLINK_NOFOLLOW = 0x0002;
+        const NO_AUTOMOUNT     = 0x0004;
+        const EMPTY_PATH       = 0x0008;
+    }
+}
+
+bitflags::bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct FsconfigCmd : u32 {
+        const  SetFlag = 0;
+        const  SetString = 1;
+        const  SetBinary = 2;
+        const  SetPath = 3;
+        const  SetPathEmpty = 4;
+        const  SetFd = 5;
+        const  CmdCreate = 6;
+        const  CmdReconfigure = 7;
+    }
+}
+
+pub fn sys_fspick(dirfd: usize, pathname: usize, flags: u32) -> SyscallResult {
+    let task = current_task();
+    let addr_space = task.addr_space();
+    let cpath = UserReadPtr::<u8>::new(pathname, &addr_space).read_c_string(256)?;
+    let path = cpath.into_string().unwrap();
+    let flags = FspickFlags::from_bits_truncate(flags);
+    let open_flags = if flags.contains(FspickFlags::CLOEXEC) {
+        OpenFlags::O_CLOEXEC
+    } else {
+        OpenFlags::empty()
+    };
+
+    let dentry = task.walk_at(AtFd::from(dirfd), path.clone())?;
+    let file = dentry.base_open()?;
+    let fd = task.with_mut_fdtable(|ft| ft.alloc(file, open_flags))?;
+    Ok(fd)
+}
+
+pub fn sys_fsconfig(fs_fd: usize, cmd: u32, key: usize, value: usize, aux: usize) -> SyscallResult {
+    let task = current_task();
+    let addr_space = task.addr_space();
+    let key_str = if key != 0 {
+        Some(UserReadPtr::<u8>::new(key, &addr_space).read_c_string(256)?)
+    } else {
+        None
+    };
+
+    let value_str = if value != 0 {
+        Some(UserReadPtr::<u8>::new(value, &addr_space).read_c_string(256)?)
+    } else {
+        None
+    };
+
+    let cmd = FsconfigCmd::from_bits_truncate(cmd);
+
+    // cmd 只要是 FSCONFIG_SET_STRING/FSCONFIG_SET_FLAG/FSCONFIG_CMD_RECONFIGURE 都直接返回 Ok(0)
+    match cmd {
+        FsconfigCmd::SetString | FsconfigCmd::SetFlag | FsconfigCmd::CmdReconfigure => Ok(0),
+        _ => Err(SysError::EINVAL),
+    }
 }

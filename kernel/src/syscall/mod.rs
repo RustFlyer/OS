@@ -244,6 +244,8 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         PKEY_FREE => sys_pkey_free(args[0] as i32),
         PKEY_MPROTECT => sys_pkey_mprotect(args[0], args[1], args[2] as i32, args[3] as i32),
         MEMFD_CREATE => sys_memfd_create(args[0], args[1] as u32),
+        FSCONFIG => sys_fsconfig(args[0], args[1] as u32, args[2], args[3], args[4]),
+        FSPICK => sys_fspick(args[0], args[1], args[2] as u32),
         _ => {
             println!("Syscall not implemented: {}", syscall_no.as_str());
             panic!("Syscall not implemented: {}", syscall_no.as_str());

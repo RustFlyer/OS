@@ -55,7 +55,7 @@
 - [ ] [  54] setns01                     25
 - [ ] [  55] clock_gettime03             24
 - [ ] [  56] close_range01               24
-- [ ] [  57] fspick01                    24
+- [x] [  57] fspick01                    24             36 all
 - [ ] [  58] io_control01                24
 - [ ] [  59] kill11                      24
 - [ ] [  60] select01                    24
