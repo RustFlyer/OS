@@ -108,7 +108,15 @@ impl AddrSpace {
             };
             let interp_file = {
                 log::debug!("[load_elf] interp_name = {}", interp_name);
-                let dentry = Path::new(sys_root_dentry(), interp_name).walk()?;
+                let mut dentry = Path::new(sys_root_dentry(), interp_name).walk()?;
+                if dentry
+                    .inode()
+                    .ok_or(SysError::ENOENT)?
+                    .inotype()
+                    .is_symlink()
+                {
+                    dentry = Path::resolve_symlink(dentry)?;
+                }
                 <dyn File>::open(dentry)?
             };
             log::debug!("[load_elf] open interp_file");

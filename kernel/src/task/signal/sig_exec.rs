@@ -175,6 +175,9 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
                             }
                         }
                     }
+                } else if let SigDetails::None = si.details {
+                    log::error!("[sig_exec] SigDetail got None, do nothing",);
+                    panic!("")
                 } else {
                     log::error!(
                         "[sig_exec] SigDetail should be Kill, but got: {:?}",

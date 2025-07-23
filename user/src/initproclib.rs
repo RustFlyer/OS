@@ -252,22 +252,22 @@ pub fn riscv_init() {
 
     close(2);
 
-    run_cmd("./busybox cp /musl/lib/libc.so /lib/ld-musl-riscv64-sf.so.1");
-    run_cmd("./busybox cp /musl/lib/libc.so /lib/ld-musl-riscv64.so.1");
+    run_cmd("./busybox ln -s /musl/lib/libc.so /lib/ld-musl-riscv64-sf.so.1");
+    run_cmd("./busybox ln -s /musl/lib/libc.so /lib/ld-musl-riscv64.so.1");
     println!("loading user lib: 20%");
 
-    run_cmd("./busybox mv /musl/lib/* /lib/");
+    run_cmd("./busybox ln -s /musl/lib/* /lib/");
     println!("loading user lib: 40%");
 
-    run_cmd("./busybox cp /glibc/lib/libc.so /lib/libc.so.6");
-    run_cmd("./busybox cp /glibc/lib/libm.so /lib/libm.so.6");
+    run_cmd("./busybox ln -s /glibc/lib/libc.so /lib/libc.so.6");
+    run_cmd("./busybox ln -s /glibc/lib/libm.so /lib/libm.so.6");
     println!("loading user lib: 60%");
 
-    run_cmd("./busybox mv /glibc/lib/* /lib/");
-    run_cmd("./busybox cp /glibc/busybox /bin/");
+    run_cmd("./busybox ln -s /glibc/lib/* /lib/");
+    run_cmd("./busybox ln -s /glibc/busybox /bin/");
     println!("loading user lib: 80%");
 
-    run_cmd("./busybox cp /glibc/busybox /");
+    run_cmd("./busybox ln -s /glibc/busybox /");
     run_cmd("./busybox --install -s /bin");
     println!("loading user lib: 100%");
     println!("loading user lib: complete!");
@@ -304,20 +304,20 @@ pub fn loongarch_init() {
 
     close(2);
 
-    run_cmd("./busybox cp /musl/lib/* /lib64/");
+    run_cmd("./busybox ln -s /musl/lib/* /lib64/");
     println!("loading user lib: 20%");
 
-    run_cmd("./busybox cp /musl/lib/libc.so /lib64/ld-musl-loongarch-lp64d.so.1");
-    run_cmd("./busybox cp /glibc/lib/* /lib64/");
+    run_cmd("./busybox ln -s /musl/lib/libc.so /lib64/ld-musl-loongarch-lp64d.so.1");
+    run_cmd("./busybox ln -s /glibc/lib/* /lib64/");
     println!("loading user lib: 40%");
 
-    run_cmd("./busybox cp /glibc/lib/* /usr/lib64/");
+    run_cmd("./busybox ln -s /glibc/lib/* /usr/lib64/");
     println!("loading user lib: 60%");
 
-    run_cmd("./busybox cp /glibc/busybox /bin/");
+    run_cmd("./busybox ln -s /glibc/busybox /bin/");
     println!("loading user lib: 80%");
 
-    run_cmd("./busybox cp /glibc/busybox /");
+    run_cmd("./busybox ln -s /glibc/busybox /");
     run_cmd("./busybox --install -s /bin");
     println!("loading user lib: 100%");
     println!("loading user lib: complete!");
