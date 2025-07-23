@@ -16,8 +16,9 @@ impl File for FullFile {
         &self.meta
     }
 
-    async fn base_read(&self, _buf: &mut [u8], _pos: usize) -> SysResult<usize> {
-        Ok(0)
+    async fn base_read(&self, buf: &mut [u8], _pos: usize) -> SysResult<usize> {
+        buf.fill(0);
+        Ok(buf.len())
     }
 
     async fn base_write(&self, _buf: &[u8], _pos: usize) -> SysResult<usize> {

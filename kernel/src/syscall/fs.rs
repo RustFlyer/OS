@@ -2562,7 +2562,6 @@ const FALLOC_VALID_FLAGS: u32 = FallocateMode::KEEP_SIZE.bits()
 pub async fn sys_fallocate(fd: usize, mode: usize, offset: usize, len: usize) -> SyscallResult {
     log::debug!("[sys_fallocate] fd: {fd}, mode: {mode:#x}, offset: {offset}, len: {len}");
 
-    // 检查是否有未知bit
     if mode as u32 & !FALLOC_VALID_FLAGS != 0 {
         return Err(SysError::EINVAL);
     }
@@ -2573,30 +2572,24 @@ pub async fn sys_fallocate(fd: usize, mode: usize, offset: usize, len: usize) ->
     let inode = file.inode();
 
     if mode.is_empty() {
-        // mode = 0，普通预分配（扩容并分配空间，等价于扩文件）
         let size = inode.size().max(offset + len);
         inode.set_size(size)?;
         return Ok(0);
     }
-    // 虚拟内存文件（比如 memfd）不支持以下操作。你可以根据 inode 类型用 match 支持更多类型。
-    // 处理常见组合旗标
+
     if mode.contains(FallocateMode::PUNCH_HOLE) {
         if !mode.contains(FallocateMode::KEEP_SIZE) {
-            // PUNCH_HOLE必须与KEEP_SIZE配合
             return Err(SysError::EINVAL);
         }
-        // (0) 校验参数是否合法，比如offset+len没有超出文件范围，否则EINVAL
+
         let file_size = inode.size();
-        // Linux允许offset==file_size且len==0，但否则offset+len>file_size算EINVAL
         if offset > file_size || len == 0 || offset + len > file_size {
             return Err(SysError::EINVAL);
         }
-        // (1) punch_hole 操作
-        file.fill_zeros(offset, len).await;
+        file.fill_zeros(offset, len).await?;
         return Ok(0);
     }
 
-    // 其它 flag 也不支持
     if mode.intersects(
         FallocateMode::COLLAPSE_RANGE
             | FallocateMode::ZERO_RANGE
@@ -2606,15 +2599,13 @@ pub async fn sys_fallocate(fd: usize, mode: usize, offset: usize, len: usize) ->
         return Err(SysError::EOPNOTSUPP);
     }
 
-    // 理论上，如果有 KEEP_SIZE 但不带其它 flag (即 mode==KEEP_SIZE), 就是告诉不增大 size，但要预分配空间
     if mode == FallocateMode::KEEP_SIZE {
-        // 提示：目前为简化，直接OK
         return Ok(0);
     }
 
-    // 理论上到不了这里
     Err(SysError::EOPNOTSUPP)
 }
+
 pub async fn sys_splice(
     fd_in: usize,
     off_in_ptr: usize,
@@ -2634,6 +2625,11 @@ pub async fn sys_splice(
         len,
         flags
     );
+
+    if len == 0 {
+        return Err(SysError::EINVAL);
+    }
+
     let _flags = SpliceFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
     let file_in = current_task().with_mut_fdtable(|ft| ft.get_file(fd_in))?;
     let file_out = current_task().with_mut_fdtable(|ft| ft.get_file(fd_out))?;

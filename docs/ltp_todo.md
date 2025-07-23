@@ -31,8 +31,8 @@
 - [ ] [  30] mount_setattr01             36
 - [ ] [  31] move_mount01                36
 - [ ] [  32] quotactl08                  36
-- [ ] [  33] splice08                    36
-- [ ] [  34] confstr01                   34
+- [x] [  33] splice08                    36             32
+- [x] [  34] confstr01                   34             36
 - [ ] [  35] mq_timedsend01              34
 - [ ] [  36] utimensat01                 34
 - [ ] [  37] memcontrol04                33
@@ -48,7 +48,7 @@
 - [x] [  47] signal05                    30             31
 - [ ] [  48] open11                      28
 - [x] [  49] signal04                    28             28
-- [x] [  50] name_to_handle_at01         27
+- [x] [  50] name_to_handle_at01         27             27
 - [ ] [  51] fsconfig02                  26
 - [x] [  52] fgetxattr01                 25             45  all
 - [ ] [  53] process_vm01                25
