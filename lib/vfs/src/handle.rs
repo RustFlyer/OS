@@ -49,6 +49,25 @@ impl FileHandle {
         &self.data.path
     }
 
+    /// Converts a byte representation of a Linux `file_handle` structure to a
+    /// [`FileHandle`].
+    ///
+    /// This function is intended for debugging purposes. It should not be called to parse
+    /// a file handle passed from a user program, as the caller does not know the length
+    /// of the file handle beforehand. Instead, call [`FileHandleHeader::from_raw_bytes`]
+    /// first to get the length of the handle, and then call
+    /// [`FileHandleData::from_raw_bytes`] with the remaining bytes.
+    pub fn from_raw_bytes(bytes: &[u8]) -> SysResult<Self> {
+        if bytes.len() < 8 {
+            return Err(SysError::EINVAL);
+        }
+
+        let header = FileHandleHeader::from_raw_bytes(&bytes[0..8]);
+        let data = FileHandleData::from_raw_bytes(&bytes[8..])?;
+
+        Ok(FileHandle { header, data })
+    }
+
     /// Converts the `FileHandle` to Linux `file_handle` structure as a byte vector.
     pub fn to_raw_bytes(&self) -> Vec<u8> {
         debug_assert!(self.data.path.len() < HANDLE_LEN, "Path length exceeds HANDLE_LEN bytes");

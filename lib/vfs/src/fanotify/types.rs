@@ -12,7 +12,7 @@ use bitflags::bitflags;
 
 use config::vfs::OpenFlags;
 
-use crate::file::File;
+use crate::dentry::Dentry;
 
 use super::constants::*;
 
@@ -180,9 +180,10 @@ pub enum FanotifyEventInfoType {
 #[derive(Clone)]
 pub enum FanotifyEventData {
     /// Fanotify event metadata. The first element is an incomplete metadata. The second
-    /// element is an open file to the filesystem object which triggered the event, which
-    /// is to be added to the process's file descriptor table when the event is read.
-    Metadata((FanotifyEventMetadata, Arc<dyn File>)),
+    /// element is a reference of the [`Dentry`] of the filesystem object which triggered
+    /// the event, which is to be opened and added to the user process's file descriptor
+    /// table.
+    Metadata((FanotifyEventMetadata, Arc<dyn Dentry>)),
     Info(FanotifyEventInfoFid),
     Pid(FanotifyEventInfoPid),
     Error(FanotifyEventInfoError),

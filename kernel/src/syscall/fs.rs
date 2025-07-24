@@ -1708,21 +1708,7 @@ pub async fn sys_ftruncate(fd: usize, length: usize) -> SyscallResult {
     log::debug!("[sys_ftruncate] fd: {fd}, length: {length}");
     let task = current_task();
     let file = task.with_mut_fdtable(|t| t.get_file(fd))?;
-    let inode = file.dentry().inode().ok_or(SysError::ENOENT)?;
-    let old_size = file.size();
-
-    inode.set_size(length);
-
-    if old_size > length && file.pos() > length {
-        file.set_pos(length);
-    }
-
-    if old_size < length {
-        let offset = old_size;
-        let len = length - offset;
-        file.fill_zeros(offset, len).await?;
-    }
-
+    file.truncate(length).await?;
     Ok(0)
 }
 

@@ -9,7 +9,9 @@ use crate_interface::call_interface;
 
 use mutex::SpinNoIrqLock;
 
-use crate::{dentry::Dentry, file::File, inode::Inode, superblock::SuperBlock};
+use crate::{
+    dentry::Dentry, fanotify::types::FanMarkFlags, file::File, inode::Inode, superblock::SuperBlock,
+};
 
 use self::{
     constants::FANOTIFY_METADATA_VERSION,
@@ -68,8 +70,8 @@ impl FanotifyGroup {
     /// Subscribes to events on a filesystem object.
     ///
     /// This method creates an entry in the fanotify group for the specified filesystem
-    /// object, with the specified mark and ignore masks. After this call, the group will
-    /// receive events of interest for the object.
+    /// object, with the specified flags, mark mask, and ignore mask. After this call, the
+    /// group will receive events of interest on the object.
     ///
     /// `object_id` is the identifier for `object`, which is used as the key in the
     /// fanotify group's entry map.
@@ -77,10 +79,17 @@ impl FanotifyGroup {
     /// `object` must contains a valid weak reference to a filesystem object.
     ///
     /// The object must not already have an entry in the group.
-    pub fn add_entry(self: &Arc<Self>, object: FsObject, mark: FanEventMask, ignore: FanEventMask) {
+    pub fn add_entry(
+        self: &Arc<Self>,
+        object: FsObject,
+        flags: FanMarkFlags,
+        mark: FanEventMask,
+        ignore: FanEventMask,
+    ) {
         let entry = Arc::new(FanotifyEntry {
             group: Arc::downgrade(self),
             object,
+            flags: SpinNoIrqLock::new(flags),
             mark: SpinNoIrqLock::new(mark),
             ignore: SpinNoIrqLock::new(ignore),
             event_queue: SpinNoIrqLock::new(VecDeque::new()),
@@ -162,6 +171,18 @@ pub struct FanotifyEntry {
     /// reference to a mount.
     object: FsObject,
 
+    /// The flags that specify the behavior of the fanotify entry.
+    ///
+    /// This field has only 3 meaningful bits; other bits are ignored. They are:
+    /// - `FAN_MARK_IGNORED` and `FAN_MARK_IGNORE`: These flags specify which ignore
+    ///   style the entry uses. If `FAN_MARK_IGNORE` is set, successive `fanotify_mark`
+    ///   calls that specify `FAN_MARK_IGNORED` will cause EEXIST error.
+    /// - `FAN_MARK_IGNORED_SURV_MODIFY`: This flag specifies that whether the ignore
+    ///   mask survives modifications to the filesystem object. If this flag is set
+    ///   with `FAN_MARK_IGNORED`, successive `fanotify_mark` calls that do not specify
+    ///   it will cause EEXIST error.
+    flags: SpinNoIrqLock<FanMarkFlags>,
+
     /// The mark mask, which specifies the event kinds that the group is interested in.
     mark: SpinNoIrqLock<FanEventMask>,
 
@@ -177,6 +198,26 @@ pub struct FanotifyEntry {
 }
 
 impl FanotifyEntry {
+    /// Returns the flags of the entry.
+    pub fn flags(&self) -> FanMarkFlags {
+        *self.flags.lock()
+    }
+
+    /// Sets the flags of the entry.
+    pub fn set_flags(&self, flags: FanMarkFlags) {
+        *self.flags.lock() = flags;
+    }
+
+    /// Returns the mark mask of the entry.
+    pub fn mark(&self) -> FanEventMask {
+        *self.mark.lock()
+    }
+
+    /// Returns the ignore mask of the entry.
+    pub fn ignore(&self) -> FanEventMask {
+        *self.ignore.lock()
+    }
+
     /// Adds events in `mark` to the mark mask of the entry.
     pub fn add_mark(&self, mark: FanEventMask) {
         *self.mark.lock() |= mark;
@@ -259,19 +300,33 @@ impl FanotifyEntry {
         let mark = *self.mark.lock();
         let ignore = *self.ignore.lock();
 
-        if !mark.difference(ignore).contains(event) {
+        if event.contains(FanEventMask::ONDIR) && !ignore.contains(FanEventMask::ONDIR) {
+            if !mark.contains(event) {
+                return;
+            }
+        } else if !mark.difference(ignore).contains(event) {
             return;
         }
+
+        log::info!(
+            "[FanotifyEntry::publish] Publishing event: \
+            mark={:?}, ignore={:?}, event={:?}, old_name={}, new_name={}",
+            mark,
+            ignore,
+            event,
+            old_name,
+            new_name
+        );
 
         let group = self.group.upgrade().unwrap();
         let group_flags = group.flags;
 
         let mut event_data = VecDeque::new();
-        let event_file = <dyn File>::open(Arc::clone(object)).unwrap();
+        let event_dentry = Arc::clone(object);
 
         // Metadata.
         let metadata = Self::create_metadata(group_flags, event);
-        event_data.push_back(FanotifyEventData::Metadata((metadata, event_file)));
+        event_data.push_back(FanotifyEventData::Metadata((metadata, event_dentry)));
 
         // Information records.
         if group_flags.contains(FanInitFlags::REPORT_FID) {
@@ -329,7 +384,25 @@ impl FanotifyEntry {
         // Add the event data to the entry's event queue.
         let mut event_queue = self.event_queue.lock();
         event_queue.extend(event_data);
+    }
 
+    /// Clears the ignore mask of the entry if the entry is not marked with
+    /// `FAN_MARK_IGNORED_SURV_MODIFY`.
+    ///
+    /// This method should be called when the file that the entry is monitoring is
+    /// modified (by writing, truncating, etc.).
+    pub fn clear_ignore(&self) {
+        if !self
+            .flags
+            .lock()
+            .contains(FanMarkFlags::IGNORED_SURV_MODIFY)
+        {
+            log::info!(
+                "[FanotifyEntry::clear_ignore] Clearing ignore mask: {:?}",
+                *self.ignore.lock()
+            );
+            *self.ignore.lock() = FanEventMask::empty();
+        }
     }
 
     /// Creates an fanotify event metadata for the specified group flags and event mask.

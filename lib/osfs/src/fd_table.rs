@@ -6,7 +6,7 @@ use systype::{
     error::{SysError, SysResult},
     rlimit::RLimit,
 };
-use vfs::file::File;
+use vfs::{fanotify::types::FanEventMask, file::File};
 
 use crate::dev::tty::{TTY0, TTY1, TTY2};
 
@@ -30,7 +30,7 @@ impl FdInfo {
     }
 
     pub fn file(&self) -> Arc<dyn File> {
-        self.file.clone()
+        Arc::clone(&self.file)
     }
 
     pub fn flags(&self) -> FdFlags {
@@ -43,6 +43,15 @@ impl FdInfo {
 
     pub fn close(&mut self) {
         self.flags = FdFlags::CLOEXEC;
+    }
+
+    fn fanotify_close(&self) {
+        let event = if self.file.flags().writable() {
+            FanEventMask::CLOSE_WRITE
+        } else {
+            FanEventMask::CLOSE_NOWRITE
+        };
+        self.file.fanotify_publish(event);
     }
 }
 
@@ -65,7 +74,6 @@ impl FdTable {
                 rlim_cur: MAX_FDS,
                 rlim_max: MAX_FDS,
             },
-            // zombie: AtomicBool::new(false),
         }
     }
 
@@ -93,10 +101,10 @@ impl FdTable {
     }
 
     pub fn alloc(&mut self, file: Arc<dyn File>, flags: OpenFlags) -> SysResult<Fd> {
-        let fdinfo = FdInfo::new(file, flags.into());
         if let Some(fd) = self.get_available_slot(0) {
             log::info!("alloc fd [{}]", fd);
-            self.table[fd] = Some(fdinfo);
+            file.fanotify_publish(FanEventMask::OPEN);
+            self.table[fd] = Some(FdInfo::new(file, flags.into()));
             Ok(fd)
         } else {
             Err(SysError::EMFILE)
@@ -124,12 +132,16 @@ impl FdTable {
     }
 
     pub fn clear(&mut self) {
-        self.table.clear();
+        for slot in self.table.iter_mut() {
+            if let Some(fd_info) = slot {
+                fd_info.fanotify_close();
+                *slot = None;
+            }
+        }
     }
 
     pub fn close_cloexec(&mut self) {
-        let mut cnt = 0;
-        for slot in self.table.iter_mut() {
+        for (cnt, slot) in self.table.iter_mut().enumerate() {
             if let Some(fd_info) = slot {
                 // log::debug!(
                 //     "fdinfo ino {} type {:?} fd {} close",
@@ -143,10 +155,10 @@ impl FdTable {
                 //     Arc::strong_count(&fd_info.file) - 1
                 // );
                 if fd_info.flags().contains(FdFlags::CLOEXEC) {
+                    fd_info.fanotify_close();
                     *slot = None;
                 }
             }
-            cnt = cnt + 1;
         }
     }
 
@@ -163,11 +175,9 @@ impl FdTable {
                     info.set_flags(FdFlags::CLOEXEC);
                     log::debug!("[remove_with_range] {}: {:?}", fd, info.flags);
                 }
-            } else {
-                if self.remove(fd).is_ok() {
-                    is_ok = true;
-                    log::debug!("[remove_with_range] {}: removed", fd);
-                }
+            } else if self.remove(fd).is_ok() {
+                is_ok = true;
+                log::debug!("[remove_with_range] {}: removed", fd);
             }
         }
 
@@ -191,6 +201,8 @@ impl FdTable {
             fd,
             Arc::strong_count(&self.table[fd].as_ref().unwrap().file) - 1
         );
+        let fdinfo = self.get_mut(fd)?;
+        fdinfo.fanotify_close();
         self.table[fd] = None;
         Ok(())
     }
@@ -268,6 +280,13 @@ impl Default for FdTable {
     }
 }
 
+impl Drop for FdTable {
+    fn drop(&mut self) {
+        // Call `clear` rather than simply dropping them to send fanotify events.
+        self.clear();
+    }
+}
+
 impl Debug for FdInfo {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(
@@ -304,7 +323,7 @@ impl FdSet {
 
     pub fn clear(&mut self) {
         for i in 0..self.fds_bits.len() {
-            self.fds_bits[i] = 0 as u64;
+            self.fds_bits[i] = 0;
         }
     }
 

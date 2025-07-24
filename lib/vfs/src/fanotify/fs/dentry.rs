@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
 
-use config::inode::InodeMode;
+use config::{inode::InodeMode, vfs::FileInternalFlags};
 use systype::error::{SysError, SysResult};
 
 use crate::{
@@ -31,9 +31,9 @@ impl Dentry for FanotifyGroupDentry {
     }
 
     fn base_open(self: Arc<Self>) -> SysResult<Arc<dyn File>> {
-        Ok(Arc::new(FanotifyGroupFile {
-            meta: FileMeta::new(self),
-        }))
+        let file_meta = FileMeta::new(self.clone());
+        *file_meta.internal_flags.lock() |= FileInternalFlags::FMODE_NONOTIFY;
+        Ok(Arc::new(FanotifyGroupFile { meta: file_meta }))
     }
 
     fn base_create(&self, _dentry: &dyn Dentry, _mode: InodeMode) -> SysResult<()> {

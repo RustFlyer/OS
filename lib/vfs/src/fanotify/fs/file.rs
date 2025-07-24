@@ -3,9 +3,13 @@ use alloc::{boxed::Box, sync::Arc};
 use async_trait::async_trait;
 use crate_interface::call_interface;
 
+use config::vfs::FileInternalFlags;
 use systype::error::{SysError, SysResult, SyscallResult};
 
-use crate::file::{File, FileMeta};
+use crate::{
+    file::{File, FileMeta},
+    handle::FileHandle,
+};
 
 use super::super::{
     FanotifyGroup,
@@ -41,11 +45,11 @@ impl FanotifyGroupFile {
             let mut event_queue = entry.event_queue.lock();
 
             while let Some(mut event) = event_queue.pop_front() {
-                let (mut metadata, event_file) =
+                let (metadata, event_file_dentry) =
                     if let FanotifyEventData::Metadata(metadata) = &mut event {
-                        (metadata.0, Arc::clone(&metadata.1))
+                        (&mut metadata.0, Arc::clone(&metadata.1))
                     } else {
-                        panic!("Expected FanotifyEventData::Metadata");
+                        unreachable!("Expected FanotifyEventData::Metadata");
                     };
 
                 let mut event_read = 0;
@@ -62,6 +66,9 @@ impl FanotifyGroupFile {
                 {
                     FAN_NOFD
                 } else {
+                    let event_file = <dyn File>::open(event_file_dentry)?;
+                    *event_file.meta().internal_flags.lock() |= FileInternalFlags::FMODE_NONOTIFY;
+
                     match call_interface!(
                         crate::fanotify::kinterface::KernelFdTableOperations::add_file(
                             event_file,
@@ -79,6 +86,13 @@ impl FanotifyGroupFile {
                 // Set the file descriptor in the event metadata.
                 metadata.fd = fd;
 
+                log::info!(
+                    "Event metadata read: fd={}, pid={}, mask={:?}",
+                    metadata.fd,
+                    metadata.pid,
+                    metadata.mask
+                );
+
                 // Copy the metadata into the buffer.
                 let metadata_len = metadata.metadata_len as usize;
                 buf[total_read..total_read + metadata_len].copy_from_slice(event.as_slice());
@@ -91,6 +105,22 @@ impl FanotifyGroupFile {
                     buf[total_read + event_read..total_read + event_read + record_len]
                         .copy_from_slice(record.as_slice());
                     event_read += record_len;
+
+                    match &record {
+                        FanotifyEventData::Metadata(_) => {
+                            unreachable!()
+                        }
+                        FanotifyEventData::Info(info) => {
+                            log::info!(
+                                "FID info read: type={:?}, handle={:?}",
+                                info.hdr().info_type,
+                                FileHandle::from_raw_bytes(info.handle()).unwrap().path()
+                            );
+                        }
+                        _ => {
+                            unimplemented!()
+                        }
+                    }
                 }
 
                 debug_assert_eq!(event_read, event_len);
