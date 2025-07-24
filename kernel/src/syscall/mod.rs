@@ -1,4 +1,5 @@
 mod consts;
+mod fanotify;
 mod fs;
 mod key;
 mod misc;
@@ -14,7 +15,7 @@ mod user;
 pub use key::init_key;
 
 use consts::SyscallNo::{self, *};
-use driver::println;
+use fanotify::*;
 use fs::*;
 use key::*;
 use misc::{sys_getrandom, sys_sysinfo, sys_syslog, sys_uname};
@@ -223,6 +224,14 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         SETGROUPS => sys_setgroups(args[0], args[1]),
         FADVISE64_64 => sys_fadvise64_64(args[0], args[1], args[2], args[3] as i32),
         SPLICE => sys_splice(args[0], args[1], args[2], args[3], args[4], args[5] as i32).await,
+        FANOTIFY_INIT => sys_fanotify_init(args[0] as u32, args[1] as u32),
+        FANOTIFY_MARK => sys_fanotify_mark(
+            args[0] as i32,
+            args[1] as u32,
+            args[2] as u64,
+            args[3] as i32,
+            args[4],
+        ),
         SETXATTR => sys_setxattr(args[0], args[1], args[2], args[3], args[4] as i32),
         LSETXATTR => sys_lsetxattr(args[0], args[1], args[2], args[3], args[4] as i32),
         GETXATTR => sys_getxattr(args[0], args[1], args[2], args[3]),
@@ -247,7 +256,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         FSCONFIG => sys_fsconfig(args[0], args[1] as u32, args[2], args[3], args[4]),
         FSPICK => sys_fspick(args[0], args[1], args[2] as u32),
         _ => {
-            println!("Syscall not implemented: {}", syscall_no.as_str());
+            log::error!("Syscall not implemented: {}", syscall_no.as_str());
             panic!("Syscall not implemented: {}", syscall_no.as_str());
         }
     };

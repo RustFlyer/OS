@@ -1763,21 +1763,7 @@ pub async fn sys_ftruncate(fd: usize, length: usize) -> SyscallResult {
     log::debug!("[sys_ftruncate] fd: {fd}, length: {length}");
     let task = current_task();
     let file = task.with_mut_fdtable(|t| t.get_file(fd))?;
-    let inode = file.dentry().inode().ok_or(SysError::ENOENT)?;
-    let old_size = file.size();
-
-    inode.set_size(length);
-
-    if old_size > length && file.pos() > length {
-        file.set_pos(length);
-    }
-
-    if old_size < length {
-        let offset = old_size;
-        let len = length - offset;
-        file.fill_zeros(offset, len).await?;
-    }
-
+    file.truncate(length).await?;
     Ok(0)
 }
 
@@ -3005,9 +2991,7 @@ pub fn sys_name_to_handle_at(
     }
 
     // Create the file handle.
-    let handle_type = 0x1ef;
-    let path = dentry.path();
-    let handle = FileHandle::new(handle_type, path);
+    let handle = dentry.file_handle();
 
     // Check if `handle_bytes` in the file handler provided by the user is valid.
     let mut user_handle_header = {

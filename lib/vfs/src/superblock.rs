@@ -1,20 +1,25 @@
-use alloc::sync::Arc;
+use alloc::{
+    sync::{Arc, Weak},
+    vec::Vec,
+};
 
 use config::vfs::StatFs;
 use driver::BlockDevice;
+use mutex::SpinNoIrqLock;
 use spin::Once;
 use systype::error::SysResult;
 
-use crate::{dentry::Dentry, fstype::FileSystemType};
+use crate::{dentry::Dentry, fanotify::FanotifyEntry, fstype::FileSystemType};
 
 static _VIRTUAL_DEV_COUNTER: core::sync::atomic::AtomicU64 =
     core::sync::atomic::AtomicU64::new(0x1000);
 
 pub struct SuperBlockMeta {
     pub device: Option<Arc<dyn BlockDevice>>,
+    pub dev_id: u64,
     pub fs_type: Arc<dyn FileSystemType>,
     pub root_dentry: Once<Arc<dyn Dentry>>,
-    pub dev_id: u64,
+    pub fanotify_entries: SpinNoIrqLock<Vec<Weak<FanotifyEntry>>>,
 }
 
 impl SuperBlockMeta {
@@ -26,9 +31,10 @@ impl SuperBlockMeta {
         // let dev_id = VIRTUAL_DEV_COUNTER.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
         Self {
             device,
-            root_dentry: Once::new(),
-            fs_type,
             dev_id,
+            fs_type,
+            root_dentry: Once::new(),
+            fanotify_entries: SpinNoIrqLock::new(Vec::new()),
         }
     }
 }

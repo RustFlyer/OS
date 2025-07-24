@@ -5,4 +5,5 @@ edition = "2021"
 
 [dependencies]
 bitflags = { workspace = true }
+crate_interface = { workspace = true }
 strum = { workspace = true }

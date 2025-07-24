@@ -105,6 +105,14 @@ impl OpenFlags {
     }
 }
 
+bitflags! {
+    /// Kernel internal flags for [`File`]s.
+    pub struct FileInternalFlags: u32 {
+        /// Don't send fanotify events occurred on this file.
+        const FMODE_NONOTIFY = 0x0001;
+    }
+}
+
 #[derive(Default, Debug, Clone, Copy)]
 #[repr(C)]
 pub struct StatFs {

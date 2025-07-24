@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, string::ToString};
+use alloc::boxed::Box;
 
 use async_trait::async_trait;
 use crate_interface::call_interface;

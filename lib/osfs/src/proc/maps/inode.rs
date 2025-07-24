@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
 
-use config::{device::BLOCK_SIZE, inode::InodeType};
+use config::inode::InodeType;
 use systype::error::SysResult;
 use vfs::{
     inode::{Inode, InodeMeta},
@@ -20,7 +20,6 @@ impl MapsInode {
             meta: InodeMeta::new(alloc_ino(), super_block),
             thread_id: tid,
         });
-        inode.set_size(BLOCK_SIZE);
         inode.set_inotype(InodeType::File);
         inode
     }
@@ -44,7 +43,7 @@ impl Inode for MapsInode {
             st_gid: 0,
             st_rdev: 0,
             __pad: 0,
-            st_size: len as u64,
+            st_size: 0,
             st_blksize: 512,
             __pad2: 0,
             st_blocks: (len / 512) as u64,
