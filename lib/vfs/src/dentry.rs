@@ -1,12 +1,15 @@
+use core::cmp::Ordering;
 use core::ptr;
-
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::sync::{Arc, Weak};
+
 use config::inode::InodeMode;
 use mutex::SpinNoIrqLock;
 use systype::error::{SysError, SysResult};
 
+use crate::fanotify::types::FanEventMask;
+use crate::fanotify::{FanotifyEntrySet, FanotifyGroup};
 use crate::file::File;
 use crate::handle::FileHandle;
 use crate::inode::Inode;
@@ -426,5 +429,108 @@ impl dyn Dentry {
         *lock = None;
 
         dentry
+    }
+
+    /// Publishes an fanotify event on this dentry to all associated fanotify groups.
+    ///
+    /// This function also tries to clear the ignore mask of associated fanotify entries
+    /// if the event contains `FanEventMask::MODIFY`.
+    ///
+    /// The parameters are the same as those of [`FanotifyGroup::publish`].
+    ///
+    /// # TODO
+    ///
+    /// Currently, the VFS does not support bind-mounting, and this method simply
+    /// publishes the event to the filesystem. After we implement bind-mounting in the
+    /// future, this method should be updated to publish the event both the mount point
+    /// and the filesystem.
+    pub(crate) fn fanotify_publish(
+        self: &Arc<Self>,
+        event: FanEventMask,
+        old_name: &str,
+        new_name: &str,
+    ) {
+        assert!(!self.is_negative());
+
+        /// A wrapper of `Arc<FanotifyGroup>` that uses pointer comparison for ordering.
+        struct GroupKey(Arc<FanotifyGroup>);
+
+        impl Ord for GroupKey {
+            fn cmp(&self, other: &Self) -> Ordering {
+                (self.0.as_ref() as *const FanotifyGroup)
+                    .cmp(&(other.0.as_ref() as *const FanotifyGroup))
+            }
+        }
+
+        impl PartialOrd for GroupKey {
+            fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+                Some(self.cmp(other))
+            }
+        }
+
+        impl Eq for GroupKey {}
+
+        impl PartialEq for GroupKey {
+            fn eq(&self, other: &Self) -> bool {
+                ptr::eq(self.0.as_ref(), other.0.as_ref())
+            }
+        }
+
+        // A map from fanotify group to fanotify entry set.
+        #[allow(clippy::mutable_key_type)]
+        let mut entries_by_group: BTreeMap<GroupKey, FanotifyEntrySet> = BTreeMap::new();
+
+        macro_rules! collect_fanotify_entries {
+            ($entries:expr, $field:ident) => {
+                $entries.retain(|e| {
+                    let entry = match e.upgrade() {
+                        Some(entry) => entry,
+                        None => return false,
+                    };
+                    if event.contains(FanEventMask::MODIFY) {
+                        entry.clear_ignore();
+                    }
+
+                    let group = entry.group();
+                    let entry_set = entries_by_group.entry(GroupKey(group)).or_default();
+                    entry_set.$field = Some(entry);
+
+                    true
+                });
+            };
+        }
+
+        collect_fanotify_entries!(
+            self.inode()
+                .unwrap()
+                .get_meta()
+                .inner
+                .lock()
+                .fanotify_entries,
+            object
+        );
+
+        if let Some(parent) = self.parent() {
+            collect_fanotify_entries!(
+                parent
+                    .inode()
+                    .unwrap()
+                    .get_meta()
+                    .inner
+                    .lock()
+                    .fanotify_entries,
+                parent
+            );
+        }
+
+        collect_fanotify_entries!(
+            self.superblock().unwrap().meta().fanotify_entries.lock(),
+            mount
+        );
+
+        // Publish the event to all fanotify groups.
+        for (group, entry_set) in entries_by_group {
+            group.0.publish(self, entry_set, event, old_name, new_name);
+        }
     }
 }

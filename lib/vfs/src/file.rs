@@ -647,18 +647,11 @@ impl dyn File {
         Ok(())
     }
 
-    /// Publishes an fanotify file event on this file to all related fanotify entries,
-    /// if the file is not marked with `FMODE_NONOTIFY`. This also clears the ignore flag
-    /// for each fanotify entry, if it is not marked with `FAN_MARK_IGNORED_SURV_MODIFY`.
+    /// Publishes an fanotify file event on this file or directory to all related fanotify
+    /// groups, if the file is not marked with `FMODE_NONOTIFY`. It also tries to clear
+    /// the ignore flag for each fanotify entry.
     ///
     /// `flags` is the event mask that indicates the type of event to publish.
-    ///
-    /// # TODO
-    ///
-    /// Currently, the VFS dose not support bind-mounting, and this method simply
-    /// publishes the event to the filesystem. After we implement bind-mounting in the
-    /// future, this method should be updated to publish the event both the mount point
-    /// and the filesystem.
     pub fn fanotify_publish(&self, event: FanEventMask) {
         if self
             .meta()
@@ -669,98 +662,11 @@ impl dyn File {
             return;
         }
 
-        if event.contains(FanEventMask::MODIFY) {
-            self.fanotify_clear_ignore();
-        }
-
         let object = self.dentry();
         let old_name = object.name();
         let new_name = old_name;
 
-        for entry in self
-            .inode()
-            .get_meta()
-            .inner
-            .lock()
-            .fanotify_entries
-            .iter()
-            .filter_map(|entry| entry.upgrade())
-        {
-            entry.publish(&object, event, old_name, new_name);
-        }
-
-        if let Some(parent_inode) = object
-            .parent()
-            .and_then(|parent: Arc<dyn Dentry + 'static>| parent.inode())
-        {
-            for entry in parent_inode
-                .get_meta()
-                .inner
-                .lock()
-                .fanotify_entries
-                .iter()
-                .filter_map(|entry| entry.upgrade())
-            {
-                entry.publish(&object, event, old_name, new_name);
-            }
-        }
-
-        if let Some(filesystem) = object.inode().map(|inode| inode.superblock()) {
-            for entry in filesystem
-                .meta()
-                .fanotify_entries
-                .lock()
-                .iter()
-                .filter_map(|entry| entry.upgrade())
-            {
-                entry.publish(&object, event, old_name, new_name);
-            }
-        }
-    }
-
-    /// Clears the ignore flag for each fanotify entry associated with this file, if it
-    /// is not marked with `FAN_MARK_IGNORED_SURV_MODIFY`.
-    fn fanotify_clear_ignore(&self) {
-        for entry in self
-            .inode()
-            .get_meta()
-            .inner
-            .lock()
-            .fanotify_entries
-            .iter()
-            .filter_map(|e| e.upgrade())
-        {
-            entry.clear_ignore();
-        }
-
-        if let Some(parent_inode) = self
-            .dentry()
-            .parent()
-            .and_then(|parent: Arc<dyn Dentry + 'static>| parent.inode())
-        {
-            for entry in parent_inode
-                .get_meta()
-                .inner
-                .lock()
-                .fanotify_entries
-                .iter()
-                .filter_map(|entry| entry.upgrade())
-            {
-                entry.clear_ignore();
-            }
-        }
-
-        for entry in self
-            .inode()
-            .superblock()
-            .meta()
-            .fanotify_entries
-            .lock()
-            .iter()
-            .filter_map(|entry| entry.upgrade())
-        {
-            entry.clear_ignore();
-        }
+        self.dentry().fanotify_publish(event, old_name, new_name);
     }
 }
 

@@ -36,96 +36,92 @@ impl FanotifyGroupFile {
     /// Reads pending events from all entries in the fanotify group.
     fn read_events(&self, buf: &mut [u8]) -> SysResult<usize> {
         let group = self.group();
-        let entries = group.entries.lock();
+        let group_flags = group.flags;
+        let event_file_flags = group.event_file_flags;
 
         let mut total_read = 0;
 
-        // Collect events from entries.
-        for entry in entries.values() {
-            let mut event_queue = entry.event_queue.lock();
-
-            while let Some(mut event) = event_queue.pop_front() {
-                let (metadata, event_file_dentry) =
-                    if let FanotifyEventData::Metadata(metadata) = &mut event {
-                        (&mut metadata.0, Arc::clone(&metadata.1))
-                    } else {
-                        unreachable!("Expected FanotifyEventData::Metadata");
-                    };
-
-                let mut event_read = 0;
-                let event_len = metadata.event_len as usize;
-                if total_read + event_len > buf.len() {
-                    event_queue.push_front(event);
-                    break;
-                }
-
-                // Add the event file to the process's file descriptor table.
-                let fd = if group
-                    .flags
-                    .intersects(FanInitFlags::REPORT_FID | FanInitFlags::REPORT_DIR_FID)
-                {
-                    FAN_NOFD
+        let mut event_queue = group.event_queue.lock();
+        while let Some(mut event) = event_queue.pop_front() {
+            let (metadata, event_file_dentry) =
+                if let FanotifyEventData::Metadata(metadata) = &mut event {
+                    (&mut metadata.0, Arc::clone(&metadata.1))
                 } else {
-                    let event_file = <dyn File>::open(event_file_dentry)?;
-                    *event_file.meta().internal_flags.lock() |= FileInternalFlags::FMODE_NONOTIFY;
-
-                    match call_interface!(
-                        crate::fanotify::kinterface::KernelFdTableOperations::add_file(
-                            event_file,
-                            group.event_file_flags.into()
-                        )
-                    ) {
-                        Ok(fd) => fd,
-                        Err(e) => {
-                            event_queue.push_front(event);
-                            return Err(e);
-                        }
-                    }
+                    unreachable!("Expected FanotifyEventData::Metadata");
                 };
 
-                // Set the file descriptor in the event metadata.
-                metadata.fd = fd;
+            let mut event_read = 0;
+            let event_len = metadata.event_len as usize;
+            if total_read + event_len > buf.len() {
+                event_queue.push_front(event);
+                break;
+            }
 
-                log::info!(
-                    "Event metadata read: fd={}, pid={}, mask={:?}",
-                    metadata.fd,
-                    metadata.pid,
-                    metadata.mask
-                );
+            // Add the event file to the process's file descriptor table.
+            let fd = if group_flags
+                .intersects(FanInitFlags::REPORT_FID | FanInitFlags::REPORT_DIR_FID)
+            {
+                FAN_NOFD
+            } else {
+                let event_file = <dyn File>::open(event_file_dentry)?;
+                *event_file.meta().internal_flags.lock() |= FileInternalFlags::FMODE_NONOTIFY;
 
-                // Copy the metadata into the buffer.
-                let metadata_len = metadata.metadata_len as usize;
-                buf[total_read..total_read + metadata_len].copy_from_slice(event.as_slice());
-                event_read += metadata_len;
-
-                // Copy the optional information records into the buffer.
-                while event_read < event_len {
-                    let record = event_queue.pop_front().unwrap();
-                    let record_len = record.as_slice().len();
-                    buf[total_read + event_read..total_read + event_read + record_len]
-                        .copy_from_slice(record.as_slice());
-                    event_read += record_len;
-
-                    match &record {
-                        FanotifyEventData::Metadata(_) => {
-                            unreachable!()
-                        }
-                        FanotifyEventData::Info(info) => {
-                            log::info!(
-                                "FID info read: type={:?}, handle={:?}",
-                                info.hdr().info_type,
-                                FileHandle::from_raw_bytes(info.handle()).unwrap().path()
-                            );
-                        }
-                        _ => {
-                            unimplemented!()
-                        }
+                match call_interface!(
+                    crate::fanotify::kinterface::KernelFdTableOperations::add_file(
+                        event_file,
+                        event_file_flags.into()
+                    )
+                ) {
+                    Ok(fd) => fd,
+                    Err(e) => {
+                        event_queue.push_front(event);
+                        return Err(e);
                     }
                 }
+            };
 
-                debug_assert_eq!(event_read, event_len);
-                total_read += event_len;
+            // Set the file descriptor in the event metadata.
+            metadata.fd = fd;
+
+            log::info!(
+                "Event metadata read: fd={}, pid={}, mask={:?}",
+                metadata.fd,
+                metadata.pid,
+                metadata.mask
+            );
+
+            // Copy the metadata into the buffer.
+            let metadata_len = metadata.metadata_len as usize;
+            buf[total_read..total_read + metadata_len].copy_from_slice(event.as_slice());
+            event_read += metadata_len;
+
+            // Copy the optional information records into the buffer.
+            while event_read < event_len {
+                let record = event_queue.pop_front().unwrap();
+                let record_len = record.as_slice().len();
+                buf[total_read + event_read..total_read + event_read + record_len]
+                    .copy_from_slice(record.as_slice());
+                event_read += record_len;
+
+                match &record {
+                    FanotifyEventData::Metadata(_) => {
+                        unreachable!()
+                    }
+                    FanotifyEventData::Info(info) => {
+                        log::info!(
+                            "FID info read: type={:?}, handle={:?}",
+                            info.hdr().info_type,
+                            FileHandle::from_raw_bytes(info.handle()).unwrap().path()
+                        );
+                    }
+                    _ => {
+                        unimplemented!()
+                    }
+                }
             }
+
+            debug_assert_eq!(event_read, event_len);
+            total_read += event_len;
         }
 
         Ok(total_read)
