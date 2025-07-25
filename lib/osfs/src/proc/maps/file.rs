@@ -21,7 +21,11 @@ impl File for MapsFile {
         &self.meta
     }
 
-    async fn base_read(&self, buf: &mut [u8], _offset: usize) -> SyscallResult {
+    async fn base_read(&self, buf: &mut [u8], offset: usize) -> SyscallResult {
+        if offset != 0 {
+            return Ok(0);
+        }
+
         let inode = self
             .inode()
             .downcast_arc::<MapsInode>()
