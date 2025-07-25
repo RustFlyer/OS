@@ -68,6 +68,9 @@ pub struct FanotifyGroup {
 
     /// Data of pending events on this group.
     event_queue: SpinNoIrqLock<VecDeque<FanotifyEventData>>,
+
+    /// Maximum number of events that can be queued in the event queue.
+    max_queued_events: u32,
 }
 
 impl FanotifyGroup {
@@ -78,6 +81,11 @@ impl FanotifyGroup {
             flags,
             event_file_flags,
             event_queue: SpinNoIrqLock::new(VecDeque::new()),
+            max_queued_events: if flags.contains(FanInitFlags::UNLIMITED_QUEUE) {
+                u32::MAX
+            } else {
+                MAX_QUEUED_EVENTS.load(atomic::Ordering::Relaxed)
+            },
         }
     }
 
@@ -286,7 +294,29 @@ impl FanotifyGroup {
             new_name
         );
 
-        let mut event_data = FanotifyEventData::new(Arc::clone(object));
+        let queue_len = self.event_queue.lock().len();
+        if queue_len >= self.max_queued_events as usize {
+            log::warn!(
+                "[FanotifyGroup::publish] Event queue is full, dropping event: \
+                event={:?}, old_name={}, new_name={}",
+                event,
+                old_name,
+                new_name
+            );
+
+            if queue_len == self.max_queued_events as usize {
+                let mut metadata = self.create_metadata(FanEventMask::Q_OVERFLOW);
+                metadata.event_len = mem::size_of::<FanotifyEventMetadata>() as u32;
+
+                let mut event_data = FanotifyEventData::new(None);
+                event_data.add_datum(FanotifyEventDatum::Metadata(metadata));
+
+                self.event_queue.lock().push_back(event_data);
+            }
+            return;
+        }
+
+        let mut event_data = FanotifyEventData::new(Some(Arc::clone(object)));
         let flags = self.flags;
 
         // Create the metadata.
@@ -599,13 +629,16 @@ pub enum FsObjectId {
 /// several information records.
 #[derive(Clone)]
 pub struct FanotifyEventData {
-    dentry: Arc<dyn Dentry>,
+    /// The dentry of the filesystem object that triggered the event. For Q_OVERFLOW
+    /// events, this is `None`.
+    dentry: Option<Arc<dyn Dentry>>,
+    /// The event data, which contains a metadata and optional information records.
     data: Vec<FanotifyEventDatum>,
 }
 
 impl FanotifyEventData {
     /// Creates an empty fanotify event data structure with the specified dentry.
-    fn new(dentry: Arc<dyn Dentry>) -> Self {
+    fn new(dentry: Option<Arc<dyn Dentry>>) -> Self {
         Self {
             dentry,
             data: Vec::new(),
@@ -619,8 +652,8 @@ impl FanotifyEventData {
 
     /// Returns a reference to the dentry of the filesystem object that triggered the
     /// event.
-    fn object(&self) -> Arc<dyn Dentry> {
-        Arc::clone(&self.dentry)
+    fn object(&self) -> Option<&Arc<dyn Dentry>> {
+        self.dentry.as_ref()
     }
 
     /// Returns a mutable reference to the metadata structure of the event data.

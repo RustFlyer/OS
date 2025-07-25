@@ -34,10 +34,10 @@ impl FanotifyGroupFile {
 
         let mut total_read = 0;
         let mut is_first_event = true;
-
         let mut event_queue = group.event_queue.lock();
+
         while let Some(mut event) = event_queue.pop_front() {
-            let event_object = event.object();
+            let event_object = event.object().cloned();
             let metadata = event.metadata_mut();
 
             let event_len = metadata.event_len as usize;
@@ -52,35 +52,34 @@ impl FanotifyGroupFile {
 
             is_first_event = false;
 
-            // Add the event file to the process's file descriptor table.
-            let fd = if group_flags
-                .intersects(FanInitFlags::REPORT_FID | FanInitFlags::REPORT_DIR_FID)
-            {
-                FAN_NOFD
-            } else {
-                let event_file = <dyn File>::open(event_object)?;
-                *event_file.meta().internal_flags.lock() |= FileInternalFlags::FMODE_NONOTIFY;
+            if let Some(event_object) = event_object {
+                // Add the event file to the process's file descriptor table.
+                metadata.fd = if group_flags
+                    .intersects(FanInitFlags::REPORT_FID | FanInitFlags::REPORT_DIR_FID)
+                {
+                    FAN_NOFD
+                } else {
+                    let event_file = <dyn File>::open(event_object)?;
+                    *event_file.meta().internal_flags.lock() |= FileInternalFlags::FMODE_NONOTIFY;
 
-                match call_interface!(
-                    crate::fanotify::kinterface::KernelFdTableOperations::add_file(
-                        event_file,
-                        event_file_flags.into()
-                    )
-                ) {
-                    Ok(fd) => fd,
-                    Err(e) => {
-                        event_queue.push_front(event);
-                        if is_first_event {
-                            return Err(e);
-                        } else {
-                            break;
+                    match call_interface!(
+                        crate::fanotify::kinterface::KernelFdTableOperations::add_file(
+                            event_file,
+                            event_file_flags.into()
+                        )
+                    ) {
+                        Ok(fd) => fd,
+                        Err(e) => {
+                            event_queue.push_front(event);
+                            if is_first_event {
+                                return Err(e);
+                            } else {
+                                break;
+                            }
                         }
                     }
-                }
-            };
-
-            // Set the file descriptor in the event metadata.
-            metadata.fd = fd;
+                };
+            }
 
             log::info!(
                 "Event metadata read: fd={}, pid={}, mask={:?}",
