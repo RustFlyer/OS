@@ -3,11 +3,12 @@ use alloc::{
     string::{String, ToString},
     sync::{Arc, Weak},
 };
-use core::mem;
+use core::{cmp::Ordering, mem, ptr, task::Waker};
 
 use crate_interface::call_interface;
 
 use mutex::SpinNoIrqLock;
+use osfuture::{suspend_now, take_waker};
 
 use crate::{
     dentry::Dentry, fanotify::types::FanMarkFlags, file::File, inode::Inode, superblock::SuperBlock,
@@ -140,10 +141,21 @@ impl FanotifyGroup {
         self.entries.lock().get(&object_id).cloned()
     }
 
-    /// Unsubscribes from events on a filesystem object. After this call, the group
-    /// will no longer receive events for the object.
-    pub fn remove_entry(&self, object_id: FsObjectId) -> Option<Arc<FanotifyEntry>> {
-        self.entries.lock().remove(&object_id)
+    /// Removes all entries in the group that are a file or a directory.
+    pub fn flush_normal_entries(&self) {
+        let mut entries = self.entries.lock();
+        entries.retain(|_, entry| !matches!(entry.object, FsObject::Inode(_)));
+    }
+
+    /// Removes all entries in the group that are a mount.
+    pub fn flush_mount_entries(&self) {
+        let mut entries = self.entries.lock();
+        entries.retain(|_, entry| !matches!(entry.object, FsObject::Mount(_)));
+    }
+
+    /// Removes all entries in the group that are a filesystem.
+    pub fn flush_filesystem_entries(&self) {
+        unimplemented!()
     }
 
     /// Publishes an event to the fanotify group's event queue.
@@ -190,7 +202,7 @@ impl FanotifyGroup {
     ///   and `new_name` are the names of the directory's dentry before and after being
     ///   renamed, respectively.
     pub(crate) fn publish(
-        &self,
+        self: Arc<Self>,
         object: &Arc<dyn Dentry>,
         entries: FanotifyEntrySet,
         event: FanEventMask,
@@ -328,8 +340,29 @@ impl FanotifyGroup {
         }
 
         // Add the event data to the entry's event queue.
-        let mut event_queue = self.event_queue.lock();
-        event_queue.extend(event_data);
+        self.event_queue.lock().extend(event_data);
+
+        self.wake();
+    }
+
+    pub(crate) async fn wait(self: Arc<Self>) {
+        let group_key = FanotifyGroupKey(self);
+        let waker = take_waker().await;
+        {
+            let mut wakers = FANOTIFY_WAKERS.lock();
+            wakers.entry(group_key).or_default().push_back(waker);
+        }
+        suspend_now().await;
+    }
+
+    fn wake(self: Arc<Self>) {
+        let group_key = FanotifyGroupKey(self);
+        let mut wakers = FANOTIFY_WAKERS.lock();
+        if let Some(waker_list) = wakers.get_mut(&group_key) {
+            if let Some(waker) = waker_list.pop_front() {
+                waker.wake_by_ref();
+            }
+        }
     }
 
     /// Creates an fanotify event metadata for this group flags with the specified event
@@ -470,22 +503,22 @@ impl FanotifyEntry {
         *self.ignore.lock()
     }
 
-    /// Adds events in `mark` to the mark mask of the entry.
+    /// Adds events and flags in `mark` to the mark mask of the entry.
     pub fn add_mark(&self, mark: FanEventMask) {
         *self.mark.lock() |= mark;
     }
 
-    /// Removes events in `mark` from the mark mask of the entry.
+    /// Removes events and flags in `mark` from the mark mask of the entry.
     pub fn remove_mark(&self, mark: FanEventMask) {
         *self.mark.lock() &= !mark;
     }
 
-    /// Adds events in `ignore` to the ignore mask of the entry.
+    /// Adds events and flags in `ignore` to the ignore mask of the entry.
     pub fn add_ignore(&self, ignore: FanEventMask) {
         *self.ignore.lock() |= ignore;
     }
 
-    /// Removes events in `ignore` from the ignore mask of the entry.
+    /// Removes events and flags in `ignore` from the ignore mask of the entry.
     pub fn remove_ignore(&self, ignore: FanEventMask) {
         *self.ignore.lock() &= !ignore;
     }
@@ -561,3 +594,29 @@ pub enum FsObjectId {
     /// Mount ID.
     Mount(u64),
 }
+
+/// A wrapper of `Arc<FanotifyGroup>` that uses pointer comparison for ordering.
+pub(crate) struct FanotifyGroupKey(pub Arc<FanotifyGroup>);
+
+impl Ord for FanotifyGroupKey {
+    fn cmp(&self, other: &Self) -> Ordering {
+        (self.0.as_ref() as *const FanotifyGroup).cmp(&(other.0.as_ref() as *const FanotifyGroup))
+    }
+}
+
+impl PartialOrd for FanotifyGroupKey {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Eq for FanotifyGroupKey {}
+
+impl PartialEq for FanotifyGroupKey {
+    fn eq(&self, other: &Self) -> bool {
+        ptr::eq(self.0.as_ref(), other.0.as_ref())
+    }
+}
+
+static FANOTIFY_WAKERS: SpinNoIrqLock<BTreeMap<FanotifyGroupKey, VecDeque<Waker>>> =
+    SpinNoIrqLock::new(BTreeMap::new());

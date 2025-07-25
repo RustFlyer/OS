@@ -96,13 +96,6 @@ pub fn sys_fanotify_mark(
     {
         return Err(SysError::EINVAL);
     }
-    if flags.contains(FanMarkFlags::FLUSH)
-        && flags != FanMarkFlags::FLUSH
-        && flags != FanMarkFlags::FLUSH | FanMarkFlags::MOUNT
-        && flags != FanMarkFlags::FLUSH | FanMarkFlags::FILESYSTEM
-    {
-        return Err(SysError::EINVAL);
-    }
     if flags.contains(FanMarkFlags::MOUNT)
         && mask.intersects(
             FanEventMask::ATTRIB
@@ -124,8 +117,20 @@ pub fn sys_fanotify_mark(
     {
         return Err(SysError::EINVAL);
     }
+    if flags.contains(FanMarkFlags::FLUSH) {
+        if flags == FanMarkFlags::FLUSH {
+            group.flush_normal_entries();
+        } else if flags == FanMarkFlags::FLUSH | FanMarkFlags::MOUNT {
+            group.flush_mount_entries();
+        } else if flags == FanMarkFlags::FLUSH | FanMarkFlags::FILESYSTEM {
+            group.flush_filesystem_entries();
+        } else {
+            return Err(SysError::EINVAL);
+        };
+        return Ok(0);
+    }
 
-    if flags.intersects(FanMarkFlags::FLUSH | FanMarkFlags::IGNORE | FanMarkFlags::EVICTABLE) {
+    if flags.intersects(FanMarkFlags::EVICTABLE) {
         unimplemented!("Unsupported fanotify flags: {flags:?}");
     }
     if mask.intersects(
@@ -141,8 +146,7 @@ pub fn sys_fanotify_mark(
             | FanEventMask::Q_OVERFLOW
             | FanEventMask::ACCESS_PERM
             | FanEventMask::OPEN_PERM
-            | FanEventMask::OPEN_EXEC_PERM
-            | FanEventMask::EVENT_ON_CHILD,
+            | FanEventMask::OPEN_EXEC_PERM,
     ) {
         unimplemented!("Unsupported fanotify mask: {mask:?}");
     }

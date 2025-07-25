@@ -40,6 +40,7 @@ impl FanotifyGroupFile {
         let event_file_flags = group.event_file_flags;
 
         let mut total_read = 0;
+        let mut is_first_event = true;
 
         let mut event_queue = group.event_queue.lock();
         while let Some(mut event) = event_queue.pop_front() {
@@ -54,8 +55,14 @@ impl FanotifyGroupFile {
             let event_len = metadata.event_len as usize;
             if total_read + event_len > buf.len() {
                 event_queue.push_front(event);
+                if is_first_event {
+                    // The buffer is too small to hold the event.
+                    return Err(SysError::EINVAL);
+                }
                 break;
             }
+
+            is_first_event = false;
 
             // Add the event file to the process's file descriptor table.
             let fd = if group_flags
@@ -149,7 +156,17 @@ impl File for FanotifyGroupFile {
     }
 
     async fn base_read(&self, buf: &mut [u8], _offset: usize) -> SyscallResult {
-        self.read_events(buf)
+        loop {
+            let bytes_read = self.read_events(buf)?;
+            if bytes_read > 0 {
+                return Ok(bytes_read);
+            } else if self.group().flags.contains(FanInitFlags::NONBLOCK) {
+                return Err(SysError::EAGAIN);
+            } else {
+                let group = self.group();
+                group.wait().await;
+            }
+        }
     }
 
     async fn base_write(&self, _buf: &[u8], _offset: usize) -> SyscallResult {

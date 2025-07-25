@@ -1,15 +1,14 @@
-use core::cmp::Ordering;
-use core::ptr;
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::sync::{Arc, Weak};
+use core::ptr;
 
 use config::inode::InodeMode;
 use mutex::SpinNoIrqLock;
 use systype::error::{SysError, SysResult};
 
 use crate::fanotify::types::FanEventMask;
-use crate::fanotify::{FanotifyEntrySet, FanotifyGroup};
+use crate::fanotify::{FanotifyEntrySet, FanotifyGroupKey};
 use crate::file::File;
 use crate::handle::FileHandle;
 use crate::inode::Inode;
@@ -452,33 +451,9 @@ impl dyn Dentry {
     ) {
         assert!(!self.is_negative());
 
-        /// A wrapper of `Arc<FanotifyGroup>` that uses pointer comparison for ordering.
-        struct GroupKey(Arc<FanotifyGroup>);
-
-        impl Ord for GroupKey {
-            fn cmp(&self, other: &Self) -> Ordering {
-                (self.0.as_ref() as *const FanotifyGroup)
-                    .cmp(&(other.0.as_ref() as *const FanotifyGroup))
-            }
-        }
-
-        impl PartialOrd for GroupKey {
-            fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-                Some(self.cmp(other))
-            }
-        }
-
-        impl Eq for GroupKey {}
-
-        impl PartialEq for GroupKey {
-            fn eq(&self, other: &Self) -> bool {
-                ptr::eq(self.0.as_ref(), other.0.as_ref())
-            }
-        }
-
         // A map from fanotify group to fanotify entry set.
         #[allow(clippy::mutable_key_type)]
-        let mut entries_by_group: BTreeMap<GroupKey, FanotifyEntrySet> = BTreeMap::new();
+        let mut entries_by_group: BTreeMap<FanotifyGroupKey, FanotifyEntrySet> = BTreeMap::new();
 
         macro_rules! collect_fanotify_entries {
             ($entries:expr, $field:ident) => {
@@ -492,7 +467,7 @@ impl dyn Dentry {
                     }
 
                     let group = entry.group();
-                    let entry_set = entries_by_group.entry(GroupKey(group)).or_default();
+                    let entry_set = entries_by_group.entry(FanotifyGroupKey(group)).or_default();
                     entry_set.$field = Some(entry);
 
                     true

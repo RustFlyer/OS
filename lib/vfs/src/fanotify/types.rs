@@ -231,7 +231,9 @@ pub enum FanotifyResponseOption {
 }
 
 bitflags! {
-    /// Mask for fanotify events.
+    /// Mask for fanotify events. It contains several event bits and three flags bits;
+    /// each event bit corresponds to a specific fanotify event, and each flag bit
+    /// specifies a special behavior of monitoring.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     #[repr(transparent)]
     pub struct FanEventMask: u64 {
@@ -257,8 +259,8 @@ bitflags! {
         /// A file or a directory was opened with the intent to be executed.
         const OPEN_EXEC = FAN_OPEN_EXEC;
 
-        // The following flags requires the fanotify group to identify filesystem objects
-        // by file handles.
+        // The following notification events require the fanotify group to identify
+        // filesystem objects by file handles.
 
         /// A file or a directory metadata was changed.
         const ATTRIB = FAN_ATTRIB;
@@ -287,8 +289,9 @@ bitflags! {
         /// A watched file or directory was modified.
         const MOVE_SELF = FAN_MOVE_SELF;
 
-        // The following constants is a bit corresponding to a fanotify permission event.
-        // They require the fanotify group to be initialized with `FAN_CLASS_CONTENT` or
+        // Each of the following constants is a bit corresponding to a fanotify permission
+        // event. They require the fanotify group both to identify filesystem objects by
+        // file handles, and to be initialized with `FAN_CLASS_CONTENT` or
         // `FAN_CLASS_PRE_CONTENT`.
 
         /// An application wants to read a file or directory, for example using `read`
@@ -314,6 +317,8 @@ bitflags! {
         /// This bit mask is used to check for any move event.
         const MOVE = FAN_MOVE;
 
+        // The following three constants are flags that modify the behavior of monitoring.
+
         /// The events described in the mask have occurred on a directory object.
         /// Reporting events on directories requires setting this flag in the mark mask.
         /// It is reported in an event mask only if the fanotify group identifies
@@ -323,10 +328,9 @@ bitflags! {
         /// Events for the immediate children of marked directories shall be created.
         const EVENT_ON_CHILD = FAN_EVENT_ON_CHILD;
 
-        /// This flag is not an event, but a special flag that indicates that the
-        /// event queue has exceeded the limit on the number of events. This limit can be
-        /// overridden by specifying the `FAN_UNLIMITED_QUEUE` flag when calling
-        /// `fanotify_init`.
+        /// This flag indicates that the event queue has exceeded the limit on the number
+        /// of events. This limit can be overridden by specifying the
+        /// `FAN_UNLIMITED_QUEUE` flag when calling `fanotify_init`.
         const Q_OVERFLOW = FAN_Q_OVERFLOW;
 
         /// This bit mask is used to check whether an event is a file event. If an event
