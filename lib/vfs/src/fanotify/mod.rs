@@ -1,9 +1,11 @@
 use alloc::{
     collections::{btree_map::BTreeMap, vec_deque::VecDeque},
+    slice,
     string::{String, ToString},
     sync::{Arc, Weak},
+    vec::Vec,
 };
-use core::{cmp::Ordering, mem, ptr, task::Waker};
+use core::{cmp, mem, ptr, sync::atomic, task::Waker};
 
 use crate_interface::call_interface;
 
@@ -11,21 +13,28 @@ use mutex::SpinNoIrqLock;
 use osfuture::{suspend_now, take_waker};
 
 use crate::{
-    dentry::Dentry, fanotify::types::FanMarkFlags, file::File, inode::Inode, superblock::SuperBlock,
+    dentry::Dentry,
+    fanotify::{
+        config::MAX_QUEUED_EVENTS,
+        types::{FanMarkFlags, FanotifyEventInfoError, FanotifyEventInfoPid},
+    },
+    file::File,
+    inode::Inode,
+    superblock::SuperBlock,
 };
 
 use self::{
     constants::FANOTIFY_METADATA_VERSION,
     types::{
-        FanEventFileFlags, FanEventMask, FanInitFlags, FanotifyEventData, FanotifyEventInfoFid,
+        FanEventFileFlags, FanEventMask, FanInitFlags, FanotifyEventInfoFid,
         FanotifyEventInfoFidInner, FanotifyEventInfoHeader, FanotifyEventInfoType,
         FanotifyEventMetadata,
     },
 };
 
-pub mod fs;
-
+pub mod config;
 pub mod constants;
+pub mod fs;
 pub mod kinterface;
 pub mod types;
 
@@ -277,19 +286,17 @@ impl FanotifyGroup {
             new_name
         );
 
+        let mut event_data = FanotifyEventData::new(Arc::clone(object));
         let flags = self.flags;
-
-        let mut event_data = VecDeque::new();
-        let event_dentry = Arc::clone(object);
 
         // Create the metadata.
         let metadata = self.create_metadata(event);
-        event_data.push_back(FanotifyEventData::Metadata((metadata, event_dentry)));
+        event_data.add_datum(FanotifyEventDatum::Metadata(metadata));
 
         // Create information records.
         if flags.contains(FanInitFlags::REPORT_FID) {
             let info = Self::create_fid_info(object, FanotifyEventInfoType::Fid, None);
-            event_data.push_back(FanotifyEventData::Info(info));
+            event_data.add_datum(FanotifyEventDatum::Info(info));
         }
         if flags.contains(FanInitFlags::REPORT_DIR_FID) {
             let reported_object = if object.inode().unwrap().inotype().is_dir() {
@@ -301,7 +308,7 @@ impl FanotifyGroup {
                 if !flags.contains(FanInitFlags::REPORT_NAME) {
                     let info =
                         Self::create_fid_info(&reported_object, FanotifyEventInfoType::Dfid, None);
-                    event_data.push_back(FanotifyEventData::Info(info));
+                    event_data.add_datum(FanotifyEventDatum::Info(info));
                 } else if event.contains(FanEventMask::RENAME) {
                     let info_old = Self::create_fid_info(
                         &reported_object,
@@ -313,15 +320,15 @@ impl FanotifyGroup {
                         FanotifyEventInfoType::NewDfidName,
                         Some(new_name.to_string()),
                     );
-                    event_data.push_back(FanotifyEventData::Info(info_old));
-                    event_data.push_back(FanotifyEventData::Info(info_new));
+                    event_data.add_datum(FanotifyEventDatum::Info(info_old));
+                    event_data.add_datum(FanotifyEventDatum::Info(info_new));
                 } else {
                     let info = Self::create_fid_info(
                         &reported_object,
                         FanotifyEventInfoType::DfidName,
                         Some(old_name.to_string()),
                     );
-                    event_data.push_back(FanotifyEventData::Info(info));
+                    event_data.add_datum(FanotifyEventDatum::Info(info));
                 }
             }
         }
@@ -333,15 +340,12 @@ impl FanotifyGroup {
             .iter()
             .map(|data| data.as_slice().len())
             .sum::<usize>() as u32;
-        if let FanotifyEventData::Metadata((ref mut metadata, _)) = event_data[0] {
-            metadata.event_len = event_len;
-        } else {
-            unreachable!()
-        }
+        event_data.metadata_mut().event_len = event_len;
 
         // Add the event data to the entry's event queue.
-        self.event_queue.lock().extend(event_data);
+        self.event_queue.lock().push_back(event_data);
 
+        // Wake up a process waiting for events in this group.
         self.wake();
     }
 
@@ -529,11 +533,7 @@ impl FanotifyEntry {
     /// This method should be called when the file that the entry is monitoring is
     /// modified (by writing, truncating, etc.).
     pub fn clear_ignore(&self) {
-        if !self
-            .flags
-            .lock()
-            .contains(FanMarkFlags::IGNORED_SURV_MODIFY)
-        {
+        if !self.flags().contains(FanMarkFlags::IGNORED_SURV_MODIFY) {
             log::info!(
                 "[FanotifyEntry::clear_ignore] Clearing ignore mask: {:?}",
                 *self.ignore.lock()
@@ -595,17 +595,104 @@ pub enum FsObjectId {
     Mount(u64),
 }
 
+/// Data of an fanotify event, which consists of a metadata structure and optionally
+/// several information records.
+#[derive(Clone)]
+pub struct FanotifyEventData {
+    dentry: Arc<dyn Dentry>,
+    data: Vec<FanotifyEventDatum>,
+}
+
+impl FanotifyEventData {
+    /// Creates an empty fanotify event data structure with the specified dentry.
+    fn new(dentry: Arc<dyn Dentry>) -> Self {
+        Self {
+            dentry,
+            data: Vec::new(),
+        }
+    }
+
+    /// Adds an event datum to the event data.
+    fn add_datum(&mut self, datum: FanotifyEventDatum) {
+        self.data.push(datum);
+    }
+
+    /// Returns a reference to the dentry of the filesystem object that triggered the
+    /// event.
+    fn object(&self) -> Arc<dyn Dentry> {
+        Arc::clone(&self.dentry)
+    }
+
+    /// Returns a mutable reference to the metadata structure of the event data.
+    ///
+    /// # Panic
+    /// If no datum is added to the event data, or if the first datum is not a metadata
+    /// structure, this method will panic.
+    fn metadata_mut(&mut self) -> &mut FanotifyEventMetadata {
+        match &mut self.data[0] {
+            FanotifyEventDatum::Metadata(metadata) => metadata,
+            _ => panic!("First datum must be metadata"),
+        }
+    }
+
+    /// Returns an iterator over the event data.
+    fn iter(&self) -> slice::Iter<FanotifyEventDatum> {
+        self.data.iter()
+    }
+}
+
+/// Enum representing an fanotify metadata structure or an information record structure.
+#[derive(Clone)]
+pub(crate) enum FanotifyEventDatum {
+    /// Fanotify event metadata. The first element is an incomplete metadata. The second
+    /// element is a reference of the [`Dentry`] of the filesystem object which triggered
+    /// the event, which is to be opened and added to the user process's file descriptor
+    /// table.
+    Metadata(FanotifyEventMetadata),
+    Info(FanotifyEventInfoFid),
+    Pid(FanotifyEventInfoPid),
+    Error(FanotifyEventInfoError),
+}
+
+impl FanotifyEventDatum {
+    /// Returns a byte slice representation of the data, which is to be read by a user
+    /// process.
+    pub fn as_slice(&self) -> &[u8] {
+        match self {
+            FanotifyEventDatum::Metadata(metadata) => unsafe {
+                slice::from_raw_parts(
+                    metadata as *const FanotifyEventMetadata as *const u8,
+                    mem::size_of::<FanotifyEventMetadata>(),
+                )
+            },
+            FanotifyEventDatum::Info(info) => info.as_bytes(),
+            FanotifyEventDatum::Pid(pid) => unsafe {
+                slice::from_raw_parts(
+                    pid as *const FanotifyEventInfoPid as *const u8,
+                    mem::size_of::<FanotifyEventInfoPid>(),
+                )
+            },
+            FanotifyEventDatum::Error(error) => unsafe {
+                slice::from_raw_parts(
+                    error as *const FanotifyEventInfoError as *const u8,
+                    mem::size_of::<FanotifyEventInfoError>(),
+                )
+            },
+        }
+    }
+}
+
 /// A wrapper of `Arc<FanotifyGroup>` that uses pointer comparison for ordering.
 pub(crate) struct FanotifyGroupKey(pub Arc<FanotifyGroup>);
 
 impl Ord for FanotifyGroupKey {
-    fn cmp(&self, other: &Self) -> Ordering {
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
         (self.0.as_ref() as *const FanotifyGroup).cmp(&(other.0.as_ref() as *const FanotifyGroup))
     }
 }
 
 impl PartialOrd for FanotifyGroupKey {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         Some(self.cmp(other))
     }
 }

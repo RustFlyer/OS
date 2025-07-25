@@ -4,15 +4,12 @@
 use alloc::{
     alloc::{Layout, alloc, dealloc},
     slice,
-    sync::Arc,
 };
-use core::{mem, ptr};
+use core::ptr;
 
 use bitflags::bitflags;
 
 use config::vfs::OpenFlags;
-
-use crate::dentry::Dentry;
 
 use super::constants::*;
 
@@ -174,46 +171,6 @@ pub enum FanotifyEventInfoType {
     NewDfidName = FAN_EVENT_INFO_TYPE_NEW_DFID_NAME,
     PidFd = FAN_EVENT_INFO_TYPE_PIDFD,
     Error = FAN_EVENT_INFO_TYPE_ERROR,
-}
-
-/// Enum representing an fanotify metadata structure or an information record structure.
-#[derive(Clone)]
-pub enum FanotifyEventData {
-    /// Fanotify event metadata. The first element is an incomplete metadata. The second
-    /// element is a reference of the [`Dentry`] of the filesystem object which triggered
-    /// the event, which is to be opened and added to the user process's file descriptor
-    /// table.
-    Metadata((FanotifyEventMetadata, Arc<dyn Dentry>)),
-    Info(FanotifyEventInfoFid),
-    Pid(FanotifyEventInfoPid),
-    Error(FanotifyEventInfoError),
-}
-
-impl FanotifyEventData {
-    /// Returns a byte slice representation of the data.
-    pub fn as_slice(&self) -> &[u8] {
-        match self {
-            FanotifyEventData::Metadata(metadata) => unsafe {
-                slice::from_raw_parts(
-                    &raw const metadata.0 as *const u8,
-                    mem::size_of::<FanotifyEventMetadata>(),
-                )
-            },
-            FanotifyEventData::Info(info) => info.as_bytes(),
-            FanotifyEventData::Pid(pid) => unsafe {
-                slice::from_raw_parts(
-                    pid as *const FanotifyEventInfoPid as *const u8,
-                    mem::size_of::<FanotifyEventInfoPid>(),
-                )
-            },
-            FanotifyEventData::Error(error) => unsafe {
-                slice::from_raw_parts(
-                    error as *const FanotifyEventInfoError as *const u8,
-                    mem::size_of::<FanotifyEventInfoError>(),
-                )
-            },
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
