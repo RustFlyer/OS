@@ -2,6 +2,7 @@
 #![no_main]
 #![feature(ptr_as_ref_unchecked)]
 #![feature(sync_unsafe_cell)]
+#![feature(assert_matches)]
 
 use alloc::sync::Arc;
 use dentry::Dentry;
@@ -10,6 +11,7 @@ use spin::Once;
 pub mod dcache;
 pub mod dentry;
 pub mod direntry;
+pub mod fanotify;
 pub mod file;
 pub mod fstype;
 pub mod handle;

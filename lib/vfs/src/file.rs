@@ -11,13 +11,16 @@ use downcast_rs::{DowncastSync, impl_downcast};
 use config::{
     inode::{InodeState, InodeType},
     mm::PAGE_SIZE,
-    vfs::{OpenFlags, PollEvents, SeekFrom},
+    vfs::{FileInternalFlags, OpenFlags, PollEvents, SeekFrom},
 };
 use mm::page_cache::page::Page;
 use mutex::SpinNoIrqLock;
 use systype::error::{SysError, SysResult, SyscallResult};
 
-use crate::{dentry::Dentry, direntry::DirEntry, inode::Inode, superblock::SuperBlock};
+use crate::{
+    dentry::Dentry, direntry::DirEntry, fanotify::types::FanEventMask, inode::Inode,
+    superblock::SuperBlock,
+};
 
 /// Data that is common to all files.
 pub struct FileMeta {
@@ -27,6 +30,8 @@ pub struct FileMeta {
     pub pos: AtomicUsize,
     /// The flags that are set for this file.
     pub flags: SpinNoIrqLock<OpenFlags>,
+    /// Kernel-internal flags for this file.
+    pub internal_flags: SpinNoIrqLock<FileInternalFlags>,
 }
 
 impl FileMeta {
@@ -37,6 +42,7 @@ impl FileMeta {
             dentry,
             pos: AtomicUsize::new(0),
             flags: SpinNoIrqLock::new(OpenFlags::empty()),
+            internal_flags: SpinNoIrqLock::new(FileInternalFlags::empty()),
         }
     }
 }
@@ -151,7 +157,7 @@ pub trait File: Send + Sync + DowncastSync {
         if res_pos < 0 {
             return Err(SysError::EINVAL);
         }
-        self.set_pos(res_pos as usize)?;
+        self.set_pos(res_pos as usize);
         Ok(res_pos as usize)
     }
 
@@ -159,9 +165,8 @@ pub trait File: Send + Sync + DowncastSync {
         self.meta().pos.load(Ordering::Relaxed)
     }
 
-    fn set_pos(&self, pos: usize) -> SysResult<()> {
+    fn set_pos(&self, pos: usize) {
         self.meta().pos.store(pos, Ordering::Relaxed);
-        Ok(())
     }
 
     fn dentry(&self) -> Arc<dyn Dentry> {
@@ -249,7 +254,10 @@ impl dyn File {
             self.base_read(buf, position).await?
         };
 
-        self.set_pos(position + bytes_read)?;
+        self.set_pos(position + bytes_read);
+
+        self.fanotify_publish(FanEventMask::ACCESS);
+
         Ok(bytes_read)
     }
 
@@ -333,7 +341,7 @@ impl dyn File {
             return Err(SysError::EBADF);
         }
         if self.flags().contains(OpenFlags::O_APPEND) {
-            self.set_pos(self.size())?;
+            self.set_pos(self.size());
         }
 
         let inode = self.inode();
@@ -372,15 +380,36 @@ impl dyn File {
         };
         let new_position = position + bytes_written;
 
-        self.set_pos(new_position)?;
+        self.set_pos(new_position);
         if inode.inotype() != InodeType::BlockDevice {
             inode.set_size(usize::max(inode.size(), new_position))?;
         }
         inode.set_state(InodeState::DirtyAll);
 
+        self.fanotify_publish(FanEventMask::MODIFY);
+
         // log::debug!("write bytes: {}", bytes_written);
 
         Ok(bytes_written)
+    }
+
+    pub async fn truncate(&self, size: usize) -> SysResult<()> {
+        let inode = self.dentry().inode().unwrap();
+
+        let old_size = self.size();
+        inode.set_size(size);
+
+        if old_size < size {
+            let offset = old_size;
+            let len = size - offset;
+            self.fill_zeros(offset, len).await?;
+        }
+
+        self.inode().set_state(InodeState::DirtyAll);
+
+        self.fanotify_publish(FanEventMask::MODIFY);
+
+        Ok(())
     }
 
     /// A helper function which writes data starting from the given position to a file
@@ -490,6 +519,9 @@ impl dyn File {
             writen_len += rec_len;
         }
         log::debug!("[read_dir] read {writen_len} bytes");
+
+        self.fanotify_publish(FanEventMask::ACCESS | FanEventMask::ONDIR);
+
         Ok(writen_len)
     }
 
@@ -502,24 +534,6 @@ impl dyn File {
         path_buf.truncate(len);
         let path = CString::new(path_buf).unwrap().into_string().unwrap();
         Ok(path)
-    }
-
-    pub async fn fill_zeros(&self, start: usize, len: usize) -> SysResult<()> {
-        if len == 0 {
-            return Ok(());
-        }
-        let zeros = [0u8; 8192];
-        let mut written = 0;
-        let old_pos = self.pos();
-        while written < len {
-            let to_write = core::cmp::min(zeros.len(), len - written);
-            self.seek(SeekFrom::Start((start + written) as u64))?;
-            self.write_through_page_cache(&zeros[..to_write], start + written)
-                .await?;
-            written += to_write;
-        }
-        self.seek(SeekFrom::Start(old_pos as u64))?;
-        Ok(())
     }
 
     /// Copies data from `src` file to `self` (destination file), using the most direct
@@ -613,6 +627,140 @@ impl dyn File {
         }
 
         Ok(total)
+    }
+
+    pub async fn fill_zeros(&self, start: usize, len: usize) -> SysResult<()> {
+        if len == 0 {
+            return Ok(());
+        }
+        let zeros = [0u8; 8192];
+        let mut written = 0;
+        let old_pos = self.pos();
+        while written < len {
+            let to_write = core::cmp::min(zeros.len(), len - written);
+            self.seek(SeekFrom::Start((start + written) as u64))?;
+            self.write_through_page_cache(&zeros[..to_write], start + written)
+                .await?;
+            written += to_write;
+        }
+        self.seek(SeekFrom::Start(old_pos as u64))?;
+        Ok(())
+    }
+
+    /// Publishes an fanotify file event on this file to all related fanotify entries,
+    /// if the file is not marked with `FMODE_NONOTIFY`. This also clears the ignore flag
+    /// for each fanotify entry, if it is not marked with `FAN_MARK_IGNORED_SURV_MODIFY`.
+    ///
+    /// `flags` is the event mask that indicates the type of event to publish.
+    ///
+    /// # TODO
+    ///
+    /// Currently, the VFS dose not support bind-mounting, and this method simply
+    /// publishes the event to the filesystem. After we implement bind-mounting in the
+    /// future, this method should be updated to publish the event both the mount point
+    /// and the filesystem.
+    pub fn fanotify_publish(&self, event: FanEventMask) {
+        if self
+            .meta()
+            .internal_flags
+            .lock()
+            .contains(FileInternalFlags::FMODE_NONOTIFY)
+        {
+            return;
+        }
+
+        if event.contains(FanEventMask::MODIFY) {
+            self.fanotify_clear_ignore();
+        }
+
+        let object = self.dentry();
+        let old_name = object.name();
+        let new_name = old_name;
+
+        for entry in self
+            .inode()
+            .get_meta()
+            .inner
+            .lock()
+            .fanotify_entries
+            .iter()
+            .filter_map(|entry| entry.upgrade())
+        {
+            entry.publish(&object, event, old_name, new_name);
+        }
+
+        if let Some(parent_inode) = object
+            .parent()
+            .and_then(|parent: Arc<dyn Dentry + 'static>| parent.inode())
+        {
+            for entry in parent_inode
+                .get_meta()
+                .inner
+                .lock()
+                .fanotify_entries
+                .iter()
+                .filter_map(|entry| entry.upgrade())
+            {
+                entry.publish(&object, event, old_name, new_name);
+            }
+        }
+
+        if let Some(filesystem) = object.inode().map(|inode| inode.superblock()) {
+            for entry in filesystem
+                .meta()
+                .fanotify_entries
+                .lock()
+                .iter()
+                .filter_map(|entry| entry.upgrade())
+            {
+                entry.publish(&object, event, old_name, new_name);
+            }
+        }
+    }
+
+    /// Clears the ignore flag for each fanotify entry associated with this file, if it
+    /// is not marked with `FAN_MARK_IGNORED_SURV_MODIFY`.
+    fn fanotify_clear_ignore(&self) {
+        for entry in self
+            .inode()
+            .get_meta()
+            .inner
+            .lock()
+            .fanotify_entries
+            .iter()
+            .filter_map(|e| e.upgrade())
+        {
+            entry.clear_ignore();
+        }
+
+        if let Some(parent_inode) = self
+            .dentry()
+            .parent()
+            .and_then(|parent: Arc<dyn Dentry + 'static>| parent.inode())
+        {
+            for entry in parent_inode
+                .get_meta()
+                .inner
+                .lock()
+                .fanotify_entries
+                .iter()
+                .filter_map(|entry| entry.upgrade())
+            {
+                entry.clear_ignore();
+            }
+        }
+
+        for entry in self
+            .inode()
+            .superblock()
+            .meta()
+            .fanotify_entries
+            .lock()
+            .iter()
+            .filter_map(|entry| entry.upgrade())
+        {
+            entry.clear_ignore();
+        }
     }
 }
 

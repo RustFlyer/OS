@@ -68,7 +68,7 @@ pub trait FileSystemType: Send + Sync {
             let inode = inode.upgrade();
             if inode.is_some() {
                 let inode = inode.unwrap();
-                if inode.ino() == inodeid as usize {
+                if inode.ino() == inodeid as i32 {
                     ret_inode = Some(inode);
                     break;
                 }

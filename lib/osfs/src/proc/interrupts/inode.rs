@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
 
-use config::inode::InodeType;
+use config::{device::BLOCK_SIZE, inode::InodeType};
 use systype::error::SysResult;
 use vfs::{
     inode::{Inode, InodeMeta},
@@ -31,7 +31,6 @@ impl Inode for InterruptsInode {
     fn get_attr(&self) -> SysResult<Stat> {
         let inner = self.meta.inner.lock();
         let mode = inner.mode.bits();
-        let len = inner.size;
         Ok(Stat {
             st_dev: 0, // non-real-file
             st_ino: self.meta.ino as u64,
@@ -41,10 +40,10 @@ impl Inode for InterruptsInode {
             st_gid: 0,
             st_rdev: 0,
             __pad: 0,
-            st_size: len as u64,
-            st_blksize: 512,
+            st_size: 0,
+            st_blksize: BLOCK_SIZE as u32,
             __pad2: 0,
-            st_blocks: (len / 512) as u64,
+            st_blocks: 0,
             st_atime: inner.atime,
             st_mtime: inner.mtime,
             st_ctime: inner.ctime,

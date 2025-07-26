@@ -12,10 +12,12 @@ osfuture = { path = "../osfuture" }
 systype = { path = "../systype" }
 simdebug = { path = "../simdebug" }
 
-
 async-trait = { workspace = true }
+bitflags = { workspace = true }
+crate_interface = { workspace = true }
 downcast-rs = { workspace = true }
 elf = { workspace = true }
 hashbrown = { workspace = true }
+lazy_static = { workspace = true }
 log = { workspace = true }
 spin = { workspace = true }
