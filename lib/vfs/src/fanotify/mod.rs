@@ -172,7 +172,8 @@ impl FanotifyGroup {
 
     /// Removes all entries in the group that are a filesystem.
     pub fn flush_filesystem_entries(&self) {
-        unimplemented!()
+        let mut entries = self.entries.lock();
+        entries.retain(|_, entry| !matches!(entry.object, FsObject::Mount(_)));
     }
 
     /// Publishes an event to the fanotify group's event queue.
@@ -373,7 +374,33 @@ impl FanotifyGroup {
         event_data.metadata_mut().event_len = event_len;
 
         // Add the event data to the entry's event queue.
-        self.event_queue.lock().push_back(event_data);
+        {
+            let mut event_queue = self.event_queue.lock();
+            let mut event_merge_to: Option<&mut FanotifyEventData> = None;
+
+            // Check if the current event can be merged into one of the last 10 events in
+            // the event queue.
+            for existing_event in event_queue.iter_mut().rev().take(10) {
+                let existing_object = existing_event.object().unwrap();
+                let existing_metadata = existing_event.metadata();
+
+                if Arc::ptr_eq(existing_object, object)
+                    && existing_metadata.pid == metadata.pid
+                    && !existing_metadata.mask.contains(metadata.mask)
+                    && ((existing_metadata.mask ^ metadata.mask) & FanEventMask::ONDIR).is_empty()
+                    && existing_event.data()[1..] == event_data.data()[1..]
+                {
+                    event_merge_to = Some(existing_event);
+                    break;
+                }
+            }
+
+            if let Some(event_merge_to) = event_merge_to {
+                event_merge_to.metadata_mut().mask |= metadata.mask;
+            } else {
+                event_queue.push_back(event_data);
+            }
+        }
 
         // Wake up a process waiting for events in this group.
         self.wake();
@@ -440,7 +467,14 @@ impl FanotifyGroup {
                 || info_type == FanotifyEventInfoType::NewDfidName,
         );
 
-        let mut handle_bytes = object.file_handle().to_raw_bytes();
+        // let mut handle_bytes = object.file_handle().to_raw_bytes();
+        let file_handle = object.file_handle();
+        log::info!(
+            "[FanotifyGroup::create_fid_info] Creating fid info: object={:?}, file_handle={:?}",
+            object.path(),
+            file_handle,
+        );
+        let mut handle_bytes = file_handle.to_raw_bytes();
         if let Some(name) = file_name {
             handle_bytes.extend_from_slice(name.as_bytes());
             handle_bytes.push(0); // Null terminator
@@ -656,6 +690,22 @@ impl FanotifyEventData {
         self.dentry.as_ref()
     }
 
+    fn data(&self) -> &[FanotifyEventDatum] {
+        &self.data
+    }
+
+    /// Returns an immutable reference to the metadata structure of the event data.
+    ///
+    /// # Panic
+    /// If no datum is added to the event data, or if the first datum is not a metadata
+    /// structure, this method will panic.
+    fn metadata(&self) -> &FanotifyEventMetadata {
+        match &self.data[0] {
+            FanotifyEventDatum::Metadata(metadata) => metadata,
+            _ => panic!("First datum must be metadata"),
+        }
+    }
+
     /// Returns a mutable reference to the metadata structure of the event data.
     ///
     /// # Panic
@@ -714,6 +764,26 @@ impl FanotifyEventDatum {
         }
     }
 }
+
+impl PartialEq for FanotifyEventDatum {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (FanotifyEventDatum::Metadata(_), FanotifyEventDatum::Metadata(_)) => {}
+            (FanotifyEventDatum::Info(_), FanotifyEventDatum::Info(_)) => {}
+            (FanotifyEventDatum::Pid(_), FanotifyEventDatum::Pid(_)) => {}
+            (FanotifyEventDatum::Error(_), FanotifyEventDatum::Error(_)) => {}
+            _ => return false,
+        }
+
+        // Compare the byte slices of the data.
+        let self_slice = self.as_slice();
+        let other_slice = other.as_slice();
+
+        self_slice == other_slice
+    }
+}
+
+impl Eq for FanotifyEventDatum {}
 
 /// A wrapper of `Arc<FanotifyGroup>` that uses pointer comparison for ordering.
 pub(crate) struct FanotifyGroupKey(pub Arc<FanotifyGroup>);

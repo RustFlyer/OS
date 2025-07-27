@@ -167,10 +167,6 @@ pub trait Dentry: Send + Sync {
         *self.get_meta().inode.lock() = Some(inode);
     }
 
-    fn unset_inode(&self) {
-        *self.get_meta().inode.lock() = None;
-    }
-
     /// Returns whether this dentry is a negative dentry.
     fn is_negative(&self) -> bool {
         self.get_meta().inode.lock().is_none()
@@ -217,10 +213,7 @@ pub trait Dentry: Send + Sync {
 
     /// Removes a child dentry to this dentry.
     fn remove_child(&self, child: &dyn Dentry) -> Option<Arc<dyn Dentry + 'static>> {
-        self.get_meta()
-            .children
-            .lock()
-            .remove(&child.name().to_string())
+        self.get_meta().children.lock().remove(child.name())
     }
 
     /// Returns the path of this dentry as a string.
@@ -248,11 +241,15 @@ impl dyn Dentry {
     /// `self` must be a valid directory. `dentry` must be a negative dentry and a child of `self`.
     /// After this call, `dentry` will become valid. The file type of `mode` must be a regular
     /// file.
-    pub fn create(&self, dentry: &dyn Dentry, mode: InodeMode) -> SysResult<()> {
+    pub fn create(self: &Arc<Self>, dentry: &dyn Dentry, mode: InodeMode) -> SysResult<()> {
         debug_assert!(!self.is_negative());
         debug_assert!(self.inode().unwrap().inotype().is_dir());
         debug_assert!(dentry.is_negative());
         debug_assert!(mode.to_type().is_reg());
+
+        let file_name = dentry.name();
+        self.fanotify_publish(FanEventMask::CREATE, file_name, file_name);
+
         self.base_create(dentry, mode)
     }
 
@@ -261,11 +258,19 @@ impl dyn Dentry {
     ///
     /// `self` must be a valid directory. `dentry` must be a negative dentry and a child of `self`.
     /// After this call, `dentry` will become valid. The file type of `mode` must be a directory.
-    pub fn mkdir(&self, dentry: &dyn Dentry, mode: InodeMode) -> SysResult<()> {
+    pub fn mkdir(self: &Arc<Self>, dentry: &dyn Dentry, mode: InodeMode) -> SysResult<()> {
         debug_assert!(!self.is_negative());
         debug_assert!(self.inode().unwrap().inotype().is_dir());
         debug_assert!(dentry.is_negative());
         debug_assert!(mode.to_type().is_dir());
+
+        let file_name = dentry.name();
+        self.fanotify_publish(
+            FanEventMask::CREATE | FanEventMask::ONDIR,
+            file_name,
+            file_name,
+        );
+
         self.base_create(dentry, mode)
     }
 
@@ -274,15 +279,15 @@ impl dyn Dentry {
     ///
     /// `self` must be a valid directory. `dentry` must be a negative dentry and a child of
     /// `self`. After this call, `dentry` will become valid.
-    pub fn symlink(&self, dentry: &dyn Dentry, target: &str) -> SysResult<()> {
+    pub fn symlink(self: &Arc<Self>, dentry: &dyn Dentry, target: &str) -> SysResult<()> {
         debug_assert!(!self.is_negative());
         debug_assert!(self.inode().unwrap().inotype().is_dir());
         debug_assert!(dentry.is_negative());
-        self.base_symlink(dentry, target)
-    }
 
-    pub fn mknod(&self, _dentry: &dyn Dentry, _mode: InodeMode, _device: usize) -> SysResult<()> {
-        unimplemented!("`mknod` seems not required in test cases")
+        let file_name = dentry.name();
+        self.fanotify_publish(FanEventMask::CREATE, file_name, file_name);
+
+        self.base_symlink(dentry, target)
     }
 
     /// Returns a reference to directory `self`'s child dentry which has the given name.
@@ -313,7 +318,11 @@ impl dyn Dentry {
     /// be a negative dentry and a child of `self`. After this call, `new_dentry` will become
     /// valid. `old_dentry` and `new_dentry` must be in the same filesystem. The file type of
     /// `old_dentry` must not be a directory.
-    pub fn link(&self, old_dentry: &dyn Dentry, new_dentry: &dyn Dentry) -> SysResult<()> {
+    pub fn link(
+        self: &Arc<Self>,
+        old_dentry: &dyn Dentry,
+        new_dentry: &dyn Dentry,
+    ) -> SysResult<()> {
         debug_assert!(!self.is_negative());
         debug_assert!(self.inode().unwrap().inotype().is_dir());
         debug_assert!(!old_dentry.is_negative());
@@ -322,6 +331,10 @@ impl dyn Dentry {
             &old_dentry.inode().unwrap().get_meta().superblock,
             &new_dentry.inode().unwrap().get_meta().superblock
         ));
+
+        let file_name = new_dentry.name();
+        self.fanotify_publish(FanEventMask::CREATE, file_name, file_name);
+
         self.base_link(new_dentry, old_dentry)
     }
 
@@ -329,12 +342,17 @@ impl dyn Dentry {
     ///
     /// `self` must be a valid directory. `dentry` must be a valid dentry and a child of
     /// `self`. After this call, `dentry` will become invalid. `dentry` must not be a directory.
-    pub fn unlink(&self, dentry: &dyn Dentry) -> SysResult<()> {
+    pub fn unlink(self: &Arc<Self>, dentry: &Arc<dyn Dentry>) -> SysResult<()> {
         debug_assert!(!self.is_negative());
         debug_assert!(self.inode().unwrap().inotype().is_dir());
         debug_assert!(!dentry.is_negative());
         debug_assert!(!dentry.inode().unwrap().inotype().is_dir());
-        self.base_unlink(dentry)
+
+        let file_name = dentry.name();
+        self.fanotify_publish(FanEventMask::DELETE, file_name, file_name);
+        dentry.fanotify_publish(FanEventMask::DELETE_SELF, file_name, file_name);
+
+        self.base_unlink(dentry.as_ref())
     }
 
     /// Removes the child directory `dentry` from directory `self` if it is empty.
@@ -343,12 +361,25 @@ impl dyn Dentry {
     /// `self`. After this call, `dentry` will become invalid. `dentry` must be a directory.
     ///
     /// Returns `ENOTEMPTY` if `dentry` is not empty. Other errors may be returned.
-    pub fn rmdir(&self, dentry: &dyn Dentry) -> SysResult<()> {
+    pub fn rmdir(self: &Arc<Self>, dentry: &Arc<dyn Dentry>) -> SysResult<()> {
         debug_assert!(!self.is_negative());
         debug_assert!(self.inode().unwrap().inotype().is_dir());
         debug_assert!(!dentry.is_negative());
         debug_assert!(dentry.inode().unwrap().inotype().is_dir());
-        self.base_rmdir(dentry)
+
+        let file_name = dentry.name();
+        self.fanotify_publish(
+            FanEventMask::DELETE | FanEventMask::ONDIR,
+            file_name,
+            file_name,
+        );
+        dentry.fanotify_publish(
+            FanEventMask::DELETE_SELF | FanEventMask::ONDIR,
+            file_name,
+            file_name,
+        );
+
+        self.base_rmdir(dentry.as_ref())
     }
 
     /// Removes the child directory `dentry` recursively from directory `self`.
@@ -378,16 +409,17 @@ impl dyn Dentry {
     /// `dentry` points to. An implementation of this function should first create a
     /// hard link to `dentry` in `new_dentry`, and then remove the old dentry.
     ///
-    /// If `new_dentry` and `dentry` points to the same file, this function does nothing.
+    /// If the path of `dentry` is a prefix of the path of `new_dentry`, this function
+    /// returns `EINVAL`.
     ///
     /// `dentry` can be a directory, but in which case `new_dentry` must be a negative
     /// dentry. In other words, this operation never replaces an existing directory.
     ///
     /// This function does not follow symbolic links.
     pub fn rename(
-        &self,
-        dentry: &dyn Dentry,
-        new_dir: &dyn Dentry,
+        self: &Arc<Self>,
+        dentry: &Arc<dyn Dentry>,
+        new_dir: &Arc<dyn Dentry>,
         new_dentry: &dyn Dentry,
     ) -> SysResult<()> {
         debug_assert!(!self.is_negative());
@@ -396,10 +428,28 @@ impl dyn Dentry {
         debug_assert!(!new_dir.is_negative());
         debug_assert!(new_dir.inode().unwrap().inotype().is_dir());
 
-        if ptr::eq(self, dentry) {
+        if ptr::eq(dentry.as_ref(), new_dentry) {
             return Ok(());
         }
-        self.base_rename(dentry, new_dir, new_dentry)
+        if dentry.path().starts_with(&new_dentry.path()) {
+            return Err(SysError::EINVAL);
+        }
+
+        let old_name = dentry.name();
+        let new_name = new_dentry.name();
+        let ondir_mask = if dentry.inode().unwrap().inotype().is_dir() {
+            FanEventMask::ONDIR
+        } else {
+            FanEventMask::empty()
+        };
+
+        self.fanotify_publish(FanEventMask::MOVED_FROM | ondir_mask, old_name, old_name);
+        new_dir.fanotify_publish(FanEventMask::MOVED_TO | ondir_mask, new_name, new_name);
+        if Arc::ptr_eq(self, new_dir) {
+            self.fanotify_publish(FanEventMask::RENAME | ondir_mask, old_name, new_name);
+        }
+
+        self.base_rename(dentry.as_ref(), new_dir.as_ref(), new_dentry)
     }
 
     /// Creates a new negative child dentry with the given name in directory `self`.

@@ -448,7 +448,7 @@ pub async fn sys_sigreturn() -> SyscallResult {
         .enumerate()
         .for_each(|(idx, u)| rs.push_str(format!("r[{idx:02}] = {u:#x}, ").as_str()));
 
-    log::info!(
+    log::debug!(
         "[sys_sigreturn] tid: {}, task: {}, after trap context: [{:?}]",
         task.tid(),
         task.get_name(),

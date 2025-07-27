@@ -9,7 +9,7 @@ use core::{
     cmp, mem,
     pin::Pin,
     ptr,
-    sync::atomic::{AtomicU8, AtomicU64},
+    sync::atomic::AtomicU8,
     task::{Context, Poll},
     time::Duration,
 };
@@ -59,7 +59,7 @@ use timer::{TimedTaskResult, TimeoutFuture};
 use vfs::{
     dentry::Dentry,
     file::File,
-    handle::{FileHandle, FileHandleData, FileHandleHeader, HANDLE_LEN},
+    handle::{FileHandleData, FileHandleHeader, HANDLE_LEN},
     kstat::Kstat,
     path::{Path, split_parent_and_name},
     sys_root_dentry,
@@ -663,12 +663,12 @@ pub async fn sys_unlinkat(dirfd: usize, pathname: usize, flags: i32) -> SyscallR
         if !is_dir {
             return Err(SysError::ENOTDIR);
         }
-        parent.rmdir(dentry.as_ref())?;
+        parent.rmdir(&dentry)?;
     } else {
         if is_dir {
             return Err(SysError::EISDIR);
         }
-        parent.unlink(dentry.as_ref())?;
+        parent.unlink(&dentry)?;
     }
     Ok(0)
 }
@@ -1615,30 +1615,25 @@ pub fn sys_renameat2(
 
     let flags = RenameFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
 
-    let coldpath = oldpath.read_c_string(256)?;
-    let cnewpath = newpath.read_c_string(256)?;
-
-    let oldpath = coldpath.into_string().expect("convert to string failed");
-    let newpath = cnewpath.into_string().expect("convert to string failed");
+    let oldpath = oldpath
+        .read_c_string(256)?
+        .into_string()
+        .or(Err(SysError::ENOENT))?;
+    let newpath = newpath
+        .read_c_string(256)?
+        .into_string()
+        .or(Err(SysError::ENOENT))?;
 
     log::info!(
         "[sys_renameat2] olddirfd:{olddirfd:?}, oldpath:{oldpath}, newdirfd:{newdirfd:?}, newpath:{newpath}, flags:{flags:?}"
     );
 
-    //OpenFlag::NO_FOLLOW
     let old_dentry = task.walk_at(olddirfd, oldpath)?;
     let new_dentry = task.walk_at(newdirfd, newpath)?;
+    let old_parent = old_dentry.parent().ok_or(SysError::ENOENT)?;
+    let new_parent = new_dentry.parent().ok_or(SysError::ENOENT)?;
 
-    let parent_dentry = old_dentry.parent().expect("can not rename root dentry");
-    // old_dentry.rename_to(&new_dentry, flags).map(|_| 0)
-    if old_dentry.is_negative() {
-        parent_dentry.lookup(old_dentry.name())?;
-    }
-    parent_dentry.rename(
-        old_dentry.as_ref(),
-        parent_dentry.as_ref(),
-        new_dentry.as_ref(),
-    )?;
+    old_parent.rename(&old_dentry, &new_parent, new_dentry.as_ref())?;
 
     // log::error!("[sys_renameat2] implement rename");
     Ok(0)
@@ -1746,7 +1741,26 @@ pub fn sys_umask(_mask: i32) -> SyscallResult {
     Ok(0x777)
 }
 
-/// The `ftruncate()` functions cause the regular file named by path or
+pub async fn sys_truncate64(path: usize, length: usize) -> SyscallResult {
+    log::debug!("[sys_truncate64] path: {path:#x}, length: {length}");
+
+    let task = current_task();
+    let addrspace = task.addr_space();
+
+    let path = UserReadPtr::<u8>::new(path, &addrspace)
+        .read_c_string(256)?
+        .into_string()
+        .or(Err(SysError::ENOENT))?;
+
+    log::info!("[sys_truncate64] path: {path}");
+
+    let dentry = task.walk_at(AtFd::FdCwd, path)?;
+    let file = <dyn File>::open(dentry)?;
+    file.truncate(length).await?;
+    Ok(0)
+}
+
+/// The `ftruncate64()` functions cause the regular file named by path or
 /// referenced by fd to be truncated to a size of precisely length bytes.
 ///
 /// If the file previously was larger than this size, the extra data is lost. If the file
@@ -1757,10 +1771,10 @@ pub fn sys_umask(_mask: i32) -> SyscallResult {
 /// status change and time of last modification; see inode(7)) for the file are updated, and
 /// the set-user-ID and set-group-ID mode bits may be cleared.
 ///
-/// With ftruncate(), the file must be open for writing; with truncate(), the file
+/// With ftruncate64(), the file must be open for writing; with truncate64(), the file
 /// must be writable.
-pub async fn sys_ftruncate(fd: usize, length: usize) -> SyscallResult {
-    log::debug!("[sys_ftruncate] fd: {fd}, length: {length}");
+pub async fn sys_ftruncate64(fd: usize, length: usize) -> SyscallResult {
+    log::debug!("[sys_ftruncate64] fd: {fd}, length: {length}");
     let task = current_task();
     let file = task.with_mut_fdtable(|t| t.get_file(fd))?;
     file.truncate(length).await?;
@@ -1960,7 +1974,7 @@ pub async fn sys_pread64(fd: usize, buf: usize, count: usize, offset: usize) -> 
     let bytes = file.read(buf_ptr).await?;
     file.seek(SeekFrom::Start(old_pos as u64))?;
 
-    return Ok(bytes);
+    Ok(bytes)
 }
 
 /// `pwrite()` writes up to `count` bytes from the buffer starting at `buf` to the file descriptor
@@ -3264,7 +3278,7 @@ pub fn sys_memfd_create(name_ptr: usize, flags: u32) -> SyscallResult {
     #[allow(static_mut_refs)]
     {
         let mut cnt = unsafe { NAME_INC.load(core::sync::atomic::Ordering::Relaxed) };
-        cnt = cnt + 1;
+        cnt += 1;
         name.push(cnt as char);
     }
 

@@ -52,7 +52,7 @@ impl FanotifyGroupFile {
 
             is_first_event = false;
 
-            if let Some(event_object) = event_object {
+            if let Some(event_object) = event_object.clone() {
                 // Add the event file to the process's file descriptor table.
                 metadata.fd = if group_flags
                     .intersects(FanInitFlags::REPORT_FID | FanInitFlags::REPORT_DIR_FID)
@@ -82,7 +82,8 @@ impl FanotifyGroupFile {
             }
 
             log::info!(
-                "Event metadata read: fd={}, pid={}, mask={:?}",
+                "Event metadata read: object={}, fd={}, pid={}, mask={:?}",
+                event_object.unwrap().path(),
                 metadata.fd,
                 metadata.pid,
                 metadata.mask
