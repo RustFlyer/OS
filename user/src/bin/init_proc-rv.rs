@@ -10,7 +10,6 @@ use user_lib::{fork, riscv_init, git_init, usershell, waitpid};
 fn main() {
     if fork() == 0 {
         riscv_init();
-        git_init();
         usershell();
     }
 

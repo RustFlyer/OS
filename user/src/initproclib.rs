@@ -272,6 +272,8 @@ pub fn riscv_init() {
     println!("loading user lib: 100%");
     println!("loading user lib: complete!");
 
+    git_init();
+
     let fd = open(0, "/dev/tty", OpenFlags::O_WRONLY, InodeMode::CHAR);
     if fd != 2 {
         dup(fd as usize);
@@ -321,6 +323,8 @@ pub fn loongarch_init() {
     run_cmd("./busybox --install -s /bin");
     println!("loading user lib: 100%");
     println!("loading user lib: complete!");
+
+    git_init();
 
     let fd = open(0, "/dev/tty", OpenFlags::O_WRONLY, InodeMode::CHAR);
     if fd != 2 {
