@@ -1,14 +1,17 @@
 use core::ffi::CStr;
 
+use alloc::ffi::CString;
 use lwext4_rust::{
     InodeTypes,
     bindings::{
-        ext4_atime_get, ext4_atime_set, ext4_ctime_get, ext4_ctime_set, ext4_inode,
-        ext4_inode_exist, ext4_mtime_get, ext4_mtime_set, ext4_sblock,
+        ext4_atime_get, ext4_atime_set, ext4_ctime_get, ext4_ctime_set, ext4_fs_get_inode_ref,
+        ext4_inode, ext4_inode_exist, ext4_mtime_get, ext4_mtime_set, ext4_sblock,
     },
 };
 
 use systype::error::{SysError, SysResult};
+
+use super::dir::ExtDir;
 
 #[allow(unused)]
 unsafe extern "C" {
@@ -194,5 +197,18 @@ impl ExtInode {
                 Err(err)
             }
         }
+    }
+
+    /// Gets inode by its id.
+    ///
+    /// You should ensure that "/" root dir exist in fs.
+    pub fn get_inode_by_id(inodeid: u32) -> ext4_inode {
+        let cstr = CString::new("/").unwrap();
+        let d: ExtDir = ExtDir::open(cstr.as_c_str()).unwrap();
+        let mp = d.0.f.mp;
+        let mut fs = unsafe { (*mp).fs };
+        let inode = unsafe { core::mem::zeroed() };
+        let ok = unsafe { ext4_fs_get_inode_ref(&mut fs, inodeid, inode) };
+        unsafe { *(*inode).inode }
     }
 }
