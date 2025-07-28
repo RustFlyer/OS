@@ -1,3 +1,4 @@
+mod bpf;
 mod consts;
 mod fanotify;
 mod fs;
@@ -16,6 +17,7 @@ mod user;
 
 pub use key::init_key;
 
+use bpf::*;
 use consts::SyscallNo::{self, *};
 use fanotify::*;
 use fs::*;
@@ -205,7 +207,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         ADDKEY => sys_add_key(args[0], args[1], args[2], args[3], args[4]),
         KEYCTL => sys_keyctl(args[0], args[1], args[2], args[3], args[4]),
         ADJTIMEX => sys_adjtimex(args[0]),
-        BPF => Err(SysError::ENOSYS),
+        BPF => sys_bpf(args[0] as u32, args[1], args[2] as u32),
         FALLOCATE => sys_fallocate(args[0], args[1], args[2], args[3]).await,
         CAPGET => sys_capget(args[0], args[1]),
         CAPSET => sys_capset(args[0], args[1]),

@@ -40,19 +40,26 @@ use osfs::{
     pipe::{inode::PIPE_BUF_LEN, new_pipe},
     pselect::{FilePollRet, PSelectFuture},
     special::{
+        bpf::BpfFile,
+        epoll::file::EpollFile,
         eventfd::file::EventFdFile,
+        fscontext::FsContextFile,
         inotify::{
             dentry::InotifyDentry,
             file::InotifyFile,
             flags::{InotifyFlags, InotifyMask},
             inode::InotifyInode,
         },
+        io_uring::file::IoUringFile,
         memfd::{
             dentry::MemDentry,
             file::MemFile,
             flags::{MemfdFlags, MemfdSeals},
             inode::MemInode,
         },
+        opentree::OpenTreeFile,
+        signalfd::file::SignalFdFile,
+        timerfd::file::TimerFdFile,
     },
 };
 use osfuture::{Select2Futures, SelectOutput};
@@ -2629,22 +2636,63 @@ pub async fn sys_splice(
     let file_in = current_task().with_mut_fdtable(|ft| ft.get_file(fd_in))?;
     let file_out = current_task().with_mut_fdtable(|ft| ft.get_file(fd_out))?;
 
+    let file_in_type = file_in.inode().inotype();
+    let file_out_type = file_out.inode().inotype();
+
+    match (file_in_type.is_fifo(), file_out_type.is_fifo()) {
+        (true, true) | (false, false) => {
+            return Err(SysError::EINVAL);
+        }
+        (true, false) | (false, true) => {}
+    }
+
+    // Some special file can not be used in splice
+    if file_out.clone().downcast_arc::<EventFdFile>().is_ok()
+        || file_out.clone().downcast_arc::<SignalFdFile>().is_ok()
+        || file_out.clone().downcast_arc::<TimerFdFile>().is_ok()
+        || file_out.clone().downcast_arc::<EpollFile>().is_ok()
+        || file_out.clone().downcast_arc::<InotifyFile>().is_ok()
+        || file_out.clone().downcast_arc::<IoUringFile>().is_ok()
+        || file_out.clone().downcast_arc::<OpenTreeFile>().is_ok()
+        || file_out.clone().downcast_arc::<FsContextFile>().is_ok()
+        || file_out.clone().downcast_arc::<BpfFile>().is_ok()
+    {
+        return Err(SysError::EINVAL);
+    }
+
+    if file_in.clone().downcast_arc::<EventFdFile>().is_ok()
+        || file_in.clone().downcast_arc::<SignalFdFile>().is_ok()
+        || file_in.clone().downcast_arc::<TimerFdFile>().is_ok()
+        || file_in.clone().downcast_arc::<EpollFile>().is_ok()
+        || file_in.clone().downcast_arc::<InotifyFile>().is_ok()
+        || file_in.clone().downcast_arc::<IoUringFile>().is_ok()
+        || file_in.clone().downcast_arc::<OpenTreeFile>().is_ok()
+        || file_in.clone().downcast_arc::<FsContextFile>().is_ok()
+        || file_in.clone().downcast_arc::<BpfFile>().is_ok()
+    {
+        return Err(SysError::EINVAL);
+    }
+
+    if file_in_type.is_dir() || file_out_type.is_dir() {
+        return Err(SysError::EINVAL);
+    }
+
+    if file_in.flags().contains(OpenFlags::O_PATH) {
+        return Err(SysError::EBADF);
+    }
+
     if !file_in.flags().readable() || !file_out.flags().writable() {
         log::error!("[sys_splice] not readable/writable",);
         return Err(SysError::EBADF);
     }
 
     if ptr::eq(file_out.as_ref(), file_in.as_ref()) {
+        log::error!("[sys_splice] can not be one");
         return Err(SysError::EINVAL);
     }
 
     if file_out.flags().contains(OpenFlags::O_APPEND) {
-        return Err(SysError::EINVAL);
-    }
-
-    let file_in_type = file_in.inode().inotype();
-    let file_out_type = file_out.inode().inotype();
-    if !file_in_type.is_fifo() && !file_out_type.is_fifo() {
+        log::error!("[sys_splice] file_out should not contain O_APPEND");
         return Err(SysError::EINVAL);
     }
 
@@ -2655,19 +2703,35 @@ pub async fn sys_splice(
     let off_in: Option<Offset> = if off_in_ptr == 0 {
         None
     } else {
-        Some(unsafe {
-            UserReadPtr::<Offset>::new(off_in_ptr, &current_task().addr_space()).read()?
-        })
+        let offset =
+            unsafe { UserReadPtr::<Offset>::new(off_in_ptr, &current_task().addr_space()).read()? };
+
+        if offset < 0 {
+            log::error!("[sys_splice] offset < 0");
+            return Err(SysError::EINVAL);
+        }
+
+        Some(offset)
     };
+
     let off_out: Option<Offset> = if off_out_ptr == 0 {
         None
     } else {
-        Some(unsafe {
+        let offset = unsafe {
             UserReadPtr::<Offset>::new(off_out_ptr, &current_task().addr_space()).read()?
-        })
+        };
+
+        if offset < 0 {
+            log::error!("[sys_splice] offset < 0");
+            return Err(SysError::EINVAL);
+        }
+
+        Some(offset)
     };
 
     let mut buffer: Vec<u8> = vec![0; len];
+
+    log::error!("[sys_splice] read");
 
     let bytes_read = if file_in_type.is_fifo() {
         file_in.read(buffer.as_mut_slice()).await?
@@ -2694,6 +2758,7 @@ pub async fn sys_splice(
         return Ok(0);
     }
 
+    log::error!("[sys_splice] ready to write {} bytes", bytes_read);
     let bytes_written = if file_out_type.is_fifo() {
         file_out.write(buffer.as_slice()).await?
     } else if let Some(offset) = off_out {
