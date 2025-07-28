@@ -1,6 +1,7 @@
 mod consts;
 mod fanotify;
 mod fs;
+mod fsmount;
 mod io;
 mod key;
 mod misc;
@@ -18,6 +19,7 @@ pub use key::init_key;
 use consts::SyscallNo::{self, *};
 use fanotify::*;
 use fs::*;
+use fsmount::*;
 use io::*;
 use key::*;
 use misc::{sys_getrandom, sys_sysinfo, sys_syslog, sys_uname};
@@ -255,7 +257,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         PKEY_FREE => sys_pkey_free(args[0] as i32),
         PKEY_MPROTECT => sys_pkey_mprotect(args[0], args[1], args[2] as i32, args[3] as i32),
         MEMFD_CREATE => sys_memfd_create(args[0], args[1] as u32),
-        FSCONFIG => sys_fsconfig(args[0], args[1] as u32, args[2], args[3], args[4]),
+        FSCONFIG => sys_fsconfig(args[0], args[1] as u32, args[2], args[3], args[4] as i32),
         FSPICK => sys_fspick(args[0], args[1], args[2] as u32),
         INOTIFY_INIT1 => sys_inotify_init1(args[0] as u32),
         INOTIFY_ADD_WATCH => sys_inotify_add_watch(args[0], args[1], args[2] as u32),
@@ -279,6 +281,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         IO_URING_REGISTER => {
             sys_io_uring_register(args[0], args[1] as u32, args[2], args[3] as u32)
         }
+        FSOPEN => sys_fsopen(args[0], args[1] as u32),
         _ => {
             log::error!("Syscall not implemented: {}", syscall_no.as_str());
             panic!("Syscall not implemented: {}", syscall_no.as_str());
