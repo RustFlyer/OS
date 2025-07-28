@@ -1648,11 +1648,15 @@ pub fn sys_renameat2(
     if old_dentry.is_negative() {
         parent_dentry.lookup(old_dentry.name())?;
     }
-    parent_dentry.rename(
-        old_dentry.as_ref(),
-        parent_dentry.as_ref(),
-        new_dentry.as_ref(),
-    )?;
+
+    if parent_dentry
+        .rename(
+            old_dentry.as_ref(),
+            parent_dentry.as_ref(),
+            new_dentry.as_ref(),
+        )
+        .is_err()
+    {}
 
     // log::error!("[sys_renameat2] implement rename");
     Ok(0)
@@ -2618,7 +2622,7 @@ pub async fn sys_splice(
 ) -> SyscallResult {
     type Offset = i32;
 
-    log::error!(
+    log::debug!(
         "[sys_splice] fd_in: {}, off_in_ptr: {}, fd_out: {}, off_out_ptr: {}, len: {}, flags: {}",
         fd_in,
         off_in_ptr,
