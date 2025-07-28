@@ -41,6 +41,12 @@ use osfs::{
     pselect::{FilePollRet, PSelectFuture},
     special::{
         eventfd::file::EventFdFile,
+        inotify::{
+            dentry::InotifyDentry,
+            file::InotifyFile,
+            flags::{InotifyFlags, InotifyMask},
+            inode::InotifyInode,
+        },
         memfd::{
             dentry::MemDentry,
             file::MemFile,
@@ -60,6 +66,7 @@ use vfs::{
     dentry::Dentry,
     file::File,
     handle::{FileHandle, FileHandleData, FileHandleHeader, HANDLE_LEN},
+    inode::Inode,
     kstat::Kstat,
     path::{Path, split_parent_and_name},
     sys_root_dentry,
@@ -3346,9 +3353,97 @@ pub fn sys_fsconfig(fs_fd: usize, cmd: u32, key: usize, value: usize, aux: usize
 
     let cmd = FsconfigCmd::from_bits_truncate(cmd);
 
-    // cmd 只要是 FSCONFIG_SET_STRING/FSCONFIG_SET_FLAG/FSCONFIG_CMD_RECONFIGURE 都直接返回 Ok(0)
     match cmd {
         FsconfigCmd::SetString | FsconfigCmd::SetFlag | FsconfigCmd::CmdReconfigure => Ok(0),
         _ => Err(SysError::EINVAL),
     }
+}
+
+pub fn sys_inotify_init1(flags: u32) -> SyscallResult {
+    let task = current_task();
+
+    let inotify_flags = InotifyFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
+
+    log::debug!("[sys_inotify_init1] flags: {:?}", inotify_flags);
+
+    let inode: Arc<dyn Inode> = InotifyInode::new(inotify_flags);
+    inode.set_mode(InodeMode::REG);
+
+    let dentry = InotifyDentry::new(
+        "inotify",
+        Some(inode),
+        Some(Arc::downgrade(&sys_root_dentry())),
+    );
+    sys_root_dentry().add_child(dentry.clone());
+
+    let file = InotifyFile::new(dentry);
+
+    let mut file_flags = OpenFlags::O_RDONLY;
+    if inotify_flags.contains(InotifyFlags::IN_CLOEXEC) {
+        file_flags |= OpenFlags::O_CLOEXEC;
+    }
+    if inotify_flags.contains(InotifyFlags::IN_NONBLOCK) {
+        file_flags |= OpenFlags::O_NONBLOCK;
+    }
+
+    task.with_mut_fdtable(|ft| ft.alloc(file, file_flags))
+}
+
+pub fn sys_inotify_add_watch(fd: usize, pathname_ptr: usize, mask: u32) -> SyscallResult {
+    let task = current_task();
+    let addr_space = task.addr_space();
+
+    let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
+    let inotify_file = file
+        .as_any()
+        .downcast_ref::<InotifyFile>()
+        .ok_or(SysError::EINVAL)?;
+
+    let valid_mask = InotifyMask::from_bits(mask).ok_or(SysError::EINVAL)?;
+
+    let mut data_ptr = UserReadPtr::<u8>::new(pathname_ptr, &addr_space);
+    let path_cstring = data_ptr.read_c_string(4096)?; // PATH_MAX
+    let path_string = path_cstring.into_string().map_err(|_| SysError::EINVAL)?;
+
+    log::debug!(
+        "[sys_inotify_add_watch] path: {}, mask: {:?}",
+        path_string,
+        valid_mask
+    );
+
+    let target_inode = task
+        .walk_at(AtFd::FdCwd, path_string.clone())?
+        .inode()
+        .ok_or(SysError::ENOENT)?;
+
+    let inode_id = target_inode.get_meta().ino as u64;
+
+    if valid_mask.contains(InotifyMask::IN_ONLYDIR) {
+        let stat = target_inode.get_attr()?;
+        if !config::inode::InodeMode::from_bits_truncate(stat.st_mode)
+            .contains(config::inode::InodeMode::DIR)
+        {
+            return Err(SysError::ENOTDIR);
+        }
+    }
+
+    let wd = inotify_file.add_watch(inode_id, valid_mask.bits(), Some(path_string))?;
+    log::debug!("[sys_inotify_add_watch] assigned wd: {}", wd);
+
+    Ok(wd as usize)
+}
+
+pub fn sys_inotify_rm_watch(fd: usize, wd: i32) -> SyscallResult {
+    let task = current_task();
+
+    let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
+    let inotify_file = file
+        .as_any()
+        .downcast_ref::<InotifyFile>()
+        .ok_or(SysError::EINVAL)?;
+
+    log::debug!("[sys_inotify_rm_watch] fd: {}, wd: {}", fd, wd);
+    inotify_file.remove_watch(wd)?;
+
+    Ok(0)
 }
