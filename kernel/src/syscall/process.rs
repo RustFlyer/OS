@@ -955,13 +955,8 @@ pub fn sys_getrusage(who: i32, usage: usize) -> SyscallResult {
     Ok(0)
 }
 
-pub const _LINUX_CAPABILITY_VERSION_1: u32 = 0x19980330;
-pub const _LINUX_CAPABILITY_VERSION_2: u32 = 0x20071026;
-pub const _LINUX_CAPABILITY_VERSION_3: u32 = 0x20080522;
-pub const CAPABILITY_U32S_1: usize = 1;
-pub const CAPABILITY_U32S_2: usize = 2;
-pub const CAPABILITY_U32S_3: usize = 2;
 pub fn sys_capget(hdrp: usize, datap: usize) -> SyscallResult {
+    use crate::task::cap::*;
     let task = current_task();
     let addrspace = task.addr_space();
 
@@ -1016,6 +1011,7 @@ pub fn sys_capget(hdrp: usize, datap: usize) -> SyscallResult {
 }
 
 pub fn sys_capset(hdrp: usize, datap: usize) -> SyscallResult {
+    use crate::task::cap::*;
     let task = current_task();
     let addrspace = task.addr_space();
 

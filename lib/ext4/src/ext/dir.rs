@@ -13,9 +13,11 @@ use core::{
 };
 
 use lwext4_rust::{
+    InodeTypes,
     bindings::{
-        ext4_dir, ext4_dir_close, ext4_dir_entry_next, ext4_dir_entry_rewind, ext4_dir_mk, ext4_dir_mv, ext4_dir_open, ext4_dir_rm, ext4_direntry
-    }, InodeTypes
+        ext4_dir, ext4_dir_close, ext4_dir_entry_next, ext4_dir_entry_rewind, ext4_dir_mk,
+        ext4_dir_mv, ext4_dir_open, ext4_dir_rm, ext4_direntry,
+    },
 };
 
 use config::inode::InodeType;
@@ -25,7 +27,7 @@ use super::file::ExtFile;
 
 /// Wrapper for `lwext4_rust` crate's `ext4_dir` struct which represents a directory
 /// file which can reads and writes directory entries.
-pub struct ExtDir(ext4_dir);
+pub struct ExtDir(pub ext4_dir);
 
 /// Wrapper for `lwext4_rust` crate's `ext4_direntry` struct which represents a directory
 /// entry.

@@ -272,6 +272,8 @@ pub fn riscv_init() {
     println!("loading user lib: 100%");
     println!("loading user lib: complete!");
 
+    git_init();
+
     let fd = open(0, "/dev/tty", OpenFlags::O_WRONLY, InodeMode::CHAR);
     if fd != 2 {
         dup(fd as usize);
@@ -321,6 +323,8 @@ pub fn loongarch_init() {
     run_cmd("./busybox --install -s /bin");
     println!("loading user lib: 100%");
     println!("loading user lib: complete!");
+
+    git_init();
 
     let fd = open(0, "/dev/tty", OpenFlags::O_WRONLY, InodeMode::CHAR);
     if fd != 2 {
@@ -454,4 +458,51 @@ pub fn supple_cmd(buf: &mut [u8; 256], bptr: &mut usize) {
         print!("{}", prefix);
     }
     *bptr = tbptr;
+}
+
+pub fn git_init() {
+    const GIT_COMMANDS: &[&str] = &[
+        "git-add", "git-am", "git-annotate", "git-apply", "git-archive", 
+        "git-backfill", "git-bisect", "git-blame", "git-branch", "git-bugreport",
+        "git-bundle", "git-cat-file", "git-check-attr", "git-check-ignore", 
+        "git-check-mailmap", "git-checkout", "git-checkout-index", "git-checkout--worker",
+        "git-check-ref-format", "git-cherry", "git-cherry-pick", "git-clean", 
+        "git-clone", "git-column", "git-commit", "git-commit-graph", "git-commit-tree",
+        "git-config", "git-count-objects", "git-credential", "git-credential-cache",
+        "git-credential-cache--daemon", "git-credential-store", "git-describe", 
+        "git-diagnose", "git-diff", "git-diff-files", "git-diff-index", "git-diff-pairs",
+        "git-difftool", "git-diff-tree", "git-fast-export", "git-fast-import",
+        "git-fetch", "git-fetch-pack", "git-fmt-merge-msg", "git-for-each-ref",
+        "git-for-each-repo", "git-format-patch", "git-fsck", "git-fsck-objects",
+        "git-fsmonitor--daemon", "git-gc", "git-get-tar-commit-id", "git-grep",
+        "git-hash-object", "git-help", "git-hook", "git-index-pack", "git-init",
+        "git-init-db", "git-interpret-trailers", "git-log", "git-ls-files",
+        "git-ls-remote", "git-ls-tree", "git-mailinfo", "git-mailsplit",
+        "git-maintenance", "git-merge", "git-merge-base", "git-merge-file",
+        "git-merge-index", "git-merge-ours", "git-merge-recursive", "git-merge-subtree",
+        "git-merge-tree", "git-mktag", "git-mktree", "git-multi-pack-index",
+        "git-mv", "git-name-rev", "git-notes", "git-pack-objects", "git-pack-redundant",
+        "git-pack-refs", "git-patch-id", "git-prune", "git-prune-packed", "git-pull",
+        "git-push", "git-range-diff", "git-read-tree", "git-rebase", "git-receive-pack",
+        "git-reflog", "git-refs", "git-remote", "git-remote-ext", "git-remote-fd",
+        "git-repack", "git-replace", "git-replay", "git-rerere", "git-reset",
+        "git-restore", "git-revert", "git-rev-list", "git-rev-parse", "git-rm",
+        "git-send-pack", "git-shortlog", "git-show", "git-show-branch", "git-show-index",
+        "git-show-ref", "git-sparse-checkout", "git-stage", "git-stash", "git-status",
+        "git-stripspace", "git-submodule--helper", "git-switch", "git-symbolic-ref",
+        "git-tag", "git-unpack-file", "git-unpack-objects", "git-update-index",
+        "git-update-ref", "git-update-server-info", "git-upload-archive", "git-upload-pack",
+        "git-var", "git-verify-commit", "git-verify-pack", "git-verify-tag",
+        "git-version", "git-whatchanged", "git-worktree", "git-write-tree"
+    ];
+
+    const GIT_BASE_PATH: &str = "/git_r_m/libexec/git-core";
+    
+    for cmd in GIT_COMMANDS {
+        let command = format!(
+            "./busybox ln -s {}/git {}/{}",
+            GIT_BASE_PATH, GIT_BASE_PATH, cmd
+        );
+        run_cmd(&command);
+    }
 }
