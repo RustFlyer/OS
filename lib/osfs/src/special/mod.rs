@@ -1,6 +1,7 @@
 pub mod epoll;
 pub mod eventfd;
 pub mod inotify;
+pub mod io_uring;
 pub mod memfd;
 pub mod perf;
 pub mod signalfd;

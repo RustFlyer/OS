@@ -1,6 +1,7 @@
 mod consts;
 mod fanotify;
 mod fs;
+mod io;
 mod key;
 mod misc;
 mod mm;
@@ -17,6 +18,7 @@ pub use key::init_key;
 use consts::SyscallNo::{self, *};
 use fanotify::*;
 use fs::*;
+use io::*;
 use key::*;
 use misc::{sys_getrandom, sys_sysinfo, sys_syslog, sys_uname};
 use mm::*;
@@ -266,6 +268,17 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
             args[3] as i32,
             args[4] as u64,
         ),
+        IO_URING_SETUP => sys_io_uring_setup(args[0] as u32, args[1]),
+        IO_URING_ENTER => sys_io_uring_enter(
+            args[0],
+            args[1] as u32,
+            args[2] as u32,
+            args[3] as u32,
+            args[4],
+        ),
+        IO_URING_REGISTER => {
+            sys_io_uring_register(args[0], args[1] as u32, args[2], args[3] as u32)
+        }
         _ => {
             log::error!("Syscall not implemented: {}", syscall_no.as_str());
             panic!("Syscall not implemented: {}", syscall_no.as_str());
