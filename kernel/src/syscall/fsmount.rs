@@ -1,10 +1,12 @@
 use crate::{processor::current_task, vm::user_ptr::UserReadPtr};
+use alloc::string::{String, ToString};
 use alloc::sync::Arc;
-use config::vfs::{AtFd, OpenFlags};
+use config::vfs::{AtFd, AtFlags, OpenFlags};
 use osfs::special::fscontext::{
     FsConfigCmd, FsConfigCommand, FsContextDentry, FsContextFile, FsContextInode, FsParameterValue,
     FsmountFlags, FsopenFlags,
 };
+use osfs::special::opentree::{OpenTreeDentry, OpenTreeFile, OpenTreeFlags, OpenTreeInode};
 use systype::error::{SysError, SyscallResult};
 use vfs::inode::Inode;
 use vfs::sys_root_dentry;
@@ -382,4 +384,102 @@ pub fn sys_move_mount(
     // 4. Update mount namespace
 
     todo!()
+}
+
+pub fn sys_open_tree(dfd: i32, pathname_ptr: usize, flags: u32) -> SyscallResult {
+    // return Err(SysError::ENOSYS);
+    let task = current_task();
+
+    // Validate flags
+    let open_tree_flags = OpenTreeFlags::from_bits(flags & 0x400001) // CLOEXEC + CLONE
+        .ok_or(SysError::EINVAL)?;
+    let at_flags = AtFlags::from_bits(flags as i32 & !0x400001) // Remove open_tree specific flags
+        .ok_or(SysError::EINVAL)?;
+
+    log::debug!(
+        "[sys_open_tree] dfd: {}, flags: {:?}, at_flags: {:?}",
+        dfd,
+        open_tree_flags,
+        at_flags
+    );
+
+    // Read pathname from user space
+    let path_string = if pathname_ptr != 0 {
+        let addr_space = task.addr_space();
+        let mut data_ptr = UserReadPtr::<u8>::new(pathname_ptr, &addr_space);
+        let path_cstring = data_ptr.read_c_string(4096)?; // PATH_MAX
+        path_cstring.into_string().map_err(|_| SysError::EINVAL)?
+    } else {
+        // Empty path case (AT_EMPTY_PATH)
+        if !at_flags.contains(AtFlags::AT_EMPTY_PATH) {
+            return Err(SysError::ENOENT);
+        }
+        String::new()
+    };
+
+    // !Get current mount namespace ID, but we replace it with fs id now.
+    let mount_ns_id = sys_root_dentry().superblock().unwrap().dev_id(); // You'll need to implement this
+
+    // Create open_tree inode
+    let inode = OpenTreeInode::new(open_tree_flags, mount_ns_id);
+    inode.set_mode(config::inode::InodeMode::REG);
+
+    // Create dentry
+    let dentry = OpenTreeDentry::new(
+        "open_tree",
+        Some(inode.clone()),
+        Some(Arc::downgrade(&sys_root_dentry())),
+    );
+    sys_root_dentry().add_child(dentry.clone());
+
+    // Create file
+    let file = OpenTreeFile::new(dentry);
+    let atdfd = AtFd::from(dfd as isize);
+
+    // Handle different cases based on flags
+    if open_tree_flags.contains(OpenTreeFlags::OPEN_TREE_CLONE) {
+        // Create a detached mount tree
+        let recursive = at_flags.contains(AtFlags::AT_RECURSIVE);
+
+        // Resolve the source path
+        let source_path = if path_string.is_empty() {
+            // Use dfd as the source
+            task.walk_at(atdfd, task.cwd_mut().path())?.path()
+        } else {
+            // Resolve path relative to dfd
+            task.walk_at(atdfd, path_string)?.path()
+        };
+
+        // Create the detached mount
+        file.create_detached_mount(&source_path, recursive)?;
+        file.set_original_path(source_path)?;
+
+        log::debug!(
+            "[sys_open_tree] Created detached mount for path: {:?}",
+            file.get_mount_info()
+        );
+    } else {
+        // Create an O_PATH file descriptor that references the location
+        let target_path = if path_string.is_empty() {
+            task.walk_at(atdfd, task.cwd_mut().path())?.path()
+        } else {
+            task.walk_at(atdfd, path_string)?.path()
+        };
+
+        file.set_original_path(target_path)?;
+
+        log::debug!(
+            "[sys_open_tree] Created O_PATH reference to: {:?}",
+            file.get_mount_info()
+        );
+    }
+
+    // Set file flags
+    let mut file_flags = OpenFlags::O_PATH; // open_tree always creates O_PATH fds
+    if open_tree_flags.contains(OpenTreeFlags::OPEN_TREE_CLOEXEC) {
+        file_flags |= OpenFlags::O_CLOEXEC;
+    }
+
+    // Allocate file descriptor
+    task.with_mut_fdtable(|ft| ft.alloc(file, file_flags))
 }

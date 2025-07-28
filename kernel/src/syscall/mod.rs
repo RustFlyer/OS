@@ -37,7 +37,15 @@ use crate::syscall::time::{sys_adjtimex, sys_clock_adjtime, sys_clock_getres, sy
 
 pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
     let Some(syscall_no) = SyscallNo::from_repr(syscall_no) else {
-        log::error!("Syscall number not included: {syscall_no}");
+        if (syscall_no as isize) < 0 {
+            log::error!("wrong syscall id? {}", syscall_no as isize);
+            return -(SysError::ENOSYS.code() as isize) as usize;
+        }
+
+        log::error!(
+            "Syscall number not included: {syscall_no} | {}",
+            syscall_no as isize
+        );
         panic!("Syscall number not included: {syscall_no}");
     };
 
@@ -282,6 +290,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
             sys_io_uring_register(args[0], args[1] as u32, args[2], args[3] as u32)
         }
         FSOPEN => sys_fsopen(args[0], args[1] as u32),
+        OPEN_TREE => sys_open_tree(args[0] as i32, args[1], args[2] as u32),
         _ => {
             log::error!("Syscall not implemented: {}", syscall_no.as_str());
             panic!("Syscall not implemented: {}", syscall_no.as_str());
