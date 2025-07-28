@@ -3,13 +3,16 @@ use core::{
     task::{Context, Poll},
 };
 
-use crate::simple::dentry::SimpleDentry;
+use crate::simple::{dentry::SimpleDentry, inode::SimpleInode};
 
 use super::event::{EpollEvent, EpollInner};
 use alloc::vec::Vec;
 use config::vfs::{EpollEvents, PollEvents};
 use mutex::SpinNoIrqLock;
-use vfs::file::{File, FileMeta};
+use vfs::{
+    file::{File, FileMeta},
+    sys_root_dentry,
+};
 
 pub struct EpollFile {
     pub(crate) meta: FileMeta,
@@ -18,7 +21,8 @@ pub struct EpollFile {
 
 impl EpollFile {
     pub fn new() -> Self {
-        let dentry = SimpleDentry::new("epoll", None, None);
+        let inode = SimpleInode::new(sys_root_dentry().superblock().unwrap());
+        let dentry = SimpleDentry::new("epoll", Some(inode), None);
         Self {
             meta: FileMeta::new(dentry),
             inner: SpinNoIrqLock::new(EpollInner::new()),

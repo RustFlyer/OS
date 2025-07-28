@@ -4,7 +4,7 @@
 extern crate alloc;
 extern crate user_lib;
 
-use user_lib::{fork, riscv_init, git_init, usershell, waitpid};
+use user_lib::{fork, riscv_init, usershell, waitpid};
 
 #[unsafe(no_mangle)]
 fn main() {

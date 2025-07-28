@@ -3,7 +3,7 @@ use core::{iter, time::Duration};
 use config::{process::INIT_PROC_ID, vfs::OpenFlags};
 use osfs::{
     fd_table::{FdFlags, FdInfo},
-    simple::{dentry::SimpleDentry, file::SimpleFileFile},
+    simple::{dentry::SimpleDentry, file::SimpleFileFile, inode::SimpleInode},
     special::signalfd::{file::SignalFdFile, flag::SignalFdFlags},
 };
 use osfuture::suspend_now;
@@ -12,6 +12,7 @@ use systype::{
     time::{TimeSpec, TimeValue},
 };
 use timer::{TIMER_MANAGER, Timer};
+use vfs::sys_root_dentry;
 
 use crate::{
     processor::current_task,
@@ -776,7 +777,8 @@ pub fn sys_pidfd_open(pid: usize, flags: u32) -> SyscallResult {
     let pidfd = pf_table.new_pidfd(&task);
 
     // stupid alloc
-    let d = SimpleDentry::new("s", None, None);
+    let i = SimpleInode::new(sys_root_dentry().superblock().unwrap());
+    let d = SimpleDentry::new("s", Some(i), None);
     let f = SimpleFileFile::new(d);
 
     let info = FdInfo::new(f, FdFlags::empty());
