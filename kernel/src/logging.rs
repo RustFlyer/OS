@@ -32,7 +32,7 @@ impl LogInterface for LogInterfaceImpl {
         if can_filter() {
             let id = unsafe { FILTER_ID.load(Ordering::Relaxed) };
             let s = format!("{}", record.args());
-            if FLITER_LIST[id]
+            if FLITER_LIST[id - 1]
                 .iter()
                 .filter(|x| s.contains(*x))
                 .last()
@@ -79,6 +79,7 @@ pub fn can_filter() -> bool {
 #[allow(static_mut_refs)]
 pub fn enable_filter(id: usize) {
     assert_ne!(id, 0, "You should not set filter as zero");
+    assert!(id <= 3, "You should not set filter level higher than 3");
     log::debug!("Filter Enable");
     unsafe { FILTER_ID.store(id, Ordering::Relaxed) };
 }
