@@ -204,8 +204,8 @@ fs-img: user
 	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/libcbench/* emnt/
 	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/lmbench/* emnt/
 	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/final/* emnt/
-	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/vim/* emnt/
-	-sudo cp -r testcase/$(ARCH)/$(TESTCASE_LIBC)/git/* emnt/
+	-sudo cp -r $(SOFTWARE_DIR)/$(ARCH)/$(TESTCASE_LIBC)/vim/* emnt/
+	-sudo cp -r $(SOFTWARE_DIR)/$(ARCH)/$(TESTCASE_LIBC)/git/* emnt/
 
 	sudo cp -r img-data/common/* emnt/
 	sudo cp -r img-data/$(ARCH)/* emnt/
