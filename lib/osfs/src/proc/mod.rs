@@ -5,7 +5,6 @@ use config::{
     vfs::OpenFlags,
 };
 use exe::{dentry::ExeDentry, inode::ExeInode};
-use fd::dirdentry::FdDirDentry;
 use gconfig::init_config_file;
 use interrupts::{dentry::InterruptsDentry, inode::InterruptsInode};
 use maps::{dentry::MapsDentry, inode::MapsInode};
@@ -97,7 +96,7 @@ pub fn init_procfs(root_dentry: Arc<dyn Dentry>) -> SysResult<()> {
     kernel_dentry
         .clone()
         .into_dyn()
-        .create(pid_max_dentry.into_dyn_ref(), InodeMode::REG)?;
+        .create(&pid_max_dentry.clone().into_dyn(), InodeMode::REG)?;
     let pid_max_file = pid_max_dentry.base_open()?;
     pid_max_file.set_flags(OpenFlags::O_WRONLY);
     osfuture::block_on(async { pid_max_file.write("32768\0".as_bytes()).await })?;
@@ -112,7 +111,7 @@ pub fn init_procfs(root_dentry: Arc<dyn Dentry>) -> SysResult<()> {
     kernel_dentry
         .clone()
         .into_dyn()
-        .create(tainted_dentry.into_dyn_ref(), InodeMode::REG)?;
+        .create(&tainted_dentry.clone().into_dyn(), InodeMode::REG)?;
     let tainted_file = tainted_dentry.base_open()?;
     tainted_file.set_flags(OpenFlags::O_WRONLY);
     osfuture::block_on(async { tainted_file.write("0\0".as_bytes()).await })?;

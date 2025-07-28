@@ -397,7 +397,7 @@ impl dyn File {
         let inode = self.dentry().inode().unwrap();
 
         let old_size = self.size();
-        inode.set_size(size);
+        inode.set_size(size)?;
 
         if old_size < size {
             let offset = old_size;
@@ -666,7 +666,7 @@ impl dyn File {
         let old_name = object.name();
         let new_name = old_name;
 
-        self.dentry().fanotify_publish(event, old_name, new_name);
+        object.fanotify_publish(None, event, old_name, new_name);
     }
 }
 

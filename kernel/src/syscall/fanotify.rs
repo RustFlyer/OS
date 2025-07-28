@@ -48,7 +48,6 @@ pub fn sys_fanotify_init(flags: u32, event_f_flags: u32) -> SyscallResult {
             | FanInitFlags::UNLIMITED_QUEUE
             | FanInitFlags::UNLIMITED_MARKS
             | FanInitFlags::ENABLE_AUDIT
-            | FanInitFlags::REPORT_TARGET_FID
             | FanInitFlags::REPORT_PIDFD,
     ) {
         unimplemented!("Unsupported fanotify flags: {flags:?}");

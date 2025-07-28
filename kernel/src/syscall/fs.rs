@@ -19,7 +19,7 @@ use strum::FromRepr;
 use arch::time::get_time_duration;
 use config::{
     device::BLOCK_SIZE,
-    inode::InodeMode,
+    inode::{InodeMode, InodeType},
     vfs::{AccessFlags, AtFd, AtFlags, MountFlags, OpenFlags, PollEvents, RenameFlags, SeekFrom},
 };
 use driver::BLOCK_DEVICE;
@@ -139,7 +139,7 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
         }
         let t = get_time_duration().as_micros() as u32;
         let subdentry = dentry.new_neg_child(format!("tmp{}", t).as_str());
-        dentry.create(subdentry.as_ref(), InodeMode::REG)?;
+        dentry.create(&subdentry, InodeMode::REG)?;
         let inode = subdentry.inode().ok_or(SysError::ENOENT)?;
         let file = <dyn File>::open(subdentry)?;
         file.set_flags(OpenFlags::O_RDWR);
@@ -178,7 +178,7 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
             }
 
             log::debug!("[sys_openat] create a new file");
-            parent.create(dentry.as_ref(), InodeMode::REG)?
+            parent.create(&dentry, InodeMode::REG)?
         } else {
             return Err(SysError::ENOENT);
         }
@@ -553,7 +553,7 @@ pub async fn sys_mkdirat(dirfd: usize, pathname: usize, mode: u32) -> SyscallRes
 
     log::info!("[sys_mkdirat] mode: {mode:?}");
 
-    parent.mkdir(dentry.as_ref(), mode)?;
+    parent.mkdir(&dentry, mode)?;
     let inode = dentry.inode().unwrap();
 
     let _cred = task.perm_mut();
@@ -1633,7 +1633,7 @@ pub fn sys_renameat2(
     let old_parent = old_dentry.parent().ok_or(SysError::ENOENT)?;
     let new_parent = new_dentry.parent().ok_or(SysError::ENOENT)?;
 
-    old_parent.rename(&old_dentry, &new_parent, new_dentry.as_ref())?;
+    old_parent.rename(&old_dentry, &new_parent, &new_dentry)?;
 
     // log::error!("[sys_renameat2] implement rename");
     Ok(0)
@@ -1675,7 +1675,7 @@ pub fn sys_linkat(
     let old_dentry = task.walk_at(olddirfd, oldpath)?;
     let new_dentry = task.walk_at(newdirfd, newpath)?;
 
-    new_dentry.link(old_dentry.as_ref(), new_dentry.as_ref())?;
+    new_dentry.link(&old_dentry, &new_dentry)?;
     Ok(0)
 }
 
@@ -1711,7 +1711,7 @@ pub fn sys_symlinkat(target: usize, newdirfd: usize, linkpath: usize) -> Syscall
     if !dentry.is_negative() {
         return Err(SysError::EEXIST);
     }
-    dentry.parent().unwrap().symlink(dentry.as_ref(), &target)?;
+    dentry.parent().unwrap().symlink(&dentry, &target)?;
     Ok(0)
 }
 
@@ -3200,22 +3200,23 @@ pub fn sys_mknodat(dirfd: usize, pathname: usize, mode: u32, dev: u32) -> Syscal
     );
 
     // 2. Parse mode into file type and file permissions
-    let mode = InodeMode::from_bits_truncate(mode);
+    let mode = InodeMode::from_bits(mode).ok_or(SysError::EINVAL)?;
+    let file_type = mode.to_type();
 
     // 3. Walk parent path and acquire parent dentry
     let (parent_dir, name) = split_parent_and_name(&path);
     let mut parent_dentry = task.walk_at(AtFd::from(dirfd), parent_dir)?;
 
-    let name = if name.is_none() {
+    let name = if let Some(name) = name {
+        name
+    } else {
         let pname = parent_dentry.name().to_string();
         parent_dentry = task.walk_at(AtFd::FdCwd, ".".to_string())?;
         pname
-    } else {
-        name.unwrap()
     };
 
     // 4. Check if file already exists
-    if parent_dentry.lookup(&name).is_ok() {
+    if !parent_dentry.lookup(&name)?.is_negative() {
         return Err(SysError::EEXIST);
     }
 
@@ -3232,24 +3233,24 @@ pub fn sys_mknodat(dirfd: usize, pathname: usize, mode: u32, dev: u32) -> Syscal
     }
 
     // 6. Special privilege check for creating device nodes
-    if (mode == InodeMode::CHAR || mode == InodeMode::BLOCK) && uid != 0 {
+    if (file_type.is_char_device() || file_type.is_block_device()) && uid != 0 {
         return Err(SysError::EPERM);
     }
 
     let dentry = task.walk_at(AtFd::FdCwd, path)?;
     // 7. Create inode according to nodetype
-    match mode {
-        InodeMode::REG => {
-            parent_dentry.create(dentry.as_ref(), InodeMode::REG)?;
+    match file_type {
+        InodeType::File => {
+            parent_dentry.create(&dentry, mode)?;
         }
-        InodeMode::FIFO => {
-            parent_dentry.create(dentry.as_ref(), InodeMode::FIFO)?;
+        InodeType::Fifo => {
+            parent_dentry.create(&dentry, mode)?;
         }
-        InodeMode::CHAR => {
-            parent_dentry.create(dentry.as_ref(), InodeMode::CHAR)?;
+        InodeType::CharDevice => {
+            parent_dentry.create(&dentry, mode)?;
         }
-        InodeMode::BLOCK => {
-            parent_dentry.create(dentry.as_ref(), InodeMode::BLOCK)?;
+        InodeType::BlockDevice => {
+            parent_dentry.create(&dentry, mode)?;
         }
         _ => return Err(SysError::EINVAL),
     }

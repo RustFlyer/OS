@@ -222,6 +222,7 @@ impl FanotifyGroup {
     pub(crate) fn publish(
         self: Arc<Self>,
         object: &Arc<dyn Dentry>,
+        subobject: Option<&Arc<dyn Dentry>>,
         entries: FanotifyEntrySet,
         event: FanEventMask,
         old_name: &str,
@@ -329,6 +330,7 @@ impl FanotifyGroup {
             let info = Self::create_fid_info(object, FanotifyEventInfoType::Fid, None);
             event_data.add_datum(FanotifyEventDatum::Info(info));
         }
+
         if flags.contains(FanInitFlags::REPORT_DIR_FID) {
             let reported_object = if object.inode().unwrap().inotype().is_dir() {
                 Some(Arc::clone(object))
@@ -362,6 +364,18 @@ impl FanotifyGroup {
                     event_data.add_datum(FanotifyEventDatum::Info(info));
                 }
             }
+        }
+
+        if flags.contains(FanInitFlags::REPORT_TARGET_FID)
+            && (FanEventMask::DIR_EVENT_MASK | FanEventMask::ONDIR).contains(event)
+        {
+            let subobject = subobject.unwrap();
+            let info = Self::create_fid_info(
+                subobject,
+                FanotifyEventInfoType::Fid,
+                None,
+            );
+            event_data.add_datum(FanotifyEventDatum::Info(info));
         }
 
         // Other information records should be added here...

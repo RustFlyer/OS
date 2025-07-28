@@ -1,7 +1,6 @@
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::sync::{Arc, Weak};
-use core::ptr;
 
 use config::inode::InodeMode;
 use mutex::SpinNoIrqLock;
@@ -241,16 +240,16 @@ impl dyn Dentry {
     /// `self` must be a valid directory. `dentry` must be a negative dentry and a child of `self`.
     /// After this call, `dentry` will become valid. The file type of `mode` must be a regular
     /// file.
-    pub fn create(self: &Arc<Self>, dentry: &dyn Dentry, mode: InodeMode) -> SysResult<()> {
+    pub fn create(self: &Arc<Self>, dentry: &Arc<dyn Dentry>, mode: InodeMode) -> SysResult<()> {
         debug_assert!(!self.is_negative());
         debug_assert!(self.inode().unwrap().inotype().is_dir());
         debug_assert!(dentry.is_negative());
         debug_assert!(mode.to_type().is_reg());
 
         let file_name = dentry.name();
-        self.fanotify_publish(FanEventMask::CREATE, file_name, file_name);
+        self.fanotify_publish(Some(dentry), FanEventMask::CREATE, file_name, file_name);
 
-        self.base_create(dentry, mode)
+        self.base_create(dentry.as_ref(), mode)
     }
 
     /// Creates a directory in directory `self` with the name given in `dentry` and the mode
@@ -258,7 +257,7 @@ impl dyn Dentry {
     ///
     /// `self` must be a valid directory. `dentry` must be a negative dentry and a child of `self`.
     /// After this call, `dentry` will become valid. The file type of `mode` must be a directory.
-    pub fn mkdir(self: &Arc<Self>, dentry: &dyn Dentry, mode: InodeMode) -> SysResult<()> {
+    pub fn mkdir(self: &Arc<Self>, dentry: &Arc<dyn Dentry>, mode: InodeMode) -> SysResult<()> {
         debug_assert!(!self.is_negative());
         debug_assert!(self.inode().unwrap().inotype().is_dir());
         debug_assert!(dentry.is_negative());
@@ -266,12 +265,13 @@ impl dyn Dentry {
 
         let file_name = dentry.name();
         self.fanotify_publish(
+            Some(dentry),
             FanEventMask::CREATE | FanEventMask::ONDIR,
             file_name,
             file_name,
         );
 
-        self.base_create(dentry, mode)
+        self.base_create(dentry.as_ref(), mode)
     }
 
     /// Creates a symbolic link in directory `self` with the name given in `dentry` which contains
@@ -279,15 +279,15 @@ impl dyn Dentry {
     ///
     /// `self` must be a valid directory. `dentry` must be a negative dentry and a child of
     /// `self`. After this call, `dentry` will become valid.
-    pub fn symlink(self: &Arc<Self>, dentry: &dyn Dentry, target: &str) -> SysResult<()> {
+    pub fn symlink(self: &Arc<Self>, dentry: &Arc<dyn Dentry>, target: &str) -> SysResult<()> {
         debug_assert!(!self.is_negative());
         debug_assert!(self.inode().unwrap().inotype().is_dir());
         debug_assert!(dentry.is_negative());
 
         let file_name = dentry.name();
-        self.fanotify_publish(FanEventMask::CREATE, file_name, file_name);
+        self.fanotify_publish(Some(dentry), FanEventMask::CREATE, file_name, file_name);
 
-        self.base_symlink(dentry, target)
+        self.base_symlink(dentry.as_ref(), target)
     }
 
     /// Returns a reference to directory `self`'s child dentry which has the given name.
@@ -320,8 +320,8 @@ impl dyn Dentry {
     /// `old_dentry` must not be a directory.
     pub fn link(
         self: &Arc<Self>,
-        old_dentry: &dyn Dentry,
-        new_dentry: &dyn Dentry,
+        old_dentry: &Arc<dyn Dentry>,
+        new_dentry: &Arc<dyn Dentry>,
     ) -> SysResult<()> {
         debug_assert!(!self.is_negative());
         debug_assert!(self.inode().unwrap().inotype().is_dir());
@@ -333,9 +333,9 @@ impl dyn Dentry {
         ));
 
         let file_name = new_dentry.name();
-        self.fanotify_publish(FanEventMask::CREATE, file_name, file_name);
+        self.fanotify_publish(Some(new_dentry), FanEventMask::CREATE, file_name, file_name);
 
-        self.base_link(new_dentry, old_dentry)
+        self.base_link(new_dentry.as_ref(), old_dentry.as_ref())
     }
 
     /// Removes the child dentry from directory `self`.
@@ -349,8 +349,8 @@ impl dyn Dentry {
         debug_assert!(!dentry.inode().unwrap().inotype().is_dir());
 
         let file_name = dentry.name();
-        self.fanotify_publish(FanEventMask::DELETE, file_name, file_name);
-        dentry.fanotify_publish(FanEventMask::DELETE_SELF, file_name, file_name);
+        self.fanotify_publish(Some(dentry), FanEventMask::DELETE, file_name, file_name);
+        dentry.fanotify_publish(None, FanEventMask::DELETE_SELF, file_name, file_name);
 
         self.base_unlink(dentry.as_ref())
     }
@@ -369,11 +369,13 @@ impl dyn Dentry {
 
         let file_name = dentry.name();
         self.fanotify_publish(
+            Some(dentry),
             FanEventMask::DELETE | FanEventMask::ONDIR,
             file_name,
             file_name,
         );
         dentry.fanotify_publish(
+            None,
             FanEventMask::DELETE_SELF | FanEventMask::ONDIR,
             file_name,
             file_name,
@@ -420,7 +422,7 @@ impl dyn Dentry {
         self: &Arc<Self>,
         dentry: &Arc<dyn Dentry>,
         new_dir: &Arc<dyn Dentry>,
-        new_dentry: &dyn Dentry,
+        new_dentry: &Arc<dyn Dentry>,
     ) -> SysResult<()> {
         debug_assert!(!self.is_negative());
         debug_assert!(self.inode().unwrap().inotype().is_dir());
@@ -428,7 +430,7 @@ impl dyn Dentry {
         debug_assert!(!new_dir.is_negative());
         debug_assert!(new_dir.inode().unwrap().inotype().is_dir());
 
-        if ptr::eq(dentry.as_ref(), new_dentry) {
+        if Arc::ptr_eq(dentry, new_dentry) {
             return Ok(());
         }
         if dentry.path().starts_with(&new_dentry.path()) {
@@ -443,13 +445,28 @@ impl dyn Dentry {
             FanEventMask::empty()
         };
 
-        self.fanotify_publish(FanEventMask::MOVED_FROM | ondir_mask, old_name, old_name);
-        new_dir.fanotify_publish(FanEventMask::MOVED_TO | ondir_mask, new_name, new_name);
+        self.fanotify_publish(
+            Some(dentry),
+            FanEventMask::MOVED_FROM | ondir_mask,
+            old_name,
+            old_name,
+        );
+        new_dir.fanotify_publish(
+            Some(new_dentry),
+            FanEventMask::MOVED_TO | ondir_mask,
+            new_name,
+            new_name,
+        );
         if Arc::ptr_eq(self, new_dir) {
-            self.fanotify_publish(FanEventMask::RENAME | ondir_mask, old_name, new_name);
+            self.fanotify_publish(
+                Some(dentry),
+                FanEventMask::RENAME | ondir_mask,
+                old_name,
+                new_name,
+            );
         }
 
-        self.base_rename(dentry.as_ref(), new_dir.as_ref(), new_dentry)
+        self.base_rename(dentry.as_ref(), new_dir.as_ref(), new_dentry.as_ref())
     }
 
     /// Creates a new negative child dentry with the given name in directory `self`.
@@ -495,6 +512,7 @@ impl dyn Dentry {
     /// and the filesystem.
     pub(crate) fn fanotify_publish(
         self: &Arc<Self>,
+        subobject: Option<&Arc<Self>>,
         event: FanEventMask,
         old_name: &str,
         new_name: &str,
@@ -555,7 +573,9 @@ impl dyn Dentry {
 
         // Publish the event to all fanotify groups.
         for (group, entry_set) in entries_by_group {
-            group.0.publish(self, entry_set, event, old_name, new_name);
+            group
+                .0
+                .publish(self, subobject, entry_set, event, old_name, new_name);
         }
     }
 }

@@ -52,13 +52,13 @@ pub fn init_proc() {
 pub fn init_proc_by_insert() {
     let root = sys_root_dentry();
     let dentry = root.new_neg_child("init_proc");
-    let _ = root.create(dentry.as_ref(), InodeMode::REG);
+    root.create(&dentry, InodeMode::REG).unwrap();
 
     let file = <dyn File>::open(dentry).unwrap();
     file.set_flags(OpenFlags::O_RDWR);
     let initproc_u8 = get_app_data_by_name("init_proc").unwrap();
-    let _ = block_on(async { file.write(initproc_u8).await });
-    let _ = file.seek(config::vfs::SeekFrom::Start(0));
+    block_on(async { file.write(initproc_u8).await.unwrap() });
+    file.seek(config::vfs::SeekFrom::Start(0)).unwrap();
 
     Task::spawn_from_elf(file, "init_proc");
 }
@@ -75,13 +75,13 @@ pub fn submit_init() {
 pub fn submit_init_by_insert() {
     let root = sys_root_dentry();
     let dentry = root.new_neg_child("submit");
-    let _ = root.create(dentry.as_ref(), InodeMode::REG);
+    root.create(&dentry, InodeMode::REG).unwrap();
 
     let file = <dyn File>::open(dentry).unwrap();
     file.set_flags(OpenFlags::O_RDWR);
     let initproc_u8 = get_app_data_by_name("submit").unwrap();
-    let _ = block_on(async { file.write(initproc_u8).await });
-    let _ = file.seek(config::vfs::SeekFrom::Start(0));
+    block_on(async { file.write(initproc_u8).await.unwrap() });
+    file.seek(config::vfs::SeekFrom::Start(0)).unwrap();
 
     Task::spawn_from_elf(file, "submit");
 }
