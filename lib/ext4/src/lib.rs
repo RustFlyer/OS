@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 #![feature(sync_unsafe_cell)]
+#![feature(ptr_as_ref_unchecked)]
 
 pub mod dentry;
 pub mod disk;
