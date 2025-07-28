@@ -259,6 +259,13 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         INOTIFY_ADD_WATCH => sys_inotify_add_watch(args[0], args[1], args[2] as u32),
         INOTIFY_RM_WATCH => sys_inotify_rm_watch(args[0], args[1] as i32),
         USERFAULTFD => sys_userfaultfd(args[0] as u32),
+        PERF_EVENT_OPEN => sys_perf_event_open(
+            args[0],
+            args[1] as i32,
+            args[2] as i32,
+            args[3] as i32,
+            args[4] as u64,
+        ),
         _ => {
             log::error!("Syscall not implemented: {}", syscall_no.as_str());
             panic!("Syscall not implemented: {}", syscall_no.as_str());
