@@ -136,11 +136,9 @@ pub trait Dentry: Send + Sync {
     /// `dentry` points to. An implementation of this function should first create a
     /// hard link to `dentry` in `new_dentry`, and then remove the old dentry.
     ///
-    /// `new_dentry` and `dentry` are sure not to be the same dentry. This constraint
-    /// may be changed in the future.
-    ///
-    /// `dentry` can be a directory, but in which case `new_dentry` must be a negative
-    /// dentry. In other words, this operation never replaces an existing directory.
+    /// The path of `dentry` must not be a prefix of the path of `new_dentry`. `dentry`
+    /// and `new_dentry` must not refer to the same inode. If `new_dentry` is valid and a
+    /// directory, it must be empty.
     ///
     /// This function does not follow symbolic links.
     fn base_rename(
@@ -378,8 +376,10 @@ impl dyn Dentry {
     ///
     /// If `new_dentry` and `dentry` points to the same file, this function does nothing.
     ///
+    /// If `dentry` and `new_dentry` refer to the same inode, this function does nothing.
+    ///
     /// `dentry` can be a directory, but in which case `new_dentry` must be a negative
-    /// dentry. In other words, this operation never replaces an existing directory.
+    /// dentry or an empty directory.
     ///
     /// This function does not follow symbolic links.
     pub fn rename(
@@ -394,10 +394,51 @@ impl dyn Dentry {
         debug_assert!(!new_dir.is_negative());
         debug_assert!(new_dir.inode().unwrap().inotype().is_dir());
 
-        if ptr::eq(self, dentry) {
+        if dentry.path().starts_with(&new_dentry.path()) {
+            return Err(SysError::EINVAL);
+        }
+        if !new_dentry.is_negative() && new_dentry.inode().unwrap().inotype().is_dir() {
+            <dyn File>::open(Arc::clone(new_dentry))?.load_dir()?;
+            if !new_dentry.get_meta().children.lock().is_empty() {
+                return Err(SysError::ENOTEMPTY);
+            }
+        }
+        if !new_dentry.is_negative()
+            && new_dentry.inode().unwrap().ino() == dentry.inode().unwrap().ino()
+        {
             return Ok(());
         }
-        self.base_rename(dentry, new_dir, new_dentry)
+
+        let old_name = dentry.name();
+        let new_name = new_dentry.name();
+        let ondir_mask = if dentry.inode().unwrap().inotype().is_dir() {
+            FanEventMask::ONDIR
+        } else {
+            FanEventMask::empty()
+        };
+
+        self.fanotify_publish(
+            Some(dentry),
+            FanEventMask::MOVED_FROM | ondir_mask,
+            old_name,
+            old_name,
+        );
+        new_dir.fanotify_publish(
+            Some(new_dentry),
+            FanEventMask::MOVED_TO | ondir_mask,
+            new_name,
+            new_name,
+        );
+        if Arc::ptr_eq(self, new_dir) {
+            self.fanotify_publish(
+                Some(dentry),
+                FanEventMask::RENAME | ondir_mask,
+                old_name,
+                new_name,
+            );
+        }
+
+        self.base_rename(dentry.as_ref(), new_dir.as_ref(), new_dentry.as_ref())
     }
 
     /// Creates a new negative child dentry with the given name in directory `self`.

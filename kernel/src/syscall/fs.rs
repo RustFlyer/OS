@@ -1641,24 +1641,16 @@ pub fn sys_renameat2(
 
     //OpenFlag::NO_FOLLOW
     let old_dentry = task.walk_at(olddirfd, oldpath)?;
-    let new_dentry = task.walk_at(newdirfd, newpath)?;
-
-    let parent_dentry = old_dentry.parent().expect("can not rename root dentry");
-    // old_dentry.rename_to(&new_dentry, flags).map(|_| 0)
+    let old_parent = old_dentry.parent().ok_or(SysError::EBUSY)?;
     if old_dentry.is_negative() {
-        parent_dentry.lookup(old_dentry.name())?;
+        return Err(SysError::ENOENT);
     }
 
-    if parent_dentry
-        .rename(
-            old_dentry.as_ref(),
-            parent_dentry.as_ref(),
-            new_dentry.as_ref(),
-        )
-        .is_err()
-    {}
+    let new_dentry = task.walk_at(newdirfd, newpath)?;
+    let new_parent = new_dentry.parent().ok_or(SysError::EBUSY)?;
 
-    // log::error!("[sys_renameat2] implement rename");
+    old_parent.rename(&old_dentry, &new_parent, &new_dentry)?;
+
     Ok(0)
 }
 
