@@ -41,7 +41,8 @@ impl Path {
     ///
     /// `path` is a string representing the path. If it starts with a `/`, it is
     /// resolved as an absolute path. Otherwise, it is resolved as a relative path
-    /// from the `start` dentry.
+    /// from the `start` dentry. `path` can be an empty string, which means the `start`
+    /// dentry itself is the target.
     ///
     /// See [`Self::walk`] for more details on how the path is resolved and what errors
     /// may be returned. Note that `start` may be a negative dentry or not a directory,
@@ -59,8 +60,8 @@ impl Path {
     /// Walks the path to find the target dentry.
     ///
     /// Returns a valid dentry if the target file exists.
-    /// Returns an invalid dentry if the target file does not exist but its parent
-    /// directory does.
+    /// Returns an invalid (negative) dentry if the target file does not exist but its
+    /// parent directory does.
     /// Returns an `ENOENT` error if any directory in the middle of the path does not
     /// exist.
     /// Returns an `ENOTDIR` error if any directory in the middle of the path is not a
@@ -209,24 +210,70 @@ impl Path {
     }
 }
 
-pub fn split_parent_and_name(path: &str) -> (String, Option<String>) {
-    let mut trimmed_path = path.trim_start_matches('/').to_string();
+/// Splits a path into its parent directory and the name of the file or directory.
+///
+/// `path` must not be an empty string.
+///
+/// Returns a tuple where the second element is the name of the file or directory, and
+/// the first element is path to the parent directory. If the path consists of only a
+/// single file name (e.g., "/", "foo", "bar/", etc.), the parent directory is an empty
+/// string. The returned parent path is absolute if the input path is absolute, and
+/// relative if the input path is relative.
+///
+/// Whether the returned parent path has trailing slashes, and whether it has consecutive
+/// slashes, is undefined. Since such paths are valid paths, they should be acceptable.
+///
+/// # Example
+/// ```rust
+/// // `baz` may be a file or directory.
+/// let (parent, name) = split_parent_and_name("/foo/bar/baz");
+/// assert_eq!(parent, "/foo/bar".to_string());
+/// assert_eq!(name, "baz".to_string());
+///
+/// // The path may be a relative path.
+/// let (parent, name) = split_parent_and_name("foo/bar/baz");
+/// assert_eq!(parent, "foo/bar".to_string());
+/// assert_eq!(name, "baz".to_string());
+///
+/// // The root directory may be a parent.
+/// let (parent, name) = split_parent_and_name("/foo");
+/// assert_eq!(parent, "/".to_string());
+/// assert_eq!(name, "foo".to_string());
+///
+/// // If the path is just a root directory, the parent is `None` and
+/// // the name is "/".
+/// let (parent, name) = split_parent_and_name("/");
+/// assert_eq!(parent, "".to_string());
+/// assert_eq!(name, "/".to_string());
+///
+/// // If the path is just a file name, the parent is `None` and the
+/// // name is the whole path.
+/// let (parent, name) = split_parent_and_name("foo");
+/// assert_eq!(parent, "".to_string());
+/// assert_eq!(name, "foo".to_string());
+/// ```
+pub fn split_parent_and_name(path: &str) -> (String, String) {
+    debug_assert!(!path.is_empty());
 
-    if let Some(n) = trimmed_path.rfind('/') {
-        let mut m = n;
-        if path.starts_with('/') {
-            trimmed_path.insert(0, '/');
-            m = m + 1;
+    // Remove trailing slashes
+    let path = path.trim_end_matches('/');
+
+    if path.is_empty() {
+        // The root directory.
+        return ("".to_string(), String::new());
+    }
+
+    if let Some(last_slash_index) = path.rfind('/') {
+        let parent = &path[..last_slash_index];
+        let name = &path[last_slash_index + 1..];
+        if parent.is_empty() {
+            ("/".to_string(), name.to_string())
+        } else {
+            (parent.to_string(), name.to_string())
         }
-        (
-            trimmed_path[..m].to_string(),
-            Some(trimmed_path[m + 1..].to_string()),
-        )
     } else {
-        if path.starts_with('/') {
-            trimmed_path.insert(0, '/');
-        }
-        (trimmed_path, None)
+        // No slashes found, so the whole path is the name
+        ("".to_string(), path.to_string())
     }
 }
 
@@ -234,21 +281,26 @@ pub fn test_split_parent_and_name() {
     struct PName {
         path: String,
         parent: String,
-        child: Option<String>,
+        child: String,
     }
 
-    let create_test = |p: &str, pr: &str, ch: Option<&str>| PName {
-        path: p.to_string(),
-        parent: pr.to_string(),
-        child: ch.map(|c| c.to_string()),
-    };
+    fn create_test(path: &str, parent: &str, child: &str) -> PName {
+        PName {
+            path: path.to_string(),
+            parent: parent.to_string(),
+            child: child.to_string(),
+        }
+    }
 
     let tests = [
-        create_test("/abs/ac", "/abs", Some("ac")), // 常规路径
-        create_test("foo/bar/baz", "foo/bar", Some("baz")), // 多级相对路径
-        create_test("/single", "/single", None),    // 只有一个路径元素
-        create_test("/", "/", None),                // 只有根路径
-        create_test("", "", None),                  // 空字符串
+        create_test("/foo/bar/baz", "/foo/bar", "baz"),
+        create_test("/foo/bar/", "/foo", "bar"),
+        create_test("/foo", "/", "foo"),
+        create_test("/", "", "/"),
+        create_test("foo", "", "foo"),
+        create_test("foo/bar/baz", "foo/bar", "baz"),
+        create_test("foo/bar/", "foo", "bar"),
+        create_test("foo", "", "foo"),
     ];
 
     for test in &tests {

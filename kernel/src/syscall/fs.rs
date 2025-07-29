@@ -798,7 +798,6 @@ pub async fn sys_mount(
         .clone();
 
     if task.pid() > 0 {
-        // log::error!("[sys_mount] mount call, unstable");
         let mdentry = task.walk_at(AtFd::FdCwd, target.clone())?;
         let dev = if name2fstype.contains("ext4") || name2fstype.contains("tmpfs") {
             Some(BLOCK_DEVICE.get().unwrap().clone())
@@ -806,7 +805,7 @@ pub async fn sys_mount(
             None
         };
         let (parent, name) = split_parent_and_name(&target);
-        log::debug!("[sys_mount] parent: {}, name: {:?}", parent, name);
+        log::debug!("[sys_mount] parent: {:?}, name: {:?}", parent, name);
 
         let dname;
         let pdentry = task.walk_at(AtFd::FdCwd, parent.to_string())?;
@@ -875,17 +874,22 @@ pub async fn sys_mount(
 /// - to write when the basic functions are implemented...
 pub async fn sys_umount2(target: usize, flags: u32) -> SyscallResult {
     let task = current_task();
-    let addr_space = task.addr_space();
-    let mut ptr = UserReadPtr::<u8>::new(target, &addr_space);
-    let mount_path = ptr.read_c_string(256)?;
-    log::info!("[sys_umount2] umount path:{mount_path:?}");
-    let target = mount_path.into_string().map_err(|_| SysError::EINVAL)?;
-    let _flags = MountFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
-    let (parent, name) = split_parent_and_name(&target);
-    log::info!("[sys_umount2] parent: {}, name: {:?}", parent, name);
 
-    let parent = task.walk_at(AtFd::FdCwd, parent.to_string())?;
-    let child = parent.lookup(&name.ok_or(SysError::ENOENT)?)?;
+    let target = UserReadPtr::<u8>::new(target, &task.addr_space())
+        .read_c_string(256)?
+        .into_string()
+        .map_err(|_| SysError::EINVAL)?;
+
+    log::error!("[sys_umount2] target:{target:?}");
+
+    let _flags = MountFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
+
+    let (parent, name) = split_parent_and_name(&target);
+
+    log::error!("[sys_umount2] parent: {}, name: {}", parent, name);
+
+    let parent = task.walk_at(AtFd::FdCwd, parent)?;
+    let child = parent.lookup(&name)?;
 
     let mdentry = child.fetch_mount_dentry();
     parent.remove_child(child.as_ref());
@@ -3285,16 +3289,8 @@ pub fn sys_mknodat(dirfd: usize, pathname: usize, mode: u32, dev: u32) -> Syscal
     let file_type = mode.to_type();
 
     // 3. Walk parent path and acquire parent dentry
-    let (parent_dir, name) = split_parent_and_name(&path);
-    let mut parent_dentry = task.walk_at(AtFd::from(dirfd), parent_dir)?;
-
-    let name = if let Some(name) = name {
-        name
-    } else {
-        let pname = parent_dentry.name().to_string();
-        parent_dentry = task.walk_at(AtFd::FdCwd, ".".to_string())?;
-        pname
-    };
+    let (parent_path, name) = split_parent_and_name(&path);
+    let parent_dentry = task.walk_at(AtFd::from(dirfd), parent_path)?;
 
     // 4. Check if file already exists
     if !parent_dentry.lookup(&name)?.is_negative() {

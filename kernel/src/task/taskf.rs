@@ -352,6 +352,7 @@ impl Task {
     /// specifies which directory to use as the base. If `dirfd` is `FdCwd`,
     /// the current working directory is used. If `dirfd` is `Normal(fd)`, the file
     /// associated with the file descriptor `fd` is used as the base directory.
+    /// The path may be an empty string, which is the same as a relative path `.`.
     ///
     /// # Errors
     /// Returns an `EBADF` error if `dirfd` is invalid.
