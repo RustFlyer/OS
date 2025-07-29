@@ -11,6 +11,7 @@ use crate::fanotify::{FanotifyEntrySet, FanotifyGroupKey};
 use crate::file::File;
 use crate::handle::FileHandle;
 use crate::inode::Inode;
+use crate::path::split_parent_and_name;
 use crate::superblock::SuperBlock;
 
 /// Data that is common to all dentries.
@@ -433,7 +434,10 @@ impl dyn Dentry {
         if Arc::ptr_eq(dentry, new_dentry) {
             return Ok(());
         }
-        if dentry.path().starts_with(&new_dentry.path()) {
+
+        let (dparent, _name) = split_parent_and_name(&dentry.path());
+        let (dnparent, _name) = split_parent_and_name(&new_dentry.path());
+        if dparent != dnparent && dparent.starts_with(&dnparent) && !dparent.is_empty() {
             return Err(SysError::EINVAL);
         }
 

@@ -71,6 +71,7 @@ use systype::{
 use timer::{TimedTaskResult, TimeoutFuture};
 use vfs::{
     dentry::Dentry,
+    fanotify::fs::file::FanotifyGroupFile,
     file::File,
     handle::{FileHandleData, FileHandleHeader, HANDLE_LEN},
     inode::Inode,
@@ -455,7 +456,7 @@ pub fn sys_fstatat(dirfd: usize, pathname: usize, stat_buf: usize, flags: i32) -
             }
         }
     };
-    // log::info!("[sys_fstat_at] dentry path: {}", dentry.path());
+    log::info!("[sys_fstat_at] dentry path: {}", dentry.path());
     let inode = dentry.inode().ok_or(SysError::ENOENT)?;
     let kstat = Kstat::from_vfs_inode(inode)?;
     log::info!("[sys_fstat_at] dentry: {:?}", kstat);
@@ -1650,10 +1651,9 @@ pub fn sys_renameat2(
         parent_dentry.lookup(old_dentry.name())?;
     }
 
-    if parent_dentry
-        .rename(&old_dentry, &parent_dentry, &new_dentry)
-        .is_err()
-    {}
+    if let Err(e) = parent_dentry.rename(&old_dentry, &parent_dentry, &new_dentry) {
+        log::error!("[sys_renameat2] error: {e:?}");
+    }
 
     // log::error!("[sys_renameat2] implement rename");
     Ok(0)
@@ -2676,6 +2676,7 @@ pub async fn sys_splice(
         || file_out.clone().downcast_arc::<OpenTreeFile>().is_ok()
         || file_out.clone().downcast_arc::<FsContextFile>().is_ok()
         || file_out.clone().downcast_arc::<BpfFile>().is_ok()
+        || file_out.clone().downcast_arc::<FanotifyGroupFile>().is_ok()
     {
         return Err(SysError::EINVAL);
     }
@@ -2689,6 +2690,7 @@ pub async fn sys_splice(
         || file_in.clone().downcast_arc::<OpenTreeFile>().is_ok()
         || file_in.clone().downcast_arc::<FsContextFile>().is_ok()
         || file_in.clone().downcast_arc::<BpfFile>().is_ok()
+        || file_in.clone().downcast_arc::<FanotifyGroupFile>().is_ok()
     {
         return Err(SysError::EINVAL);
     }

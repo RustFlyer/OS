@@ -189,5 +189,5 @@ pub fn sys_getrandom(buf: usize, buflen: usize, flags: i32) -> SyscallResult {
 
     unsafe { buf.write_array(&random_array)? };
 
-    Ok(0)
+    Ok(buflen)
 }

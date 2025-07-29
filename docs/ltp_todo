@@ -1,7 +1,7 @@
                name                    total           pass
 - [ ] [   1] fanotify16                 845
-- [ ] [   2] splice07                   615
-- [ ] [   3] fanotify01                 442
+- [x] [   2] splice07                   615             565
+- [x] [   3] fanotify01                 442             702
 - [ ] [   4] fanotify14                 334
 - [x] [   5] epoll_ctl03                256             256
 - [ ] [   6] fanotify13                 200
