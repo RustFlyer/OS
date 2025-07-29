@@ -1,3 +1,4 @@
+use alloc::sync::Arc;
 use arch::mm::tlb_flush_all;
 use config::mm::PAGE_SIZE;
 use id_allocator::IdAllocator;
@@ -499,4 +500,59 @@ pub fn sys_pkey_mprotect(addr: usize, len: usize, prot: i32, pkey: i32) -> Sysca
 
     log::info!("[sys_pkey_mprotect] protection updated successfully");
     Ok(0)
+}
+
+pub fn sys_userfaultfd(flags: u32) -> SyscallResult {
+    use config::vfs::OpenFlags;
+    use osfs::special::userfaultfd::{
+        UserfaultfdDentry, UserfaultfdFile, UserfaultfdFlags, UserfaultfdInode,
+    };
+    use vfs::inode::Inode;
+    use vfs::sys_root_dentry;
+
+    let task = current_task();
+
+    // Validate flags
+    let uffd_flags = UserfaultfdFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
+
+    // Check permissions (simplified - in real kernel would check CAP_SYS_PTRACE or sysctl)
+    if uffd_flags.contains(UserfaultfdFlags::UFFD_USER_MODE_ONLY) {
+        // User mode only, less privileged
+    } else {
+        // Full mode, need privileges
+        // In real implementation: check CAP_SYS_PTRACE or unprivileged_userfaultfd sysctl
+    }
+
+    log::debug!("[sys_userfaultfd] flags: {:?}", uffd_flags);
+
+    // Get current process memory management ID
+    let mm_id = task.pid() as u64; // Simplified
+
+    // Create userfaultfd inode
+    let inode = UserfaultfdInode::new(uffd_flags, mm_id);
+    inode.set_mode(config::inode::InodeMode::REG);
+
+    // Create dentry
+    let dentry = UserfaultfdDentry::new(
+        "userfaultfd",
+        Some(inode),
+        Some(Arc::downgrade(&sys_root_dentry())),
+    );
+    sys_root_dentry().add_child(dentry.clone());
+
+    // Create file
+    let file = UserfaultfdFile::new(dentry);
+
+    // Set file flags
+    let mut file_flags = OpenFlags::O_RDONLY;
+    if uffd_flags.contains(UserfaultfdFlags::UFFD_CLOEXEC) {
+        file_flags |= OpenFlags::O_CLOEXEC;
+    }
+
+    if uffd_flags.contains(UserfaultfdFlags::UFFD_NONBLOCK) {
+        file_flags |= OpenFlags::O_NONBLOCK;
+    }
+
+    // Allocate file descriptor
+    task.with_mut_fdtable(|ft| ft.alloc(file, file_flags))
 }

@@ -1,6 +1,7 @@
 #![no_main]
 #![no_std]
 #![feature(new_zeroed_alloc)]
+#![feature(sync_unsafe_cell)]
 
 use alloc::{
     collections::btree_map::BTreeMap,

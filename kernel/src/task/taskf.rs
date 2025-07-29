@@ -23,6 +23,7 @@ use timer::{TIMER_MANAGER, Timer};
 use vfs::{dentry::Dentry, file::File, fstype::FileSystemType, path::Path};
 
 use super::{
+    cap::CapabilitiesFlags,
     futex::{FutexHashKey, futex_manager},
     future,
     manager::TASK_MANAGER,
@@ -715,5 +716,16 @@ impl Task {
             .map(|fs| fs.clone());
 
         fs
+    }
+
+    pub fn can_monitor_process(&self, pid: usize) -> bool {
+        // 1. 目标进程是否存在
+        // 2. 是否有 ptrace 权限
+        // 3. SELinux/AppArmor 权限等
+        self.tid() == pid || self.has_capability(CapabilitiesFlags::CAP_SYS_PTRACE)
+    }
+
+    pub fn has_capability(&self, cap: CapabilitiesFlags) -> bool {
+        self.capability().has_effective(cap)
     }
 }

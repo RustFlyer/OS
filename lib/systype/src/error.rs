@@ -131,6 +131,8 @@ pub enum SysError {
     EINPROGRESS = 115,
     /// Stale file.
     ESTALE = 116,
+    /// operation is cancelled
+    ECANCELED = 125,
     /// UTF-8 Convert Failed
     EUTFFAIL = 188,
 }
@@ -179,7 +181,7 @@ impl SysError {
             ENOLCK => "No record locks available",
             ENOSYS => "Invalid system call number",
             ENOTEMPTY => "Directory not empty",
-            ESTALE => "Inode is null",
+            ESTALE => "Stale file handle",
             ENODATA => "no data",
             ELOOP => "Trap in Infinite loop",
             EOVERFLOW => "too much data",
@@ -195,7 +197,7 @@ impl SysError {
             ECONNREFUSED => "Connection refused",
             ECONNRESET => "Connection reset",
             EINPROGRESS => "Operation now in progress",
-            ESTALE => "Stale file handle",
+            ECANCELED => "operation is cancelled",
             EUTFFAIL => "UTF-8 Convert Failed",
         }
     }

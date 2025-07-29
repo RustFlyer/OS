@@ -374,6 +374,8 @@ bitflags! {
         const AT_REMOVEDIR = 0x200;
         /// Empty Path
         const AT_EMPTY_PATH  = 0x1000;
+        /// Recursively clone the entire subtree
+        const AT_RECURSIVE = 0x8000;
 
         const AT_HANDLE_FID = 0x200;
     }

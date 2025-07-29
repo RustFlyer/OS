@@ -104,6 +104,7 @@ impl FdTable {
         if let Some(fd) = self.get_available_slot(0) {
             log::info!("alloc fd [{}]", fd);
             crate::proc::fd::create_self_fd_file(fd)?;
+            crate::special::inotify::vfs_create_notify(file.clone());
             file.fanotify_publish(FanEventMask::OPEN);
             self.table[fd] = Some(FdInfo::new(file, flags.into()));
             Ok(fd)
@@ -135,6 +136,7 @@ impl FdTable {
     pub fn clear(&mut self) {
         for slot in self.table.iter_mut() {
             if let Some(fd_info) = slot {
+                crate::special::inotify::vfs_delete_notify(fd_info.file.clone());
                 fd_info.fanotify_close();
                 *slot = None;
             }
@@ -156,6 +158,7 @@ impl FdTable {
                 //     Arc::strong_count(&fd_info.file) - 1
                 // );
                 if fd_info.flags().contains(FdFlags::CLOEXEC) {
+                    crate::special::inotify::vfs_delete_notify(fd_info.file.clone());
                     fd_info.fanotify_close();
                     *slot = None;
                 }
@@ -203,6 +206,7 @@ impl FdTable {
             Arc::strong_count(&self.table[fd].as_ref().unwrap().file) - 1
         );
         let fdinfo = self.get_mut(fd)?;
+        crate::special::inotify::vfs_delete_notify(fdinfo.file.clone());
         fdinfo.fanotify_close();
         self.table[fd] = None;
         Ok(())

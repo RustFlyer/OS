@@ -1,6 +1,9 @@
+mod bpf;
 mod consts;
 mod fanotify;
 mod fs;
+mod fsmount;
+mod io;
 mod key;
 mod misc;
 mod mm;
@@ -14,9 +17,12 @@ mod user;
 
 pub use key::init_key;
 
+use bpf::*;
 use consts::SyscallNo::{self, *};
 use fanotify::*;
 use fs::*;
+use fsmount::*;
+use io::*;
 use key::*;
 use misc::{sys_getrandom, sys_sysinfo, sys_syslog, sys_uname};
 use mm::*;
@@ -33,7 +39,15 @@ use crate::syscall::time::{sys_adjtimex, sys_clock_adjtime, sys_clock_getres, sy
 
 pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
     let Some(syscall_no) = SyscallNo::from_repr(syscall_no) else {
-        log::error!("Syscall number not included: {syscall_no}");
+        if (syscall_no as isize) < 0 {
+            log::error!("wrong syscall id? {}", syscall_no as isize);
+            return -(SysError::ENOSYS.code() as isize) as usize;
+        }
+
+        log::error!(
+            "Syscall number not included: {syscall_no} | {}",
+            syscall_no as isize
+        );
         panic!("Syscall number not included: {syscall_no}");
     };
 
@@ -194,7 +208,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         ADDKEY => sys_add_key(args[0], args[1], args[2], args[3], args[4]),
         KEYCTL => sys_keyctl(args[0], args[1], args[2], args[3], args[4]),
         ADJTIMEX => sys_adjtimex(args[0]),
-        BPF => Err(SysError::ENOSYS),
+        BPF => sys_bpf(args[0] as u32, args[1], args[2] as u32),
         FALLOCATE => sys_fallocate(args[0], args[1], args[2], args[3]).await,
         CAPGET => sys_capget(args[0], args[1]),
         CAPSET => sys_capset(args[0], args[1]),
@@ -254,8 +268,32 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         PKEY_FREE => sys_pkey_free(args[0] as i32),
         PKEY_MPROTECT => sys_pkey_mprotect(args[0], args[1], args[2] as i32, args[3] as i32),
         MEMFD_CREATE => sys_memfd_create(args[0], args[1] as u32),
-        FSCONFIG => sys_fsconfig(args[0], args[1] as u32, args[2], args[3], args[4]),
+        FSCONFIG => sys_fsconfig(args[0], args[1] as u32, args[2], args[3], args[4] as i32),
         FSPICK => sys_fspick(args[0], args[1], args[2] as u32),
+        INOTIFY_INIT1 => sys_inotify_init1(args[0] as u32),
+        INOTIFY_ADD_WATCH => sys_inotify_add_watch(args[0], args[1], args[2] as u32),
+        INOTIFY_RM_WATCH => sys_inotify_rm_watch(args[0], args[1] as i32),
+        USERFAULTFD => sys_userfaultfd(args[0] as u32),
+        PERF_EVENT_OPEN => sys_perf_event_open(
+            args[0],
+            args[1] as i32,
+            args[2] as i32,
+            args[3] as i32,
+            args[4] as u64,
+        ),
+        IO_URING_SETUP => sys_io_uring_setup(args[0] as u32, args[1]),
+        IO_URING_ENTER => sys_io_uring_enter(
+            args[0],
+            args[1] as u32,
+            args[2] as u32,
+            args[3] as u32,
+            args[4],
+        ),
+        IO_URING_REGISTER => {
+            sys_io_uring_register(args[0], args[1] as u32, args[2], args[3] as u32)
+        }
+        FSOPEN => sys_fsopen(args[0], args[1] as u32),
+        OPEN_TREE => sys_open_tree(args[0] as i32, args[1], args[2] as u32),
         _ => {
             log::error!("Syscall not implemented: {}", syscall_no.as_str());
             panic!("Syscall not implemented: {}", syscall_no.as_str());

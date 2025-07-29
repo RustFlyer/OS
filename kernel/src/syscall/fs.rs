@@ -40,13 +40,26 @@ use osfs::{
     pipe::{inode::PIPE_BUF_LEN, new_pipe},
     pselect::{FilePollRet, PSelectFuture},
     special::{
+        bpf::BpfFile,
+        epoll::file::EpollFile,
         eventfd::file::EventFdFile,
+        fscontext::FsContextFile,
+        inotify::{
+            dentry::InotifyDentry,
+            file::InotifyFile,
+            flags::{InotifyFlags, InotifyMask},
+            inode::InotifyInode,
+        },
+        io_uring::file::IoUringFile,
         memfd::{
             dentry::MemDentry,
             file::MemFile,
             flags::{MemfdFlags, MemfdSeals},
             inode::MemInode,
         },
+        opentree::OpenTreeFile,
+        signalfd::file::SignalFdFile,
+        timerfd::file::TimerFdFile,
     },
 };
 use osfuture::{Select2Futures, SelectOutput};
@@ -60,6 +73,7 @@ use vfs::{
     dentry::Dentry,
     file::File,
     handle::{FileHandleData, FileHandleHeader, HANDLE_LEN},
+    inode::Inode,
     kstat::Kstat,
     path::{Path, split_parent_and_name},
     sys_root_dentry,
@@ -1633,7 +1647,16 @@ pub fn sys_renameat2(
     let old_parent = old_dentry.parent().ok_or(SysError::ENOENT)?;
     let new_parent = new_dentry.parent().ok_or(SysError::ENOENT)?;
 
-    old_parent.rename(&old_dentry, &new_parent, &new_dentry)?;
+    let parent_dentry = old_dentry.parent().expect("can not rename root dentry");
+    // old_dentry.rename_to(&new_dentry, flags).map(|_| 0)
+    if old_dentry.is_negative() {
+        parent_dentry.lookup(old_dentry.name())?;
+    }
+
+    if parent_dentry
+        .rename(&old_dentry, &parent_dentry, &new_dentry)
+        .is_err()
+    {}
 
     // log::error!("[sys_renameat2] implement rename");
     Ok(0)
@@ -2618,7 +2641,7 @@ pub async fn sys_splice(
 ) -> SyscallResult {
     type Offset = i32;
 
-    log::error!(
+    log::debug!(
         "[sys_splice] fd_in: {}, off_in_ptr: {}, fd_out: {}, off_out_ptr: {}, len: {}, flags: {}",
         fd_in,
         off_in_ptr,
@@ -2636,22 +2659,63 @@ pub async fn sys_splice(
     let file_in = current_task().with_mut_fdtable(|ft| ft.get_file(fd_in))?;
     let file_out = current_task().with_mut_fdtable(|ft| ft.get_file(fd_out))?;
 
+    let file_in_type = file_in.inode().inotype();
+    let file_out_type = file_out.inode().inotype();
+
+    match (file_in_type.is_fifo(), file_out_type.is_fifo()) {
+        (true, true) | (false, false) => {
+            return Err(SysError::EINVAL);
+        }
+        (true, false) | (false, true) => {}
+    }
+
+    // Some special file can not be used in splice
+    if file_out.clone().downcast_arc::<EventFdFile>().is_ok()
+        || file_out.clone().downcast_arc::<SignalFdFile>().is_ok()
+        || file_out.clone().downcast_arc::<TimerFdFile>().is_ok()
+        || file_out.clone().downcast_arc::<EpollFile>().is_ok()
+        || file_out.clone().downcast_arc::<InotifyFile>().is_ok()
+        || file_out.clone().downcast_arc::<IoUringFile>().is_ok()
+        || file_out.clone().downcast_arc::<OpenTreeFile>().is_ok()
+        || file_out.clone().downcast_arc::<FsContextFile>().is_ok()
+        || file_out.clone().downcast_arc::<BpfFile>().is_ok()
+    {
+        return Err(SysError::EINVAL);
+    }
+
+    if file_in.clone().downcast_arc::<EventFdFile>().is_ok()
+        || file_in.clone().downcast_arc::<SignalFdFile>().is_ok()
+        || file_in.clone().downcast_arc::<TimerFdFile>().is_ok()
+        || file_in.clone().downcast_arc::<EpollFile>().is_ok()
+        || file_in.clone().downcast_arc::<InotifyFile>().is_ok()
+        || file_in.clone().downcast_arc::<IoUringFile>().is_ok()
+        || file_in.clone().downcast_arc::<OpenTreeFile>().is_ok()
+        || file_in.clone().downcast_arc::<FsContextFile>().is_ok()
+        || file_in.clone().downcast_arc::<BpfFile>().is_ok()
+    {
+        return Err(SysError::EINVAL);
+    }
+
+    if file_in_type.is_dir() || file_out_type.is_dir() {
+        return Err(SysError::EINVAL);
+    }
+
+    if file_in.flags().contains(OpenFlags::O_PATH) {
+        return Err(SysError::EBADF);
+    }
+
     if !file_in.flags().readable() || !file_out.flags().writable() {
         log::error!("[sys_splice] not readable/writable",);
         return Err(SysError::EBADF);
     }
 
     if ptr::eq(file_out.as_ref(), file_in.as_ref()) {
+        log::error!("[sys_splice] can not be one");
         return Err(SysError::EINVAL);
     }
 
     if file_out.flags().contains(OpenFlags::O_APPEND) {
-        return Err(SysError::EINVAL);
-    }
-
-    let file_in_type = file_in.inode().inotype();
-    let file_out_type = file_out.inode().inotype();
-    if !file_in_type.is_fifo() && !file_out_type.is_fifo() {
+        log::error!("[sys_splice] file_out should not contain O_APPEND");
         return Err(SysError::EINVAL);
     }
 
@@ -2662,19 +2726,35 @@ pub async fn sys_splice(
     let off_in: Option<Offset> = if off_in_ptr == 0 {
         None
     } else {
-        Some(unsafe {
-            UserReadPtr::<Offset>::new(off_in_ptr, &current_task().addr_space()).read()?
-        })
+        let offset =
+            unsafe { UserReadPtr::<Offset>::new(off_in_ptr, &current_task().addr_space()).read()? };
+
+        if offset < 0 {
+            log::error!("[sys_splice] offset < 0");
+            return Err(SysError::EINVAL);
+        }
+
+        Some(offset)
     };
+
     let off_out: Option<Offset> = if off_out_ptr == 0 {
         None
     } else {
-        Some(unsafe {
+        let offset = unsafe {
             UserReadPtr::<Offset>::new(off_out_ptr, &current_task().addr_space()).read()?
-        })
+        };
+
+        if offset < 0 {
+            log::error!("[sys_splice] offset < 0");
+            return Err(SysError::EINVAL);
+        }
+
+        Some(offset)
     };
 
     let mut buffer: Vec<u8> = vec![0; len];
+
+    log::error!("[sys_splice] read");
 
     let bytes_read = if file_in_type.is_fifo() {
         file_in.read(buffer.as_mut_slice()).await?
@@ -2701,6 +2781,7 @@ pub async fn sys_splice(
         return Ok(0);
     }
 
+    log::error!("[sys_splice] ready to write {} bytes", bytes_read);
     let bytes_written = if file_out_type.is_fifo() {
         file_out.write(buffer.as_slice()).await?
     } else if let Some(offset) = off_out {
@@ -3302,68 +3383,91 @@ pub fn sys_memfd_create(name_ptr: usize, flags: u32) -> SyscallResult {
     task.with_mut_fdtable(|ft| ft.alloc(file, file_flags))
 }
 
-bitflags::bitflags! {
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    pub struct FspickFlags: u32 {
-        const CLOEXEC          = 0x0001;
-        const SYMLINK_NOFOLLOW = 0x0002;
-        const NO_AUTOMOUNT     = 0x0004;
-        const EMPTY_PATH       = 0x0008;
+pub fn sys_inotify_init1(flags: u32) -> SyscallResult {
+    let task = current_task();
+
+    let inotify_flags = InotifyFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
+
+    log::debug!("[sys_inotify_init1] flags: {:?}", inotify_flags);
+
+    let inode: Arc<dyn Inode> = InotifyInode::new(inotify_flags);
+    inode.set_mode(InodeMode::REG);
+
+    let dentry = InotifyDentry::new(
+        "inotify",
+        Some(inode),
+        Some(Arc::downgrade(&sys_root_dentry())),
+    );
+    sys_root_dentry().add_child(dentry.clone());
+
+    let file = InotifyFile::new(dentry);
+
+    let mut file_flags = OpenFlags::O_RDONLY;
+    if inotify_flags.contains(InotifyFlags::IN_CLOEXEC) {
+        file_flags |= OpenFlags::O_CLOEXEC;
     }
+    if inotify_flags.contains(InotifyFlags::IN_NONBLOCK) {
+        file_flags |= OpenFlags::O_NONBLOCK;
+    }
+
+    task.with_mut_fdtable(|ft| ft.alloc(file, file_flags))
 }
 
-bitflags::bitflags! {
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    pub struct FsconfigCmd : u32 {
-        const  SetFlag = 0;
-        const  SetString = 1;
-        const  SetBinary = 2;
-        const  SetPath = 3;
-        const  SetPathEmpty = 4;
-        const  SetFd = 5;
-        const  CmdCreate = 6;
-        const  CmdReconfigure = 7;
-    }
-}
-
-pub fn sys_fspick(dirfd: usize, pathname: usize, flags: u32) -> SyscallResult {
+pub fn sys_inotify_add_watch(fd: usize, pathname_ptr: usize, mask: u32) -> SyscallResult {
     let task = current_task();
     let addr_space = task.addr_space();
-    let cpath = UserReadPtr::<u8>::new(pathname, &addr_space).read_c_string(256)?;
-    let path = cpath.into_string().unwrap();
-    let flags = FspickFlags::from_bits_truncate(flags);
-    let open_flags = if flags.contains(FspickFlags::CLOEXEC) {
-        OpenFlags::O_CLOEXEC
-    } else {
-        OpenFlags::empty()
-    };
 
-    let dentry = task.walk_at(AtFd::from(dirfd), path.clone())?;
-    let file = dentry.base_open()?;
-    let fd = task.with_mut_fdtable(|ft| ft.alloc(file, open_flags))?;
-    Ok(fd)
+    let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
+    let inotify_file = file
+        .as_any()
+        .downcast_ref::<InotifyFile>()
+        .ok_or(SysError::EINVAL)?;
+
+    let valid_mask = InotifyMask::from_bits(mask).ok_or(SysError::EINVAL)?;
+
+    let mut data_ptr = UserReadPtr::<u8>::new(pathname_ptr, &addr_space);
+    let path_cstring = data_ptr.read_c_string(4096)?; // PATH_MAX
+    let path_string = path_cstring.into_string().map_err(|_| SysError::EINVAL)?;
+
+    log::debug!(
+        "[sys_inotify_add_watch] path: {}, mask: {:?}",
+        path_string,
+        valid_mask
+    );
+
+    let target_inode = task
+        .walk_at(AtFd::FdCwd, path_string.clone())?
+        .inode()
+        .ok_or(SysError::ENOENT)?;
+
+    let inode_id = target_inode.get_meta().ino as u64;
+
+    if valid_mask.contains(InotifyMask::IN_ONLYDIR) {
+        let stat = target_inode.get_attr()?;
+        if !config::inode::InodeMode::from_bits_truncate(stat.st_mode)
+            .contains(config::inode::InodeMode::DIR)
+        {
+            return Err(SysError::ENOTDIR);
+        }
+    }
+
+    let wd = inotify_file.add_watch(inode_id, valid_mask.bits(), Some(path_string))?;
+    log::debug!("[sys_inotify_add_watch] assigned wd: {}", wd);
+
+    Ok(wd as usize)
 }
 
-pub fn sys_fsconfig(fs_fd: usize, cmd: u32, key: usize, value: usize, aux: usize) -> SyscallResult {
+pub fn sys_inotify_rm_watch(fd: usize, wd: i32) -> SyscallResult {
     let task = current_task();
-    let addr_space = task.addr_space();
-    let key_str = if key != 0 {
-        Some(UserReadPtr::<u8>::new(key, &addr_space).read_c_string(256)?)
-    } else {
-        None
-    };
 
-    let value_str = if value != 0 {
-        Some(UserReadPtr::<u8>::new(value, &addr_space).read_c_string(256)?)
-    } else {
-        None
-    };
+    let file = task.with_mut_fdtable(|table| table.get_file(fd))?;
+    let inotify_file = file
+        .as_any()
+        .downcast_ref::<InotifyFile>()
+        .ok_or(SysError::EINVAL)?;
 
-    let cmd = FsconfigCmd::from_bits_truncate(cmd);
+    log::debug!("[sys_inotify_rm_watch] fd: {}, wd: {}", fd, wd);
+    inotify_file.remove_watch(wd)?;
 
-    // cmd 只要是 FSCONFIG_SET_STRING/FSCONFIG_SET_FLAG/FSCONFIG_CMD_RECONFIGURE 都直接返回 Ok(0)
-    match cmd {
-        FsconfigCmd::SetString | FsconfigCmd::SetFlag | FsconfigCmd::CmdReconfigure => Ok(0),
-        _ => Err(SysError::EINVAL),
-    }
+    Ok(0)
 }

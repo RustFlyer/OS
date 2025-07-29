@@ -1,5 +1,12 @@
+pub mod bpf;
 pub mod epoll;
 pub mod eventfd;
+pub mod fscontext;
+pub mod inotify;
+pub mod io_uring;
 pub mod memfd;
+pub mod opentree;
+pub mod perf;
 pub mod signalfd;
 pub mod timerfd;
+pub mod userfaultfd;

@@ -3,6 +3,12 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use bitflags::*;
+use config::vfs::OpenFlags;
+use osfs::simple::dentry::SimpleDentry;
+use osfs::special::perf::event::PerfEventAttr;
+use osfs::special::perf::file::PerfEventFile;
+use osfs::special::perf::flags::{PERF_ATTR_SIZE_VER0, PerfType};
+use osfs::special::perf::inode::PerfEventInode;
 use strum::FromRepr;
 
 use config::inode::InodeType;
@@ -18,7 +24,7 @@ use systype::{
 use vfs::file::File;
 use vfs::path::Path;
 
-use crate::task::cap::{CapUserData, CapUserHeader};
+use crate::task::cap::{CapUserData, CapUserHeader, CapabilitiesFlags};
 use crate::task::signal::pidfd::PF_TABLE;
 use crate::task::signal::sig_info::Sig;
 use crate::task::{
@@ -1158,4 +1164,422 @@ pub fn sys_chroot(path_ptr: usize) -> SyscallResult {
 
     *task.root().lock() = dentry;
     Ok(0)
+}
+
+pub fn sys_perf_event_open(
+    attr_ptr: usize,
+    pid: i32,
+    cpu: i32,
+    group_fd: i32,
+    flags: u64,
+) -> SyscallResult {
+    use vfs::inode::Inode;
+    let task = current_task();
+
+    log::debug!(
+        "[sys_perf_event_open] attr_ptr: {:#x}, pid: {}, cpu: {}, group_fd: {}, flags: {:#x}",
+        attr_ptr,
+        pid,
+        cpu,
+        group_fd,
+        flags
+    );
+
+    if attr_ptr == 0 {
+        return Err(SysError::EFAULT);
+    }
+
+    const PERF_FLAG_FD_NO_GROUP: u64 = 1 << 0;
+    const PERF_FLAG_FD_OUTPUT: u64 = 1 << 1;
+    const PERF_FLAG_PID_CGROUP: u64 = 1 << 2;
+    const PERF_FLAG_FD_CLOEXEC: u64 = 1 << 3;
+
+    let valid_flags =
+        PERF_FLAG_FD_NO_GROUP | PERF_FLAG_FD_OUTPUT | PERF_FLAG_PID_CGROUP | PERF_FLAG_FD_CLOEXEC;
+    if flags & !valid_flags != 0 {
+        return Err(SysError::EINVAL);
+    }
+
+    let addr_space = task.addr_space();
+    let mut attr_ptr = UserReadPtr::<u8>::new(attr_ptr, &addr_space);
+
+    let size_bytes = unsafe { attr_ptr.read_array(8) }?; // type(4) + size(4)
+    let attr_size =
+        u32::from_ne_bytes([size_bytes[4], size_bytes[5], size_bytes[6], size_bytes[7]]);
+
+    if attr_size < PERF_ATTR_SIZE_VER0 || attr_size > core::mem::size_of::<PerfEventAttr>() as u32 {
+        return Err(SysError::E2BIG);
+    }
+
+    let attr_bytes = unsafe { attr_ptr.read_array(attr_size as usize) }?;
+    let mut attr = PerfEventAttr::new();
+
+    // type (u32) + size (u32) = 8 bytes
+    if attr_size >= 8 {
+        attr.r#type =
+            u32::from_ne_bytes([attr_bytes[0], attr_bytes[1], attr_bytes[2], attr_bytes[3]]);
+        attr.size =
+            u32::from_ne_bytes([attr_bytes[4], attr_bytes[5], attr_bytes[6], attr_bytes[7]]);
+    }
+
+    // config (u64) = 8 bytes, offset 8
+    if attr_size >= 16 {
+        attr.config = u64::from_ne_bytes([
+            attr_bytes[8],
+            attr_bytes[9],
+            attr_bytes[10],
+            attr_bytes[11],
+            attr_bytes[12],
+            attr_bytes[13],
+            attr_bytes[14],
+            attr_bytes[15],
+        ]);
+    }
+
+    // sample_period_freq (u64) = 8 bytes, offset 16
+    if attr_size >= 24 {
+        attr.sample_period_freq = u64::from_ne_bytes([
+            attr_bytes[16],
+            attr_bytes[17],
+            attr_bytes[18],
+            attr_bytes[19],
+            attr_bytes[20],
+            attr_bytes[21],
+            attr_bytes[22],
+            attr_bytes[23],
+        ]);
+    }
+
+    // sample_type (u64) = 8 bytes, offset 24
+    if attr_size >= 32 {
+        attr.sample_type = u64::from_ne_bytes([
+            attr_bytes[24],
+            attr_bytes[25],
+            attr_bytes[26],
+            attr_bytes[27],
+            attr_bytes[28],
+            attr_bytes[29],
+            attr_bytes[30],
+            attr_bytes[31],
+        ]);
+    }
+
+    // read_format (u64) = 8 bytes, offset 32
+    if attr_size >= 40 {
+        attr.read_format = u64::from_ne_bytes([
+            attr_bytes[32],
+            attr_bytes[33],
+            attr_bytes[34],
+            attr_bytes[35],
+            attr_bytes[36],
+            attr_bytes[37],
+            attr_bytes[38],
+            attr_bytes[39],
+        ]);
+    }
+
+    // flags (u64) = 8 bytes, offset 40
+    if attr_size >= 48 {
+        attr.flags = u64::from_ne_bytes([
+            attr_bytes[40],
+            attr_bytes[41],
+            attr_bytes[42],
+            attr_bytes[43],
+            attr_bytes[44],
+            attr_bytes[45],
+            attr_bytes[46],
+            attr_bytes[47],
+        ]);
+    }
+
+    // wakeup_events_watermark (u32) + bp_type (u32) = 8 bytes, offset 48
+    if attr_size >= 56 {
+        attr.wakeup_events_watermark = u32::from_ne_bytes([
+            attr_bytes[48],
+            attr_bytes[49],
+            attr_bytes[50],
+            attr_bytes[51],
+        ]);
+        attr.bp_type = u32::from_ne_bytes([
+            attr_bytes[52],
+            attr_bytes[53],
+            attr_bytes[54],
+            attr_bytes[55],
+        ]);
+    }
+
+    // bp_addr_config1 (u64) = 8 bytes, offset 56
+    if attr_size >= 64 {
+        attr.bp_addr_config1 = u64::from_ne_bytes([
+            attr_bytes[56],
+            attr_bytes[57],
+            attr_bytes[58],
+            attr_bytes[59],
+            attr_bytes[60],
+            attr_bytes[61],
+            attr_bytes[62],
+            attr_bytes[63],
+        ]);
+    }
+
+    // bp_len_config2 (u64) = 8 bytes, offset 64
+    if attr_size >= 72 {
+        attr.bp_len_config2 = u64::from_ne_bytes([
+            attr_bytes[64],
+            attr_bytes[65],
+            attr_bytes[66],
+            attr_bytes[67],
+            attr_bytes[68],
+            attr_bytes[69],
+            attr_bytes[70],
+            attr_bytes[71],
+        ]);
+    }
+
+    // config3 (u64) = 8 bytes, offset 72
+    if attr_size >= 80 {
+        attr.config3 = u64::from_ne_bytes([
+            attr_bytes[72],
+            attr_bytes[73],
+            attr_bytes[74],
+            attr_bytes[75],
+            attr_bytes[76],
+            attr_bytes[77],
+            attr_bytes[78],
+            attr_bytes[79],
+        ]);
+    }
+
+    // branch_sample_type (u64) = 8 bytes, offset 80
+    if attr_size >= 88 {
+        attr.branch_sample_type = u64::from_ne_bytes([
+            attr_bytes[80],
+            attr_bytes[81],
+            attr_bytes[82],
+            attr_bytes[83],
+            attr_bytes[84],
+            attr_bytes[85],
+            attr_bytes[86],
+            attr_bytes[87],
+        ]);
+    }
+
+    // sample_regs_user (u64) = 8 bytes, offset 88
+    if attr_size >= 96 {
+        attr.sample_regs_user = u64::from_ne_bytes([
+            attr_bytes[88],
+            attr_bytes[89],
+            attr_bytes[90],
+            attr_bytes[91],
+            attr_bytes[92],
+            attr_bytes[93],
+            attr_bytes[94],
+            attr_bytes[95],
+        ]);
+    }
+
+    // sample_stack_user (u32) + clockid (i32) = 8 bytes, offset 96
+    if attr_size >= 104 {
+        attr.sample_stack_user = u32::from_ne_bytes([
+            attr_bytes[96],
+            attr_bytes[97],
+            attr_bytes[98],
+            attr_bytes[99],
+        ]);
+        attr.clockid = i32::from_ne_bytes([
+            attr_bytes[100],
+            attr_bytes[101],
+            attr_bytes[102],
+            attr_bytes[103],
+        ]);
+    }
+
+    // sample_regs_intr (u64) = 8 bytes, offset 104
+    if attr_size >= 112 {
+        attr.sample_regs_intr = u64::from_ne_bytes([
+            attr_bytes[104],
+            attr_bytes[105],
+            attr_bytes[106],
+            attr_bytes[107],
+            attr_bytes[108],
+            attr_bytes[109],
+            attr_bytes[110],
+            attr_bytes[111],
+        ]);
+    }
+
+    // aux_watermark (u32) + sample_max_stack (u16) + __reserved_2 (u16) = 8 bytes, offset 112
+    if attr_size >= 120 {
+        attr.aux_watermark = u32::from_ne_bytes([
+            attr_bytes[112],
+            attr_bytes[113],
+            attr_bytes[114],
+            attr_bytes[115],
+        ]);
+        attr.sample_max_stack = u16::from_ne_bytes([attr_bytes[116], attr_bytes[117]]);
+        attr.__reserved_2 = u16::from_ne_bytes([attr_bytes[118], attr_bytes[119]]);
+    }
+
+    // aux_sample_size (u32) + __reserved_3 (u32) = 8 bytes, offset 120
+    if attr_size >= 128 {
+        attr.aux_sample_size = u32::from_ne_bytes([
+            attr_bytes[120],
+            attr_bytes[121],
+            attr_bytes[122],
+            attr_bytes[123],
+        ]);
+        attr.__reserved_3 = u32::from_ne_bytes([
+            attr_bytes[124],
+            attr_bytes[125],
+            attr_bytes[126],
+            attr_bytes[127],
+        ]);
+    }
+
+    // sig_data (u64) = 8 bytes, offset 128
+    if attr_size >= 136 {
+        attr.sig_data = u64::from_ne_bytes([
+            attr_bytes[128],
+            attr_bytes[129],
+            attr_bytes[130],
+            attr_bytes[131],
+            attr_bytes[132],
+            attr_bytes[133],
+            attr_bytes[134],
+            attr_bytes[135],
+        ]);
+    }
+
+    if !attr.validate() {
+        return Err(SysError::EINVAL);
+    }
+
+    let target_pid = if pid == 0 {
+        task.pid() as i32
+    } else if pid == -1 {
+        -1
+    } else if pid > 0 {
+        // todo! check process perm (EPERM)
+        pid
+    } else {
+        return Err(SysError::EINVAL);
+    };
+
+    let target_cpu = if cpu == -1 {
+        -1
+    } else if cpu >= 0 {
+        // todo! check cpu valid (EINVAL)
+        cpu
+    } else {
+        return Err(SysError::EINVAL);
+    };
+
+    let mut group_leader: Option<Arc<PerfEventFile>> = None;
+    if group_fd >= 0 {
+        if flags & PERF_FLAG_FD_NO_GROUP != 0 {
+            return Err(SysError::EINVAL);
+        }
+
+        let group_file = task.with_mut_fdtable(|table| table.get_file(group_fd as usize))?;
+        let perf_group_file = group_file
+            .as_any()
+            .downcast_ref::<PerfEventFile>()
+            .ok_or(SysError::EBADF)?;
+
+        let group_attr = perf_group_file.get_attr()?;
+        if group_attr.r#type != attr.r#type {
+            return Err(SysError::EINVAL);
+        }
+
+        group_leader = Some(
+            group_file
+                .downcast_arc::<PerfEventFile>()
+                .map_err(|_| SysError::EINVAL)?,
+        );
+    }
+
+    fn is_perf_paranoid_allowed(level: i32) -> bool {
+        // todo!: check perf_event_paranoid setup
+        // 0: 不限制
+        // 1: 限制 CPU 事件和内核分析
+        // 2: 限制内核分析
+        // 3: 禁用所有
+        let paranoid_level = get_perf_event_paranoid();
+        paranoid_level <= level
+    }
+
+    fn get_perf_event_paranoid() -> i32 {
+        // todo!: read /proc/sys/kernel/perf_event_paranoid
+        // default strict setup
+        2
+    }
+
+    match PerfType::try_from_u32(attr.r#type) {
+        Ok(PerfType::Hardware) | Ok(PerfType::HwCache) => {
+            // Hareware events need 1 perm
+            if !task.has_capability(CapabilitiesFlags::CAP_SYS_ADMIN)
+                && !is_perf_paranoid_allowed(1)
+            {
+                return Err(SysError::EACCES);
+            }
+        }
+        Ok(PerfType::Tracepoint) => {
+            // Tracepoint events need 0 perm
+            if !task.has_capability(CapabilitiesFlags::CAP_SYS_ADMIN)
+                && !is_perf_paranoid_allowed(0)
+            {
+                return Err(SysError::EACCES);
+            }
+        }
+        Ok(PerfType::Raw) => {
+            // Raw events need CAP_SYS_ADMIN
+            if !task.has_capability(CapabilitiesFlags::CAP_SYS_ADMIN) {
+                return Err(SysError::EACCES);
+            }
+        }
+        _ => {} // Software Events are always allowed
+    }
+
+    // allocate unique event id
+    static EVENT_ID_COUNTER: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(1);
+    let event_id = EVENT_ID_COUNTER.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
+
+    // create perf event
+    let perf_inode = PerfEventInode::new(attr.clone(), target_pid, target_cpu, group_fd, event_id);
+    perf_inode.set_mode(config::inode::InodeMode::REG);
+
+    // create dentry and file
+    let dentry = SimpleDentry::new(
+        "perf_event",
+        Some(perf_inode.clone()),
+        Some(Arc::downgrade(&sys_root_dentry())),
+    );
+    sys_root_dentry().add_child(dentry.clone());
+
+    let perf_file = PerfEventFile::new(dentry);
+
+    if let Some(leader) = group_leader {
+        perf_file.set_group_leader(Some(leader.clone()))?;
+        leader.add_group_member(Arc::downgrade(&perf_file))?;
+        perf_file.sync_with_leader(&leader)?;
+    }
+
+    perf_file.setup()?;
+
+    osfs::special::perf::file::register_perf_event(&perf_file);
+
+    let mut file_flags = OpenFlags::O_RDONLY;
+    if flags & PERF_FLAG_FD_CLOEXEC != 0 {
+        file_flags |= OpenFlags::O_CLOEXEC;
+    }
+
+    let fd = task.with_mut_fdtable(|ft| ft.alloc(perf_file, file_flags))?;
+    log::debug!(
+        "[sys_perf_event_open] created event fd={}, id={}, type={}",
+        fd,
+        event_id,
+        attr.r#type
+    );
+
+    Ok(fd)
 }
