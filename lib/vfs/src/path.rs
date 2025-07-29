@@ -244,7 +244,7 @@ impl Path {
 /// // the name is "/".
 /// let (parent, name) = split_parent_and_name("/");
 /// assert_eq!(parent, "".to_string());
-/// assert_eq!(name, "/".to_string());
+/// assert_eq!(name, "".to_string());
 ///
 /// // If the path is just a file name, the parent is `None` and the
 /// // name is the whole path.
@@ -296,7 +296,7 @@ pub fn test_split_parent_and_name() {
         create_test("/foo/bar/baz", "/foo/bar", "baz"),
         create_test("/foo/bar/", "/foo", "bar"),
         create_test("/foo", "/", "foo"),
-        create_test("/", "", "/"),
+        create_test("/", "", ""),
         create_test("foo", "", "foo"),
         create_test("foo/bar/baz", "foo/bar", "baz"),
         create_test("foo/bar/", "foo", "bar"),
@@ -304,10 +304,10 @@ pub fn test_split_parent_and_name() {
     ];
 
     for test in &tests {
-        let (pr, ch) = split_parent_and_name(&test.path);
+        let (parent, child) = split_parent_and_name(&test.path);
 
-        assert_eq!(pr, test.parent, "Failed for path: {:?}", test.path);
-        assert_eq!(ch, test.child, "Failed for path: {:?}", test.path);
+        assert_eq!(parent, test.parent, "Failed for path: {:?}", test.path);
+        assert_eq!(child, test.child, "Failed for path: {:?}", test.path);
     }
 
     log::info!("pass test_split_parent_and_name");

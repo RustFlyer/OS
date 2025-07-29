@@ -804,17 +804,18 @@ pub async fn sys_mount(
         } else {
             None
         };
+
         let (parent, name) = split_parent_and_name(&target);
         log::debug!("[sys_mount] parent: {:?}, name: {:?}", parent, name);
 
         let dname;
         let pdentry = task.walk_at(AtFd::FdCwd, parent.to_string())?;
         let parent: Arc<dyn Dentry>;
-        if name.is_none() {
+        if name.is_empty() {
             dname = pdentry.name().to_string();
             parent = pdentry.parent().ok_or(SysError::ENOENT)?;
         } else {
-            dname = name.unwrap();
+            dname = name;
             parent = pdentry.clone();
         }
 
@@ -836,14 +837,10 @@ pub async fn sys_mount(
                 None
             };
             let (parent, name) = split_parent_and_name(&target);
-            log::debug!(
-                "[sys_mount] start mount [{}], [{}]",
-                parent,
-                name.clone().unwrap()
-            );
+            log::debug!("[sys_mount] start mount [{}], [{}]", parent, name.clone());
             let parent = task.walk_at(AtFd::FdCwd, parent.to_string())?;
             log::debug!("[sys_mount] parent dentry is {}", parent.path());
-            fs_type.mount(name.unwrap().as_str(), Some(parent), flags, dev)?
+            fs_type.mount(name.as_str(), Some(parent), flags, dev)?
         }
         name @ "fat32" => {
             log::debug!("[sys_mount] fat32 check pass");
@@ -854,14 +851,10 @@ pub async fn sys_mount(
                 None
             };
             let (parent, name) = split_parent_and_name(&target);
-            log::debug!(
-                "[sys_mount] start mount [{}], [{}]",
-                parent,
-                name.clone().unwrap()
-            );
+            log::debug!("[sys_mount] start mount [{}], [{}]", parent, name.clone());
             let parent = task.walk_at(AtFd::FdCwd, parent.to_string())?;
             log::debug!("[sys_mount] parent dentry is {}", parent.path());
-            fs_type.mount(name.unwrap().as_str(), Some(parent), flags, dev)?
+            fs_type.mount(name.as_str(), Some(parent), flags, dev)?
         }
         _ => return Err(SysError::EINVAL),
     };
