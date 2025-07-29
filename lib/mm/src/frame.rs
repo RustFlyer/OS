@@ -155,24 +155,24 @@ impl FrameTracker {
     }
 
     /// Gets the physical page number of the frame.
-    pub fn ppn(&self) -> PhysPageNum {
+    pub const fn ppn(&self) -> PhysPageNum {
         self.ppn
     }
 
     /// Gets the virtual page number of the frame in the kernel space.
-    pub fn vpn(&self) -> VirtPageNum {
+    pub const fn vpn(&self) -> VirtPageNum {
         self.ppn.to_vpn_kernel()
     }
 
     /// Gets a slice pointing to the frame.
-    pub fn as_slice(&self) -> &[u8; PAGE_SIZE] {
+    pub const fn as_slice(&self) -> &[u8; PAGE_SIZE] {
         // SAFETY: The frame is allocated, and the returned slice does not outlive
         // the `FrameTracker` which lives as long as the frame.
         unsafe { self.vpn().as_slice() }
     }
 
     /// Gets a mutable slice pointing to the frame.
-    pub fn as_mut_slice(&mut self) -> &mut [u8; PAGE_SIZE] {
+    pub const fn as_mut_slice(&mut self) -> &mut [u8; PAGE_SIZE] {
         // SAFETY: The frame is allocated, and the returned slice does not outlive
         // the `FrameTracker` which lives as long as the frame.
         unsafe { self.vpn().as_slice_mut() }
@@ -198,7 +198,7 @@ impl FrameDropper {
     /// Constructs a `FrameDropper` from a vector of `FrameTracker`.
     ///
     /// The frames will be deallocated when this `FrameDropper` is dropped.
-    pub fn new(frames: Vec<FrameTracker>) -> Self {
+    pub const fn new(frames: Vec<FrameTracker>) -> Self {
         Self {
             frames: ManuallyDrop::new(frames),
         }

@@ -79,18 +79,18 @@ impl Page {
     }
 
     /// Returns the physical page number of the page.
-    pub fn ppn(&self) -> PhysPageNum {
+    pub const fn ppn(&self) -> PhysPageNum {
         unsafe { self.frame.get().as_ref_unchecked().ppn() }
     }
 
     /// Returns a reference to the underlying [`FrameTracker`].
-    pub fn as_slice(&self) -> &[u8; PAGE_SIZE] {
+    pub const fn as_slice(&self) -> &[u8; PAGE_SIZE] {
         unsafe { self.frame.get().as_ref_unchecked().as_slice() }
     }
 
     /// Returns a mutable reference to the underlying page.
     #[allow(clippy::mut_from_ref)]
-    pub fn as_mut_slice(&self) -> &mut [u8; PAGE_SIZE] {
+    pub const fn as_mut_slice(&self) -> &mut [u8; PAGE_SIZE] {
         unsafe { self.frame.get().as_mut_unchecked().as_mut_slice() }
     }
 }
