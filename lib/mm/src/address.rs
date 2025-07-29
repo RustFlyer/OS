@@ -27,12 +27,8 @@ impl PhysAddr {
     ///
     /// # Note
     /// We only support physical addresses in the lower half of the address space.
-    pub fn new(addr: usize) -> Self {
-        debug_assert!(
-            Self::check_validity(addr),
-            "invalid physical address: {:#x}",
-            addr
-        );
+    pub const fn new(addr: usize) -> Self {
+        debug_assert!(Self::check_validity(addr));
         PhysAddr { addr }
     }
 
@@ -41,38 +37,38 @@ impl PhysAddr {
     /// # Note
     /// MMIO addresses may be outside the RAM range, but they are still valid. This
     /// function is only a sanity check and does not guarantee the address is valid.
-    pub fn check_validity(addr: usize) -> bool {
+    pub const fn check_validity(addr: usize) -> bool {
         let high_bits = addr as isize >> PA_WIDTH_SV39;
         high_bits == 0
     }
 
     /// Gets the inner `usize` address.
-    pub fn to_usize(self) -> usize {
+    pub const fn to_usize(self) -> usize {
         self.addr
     }
 
     /// Gets the offset within the page where the address resides.
-    pub fn page_offset(self) -> usize {
+    pub const fn page_offset(self) -> usize {
         self.addr % PAGE_SIZE
     }
 
     /// Gets the page number where the address resides.
-    pub fn page_number(self) -> PhysPageNum {
+    pub const fn page_number(self) -> PhysPageNum {
         PhysPageNum::new(self.addr / PAGE_SIZE)
     }
 
     /// Rounds the address down to the nearest page boundary.
-    pub fn round_down(self) -> PhysAddr {
+    pub const fn round_down(self) -> PhysAddr {
         PhysAddr::new(self.addr & !(PAGE_SIZE - 1))
     }
 
     /// Rounds the address up to the nearest page boundary.
-    pub fn round_up(self) -> PhysAddr {
+    pub const fn round_up(self) -> PhysAddr {
         PhysAddr::new((self.addr + PAGE_SIZE - 1) & !(PAGE_SIZE - 1))
     }
 
     /// Translates a physical address into a virtual address in the kernel space.
-    pub fn to_va_kernel(self) -> VirtAddr {
+    pub const fn to_va_kernel(self) -> VirtAddr {
         VirtAddr::new(self.addr + KERNEL_MAP_OFFSET)
     }
 }
@@ -106,18 +102,14 @@ impl VirtAddr {
     /// former kind of addresses may has `0x9` or `0x8` being the upper 4 bits
     /// (in our current implementation), and the latter kind of addresses
     /// is similar to RISC-V.
-    pub fn new(addr: usize) -> Self {
-        debug_assert!(
-            Self::check_validity(addr),
-            "invalid virtual address: {:#x}",
-            addr
-        );
+    pub const fn new(addr: usize) -> Self {
+        debug_assert!(Self::check_validity(addr));
         VirtAddr { addr }
     }
 
     /// Checks the validity of the address.
     #[cfg(target_arch = "riscv64")]
-    pub fn check_validity(addr: usize) -> bool {
+    pub const fn check_validity(addr: usize) -> bool {
         let high_bits = addr as isize >> (VA_WIDTH_SV39 - 1);
         high_bits == 0 || high_bits == -1
     }
@@ -128,43 +120,43 @@ impl VirtAddr {
     /// LoongArch64 has multiple kinds of virtual addresses. This check is only
     /// a sanity check and does not guarantee the address is valid.
     #[cfg(target_arch = "loongarch64")]
-    pub fn check_validity(addr: usize) -> bool {
+    pub const fn check_validity(addr: usize) -> bool {
         let dmw_bits = addr >> 60;
         matches!(dmw_bits, 0x0 | 0xf | 0x8 | 0x9)
     }
 
-    pub fn in_user_space(self) -> bool {
+    pub const fn in_user_space(self) -> bool {
         self.addr < USER_END
     }
 
     /// Gets the inner `usize` address.
-    pub fn to_usize(self) -> usize {
+    pub const fn to_usize(self) -> usize {
         self.addr
     }
 
     /// Gets the offset within the page where the address resides.
-    pub fn page_offset(self) -> usize {
+    pub const fn page_offset(self) -> usize {
         self.addr % PAGE_SIZE
     }
 
     /// Gets the page number where the address resides.
-    pub fn page_number(self) -> VirtPageNum {
+    pub const fn page_number(self) -> VirtPageNum {
         VirtPageNum::new(self.addr / PAGE_SIZE)
     }
 
     /// Rounds the address down to the nearest page boundary.
-    pub fn round_down(self) -> VirtAddr {
+    pub const fn round_down(self) -> VirtAddr {
         VirtAddr::new(self.addr & !(PAGE_SIZE - 1))
     }
 
     /// Rounds the address up to the nearest page boundary.
-    pub fn round_up(self) -> VirtAddr {
+    pub const fn round_up(self) -> VirtAddr {
         VirtAddr::new((self.addr + PAGE_SIZE - 1) & !(PAGE_SIZE - 1))
     }
 
     /// Translates a virtual address into a physical address, if the VA is in the
     /// kernel space.
-    pub fn to_pa_kernel(self) -> PhysAddr {
+    pub const fn to_pa_kernel(self) -> PhysAddr {
         PhysAddr::new(self.addr - KERNEL_MAP_OFFSET)
     }
 }
@@ -186,33 +178,29 @@ pub struct PhysPageNum {
 
 impl PhysPageNum {
     /// Creates a new `PhysPageNum` from the given page number.
-    pub fn new(page_num: usize) -> Self {
-        debug_assert!(
-            Self::check_validity(page_num),
-            "invalid physical page number: {:#x}",
-            page_num
-        );
+    pub const fn new(page_num: usize) -> Self {
+        debug_assert!(Self::check_validity(page_num));
         PhysPageNum { page_num }
     }
 
     /// Checks the validity of the page number.
-    pub fn check_validity(page_num: usize) -> bool {
+    pub const fn check_validity(page_num: usize) -> bool {
         let high_bits = page_num >> PPN_WIDTH;
         high_bits == 0
     }
 
     /// Gets the inner `usize` page number.
-    pub fn to_usize(self) -> usize {
+    pub const fn to_usize(self) -> usize {
         self.page_num
     }
 
     /// Gets the starting address of the page.
-    pub fn address(self) -> PhysAddr {
+    pub const fn address(self) -> PhysAddr {
         PhysAddr::new(self.page_num << PAGE_OFFSET_WIDTH)
     }
 
     /// Translates a physical page number into a virtual page number in the kernel space.
-    pub fn to_vpn_kernel(self) -> VirtPageNum {
+    pub const fn to_vpn_kernel(self) -> VirtPageNum {
         self.address().to_va_kernel().page_number()
     }
 }
@@ -234,42 +222,38 @@ pub struct VirtPageNum {
 
 impl VirtPageNum {
     /// Creates a new `VirtPageNum` from the given page number.
-    pub fn new(page_num: usize) -> Self {
-        debug_assert!(
-            Self::check_validity(page_num),
-            "invalid virtual page number: {:#x}",
-            page_num
-        );
+    pub const fn new(page_num: usize) -> Self {
+        debug_assert!(Self::check_validity(page_num));
         VirtPageNum { page_num }
     }
 
     /// Checks the validity of the page number.
     #[cfg(target_arch = "riscv64")]
-    pub fn check_validity(page_num: usize) -> bool {
+    pub const fn check_validity(page_num: usize) -> bool {
         let extended_bits = page_num >> VPN_WIDTH;
         extended_bits == 0
     }
 
     /// Checks the validity of the page number.
     #[cfg(target_arch = "loongarch64")]
-    pub fn check_validity(page_num: usize) -> bool {
+    pub const fn check_validity(page_num: usize) -> bool {
         let dmw_bits = page_num >> (VPN_WIDTH - 4);
         matches!(dmw_bits, 0x0 | 0xf | 0x8 | 0x9)
     }
 
     /// Gets the inner `usize` page number.
-    pub fn to_usize(self) -> usize {
+    pub const fn to_usize(self) -> usize {
         self.page_num
     }
 
     /// Gets the starting address of the page.
-    pub fn address(self) -> VirtAddr {
+    pub const fn address(self) -> VirtAddr {
         VirtAddr::new(self.page_num << PAGE_OFFSET_WIDTH)
     }
 
     /// Translates a virtual page number into a physical page number, if the VPN is in the
     /// kernel space.
-    pub fn to_ppn_kernel(self) -> PhysPageNum {
+    pub const fn to_ppn_kernel(self) -> PhysPageNum {
         self.address().to_pa_kernel().page_number()
     }
 
@@ -278,7 +262,7 @@ impl VirtPageNum {
     /// # Safety
     /// The caller must ensure that the page is allocated, and the slice should
     /// not outlive the page.
-    pub unsafe fn as_slice(self) -> &'static [u8; PAGE_SIZE] {
+    pub const unsafe fn as_slice(self) -> &'static [u8; PAGE_SIZE] {
         let ptr = self.address().to_usize() as *const [u8; PAGE_SIZE];
         unsafe { &*ptr }
     }
@@ -288,7 +272,7 @@ impl VirtPageNum {
     /// # Safety
     /// The caller must ensure that the page is allocated, and the slice should
     /// not outlive the page.
-    pub unsafe fn as_slice_mut(self) -> &'static mut [u8; PAGE_SIZE] {
+    pub const unsafe fn as_slice_mut(self) -> &'static mut [u8; PAGE_SIZE] {
         let ptr = self.address().to_usize() as *mut [u8; PAGE_SIZE];
         unsafe { &mut *ptr }
     }
@@ -298,7 +282,7 @@ impl VirtPageNum {
     /// `indices[2]` is the index of the root page table.
     /// `indices[1]` is the index of the second-level page table.
     /// `indices[0]` is the index of the leaf page table.
-    pub fn indices(self) -> [usize; 3] {
+    pub const fn indices(self) -> [usize; 3] {
         let index_mask = 0x1ff;
         let vpn = self.to_usize();
         let mut indices = [0; 3];

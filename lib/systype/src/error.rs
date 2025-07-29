@@ -1,5 +1,5 @@
 use alloc::boxed::Box;
-use core::{future::Future, pin::Pin, str::Utf8Error};
+use core::{future::Future, pin::Pin};
 
 use strum::FromRepr;
 
@@ -202,13 +202,10 @@ impl SysError {
         }
     }
 
-    pub fn from_i32(value: i32) -> Self {
+    pub const fn from_i32(value: i32) -> Self {
         Self::from_repr(value).unwrap()
     }
 
-    pub fn from_utf8_err(_value: Utf8Error) -> Self {
-        Self::EUTFFAIL
-    }
     /// Returns the error code value in `i32`.
     pub const fn code(self) -> i32 {
         self as i32
