@@ -112,10 +112,8 @@ impl Dentry for SimpleDentry {
 
     fn base_unlink(&self, dentry: &dyn Dentry) -> SysResult<()> {
         check_permission(dentry)?;
-        self.into_dyn_ref()
-            .remove_child(dentry)
-            .ok_or(SysError::ENOENT)
-            .map(|_| ())
+        self.remove_child(dentry);
+        Ok(())
     }
 
     fn base_rmdir(&self, dentry: &dyn Dentry) -> SysResult<()> {
@@ -123,7 +121,7 @@ impl Dentry for SimpleDentry {
         if !dentry.get_meta().children.lock().is_empty() {
             return Err(SysError::ENOTEMPTY);
         }
-        self.remove_child(dentry).unwrap();
+        self.remove_child(dentry);
         Ok(())
     }
 
@@ -135,8 +133,8 @@ impl Dentry for SimpleDentry {
     ) -> SysResult<()> {
         check_permission(dentry)?;
         new_dentry.set_inode(dentry.inode().unwrap());
-        dentry.unset_inode();
         dentry.get_meta().children.lock().clear();
+        self.remove_child(dentry);
         Ok(())
     }
 }

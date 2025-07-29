@@ -6,7 +6,6 @@
 #![allow(clippy::module_inception)]
 #![feature(stmt_expr_attributes)]
 #![feature(slice_as_array)]
-#![feature(core_intrinsics)]
 // #![allow(dead_code)]
 // #![allow(unused)]
 

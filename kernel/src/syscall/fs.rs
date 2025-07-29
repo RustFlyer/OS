@@ -9,7 +9,7 @@ use core::{
     cmp, mem,
     pin::Pin,
     ptr,
-    sync::atomic::{AtomicU8, AtomicU64},
+    sync::atomic::AtomicU8,
     task::{Context, Poll},
     time::Duration,
 };
@@ -19,7 +19,7 @@ use strum::FromRepr;
 use arch::time::get_time_duration;
 use config::{
     device::BLOCK_SIZE,
-    inode::InodeMode,
+    inode::{InodeMode, InodeType},
     vfs::{AccessFlags, AtFd, AtFlags, MountFlags, OpenFlags, PollEvents, RenameFlags, SeekFrom},
 };
 use driver::BLOCK_DEVICE;
@@ -72,7 +72,7 @@ use timer::{TimedTaskResult, TimeoutFuture};
 use vfs::{
     dentry::Dentry,
     file::File,
-    handle::{FileHandle, FileHandleData, FileHandleHeader, HANDLE_LEN},
+    handle::{FileHandleData, FileHandleHeader, HANDLE_LEN},
     inode::Inode,
     kstat::Kstat,
     path::{Path, split_parent_and_name},
@@ -153,7 +153,7 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
         }
         let t = get_time_duration().as_micros() as u32;
         let subdentry = dentry.new_neg_child(format!("tmp{}", t).as_str());
-        dentry.create(subdentry.as_ref(), InodeMode::REG)?;
+        dentry.create(&subdentry, InodeMode::REG)?;
         let inode = subdentry.inode().ok_or(SysError::ENOENT)?;
         let file = <dyn File>::open(subdentry)?;
         file.set_flags(OpenFlags::O_RDWR);
@@ -192,7 +192,7 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
             }
 
             log::debug!("[sys_openat] create a new file");
-            parent.create(dentry.as_ref(), InodeMode::REG)?
+            parent.create(&dentry, InodeMode::REG)?
         } else {
             return Err(SysError::ENOENT);
         }
@@ -567,7 +567,7 @@ pub async fn sys_mkdirat(dirfd: usize, pathname: usize, mode: u32) -> SyscallRes
 
     log::info!("[sys_mkdirat] mode: {mode:?}");
 
-    parent.mkdir(dentry.as_ref(), mode)?;
+    parent.mkdir(&dentry, mode)?;
     let inode = dentry.inode().unwrap();
 
     let _cred = task.perm_mut();
@@ -677,12 +677,12 @@ pub async fn sys_unlinkat(dirfd: usize, pathname: usize, flags: i32) -> SyscallR
         if !is_dir {
             return Err(SysError::ENOTDIR);
         }
-        parent.rmdir(dentry.as_ref())?;
+        parent.rmdir(&dentry)?;
     } else {
         if is_dir {
             return Err(SysError::EISDIR);
         }
-        parent.unlink(dentry.as_ref())?;
+        parent.unlink(&dentry)?;
     }
     Ok(0)
 }
@@ -1629,17 +1629,19 @@ pub fn sys_renameat2(
 
     let flags = RenameFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
 
-    let coldpath = oldpath.read_c_string(256)?;
-    let cnewpath = newpath.read_c_string(256)?;
-
-    let oldpath = coldpath.into_string().expect("convert to string failed");
-    let newpath = cnewpath.into_string().expect("convert to string failed");
+    let oldpath = oldpath
+        .read_c_string(256)?
+        .into_string()
+        .or(Err(SysError::ENOENT))?;
+    let newpath = newpath
+        .read_c_string(256)?
+        .into_string()
+        .or(Err(SysError::ENOENT))?;
 
     log::info!(
         "[sys_renameat2] olddirfd:{olddirfd:?}, oldpath:{oldpath}, newdirfd:{newdirfd:?}, newpath:{newpath}, flags:{flags:?}"
     );
 
-    //OpenFlag::NO_FOLLOW
     let old_dentry = task.walk_at(olddirfd, oldpath)?;
     let old_parent = old_dentry.parent().ok_or(SysError::EBUSY)?;
     if old_dentry.is_negative() {
@@ -1690,7 +1692,7 @@ pub fn sys_linkat(
     let old_dentry = task.walk_at(olddirfd, oldpath)?;
     let new_dentry = task.walk_at(newdirfd, newpath)?;
 
-    new_dentry.link(old_dentry.as_ref(), new_dentry.as_ref())?;
+    new_dentry.link(&old_dentry, &new_dentry)?;
     Ok(0)
 }
 
@@ -1726,7 +1728,7 @@ pub fn sys_symlinkat(target: usize, newdirfd: usize, linkpath: usize) -> Syscall
     if !dentry.is_negative() {
         return Err(SysError::EEXIST);
     }
-    dentry.parent().unwrap().symlink(dentry.as_ref(), &target)?;
+    dentry.parent().unwrap().symlink(&dentry, &target)?;
     Ok(0)
 }
 
@@ -1756,7 +1758,26 @@ pub fn sys_umask(_mask: i32) -> SyscallResult {
     Ok(0x777)
 }
 
-/// The `ftruncate()` functions cause the regular file named by path or
+pub async fn sys_truncate64(path: usize, length: usize) -> SyscallResult {
+    log::debug!("[sys_truncate64] path: {path:#x}, length: {length}");
+
+    let task = current_task();
+    let addrspace = task.addr_space();
+
+    let path = UserReadPtr::<u8>::new(path, &addrspace)
+        .read_c_string(256)?
+        .into_string()
+        .or(Err(SysError::ENOENT))?;
+
+    log::info!("[sys_truncate64] path: {path}");
+
+    let dentry = task.walk_at(AtFd::FdCwd, path)?;
+    let file = <dyn File>::open(dentry)?;
+    file.truncate(length).await?;
+    Ok(0)
+}
+
+/// The `ftruncate64()` functions cause the regular file named by path or
 /// referenced by fd to be truncated to a size of precisely length bytes.
 ///
 /// If the file previously was larger than this size, the extra data is lost. If the file
@@ -1767,10 +1788,10 @@ pub fn sys_umask(_mask: i32) -> SyscallResult {
 /// status change and time of last modification; see inode(7)) for the file are updated, and
 /// the set-user-ID and set-group-ID mode bits may be cleared.
 ///
-/// With ftruncate(), the file must be open for writing; with truncate(), the file
+/// With ftruncate64(), the file must be open for writing; with truncate64(), the file
 /// must be writable.
-pub async fn sys_ftruncate(fd: usize, length: usize) -> SyscallResult {
-    log::debug!("[sys_ftruncate] fd: {fd}, length: {length}");
+pub async fn sys_ftruncate64(fd: usize, length: usize) -> SyscallResult {
+    log::debug!("[sys_ftruncate64] fd: {fd}, length: {length}");
     let task = current_task();
     let file = task.with_mut_fdtable(|t| t.get_file(fd))?;
     file.truncate(length).await?;
@@ -1970,7 +1991,7 @@ pub async fn sys_pread64(fd: usize, buf: usize, count: usize, offset: usize) -> 
     let bytes = file.read(buf_ptr).await?;
     file.seek(SeekFrom::Start(old_pos as u64))?;
 
-    return Ok(bytes);
+    Ok(bytes)
 }
 
 /// `pwrite()` writes up to `count` bytes from the buffer starting at `buf` to the file descriptor
@@ -3254,22 +3275,23 @@ pub fn sys_mknodat(dirfd: usize, pathname: usize, mode: u32, dev: u32) -> Syscal
     );
 
     // 2. Parse mode into file type and file permissions
-    let mode = InodeMode::from_bits_truncate(mode);
+    let mode = InodeMode::from_bits(mode).ok_or(SysError::EINVAL)?;
+    let file_type = mode.to_type();
 
     // 3. Walk parent path and acquire parent dentry
     let (parent_dir, name) = split_parent_and_name(&path);
     let mut parent_dentry = task.walk_at(AtFd::from(dirfd), parent_dir)?;
 
-    let name = if name.is_none() {
+    let name = if let Some(name) = name {
+        name
+    } else {
         let pname = parent_dentry.name().to_string();
         parent_dentry = task.walk_at(AtFd::FdCwd, ".".to_string())?;
         pname
-    } else {
-        name.unwrap()
     };
 
     // 4. Check if file already exists
-    if parent_dentry.lookup(&name).is_ok() {
+    if !parent_dentry.lookup(&name)?.is_negative() {
         return Err(SysError::EEXIST);
     }
 
@@ -3286,24 +3308,24 @@ pub fn sys_mknodat(dirfd: usize, pathname: usize, mode: u32, dev: u32) -> Syscal
     }
 
     // 6. Special privilege check for creating device nodes
-    if (mode == InodeMode::CHAR || mode == InodeMode::BLOCK) && uid != 0 {
+    if (file_type.is_char_device() || file_type.is_block_device()) && uid != 0 {
         return Err(SysError::EPERM);
     }
 
     let dentry = task.walk_at(AtFd::FdCwd, path)?;
     // 7. Create inode according to nodetype
-    match mode {
-        InodeMode::REG => {
-            parent_dentry.create(dentry.as_ref(), InodeMode::REG)?;
+    match file_type {
+        InodeType::File => {
+            parent_dentry.create(&dentry, mode)?;
         }
-        InodeMode::FIFO => {
-            parent_dentry.create(dentry.as_ref(), InodeMode::FIFO)?;
+        InodeType::Fifo => {
+            parent_dentry.create(&dentry, mode)?;
         }
-        InodeMode::CHAR => {
-            parent_dentry.create(dentry.as_ref(), InodeMode::CHAR)?;
+        InodeType::CharDevice => {
+            parent_dentry.create(&dentry, mode)?;
         }
-        InodeMode::BLOCK => {
-            parent_dentry.create(dentry.as_ref(), InodeMode::BLOCK)?;
+        InodeType::BlockDevice => {
+            parent_dentry.create(&dentry, mode)?;
         }
         _ => return Err(SysError::EINVAL),
     }
@@ -3332,7 +3354,7 @@ pub fn sys_memfd_create(name_ptr: usize, flags: u32) -> SyscallResult {
     #[allow(static_mut_refs)]
     {
         let mut cnt = unsafe { NAME_INC.load(core::sync::atomic::Ordering::Relaxed) };
-        cnt = cnt + 1;
+        cnt += 1;
         name.push(cnt as char);
     }
 

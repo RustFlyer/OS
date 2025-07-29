@@ -138,10 +138,9 @@ impl Dentry for ExtDentry {
     }
 
     fn base_unlink(&self, dentry: &dyn Dentry) -> SysResult<()> {
-        self.meta.children.lock().remove(dentry.name());
         let path = CString::new(dentry.path()).unwrap();
         ExtFile::unlink(&path)?;
-        dentry.unset_inode();
+        self.remove_child(dentry);
         Ok(())
     }
 
@@ -166,14 +165,14 @@ impl Dentry for ExtDentry {
             return Err(SysError::ENOTEMPTY);
         }
         ExtDir::remove_recur(&path)?;
-        dentry.unset_inode();
+        self.remove_child(dentry);
         Ok(())
     }
 
     fn base_rmdir_recur(&self, dentry: &dyn Dentry) -> SysResult<()> {
         let path = CString::new(dentry.path()).unwrap();
         ExtDir::remove_recur(&path)?;
-        dentry.unset_inode();
+        self.remove_child(dentry);
         Ok(())
     }
 
@@ -201,8 +200,8 @@ impl Dentry for ExtDentry {
             ExtFile::rename(&old_path, &new_path)?;
         }
         new_dentry.set_inode(dentry.inode().unwrap());
-        dentry.unset_inode();
         dentry.get_meta().children.lock().clear();
+        self.remove_child(dentry);
         Ok(())
     }
 }

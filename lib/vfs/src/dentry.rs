@@ -1,12 +1,13 @@
-use core::ptr;
-
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::sync::{Arc, Weak};
+
 use config::inode::InodeMode;
 use mutex::SpinNoIrqLock;
 use systype::error::{SysError, SysResult};
 
+use crate::fanotify::types::FanEventMask;
+use crate::fanotify::{FanotifyEntrySet, FanotifyGroupKey};
 use crate::file::File;
 use crate::handle::FileHandle;
 use crate::inode::Inode;
@@ -163,10 +164,6 @@ pub trait Dentry: Send + Sync {
         *self.get_meta().inode.lock() = Some(inode);
     }
 
-    fn unset_inode(&self) {
-        *self.get_meta().inode.lock() = None;
-    }
-
     /// Returns whether this dentry is a negative dentry.
     fn is_negative(&self) -> bool {
         self.get_meta().inode.lock().is_none()
@@ -213,10 +210,7 @@ pub trait Dentry: Send + Sync {
 
     /// Removes a child dentry to this dentry.
     fn remove_child(&self, child: &dyn Dentry) -> Option<Arc<dyn Dentry + 'static>> {
-        self.get_meta()
-            .children
-            .lock()
-            .remove(&child.name().to_string())
+        self.get_meta().children.lock().remove(child.name())
     }
 
     /// Returns the path of this dentry as a string.
@@ -244,12 +238,16 @@ impl dyn Dentry {
     /// `self` must be a valid directory. `dentry` must be a negative dentry and a child of `self`.
     /// After this call, `dentry` will become valid. The file type of `mode` must be a regular
     /// file.
-    pub fn create(&self, dentry: &dyn Dentry, mode: InodeMode) -> SysResult<()> {
+    pub fn create(self: &Arc<Self>, dentry: &Arc<dyn Dentry>, mode: InodeMode) -> SysResult<()> {
         debug_assert!(!self.is_negative());
         debug_assert!(self.inode().unwrap().inotype().is_dir());
         debug_assert!(dentry.is_negative());
         debug_assert!(mode.to_type().is_reg());
-        self.base_create(dentry, mode)
+
+        let file_name = dentry.name();
+        self.fanotify_publish(Some(dentry), FanEventMask::CREATE, file_name, file_name);
+
+        self.base_create(dentry.as_ref(), mode)
     }
 
     /// Creates a directory in directory `self` with the name given in `dentry` and the mode
@@ -257,12 +255,21 @@ impl dyn Dentry {
     ///
     /// `self` must be a valid directory. `dentry` must be a negative dentry and a child of `self`.
     /// After this call, `dentry` will become valid. The file type of `mode` must be a directory.
-    pub fn mkdir(&self, dentry: &dyn Dentry, mode: InodeMode) -> SysResult<()> {
+    pub fn mkdir(self: &Arc<Self>, dentry: &Arc<dyn Dentry>, mode: InodeMode) -> SysResult<()> {
         debug_assert!(!self.is_negative());
         debug_assert!(self.inode().unwrap().inotype().is_dir());
         debug_assert!(dentry.is_negative());
         debug_assert!(mode.to_type().is_dir());
-        self.base_create(dentry, mode)
+
+        let file_name = dentry.name();
+        self.fanotify_publish(
+            Some(dentry),
+            FanEventMask::CREATE | FanEventMask::ONDIR,
+            file_name,
+            file_name,
+        );
+
+        self.base_create(dentry.as_ref(), mode)
     }
 
     /// Creates a symbolic link in directory `self` with the name given in `dentry` which contains
@@ -270,15 +277,15 @@ impl dyn Dentry {
     ///
     /// `self` must be a valid directory. `dentry` must be a negative dentry and a child of
     /// `self`. After this call, `dentry` will become valid.
-    pub fn symlink(&self, dentry: &dyn Dentry, target: &str) -> SysResult<()> {
+    pub fn symlink(self: &Arc<Self>, dentry: &Arc<dyn Dentry>, target: &str) -> SysResult<()> {
         debug_assert!(!self.is_negative());
         debug_assert!(self.inode().unwrap().inotype().is_dir());
         debug_assert!(dentry.is_negative());
-        self.base_symlink(dentry, target)
-    }
 
-    pub fn mknod(&self, _dentry: &dyn Dentry, _mode: InodeMode, _device: usize) -> SysResult<()> {
-        unimplemented!("`mknod` seems not required in test cases")
+        let file_name = dentry.name();
+        self.fanotify_publish(Some(dentry), FanEventMask::CREATE, file_name, file_name);
+
+        self.base_symlink(dentry.as_ref(), target)
     }
 
     /// Returns a reference to directory `self`'s child dentry which has the given name.
@@ -309,7 +316,11 @@ impl dyn Dentry {
     /// be a negative dentry and a child of `self`. After this call, `new_dentry` will become
     /// valid. `old_dentry` and `new_dentry` must be in the same filesystem. The file type of
     /// `old_dentry` must not be a directory.
-    pub fn link(&self, old_dentry: &dyn Dentry, new_dentry: &dyn Dentry) -> SysResult<()> {
+    pub fn link(
+        self: &Arc<Self>,
+        old_dentry: &Arc<dyn Dentry>,
+        new_dentry: &Arc<dyn Dentry>,
+    ) -> SysResult<()> {
         debug_assert!(!self.is_negative());
         debug_assert!(self.inode().unwrap().inotype().is_dir());
         debug_assert!(!old_dentry.is_negative());
@@ -318,19 +329,28 @@ impl dyn Dentry {
             &old_dentry.inode().unwrap().get_meta().superblock,
             &new_dentry.inode().unwrap().get_meta().superblock
         ));
-        self.base_link(new_dentry, old_dentry)
+
+        let file_name = new_dentry.name();
+        self.fanotify_publish(Some(new_dentry), FanEventMask::CREATE, file_name, file_name);
+
+        self.base_link(new_dentry.as_ref(), old_dentry.as_ref())
     }
 
     /// Removes the child dentry from directory `self`.
     ///
     /// `self` must be a valid directory. `dentry` must be a valid dentry and a child of
     /// `self`. After this call, `dentry` will become invalid. `dentry` must not be a directory.
-    pub fn unlink(&self, dentry: &dyn Dentry) -> SysResult<()> {
+    pub fn unlink(self: &Arc<Self>, dentry: &Arc<dyn Dentry>) -> SysResult<()> {
         debug_assert!(!self.is_negative());
         debug_assert!(self.inode().unwrap().inotype().is_dir());
         debug_assert!(!dentry.is_negative());
         debug_assert!(!dentry.inode().unwrap().inotype().is_dir());
-        self.base_unlink(dentry)
+
+        let file_name = dentry.name();
+        self.fanotify_publish(Some(dentry), FanEventMask::DELETE, file_name, file_name);
+        dentry.fanotify_publish(None, FanEventMask::DELETE_SELF, file_name, file_name);
+
+        self.base_unlink(dentry.as_ref())
     }
 
     /// Removes the child directory `dentry` from directory `self` if it is empty.
@@ -339,12 +359,27 @@ impl dyn Dentry {
     /// `self`. After this call, `dentry` will become invalid. `dentry` must be a directory.
     ///
     /// Returns `ENOTEMPTY` if `dentry` is not empty. Other errors may be returned.
-    pub fn rmdir(&self, dentry: &dyn Dentry) -> SysResult<()> {
+    pub fn rmdir(self: &Arc<Self>, dentry: &Arc<dyn Dentry>) -> SysResult<()> {
         debug_assert!(!self.is_negative());
         debug_assert!(self.inode().unwrap().inotype().is_dir());
         debug_assert!(!dentry.is_negative());
         debug_assert!(dentry.inode().unwrap().inotype().is_dir());
-        self.base_rmdir(dentry)
+
+        let file_name = dentry.name();
+        self.fanotify_publish(
+            Some(dentry),
+            FanEventMask::DELETE | FanEventMask::ONDIR,
+            file_name,
+            file_name,
+        );
+        dentry.fanotify_publish(
+            None,
+            FanEventMask::DELETE_SELF | FanEventMask::ONDIR,
+            file_name,
+            file_name,
+        );
+
+        self.base_rmdir(dentry.as_ref())
     }
 
     /// Removes the child directory `dentry` recursively from directory `self`.
@@ -374,7 +409,8 @@ impl dyn Dentry {
     /// `dentry` points to. An implementation of this function should first create a
     /// hard link to `dentry` in `new_dentry`, and then remove the old dentry.
     ///
-    /// If `new_dentry` and `dentry` points to the same file, this function does nothing.
+    /// If the path of `dentry` is a prefix of the path of `new_dentry`, this function
+    /// returns `EINVAL`.
     ///
     /// If `dentry` and `new_dentry` refer to the same inode, this function does nothing.
     ///
@@ -383,10 +419,10 @@ impl dyn Dentry {
     ///
     /// This function does not follow symbolic links.
     pub fn rename(
-        &self,
-        dentry: &dyn Dentry,
-        new_dir: &dyn Dentry,
-        new_dentry: &dyn Dentry,
+        self: &Arc<Self>,
+        dentry: &Arc<dyn Dentry>,
+        new_dir: &Arc<dyn Dentry>,
+        new_dentry: &Arc<dyn Dentry>,
     ) -> SysResult<()> {
         debug_assert!(!self.is_negative());
         debug_assert!(self.inode().unwrap().inotype().is_dir());
@@ -467,5 +503,87 @@ impl dyn Dentry {
         *lock = None;
 
         dentry
+    }
+
+    /// Publishes an fanotify event on this dentry to all associated fanotify groups.
+    ///
+    /// This function also tries to clear the ignore mask of associated fanotify entries
+    /// if the event contains `FanEventMask::MODIFY`.
+    ///
+    /// The parameters are the same as those of [`FanotifyGroup::publish`].
+    ///
+    /// # TODO
+    ///
+    /// Currently, the VFS does not support bind-mounting, and this method simply
+    /// publishes the event to the filesystem. After we implement bind-mounting in the
+    /// future, this method should be updated to publish the event both the mount point
+    /// and the filesystem.
+    pub(crate) fn fanotify_publish(
+        self: &Arc<Self>,
+        subobject: Option<&Arc<Self>>,
+        event: FanEventMask,
+        old_name: &str,
+        new_name: &str,
+    ) {
+        assert!(!self.is_negative());
+
+        // A map from fanotify group to fanotify entry set.
+        #[allow(clippy::mutable_key_type)]
+        let mut entries_by_group: BTreeMap<FanotifyGroupKey, FanotifyEntrySet> = BTreeMap::new();
+
+        macro_rules! collect_fanotify_entries {
+            ($entries:expr, $field:ident) => {
+                $entries.retain(|e| {
+                    let entry = match e.upgrade() {
+                        Some(entry) => entry,
+                        None => return false,
+                    };
+                    if event.contains(FanEventMask::MODIFY) {
+                        entry.clear_ignore();
+                    }
+
+                    let group = entry.group();
+                    let entry_set = entries_by_group.entry(FanotifyGroupKey(group)).or_default();
+                    entry_set.$field = Some(entry);
+
+                    true
+                });
+            };
+        }
+
+        collect_fanotify_entries!(
+            self.inode()
+                .unwrap()
+                .get_meta()
+                .inner
+                .lock()
+                .fanotify_entries,
+            object
+        );
+
+        if let Some(parent) = self.parent() {
+            collect_fanotify_entries!(
+                parent
+                    .inode()
+                    .unwrap()
+                    .get_meta()
+                    .inner
+                    .lock()
+                    .fanotify_entries,
+                parent
+            );
+        }
+
+        collect_fanotify_entries!(
+            self.superblock().unwrap().meta().fanotify_entries.lock(),
+            mount
+        );
+
+        // Publish the event to all fanotify groups.
+        for (group, entry_set) in entries_by_group {
+            group
+                .0
+                .publish(self, subobject, entry_set, event, old_name, new_name);
+        }
     }
 }

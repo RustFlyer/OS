@@ -4,15 +4,12 @@
 use alloc::{
     alloc::{Layout, alloc, dealloc},
     slice,
-    sync::Arc,
 };
-use core::{mem, ptr};
+use core::ptr;
 
 use bitflags::bitflags;
 
 use config::vfs::OpenFlags;
-
-use crate::dentry::Dentry;
 
 use super::constants::*;
 
@@ -176,46 +173,6 @@ pub enum FanotifyEventInfoType {
     Error = FAN_EVENT_INFO_TYPE_ERROR,
 }
 
-/// Enum representing an fanotify metadata structure or an information record structure.
-#[derive(Clone)]
-pub enum FanotifyEventData {
-    /// Fanotify event metadata. The first element is an incomplete metadata. The second
-    /// element is a reference of the [`Dentry`] of the filesystem object which triggered
-    /// the event, which is to be opened and added to the user process's file descriptor
-    /// table.
-    Metadata((FanotifyEventMetadata, Arc<dyn Dentry>)),
-    Info(FanotifyEventInfoFid),
-    Pid(FanotifyEventInfoPid),
-    Error(FanotifyEventInfoError),
-}
-
-impl FanotifyEventData {
-    /// Returns a byte slice representation of the data.
-    pub fn as_slice(&self) -> &[u8] {
-        match self {
-            FanotifyEventData::Metadata(metadata) => unsafe {
-                slice::from_raw_parts(
-                    &raw const metadata.0 as *const u8,
-                    mem::size_of::<FanotifyEventMetadata>(),
-                )
-            },
-            FanotifyEventData::Info(info) => info.as_bytes(),
-            FanotifyEventData::Pid(pid) => unsafe {
-                slice::from_raw_parts(
-                    pid as *const FanotifyEventInfoPid as *const u8,
-                    mem::size_of::<FanotifyEventInfoPid>(),
-                )
-            },
-            FanotifyEventData::Error(error) => unsafe {
-                slice::from_raw_parts(
-                    error as *const FanotifyEventInfoError as *const u8,
-                    mem::size_of::<FanotifyEventInfoError>(),
-                )
-            },
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub struct FanotifyResponse {
@@ -231,7 +188,9 @@ pub enum FanotifyResponseOption {
 }
 
 bitflags! {
-    /// Mask for fanotify events.
+    /// Mask for fanotify events. It contains several event bits and three flags bits;
+    /// each event bit corresponds to a specific fanotify event, and each flag bit
+    /// specifies a special behavior of monitoring.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     #[repr(transparent)]
     pub struct FanEventMask: u64 {
@@ -257,8 +216,8 @@ bitflags! {
         /// A file or a directory was opened with the intent to be executed.
         const OPEN_EXEC = FAN_OPEN_EXEC;
 
-        // The following flags requires the fanotify group to identify filesystem objects
-        // by file handles.
+        // The following notification events require the fanotify group to identify
+        // filesystem objects by file handles.
 
         /// A file or a directory metadata was changed.
         const ATTRIB = FAN_ATTRIB;
@@ -287,8 +246,9 @@ bitflags! {
         /// A watched file or directory was modified.
         const MOVE_SELF = FAN_MOVE_SELF;
 
-        // The following constants is a bit corresponding to a fanotify permission event.
-        // They require the fanotify group to be initialized with `FAN_CLASS_CONTENT` or
+        // Each of the following constants is a bit corresponding to a fanotify permission
+        // event. They require the fanotify group both to identify filesystem objects by
+        // file handles, and to be initialized with `FAN_CLASS_CONTENT` or
         // `FAN_CLASS_PRE_CONTENT`.
 
         /// An application wants to read a file or directory, for example using `read`
@@ -314,6 +274,8 @@ bitflags! {
         /// This bit mask is used to check for any move event.
         const MOVE = FAN_MOVE;
 
+        // The following three constants are flags that modify the behavior of monitoring.
+
         /// The events described in the mask have occurred on a directory object.
         /// Reporting events on directories requires setting this flag in the mark mask.
         /// It is reported in an event mask only if the fanotify group identifies
@@ -323,11 +285,38 @@ bitflags! {
         /// Events for the immediate children of marked directories shall be created.
         const EVENT_ON_CHILD = FAN_EVENT_ON_CHILD;
 
-        /// This flag is not an event, but a special flag that indicates that the
-        /// event queue has exceeded the limit on the number of events. This limit can be
-        /// overridden by specifying the `FAN_UNLIMITED_QUEUE` flag when calling
-        /// `fanotify_init`.
+        /// This flag indicates that the event queue has exceeded the limit on the number
+        /// of events. This limit can be overridden by specifying the
+        /// `FAN_UNLIMITED_QUEUE` flag when calling `fanotify_init`.
         const Q_OVERFLOW = FAN_Q_OVERFLOW;
+
+        /// This bit mask is used to check whether an event is a file event. If an event
+        /// is not a file event, it is a directory event. Note that flags `ONDIR`,
+        /// `EVENT_ON_CHILD`, and `Q_OVERFLOW` are not included in this mask, so the
+        /// user should be careful when using this mask to check for file events.
+        const FILE_EVENT_MASK = Self::ACCESS.bits()
+            | Self::MODIFY.bits()
+            | Self::CLOSE_WRITE.bits()
+            | Self::CLOSE_NOWRITE.bits()
+            | Self::OPEN.bits()
+            | Self::OPEN_EXEC.bits()
+            | Self::ATTRIB.bits()
+            | Self::DELETE_SELF.bits()
+            | Self::FS_ERROR.bits()
+            | Self::MOVE_SELF.bits()
+            | Self::ACCESS_PERM.bits()
+            | Self::OPEN_PERM.bits()
+            | Self::OPEN_EXEC_PERM.bits();
+
+        /// This bit mask is used to check whether an event is a directory event. If an
+        /// event is not a directory event, it is a file event. Note that flags `ONDIR`,
+        /// `EVENT_ON_CHILD`, and `Q_OVERFLOW` are not included in this mask, so the
+        /// user should be careful when using this mask to check for directory events.
+        const DIR_EVENT_MASK = Self::CREATE.bits()
+            | Self::DELETE.bits()
+            | Self::MOVED_FROM.bits()
+            | Self::MOVED_TO.bits()
+            | Self::RENAME.bits();
     }
 }
 

@@ -18,7 +18,7 @@ pub fn sys_fanotify_init(flags: u32, event_f_flags: u32) -> SyscallResult {
     let flags = FanInitFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
     let event_f_flags = FanEventFileFlags::from_bits(event_f_flags).ok_or(SysError::EINVAL)?;
 
-    log::info!("sys_fanotify_init: flags={flags:?}, event_f_flags={event_f_flags:?}");
+    log::info!("[sys_fanotify_init] flags={flags:?}, event_f_flags={event_f_flags:?}");
 
     if flags.contains(FanInitFlags::CLASS_PRE_CONTENT | FanInitFlags::CLASS_CONTENT) {
         return Err(SysError::EINVAL);
@@ -48,7 +48,6 @@ pub fn sys_fanotify_init(flags: u32, event_f_flags: u32) -> SyscallResult {
             | FanInitFlags::UNLIMITED_QUEUE
             | FanInitFlags::UNLIMITED_MARKS
             | FanInitFlags::ENABLE_AUDIT
-            | FanInitFlags::REPORT_TARGET_FID
             | FanInitFlags::REPORT_PIDFD,
     ) {
         unimplemented!("Unsupported fanotify flags: {flags:?}");
@@ -59,6 +58,8 @@ pub fn sys_fanotify_init(flags: u32, event_f_flags: u32) -> SyscallResult {
     let group_file = create_group_file(&group)?;
     let group_open_flags = OpenFlags::from(flags);
     let fd = task.with_mut_fdtable(|fdtable| fdtable.alloc(group_file, group_open_flags))?;
+
+    log::info!("[sys_fanotify_init] Created fanotify group with fd: {fd}");
 
     Ok(fd)
 }
@@ -84,22 +85,13 @@ pub fn sys_fanotify_mark(
     let flags = FanMarkFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
     let mask = FanEventMask::from_bits(mask).ok_or(SysError::EINVAL)?;
 
-    log::info!(
-        "sys_fanotify_mark: flags={flags:?}, mask={mask:?}, dirfd={dirfd}, pathname={pathname:#x}"
-    );
+    log::info!("[sys_fanotify_mark] flags={flags:?}, mask={mask:?}, dirfd={dirfd}, pathname={pathname:#x}");
 
     if flags
         .intersection(FanMarkFlags::ADD | FanMarkFlags::REMOVE | FanMarkFlags::FLUSH)
         .bits()
         .count_ones()
         != 1
-    {
-        return Err(SysError::EINVAL);
-    }
-    if flags.contains(FanMarkFlags::FLUSH)
-        && flags != FanMarkFlags::FLUSH
-        && flags != FanMarkFlags::FLUSH | FanMarkFlags::MOUNT
-        && flags != FanMarkFlags::FLUSH | FanMarkFlags::FILESYSTEM
     {
         return Err(SysError::EINVAL);
     }
@@ -124,25 +116,29 @@ pub fn sys_fanotify_mark(
     {
         return Err(SysError::EINVAL);
     }
+    if flags.contains(FanMarkFlags::FLUSH) {
+        if flags == FanMarkFlags::FLUSH {
+            group.flush_normal_entries();
+        } else if flags == FanMarkFlags::FLUSH | FanMarkFlags::MOUNT {
+            group.flush_mount_entries();
+        } else if flags == FanMarkFlags::FLUSH | FanMarkFlags::FILESYSTEM {
+            group.flush_filesystem_entries();
+        } else {
+            return Err(SysError::EINVAL);
+        };
+        return Ok(0);
+    }
 
-    if flags.intersects(FanMarkFlags::FLUSH | FanMarkFlags::IGNORE | FanMarkFlags::EVICTABLE) {
+    if flags.intersects(FanMarkFlags::EVICTABLE) {
         unimplemented!("Unsupported fanotify flags: {flags:?}");
     }
     if mask.intersects(
         FanEventMask::OPEN_EXEC
             | FanEventMask::ATTRIB
-            | FanEventMask::DELETE
-            | FanEventMask::DELETE_SELF
             | FanEventMask::FS_ERROR
-            | FanEventMask::RENAME
-            | FanEventMask::MOVED_FROM
-            | FanEventMask::MOVED_TO
-            | FanEventMask::MOVE_SELF
-            | FanEventMask::Q_OVERFLOW
             | FanEventMask::ACCESS_PERM
             | FanEventMask::OPEN_PERM
-            | FanEventMask::OPEN_EXEC_PERM
-            | FanEventMask::EVENT_ON_CHILD,
+            | FanEventMask::OPEN_EXEC_PERM,
     ) {
         unimplemented!("Unsupported fanotify mask: {mask:?}");
     }

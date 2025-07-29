@@ -1,30 +1,40 @@
 use alloc::{
     collections::{btree_map::BTreeMap, vec_deque::VecDeque},
+    slice,
     string::{String, ToString},
     sync::{Arc, Weak},
+    vec::Vec,
 };
-use core::mem;
+use core::{cmp, mem, ptr, sync::atomic, task::Waker};
 
 use crate_interface::call_interface;
 
 use mutex::SpinNoIrqLock;
+use osfuture::{suspend_now, take_waker};
 
 use crate::{
-    dentry::Dentry, fanotify::types::FanMarkFlags, file::File, inode::Inode, superblock::SuperBlock,
+    dentry::Dentry,
+    fanotify::{
+        config::MAX_QUEUED_EVENTS,
+        types::{FanMarkFlags, FanotifyEventInfoError, FanotifyEventInfoPid},
+    },
+    file::File,
+    inode::Inode,
+    superblock::SuperBlock,
 };
 
 use self::{
     constants::FANOTIFY_METADATA_VERSION,
     types::{
-        FanEventFileFlags, FanEventMask, FanInitFlags, FanotifyEventData, FanotifyEventInfoFid,
+        FanEventFileFlags, FanEventMask, FanInitFlags, FanotifyEventInfoFid,
         FanotifyEventInfoFidInner, FanotifyEventInfoHeader, FanotifyEventInfoType,
         FanotifyEventMetadata,
     },
 };
 
-pub mod fs;
-
+pub mod config;
 pub mod constants;
+pub mod fs;
 pub mod kinterface;
 pub mod types;
 
@@ -55,6 +65,12 @@ pub struct FanotifyGroup {
     /// The file status flags that will be set on the file that are created for fanotify
     /// events.
     event_file_flags: FanEventFileFlags,
+
+    /// Data of pending events on this group.
+    event_queue: SpinNoIrqLock<VecDeque<FanotifyEventData>>,
+
+    /// Maximum number of events that can be queued in the event queue.
+    max_queued_events: u32,
 }
 
 impl FanotifyGroup {
@@ -64,6 +80,12 @@ impl FanotifyGroup {
             entries: SpinNoIrqLock::new(BTreeMap::new()),
             flags,
             event_file_flags,
+            event_queue: SpinNoIrqLock::new(VecDeque::new()),
+            max_queued_events: if flags.contains(FanInitFlags::UNLIMITED_QUEUE) {
+                u32::MAX
+            } else {
+                MAX_QUEUED_EVENTS.load(atomic::Ordering::Relaxed)
+            },
         }
     }
 
@@ -92,7 +114,6 @@ impl FanotifyGroup {
             flags: SpinNoIrqLock::new(flags),
             mark: SpinNoIrqLock::new(mark),
             ignore: SpinNoIrqLock::new(ignore),
-            event_queue: SpinNoIrqLock::new(VecDeque::new()),
             permission_queue: SpinNoIrqLock::new(VecDeque::new()),
         });
 
@@ -137,10 +158,354 @@ impl FanotifyGroup {
         self.entries.lock().get(&object_id).cloned()
     }
 
-    /// Unsubscribes from events on a filesystem object. After this call, the group
-    /// will no longer receive events for the object.
-    pub fn remove_entry(&self, object_id: FsObjectId) -> Option<Arc<FanotifyEntry>> {
-        self.entries.lock().remove(&object_id)
+    /// Removes all entries in the group that are a file or a directory.
+    pub fn flush_normal_entries(&self) {
+        let mut entries = self.entries.lock();
+        entries.retain(|_, entry| !matches!(entry.object, FsObject::Inode(_)));
+    }
+
+    /// Removes all entries in the group that are a mount.
+    pub fn flush_mount_entries(&self) {
+        let mut entries = self.entries.lock();
+        entries.retain(|_, entry| !matches!(entry.object, FsObject::Mount(_)));
+    }
+
+    /// Removes all entries in the group that are a filesystem.
+    pub fn flush_filesystem_entries(&self) {
+        let mut entries = self.entries.lock();
+        entries.retain(|_, entry| !matches!(entry.object, FsObject::Mount(_)));
+    }
+
+    /// Publishes an event to the fanotify group's event queue.
+    ///
+    /// This method is called when the current task performs a filesystem action on a
+    /// filesystem object that the fanotify group is monitoring.
+    ///
+    /// This method creates event data for the action and adds it to the group's event
+    /// queue. The event data starts with an fanotify event metadata, followed by zero or
+    /// more information records.
+    ///
+    /// # Parameters
+    ///
+    /// `object` is a reference to the filesystem object's dentry on which the event
+    /// occurred. By “occur on” or “event on” a filesystem object, we mean:
+    /// - For file events occurred on a file (FAN_OPEN, FAN_ACCESS, FAN_CLOSE_NOWRITE,
+    ///   FAN_CLOSE_WRITE, etc.), this is the dentry of the accessed file.
+    /// - For file events occurred on a directory (FAN_OPEN, FAN_ACCESS,
+    ///   FAN_CLOSE_NOWRITE, etc.), this is the dentry of the accessed directory.
+    /// - For directory events occurred on a directory (FAN_CREATE, FAN_DELETE, etc.),
+    ///   this is the dentry of the directory whose dentries were modified.
+    ///
+    /// Note that some file events cannot occur on a directory, such as FAN_CLOSE_WRITE.
+    /// All directory events cannot occur on a file.
+    ///
+    /// `entries` contains fanotify entries in this group that are associated with the
+    /// filesystem object. Specifically, it contains the entries marked on the object
+    /// itself, on its parent directory, on the mount the object belongs to, and on the
+    /// filesystem the object belongs to. If any of these entries does not exist, the
+    /// corresponding entry in the structure is `None`. If all of them do not exist, this
+    /// method needs not be called.
+    ///
+    /// `event` must contain one bit set, which specifies the event kind that occurred.
+    /// Additionally, it should contain FAN_ONDIR for file events which occurred on a
+    /// directory, and for directory events where the directory's modified dentry is a
+    /// directory.
+    ///
+    /// `old_name` and `new_name` should be set as follows:
+    /// - For file events occurred on a file, both of them are the name of the accessed
+    ///   file.
+    /// - For file events occurred on a directory, both of them are `.`.
+    /// - For directory events occurred on a directory, both of them are the name of the
+    ///   directory's modified dentry. As a special case, for rename events, `old_name`
+    ///   and `new_name` are the names of the directory's dentry before and after being
+    ///   renamed, respectively.
+    pub(crate) fn publish(
+        self: Arc<Self>,
+        object: &Arc<dyn Dentry>,
+        subobject: Option<&Arc<dyn Dentry>>,
+        entries: FanotifyEntrySet,
+        event: FanEventMask,
+        old_name: &str,
+        new_name: &str,
+    ) {
+        // Check whether the event is marked and not ignored.
+        let object_entry = entries.object;
+        let parent_entry = entries.parent;
+        let mount_entry = entries.mount;
+        let fs_entry = entries.fs;
+
+        let object_mark = object_entry
+            .clone()
+            .map_or(FanEventMask::empty(), |e| e.mark());
+        let parent_mark = parent_entry
+            .clone()
+            .map_or(FanEventMask::empty(), |e| e.mark());
+        let mount_mark = mount_entry
+            .clone()
+            .map_or(FanEventMask::empty(), |e| e.mark());
+        let fs_mark = fs_entry.clone().map_or(FanEventMask::empty(), |e| e.mark());
+
+        if !(object_mark.contains(event)
+            || ((FanEventMask::FILE_EVENT_MASK | FanEventMask::ONDIR).contains(event)
+                && parent_mark.contains(event | FanEventMask::EVENT_ON_CHILD))
+            || mount_mark.contains(event)
+            || fs_mark.contains(event))
+        {
+            log::debug!(
+                "[FanotifyGroup::publish] Event not marked: event={:?}, object={:?}, \
+                object_mark={:?}, parent_mark={:?}, mount_mark={:?}, fs_mark={:?}",
+                event,
+                object.path(),
+                object_mark,
+                parent_mark,
+                mount_mark,
+                fs_mark
+            );
+            return;
+        }
+
+        let object_ignore = object_entry.map_or(FanEventMask::empty(), |e| e.ignore());
+        let parent_ignore = parent_entry.map_or(FanEventMask::empty(), |e| e.ignore());
+        let mount_ignore = mount_entry.map_or(FanEventMask::empty(), |e| e.ignore());
+        let fs_ignore = fs_entry.map_or(FanEventMask::empty(), |e| e.ignore());
+
+        if object_ignore.contains(event)
+            || (FanEventMask::FILE_EVENT_MASK | FanEventMask::ONDIR).contains(event)
+                && parent_ignore.contains(event | FanEventMask::EVENT_ON_CHILD)
+            || mount_ignore.contains(event)
+            || fs_ignore.contains(event)
+        {
+            log::debug!(
+                "[FanotifyGroup::publish] Event ignored: event={:?}, object={:?}, \
+                object_ignore={:?}, parent_ignore={:?}, mount_ignore={:?}, fs_ignore={:?}",
+                event,
+                object.path(),
+                object_ignore,
+                parent_ignore,
+                mount_ignore,
+                fs_ignore
+            );
+            return;
+        }
+
+        log::info!(
+            "[FanotifyGroup::publish] Publishing event: \
+            event={:?}, old_name={}, new_name={}",
+            event,
+            old_name,
+            new_name
+        );
+
+        let queue_len = self.event_queue.lock().len();
+        if queue_len >= self.max_queued_events as usize {
+            log::warn!(
+                "[FanotifyGroup::publish] Event queue is full, dropping event: \
+                event={:?}, old_name={}, new_name={}",
+                event,
+                old_name,
+                new_name
+            );
+
+            if queue_len == self.max_queued_events as usize {
+                let mut metadata = self.create_metadata(FanEventMask::Q_OVERFLOW);
+                metadata.event_len = mem::size_of::<FanotifyEventMetadata>() as u32;
+
+                let mut event_data = FanotifyEventData::new(None);
+                event_data.add_datum(FanotifyEventDatum::Metadata(metadata));
+
+                self.event_queue.lock().push_back(event_data);
+            }
+            return;
+        }
+
+        let mut event_data = FanotifyEventData::new(Some(Arc::clone(object)));
+        let flags = self.flags;
+
+        // Create the metadata.
+        let metadata = self.create_metadata(event);
+        event_data.add_datum(FanotifyEventDatum::Metadata(metadata));
+
+        // Create information records.
+        if flags.contains(FanInitFlags::REPORT_FID) {
+            let info = Self::create_fid_info(object, FanotifyEventInfoType::Fid, None);
+            event_data.add_datum(FanotifyEventDatum::Info(info));
+        }
+
+        if flags.contains(FanInitFlags::REPORT_DIR_FID) {
+            let reported_object = if object.inode().unwrap().inotype().is_dir() {
+                Some(Arc::clone(object))
+            } else {
+                object.parent()
+            };
+            if let Some(reported_object) = reported_object {
+                if !flags.contains(FanInitFlags::REPORT_NAME) {
+                    let info =
+                        Self::create_fid_info(&reported_object, FanotifyEventInfoType::Dfid, None);
+                    event_data.add_datum(FanotifyEventDatum::Info(info));
+                } else if event.contains(FanEventMask::RENAME) {
+                    let info_old = Self::create_fid_info(
+                        &reported_object,
+                        FanotifyEventInfoType::OldDfidName,
+                        Some(old_name.to_string()),
+                    );
+                    let info_new = Self::create_fid_info(
+                        &reported_object,
+                        FanotifyEventInfoType::NewDfidName,
+                        Some(new_name.to_string()),
+                    );
+                    event_data.add_datum(FanotifyEventDatum::Info(info_old));
+                    event_data.add_datum(FanotifyEventDatum::Info(info_new));
+                } else {
+                    let info = Self::create_fid_info(
+                        &reported_object,
+                        FanotifyEventInfoType::DfidName,
+                        Some(old_name.to_string()),
+                    );
+                    event_data.add_datum(FanotifyEventDatum::Info(info));
+                }
+            }
+        }
+
+        if flags.contains(FanInitFlags::REPORT_TARGET_FID)
+            && (FanEventMask::DIR_EVENT_MASK | FanEventMask::ONDIR).contains(event)
+        {
+            let subobject = subobject.unwrap();
+            let info = Self::create_fid_info(
+                subobject,
+                FanotifyEventInfoType::Fid,
+                None,
+            );
+            event_data.add_datum(FanotifyEventDatum::Info(info));
+        }
+
+        // Other information records should be added here...
+
+        // Set the event length in the metadata.
+        let event_len = event_data
+            .iter()
+            .map(|data| data.as_slice().len())
+            .sum::<usize>() as u32;
+        event_data.metadata_mut().event_len = event_len;
+
+        // Add the event data to the entry's event queue.
+        {
+            let mut event_queue = self.event_queue.lock();
+            let mut event_merge_to: Option<&mut FanotifyEventData> = None;
+
+            // Check if the current event can be merged into one of the last 10 events in
+            // the event queue.
+            for existing_event in event_queue.iter_mut().rev().take(10) {
+                let existing_object = existing_event.object().unwrap();
+                let existing_metadata = existing_event.metadata();
+
+                if Arc::ptr_eq(existing_object, object)
+                    && existing_metadata.pid == metadata.pid
+                    && !existing_metadata.mask.contains(metadata.mask)
+                    && ((existing_metadata.mask ^ metadata.mask) & FanEventMask::ONDIR).is_empty()
+                    && existing_event.data()[1..] == event_data.data()[1..]
+                {
+                    event_merge_to = Some(existing_event);
+                    break;
+                }
+            }
+
+            if let Some(event_merge_to) = event_merge_to {
+                event_merge_to.metadata_mut().mask |= metadata.mask;
+            } else {
+                event_queue.push_back(event_data);
+            }
+        }
+
+        // Wake up a process waiting for events in this group.
+        self.wake();
+    }
+
+    pub(crate) async fn wait(self: Arc<Self>) {
+        let group_key = FanotifyGroupKey(self);
+        let waker = take_waker().await;
+        {
+            let mut wakers = FANOTIFY_WAKERS.lock();
+            wakers.entry(group_key).or_default().push_back(waker);
+        }
+        suspend_now().await;
+    }
+
+    fn wake(self: Arc<Self>) {
+        let group_key = FanotifyGroupKey(self);
+        let mut wakers = FANOTIFY_WAKERS.lock();
+        if let Some(waker_list) = wakers.get_mut(&group_key) {
+            if let Some(waker) = waker_list.pop_front() {
+                waker.wake_by_ref();
+            }
+        }
+    }
+
+    /// Creates an fanotify event metadata for this group flags with the specified event
+    /// mask.
+    ///
+    /// The following two fields of event metadata are not set in this function:
+    /// * `event_len` should be set before the metadata is inserted into the event queue.
+    /// * `fd` should be set when the event is read by the user monitor process.
+    fn create_metadata(&self, mask: FanEventMask) -> FanotifyEventMetadata {
+        FanotifyEventMetadata {
+            event_len: 0,
+            vers: FANOTIFY_METADATA_VERSION,
+            reserved: 0,
+            metadata_len: mem::size_of::<FanotifyEventMetadata>() as u16,
+            fd: 0,
+            pid: if self.flags.contains(FanInitFlags::REPORT_TID) {
+                call_interface!(systype::kinterface::KernelTaskOperations::current_pid())
+            } else {
+                call_interface!(systype::kinterface::KernelTaskOperations::current_tid())
+            },
+            mask,
+        }
+    }
+
+    /// Creates an information record of structure type [`FanotifyEventInfoType`]
+    /// containing a file handle and optionally a file name for the specified filesystem
+    /// object.
+    ///
+    /// `file_name` is only used for creating the [`FanotifyEventInfoFid`] of type
+    /// [`FanotifyEventInfoType::DfidName`], [`FanotifyEventInfoType::OldDfidName`],
+    /// or [`FanotifyEventInfoType::NewDfidName`].
+    fn create_fid_info(
+        object: &Arc<dyn Dentry>,
+        info_type: FanotifyEventInfoType,
+        file_name: Option<String>,
+    ) -> FanotifyEventInfoFid {
+        debug_assert!(
+            file_name.is_none()
+                || info_type == FanotifyEventInfoType::DfidName
+                || info_type == FanotifyEventInfoType::OldDfidName
+                || info_type == FanotifyEventInfoType::NewDfidName,
+        );
+
+        // let mut handle_bytes = object.file_handle().to_raw_bytes();
+        let file_handle = object.file_handle();
+        log::info!(
+            "[FanotifyGroup::create_fid_info] Creating fid info: object={:?}, file_handle={:?}",
+            object.path(),
+            file_handle,
+        );
+        let mut handle_bytes = file_handle.to_raw_bytes();
+        if let Some(name) = file_name {
+            handle_bytes.extend_from_slice(name.as_bytes());
+            handle_bytes.push(0); // Null terminator
+        }
+
+        let header = FanotifyEventInfoHeader {
+            info_type,
+            pad: 0,
+            len: (mem::size_of::<FanotifyEventInfoFidInner>() + handle_bytes.len()) as u16,
+        };
+        let fsid = [0; 2];
+
+        let mut info = FanotifyEventInfoFid::new(handle_bytes.len());
+        info.set_hdr(header);
+        info.set_fsid(fsid);
+        info.handle_mut().copy_from_slice(handle_bytes.as_slice());
+        info
     }
 }
 
@@ -190,14 +555,16 @@ pub struct FanotifyEntry {
     /// in.
     ignore: SpinNoIrqLock<FanEventMask>,
 
-    /// Data of pending events on this entry.
-    event_queue: SpinNoIrqLock<VecDeque<FanotifyEventData>>,
-
     /// Permission events that are waiting for responses from userspace.
     permission_queue: SpinNoIrqLock<VecDeque<FanotifyPermissionEvent>>,
 }
 
 impl FanotifyEntry {
+    /// Returns a reference to the group this entry belongs to.
+    pub fn group(&self) -> Arc<FanotifyGroup> {
+        self.group.upgrade().unwrap()
+    }
+
     /// Returns the flags of the entry.
     pub fn flags(&self) -> FanMarkFlags {
         *self.flags.lock()
@@ -218,172 +585,24 @@ impl FanotifyEntry {
         *self.ignore.lock()
     }
 
-    /// Adds events in `mark` to the mark mask of the entry.
+    /// Adds events and flags in `mark` to the mark mask of the entry.
     pub fn add_mark(&self, mark: FanEventMask) {
         *self.mark.lock() |= mark;
     }
 
-    /// Removes events in `mark` from the mark mask of the entry.
+    /// Removes events and flags in `mark` from the mark mask of the entry.
     pub fn remove_mark(&self, mark: FanEventMask) {
         *self.mark.lock() &= !mark;
     }
 
-    /// Adds events in `ignore` to the ignore mask of the entry.
+    /// Adds events and flags in `ignore` to the ignore mask of the entry.
     pub fn add_ignore(&self, ignore: FanEventMask) {
         *self.ignore.lock() |= ignore;
     }
 
-    /// Removes events in `ignore` from the ignore mask of the entry.
+    /// Removes events and flags in `ignore` from the ignore mask of the entry.
     pub fn remove_ignore(&self, ignore: FanEventMask) {
         *self.ignore.lock() &= !ignore;
-    }
-
-    /// Publishes an event to the fanotify entry's event queue.
-    ///
-    /// This method is called when the current task performs a filesystem action on a
-    /// filesystem object that may be monitored by this fanotify entry. A detailed
-    /// description of when this method should be called is provided below.
-    ///
-    /// This method checks whether the action is of interest to the entry (i.e., whether
-    /// it is in the mark mask and not in the ignore mask), and if so, it creates event
-    /// data for the action and adds them to the entry's event queue. The event data
-    /// starts with an fanotify event metadata, followed by zero or more information
-    /// records.
-    ///
-    /// # Parameters
-    ///
-    /// `object` is a reference to the filesystem object's dentry on which the event
-    /// occurred. By “occur on”, we mean:
-    /// - For file events occurred on a file (FAN_OPEN, FAN_ACCESS, FAN_CLOSE_NOWRITE,
-    ///   FAN_CLOSE_WRITE, etc.), this is the dentry of the accessed file.
-    /// - For file events occurred on a directory (FAN_OPEN, FAN_ACCESS,
-    ///   FAN_CLOSE_NOWRITE, etc.), this is the dentry of the accessed directory.
-    /// - For directory events occurred on a directory (FAN_CREATE, FAN_DELETE, etc.),
-    ///   this is the dentry of the directory whose dentries were modified.
-    /// - Some file events cannot occur on a directory, such as FAN_CLOSE_WRITE. All
-    ///   directory events cannot occur on a file. For these events, this method
-    ///   must not be called.
-    ///
-    /// `event` must contain one bit set, which specifies the event kind that occurred.
-    /// Additionally, it should contain FAN_ONDIR for file events which occurred on a
-    /// directory and for directory events where the directory's modified dentry is a
-    /// directory. Additionally, it should contain FAN_EVENT_ON_CHILD for file events
-    /// that occurred on a child of the directory that this fanotify entry is marked on.
-    ///
-    /// `old_name` and `new_name` are set as follows:
-    /// - For file events occurred on a file, both of them are the name of the accessed
-    ///   file.
-    /// - For file events occurred on a directory, both of them are `.`.
-    /// - For directory events occurred on a directory, both of them are the name of the
-    ///   directory's modified dentry that was modified. As a special case, for rename
-    ///   events, `old_name` and `new_name` are the names of the directory's dentry
-    ///   before and after being renamed, respectively.
-    ///
-    /// # Circumstances for calling this method
-    ///
-    /// If an event occurs on a filesystem object, then this method should be called
-    /// exactly on the following fanotify entries if they exist:
-    /// - The fanotify entry marked on the filesystem object itself.
-    /// - The fanotify entry marked on the parent directory of the filesystem object, if
-    ///   the event is a file event. FAN_EVENT_ON_CHILD is set in `event` in and only in
-    ///   this case.
-    /// - The fanotify entry marked on the mount that the filesystem object belongs to.
-    /// - The fanotify entry marked on the filesystem that the filesystem object belongs
-    ///   to.
-    pub fn publish(
-        &self,
-        object: &Arc<dyn Dentry>,
-        event: FanEventMask,
-        old_name: &str,
-        new_name: &str,
-    ) {
-        let mark = *self.mark.lock();
-        let ignore = *self.ignore.lock();
-
-        if event.contains(FanEventMask::ONDIR) && !ignore.contains(FanEventMask::ONDIR) {
-            if !mark.contains(event) {
-                return;
-            }
-        } else if !mark.difference(ignore).contains(event) {
-            return;
-        }
-
-        log::info!(
-            "[FanotifyEntry::publish] Publishing event: \
-            mark={:?}, ignore={:?}, event={:?}, old_name={}, new_name={}",
-            mark,
-            ignore,
-            event,
-            old_name,
-            new_name
-        );
-
-        let group = self.group.upgrade().unwrap();
-        let group_flags = group.flags;
-
-        let mut event_data = VecDeque::new();
-        let event_dentry = Arc::clone(object);
-
-        // Metadata.
-        let metadata = Self::create_metadata(group_flags, event);
-        event_data.push_back(FanotifyEventData::Metadata((metadata, event_dentry)));
-
-        // Information records.
-        if group_flags.contains(FanInitFlags::REPORT_FID) {
-            let info = Self::create_fid_info(object, FanotifyEventInfoType::Fid, None);
-            event_data.push_back(FanotifyEventData::Info(info));
-        }
-        if group_flags.contains(FanInitFlags::REPORT_DIR_FID) {
-            let reported_object = if object.inode().unwrap().inotype().is_dir() {
-                Some(Arc::clone(object))
-            } else {
-                object.parent()
-            };
-            if let Some(reported_object) = reported_object {
-                if !group_flags.contains(FanInitFlags::REPORT_NAME) {
-                    let info =
-                        Self::create_fid_info(&reported_object, FanotifyEventInfoType::Dfid, None);
-                    event_data.push_back(FanotifyEventData::Info(info));
-                } else if event.contains(FanEventMask::RENAME) {
-                    let info_old = Self::create_fid_info(
-                        &reported_object,
-                        FanotifyEventInfoType::OldDfidName,
-                        Some(old_name.to_string()),
-                    );
-                    let info_new = Self::create_fid_info(
-                        &reported_object,
-                        FanotifyEventInfoType::NewDfidName,
-                        Some(new_name.to_string()),
-                    );
-                    event_data.push_back(FanotifyEventData::Info(info_old));
-                    event_data.push_back(FanotifyEventData::Info(info_new));
-                } else {
-                    let info = Self::create_fid_info(
-                        &reported_object,
-                        FanotifyEventInfoType::DfidName,
-                        Some(old_name.to_string()),
-                    );
-                    event_data.push_back(FanotifyEventData::Info(info));
-                }
-            }
-        }
-
-        // Other information records should be added here...
-
-        // Set the event length in the metadata.
-        let event_len = event_data
-            .iter()
-            .map(|data| data.as_slice().len())
-            .sum::<usize>() as u32;
-        if let FanotifyEventData::Metadata((ref mut metadata, _)) = event_data[0] {
-            metadata.event_len = event_len;
-        } else {
-            unreachable!()
-        }
-
-        // Add the event data to the entry's event queue.
-        let mut event_queue = self.event_queue.lock();
-        event_queue.extend(event_data);
     }
 
     /// Clears the ignore mask of the entry if the entry is not marked with
@@ -392,11 +611,7 @@ impl FanotifyEntry {
     /// This method should be called when the file that the entry is monitoring is
     /// modified (by writing, truncating, etc.).
     pub fn clear_ignore(&self) {
-        if !self
-            .flags
-            .lock()
-            .contains(FanMarkFlags::IGNORED_SURV_MODIFY)
-        {
+        if !self.flags().contains(FanMarkFlags::IGNORED_SURV_MODIFY) {
             log::info!(
                 "[FanotifyEntry::clear_ignore] Clearing ignore mask: {:?}",
                 *self.ignore.lock()
@@ -404,65 +619,20 @@ impl FanotifyEntry {
             *self.ignore.lock() = FanEventMask::empty();
         }
     }
+}
 
-    /// Creates an fanotify event metadata for the specified group flags and event mask.
-    ///
-    /// The following two field are not set in this function:
-    /// * `event_len` should be set before the metadata is inserted into the event queue.
-    /// * `fd` should be set when the event is read by the user monitor process.
-    fn create_metadata(group_flags: FanInitFlags, mask: FanEventMask) -> FanotifyEventMetadata {
-        FanotifyEventMetadata {
-            event_len: 0,
-            vers: FANOTIFY_METADATA_VERSION,
-            reserved: 0,
-            metadata_len: mem::size_of::<FanotifyEventMetadata>() as u16,
-            fd: 0,
-            pid: if group_flags.contains(FanInitFlags::REPORT_TID) {
-                call_interface!(systype::kinterface::KernelTaskOperations::current_pid())
-            } else {
-                call_interface!(systype::kinterface::KernelTaskOperations::current_tid())
-            },
-            mask,
-        }
-    }
-
-    /// Creates an information record of structure type [`FanotifyEventInfoType`]
-    /// containing a file handle for the specified filesystem object.
-    ///
-    /// `file_name` is only used for creating the [`FanotifyEventInfoFid`] of type
-    /// [`FanotifyEventInfoType::DfidName`], [`FanotifyEventInfoType::OldDfidName`],
-    /// or [`FanotifyEventInfoType::NewDfidName`].
-    fn create_fid_info(
-        object: &Arc<dyn Dentry>,
-        info_type: FanotifyEventInfoType,
-        file_name: Option<String>,
-    ) -> FanotifyEventInfoFid {
-        debug_assert!(
-            file_name.is_none()
-                || info_type == FanotifyEventInfoType::DfidName
-                || info_type == FanotifyEventInfoType::OldDfidName
-                || info_type == FanotifyEventInfoType::NewDfidName,
-        );
-
-        let mut handle_bytes = object.file_handle().to_raw_bytes();
-        if let Some(name) = file_name {
-            handle_bytes.extend_from_slice(name.as_bytes());
-            handle_bytes.push(0); // Null terminator
-        }
-
-        let header = FanotifyEventInfoHeader {
-            info_type,
-            pad: 0,
-            len: (mem::size_of::<FanotifyEventInfoFidInner>() + handle_bytes.len()) as u16,
-        };
-        let fsid = [0; 2];
-
-        let mut info = FanotifyEventInfoFid::new(handle_bytes.len());
-        info.set_hdr(header);
-        info.set_fsid(fsid);
-        info.handle_mut().copy_from_slice(handle_bytes.as_slice());
-        info
-    }
+/// A set of fanotify entries that is associated with a filesystem object.
+///
+/// This structure is used as a parameter to [`FanotifyGroup::publish`]. It contains
+/// entries for the object itself, its parent directory, the mount it belongs to, and the
+/// filesystem it belongs to. When an event occurs on a filesystem object, these entries
+/// are used to determine whether the event is marked and not ignored.
+#[derive(Default, Clone)]
+pub(crate) struct FanotifyEntrySet {
+    pub object: Option<Arc<FanotifyEntry>>,
+    pub parent: Option<Arc<FanotifyEntry>>,
+    pub mount: Option<Arc<FanotifyEntry>>,
+    pub fs: Option<Arc<FanotifyEntry>>,
 }
 
 /// Data structure for pending permission events.
@@ -502,3 +672,155 @@ pub enum FsObjectId {
     /// Mount ID.
     Mount(u64),
 }
+
+/// Data of an fanotify event, which consists of a metadata structure and optionally
+/// several information records.
+#[derive(Clone)]
+pub struct FanotifyEventData {
+    /// The dentry of the filesystem object that triggered the event. For Q_OVERFLOW
+    /// events, this is `None`.
+    dentry: Option<Arc<dyn Dentry>>,
+    /// The event data, which contains a metadata and optional information records.
+    data: Vec<FanotifyEventDatum>,
+}
+
+impl FanotifyEventData {
+    /// Creates an empty fanotify event data structure with the specified dentry.
+    fn new(dentry: Option<Arc<dyn Dentry>>) -> Self {
+        Self {
+            dentry,
+            data: Vec::new(),
+        }
+    }
+
+    /// Adds an event datum to the event data.
+    fn add_datum(&mut self, datum: FanotifyEventDatum) {
+        self.data.push(datum);
+    }
+
+    /// Returns a reference to the dentry of the filesystem object that triggered the
+    /// event.
+    fn object(&self) -> Option<&Arc<dyn Dentry>> {
+        self.dentry.as_ref()
+    }
+
+    fn data(&self) -> &[FanotifyEventDatum] {
+        &self.data
+    }
+
+    /// Returns an immutable reference to the metadata structure of the event data.
+    ///
+    /// # Panic
+    /// If no datum is added to the event data, or if the first datum is not a metadata
+    /// structure, this method will panic.
+    fn metadata(&self) -> &FanotifyEventMetadata {
+        match &self.data[0] {
+            FanotifyEventDatum::Metadata(metadata) => metadata,
+            _ => panic!("First datum must be metadata"),
+        }
+    }
+
+    /// Returns a mutable reference to the metadata structure of the event data.
+    ///
+    /// # Panic
+    /// If no datum is added to the event data, or if the first datum is not a metadata
+    /// structure, this method will panic.
+    fn metadata_mut(&mut self) -> &mut FanotifyEventMetadata {
+        match &mut self.data[0] {
+            FanotifyEventDatum::Metadata(metadata) => metadata,
+            _ => panic!("First datum must be metadata"),
+        }
+    }
+
+    /// Returns an iterator over the event data.
+    fn iter(&self) -> slice::Iter<FanotifyEventDatum> {
+        self.data.iter()
+    }
+}
+
+/// Enum representing an fanotify metadata structure or an information record structure.
+#[derive(Clone)]
+pub(crate) enum FanotifyEventDatum {
+    /// Fanotify event metadata. The first element is an incomplete metadata. The second
+    /// element is a reference of the [`Dentry`] of the filesystem object which triggered
+    /// the event, which is to be opened and added to the user process's file descriptor
+    /// table.
+    Metadata(FanotifyEventMetadata),
+    Info(FanotifyEventInfoFid),
+    Pid(FanotifyEventInfoPid),
+    Error(FanotifyEventInfoError),
+}
+
+impl FanotifyEventDatum {
+    /// Returns a byte slice representation of the data, which is to be read by a user
+    /// process.
+    pub fn as_slice(&self) -> &[u8] {
+        match self {
+            FanotifyEventDatum::Metadata(metadata) => unsafe {
+                slice::from_raw_parts(
+                    metadata as *const FanotifyEventMetadata as *const u8,
+                    mem::size_of::<FanotifyEventMetadata>(),
+                )
+            },
+            FanotifyEventDatum::Info(info) => info.as_bytes(),
+            FanotifyEventDatum::Pid(pid) => unsafe {
+                slice::from_raw_parts(
+                    pid as *const FanotifyEventInfoPid as *const u8,
+                    mem::size_of::<FanotifyEventInfoPid>(),
+                )
+            },
+            FanotifyEventDatum::Error(error) => unsafe {
+                slice::from_raw_parts(
+                    error as *const FanotifyEventInfoError as *const u8,
+                    mem::size_of::<FanotifyEventInfoError>(),
+                )
+            },
+        }
+    }
+}
+
+impl PartialEq for FanotifyEventDatum {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (FanotifyEventDatum::Metadata(_), FanotifyEventDatum::Metadata(_)) => {}
+            (FanotifyEventDatum::Info(_), FanotifyEventDatum::Info(_)) => {}
+            (FanotifyEventDatum::Pid(_), FanotifyEventDatum::Pid(_)) => {}
+            (FanotifyEventDatum::Error(_), FanotifyEventDatum::Error(_)) => {}
+            _ => return false,
+        }
+
+        // Compare the byte slices of the data.
+        let self_slice = self.as_slice();
+        let other_slice = other.as_slice();
+
+        self_slice == other_slice
+    }
+}
+
+impl Eq for FanotifyEventDatum {}
+
+/// A wrapper of `Arc<FanotifyGroup>` that uses pointer comparison for ordering.
+pub(crate) struct FanotifyGroupKey(pub Arc<FanotifyGroup>);
+
+impl Ord for FanotifyGroupKey {
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        (self.0.as_ref() as *const FanotifyGroup).cmp(&(other.0.as_ref() as *const FanotifyGroup))
+    }
+}
+
+impl PartialOrd for FanotifyGroupKey {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Eq for FanotifyGroupKey {}
+
+impl PartialEq for FanotifyGroupKey {
+    fn eq(&self, other: &Self) -> bool {
+        ptr::eq(self.0.as_ref(), other.0.as_ref())
+    }
+}
+
+static FANOTIFY_WAKERS: SpinNoIrqLock<BTreeMap<FanotifyGroupKey, VecDeque<Waker>>> =
+    SpinNoIrqLock::new(BTreeMap::new());

@@ -160,8 +160,8 @@ impl Dentry for FatDentry {
             .map_err(as_sys_err)?;
 
         new_dentry.set_inode(dentry.inode().ok_or(SysError::ENOENT)?);
-        dentry.unset_inode();
         dentry.get_meta().children.lock().clear();
+        self.remove_child(dentry);
         Ok(())
     }
 
@@ -172,6 +172,7 @@ impl Dentry for FatDentry {
             .downcast_arc::<FatDirInode>()
             .map_err(|_| SysError::ENOTDIR)?;
         inode.dir.lock().remove(dentry.name()).map_err(as_sys_err)?;
+        self.remove_child(dentry);
         Ok(())
     }
 }
