@@ -570,6 +570,7 @@ pub async fn sys_mkdirat(dirfd: usize, pathname: usize, mode: u32) -> SyscallRes
 
     parent.mkdir(&dentry, mode)?;
     let inode = dentry.inode().unwrap();
+    log::info!("[sys_mkdirat] dentry created: {}", dentry.path());
 
     let _cred = task.perm_mut();
     let cred = _cred.lock();
@@ -1692,10 +1693,20 @@ pub fn sys_linkat(
     let olddirfd = AtFd::from(olddirfd);
     let newdirfd = AtFd::from(newdirfd);
 
+    log::info!("[sys_linkat] path: {} -> {}", newpath, oldpath);
+
     let old_dentry = task.walk_at(olddirfd, oldpath)?;
     let new_dentry = task.walk_at(newdirfd, newpath)?;
 
-    new_dentry.link(&old_dentry, &new_dentry)?;
+    log::info!(
+        "[sys_linkat] dentry: {} -> {}",
+        old_dentry.path(),
+        new_dentry.path()
+    );
+
+    let parent = new_dentry.parent().ok_or(SysError::ENOENT)?;
+    parent.link(&old_dentry, &new_dentry)?;
+
     Ok(0)
 }
 

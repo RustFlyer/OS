@@ -17,6 +17,7 @@ pub type ASysResult<'a, T> = SysFuture<'a, SysResult<T>>;
 
 /// Linux specific error codes defined in `errno.h`.
 // See in "asm-generic/errno-base.h" and "asm-generic/errno.h".
+/// https://elixir.bootlin.com/linux/v6.8.9/source/include/uapi/asm-generic/errno.h#L71
 #[derive(FromRepr, Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(i32)]
 pub enum SysError {

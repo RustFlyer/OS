@@ -1,4 +1,4 @@
-use alloc::sync::Arc;
+use alloc::{sync::Arc, vec::Vec};
 
 use config::{mm::PAGE_SIZE, vfs::OpenFlags};
 use net::poll_interfaces;
@@ -9,6 +9,7 @@ use crate::{
     net::{
         SocketType,
         addr::{SaFamily, SockAddr, read_sockaddr, write_sockaddr},
+        msg::{IoVec, MmsgHdr},
         sock::Sock,
         socket::Socket,
         sockopt::{SocketLevel, SocketOpt, TcpSocketOpt},
@@ -494,4 +495,225 @@ pub async fn sys_accept4(
     let new_socket = Arc::new(Socket::from_another(&socket, Sock::Tcp(new_sk)));
     let fd = task.with_mut_fdtable(|table| table.alloc(new_socket, open_flags))?;
     Ok(fd)
+}
+
+/// sendmmsg() system call - send multiple messages on a socket
+///
+/// The sendmmsg() system call is an extension of sendmsg() that allows
+/// the caller to transmit multiple messages on a socket using a single
+/// system call, which has performance benefits.
+pub async fn sys_sendmmsg(
+    sockfd: usize,
+    msgvec: usize,
+    vlen: usize,
+    flags: usize,
+) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+
+    log::debug!(
+        "[sys_sendmmsg] tid: {}, sockfd: {}, vlen: {}, flags: {:#x}",
+        task.tid(),
+        sockfd,
+        vlen,
+        flags
+    );
+
+    if vlen == 0 {
+        return Ok(0);
+    }
+
+    let socket: Arc<Socket> = task
+        .with_mut_fdtable(|table| table.get_file(sockfd))?
+        .downcast_arc::<Socket>()
+        .map_err(|_| SysError::ENOTSOCK)?;
+
+    let mut msgvec_ptr = UserReadPtr::<MmsgHdr>::new(msgvec, &addrspace);
+    let msgvec_array = unsafe { msgvec_ptr.read_array(vlen)? };
+
+    let mut sent_count = 0;
+    let mut total_bytes = 0;
+
+    task.set_state(TaskState::Interruptible);
+
+    for (i, mmsg) in msgvec_array.iter().enumerate() {
+        let msg_hdr = &mmsg.msg_hdr;
+
+        let dest_addr = if msg_hdr.msg_name != 0 && msg_hdr.msg_namelen > 0 {
+            Some(read_sockaddr(
+                addrspace.clone(),
+                msg_hdr.msg_name,
+                msg_hdr.msg_namelen as usize,
+            )?)
+        } else {
+            None
+        };
+
+        if msg_hdr.msg_iov == 0 || msg_hdr.msg_iovlen == 0 {
+            sent_count += 1;
+            continue;
+        }
+
+        let mut iov_ptr = UserReadPtr::<IoVec>::new(msg_hdr.msg_iov, &addrspace);
+        let iov_array = unsafe { iov_ptr.read_array(msg_hdr.msg_iovlen)? };
+
+        let mut buf = Vec::new();
+        for iov in iov_array.iter() {
+            if iov.iov_len > 0 && iov.iov_base != 0 {
+                let mut data_ptr = UserReadPtr::<u8>::new(iov.iov_base, &addrspace);
+                let data = unsafe { data_ptr.try_into_slice(iov.iov_len)? };
+                buf.extend_from_slice(data);
+            }
+        }
+
+        let bytes_sent = match socket.types {
+            SocketType::STREAM => {
+                if dest_addr.is_some() {
+                    task.set_state(TaskState::Running);
+                    return Err(SysError::EISCONN);
+                }
+                socket.sk.sendto(&buf, None).await?
+            }
+            SocketType::DGRAM => socket.sk.sendto(&buf, dest_addr).await?,
+            _ => {
+                task.set_state(TaskState::Running);
+                return Err(SysError::EOPNOTSUPP);
+            }
+        };
+
+        let mut result_ptr = UserWritePtr::<u32>::new(
+            msgvec + i * core::mem::size_of::<MmsgHdr>() + core::mem::offset_of!(MmsgHdr, msg_len),
+            &addrspace,
+        );
+
+        unsafe {
+            result_ptr.write(bytes_sent as u32)?;
+        }
+
+        sent_count += 1;
+        total_bytes += bytes_sent;
+
+        if bytes_sent < buf.len() {
+            break;
+        }
+    }
+
+    task.set_state(TaskState::Running);
+    poll_interfaces();
+
+    log::debug!(
+        "[sys_sendmmsg] sent {} messages, total {} bytes",
+        sent_count,
+        total_bytes
+    );
+
+    Ok(sent_count)
+}
+
+/// recvmmsg() system call - receive multiple messages from a socket
+///
+/// The recvmmsg() system call is an extension of recvmsg() that allows
+/// the caller to receive multiple messages from a socket using a single
+/// system call.
+pub async fn sys_recvmmsg(
+    sockfd: usize,
+    msgvec: usize,
+    vlen: usize,
+    flags: usize,
+    timeout: usize,
+) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+
+    log::debug!(
+        "[sys_recvmmsg] tid: {}, sockfd: {}, vlen: {}, flags: {:#x}",
+        task.tid(),
+        sockfd,
+        vlen,
+        flags
+    );
+
+    if vlen == 0 {
+        return Ok(0);
+    }
+
+    let socket: Arc<Socket> = task
+        .with_mut_fdtable(|table| table.get_file(sockfd))?
+        .downcast_arc::<Socket>()
+        .map_err(|_| SysError::ENOTSOCK)?;
+
+    let mut msgvec_ptr = UserReadPtr::<MmsgHdr>::new(msgvec, &addrspace);
+    let msgvec_array = unsafe { msgvec_ptr.read_array(vlen)? };
+
+    let mut recv_count = 0;
+
+    task.set_state(TaskState::Interruptible);
+
+    for (i, mmsg) in msgvec_array.iter().enumerate() {
+        let msg_hdr = &mmsg.msg_hdr;
+
+        if msg_hdr.msg_iov == 0 || msg_hdr.msg_iovlen == 0 {
+            recv_count += 1;
+            continue;
+        }
+
+        let mut iov_ptr = UserReadPtr::<IoVec>::new(msg_hdr.msg_iov, &addrspace);
+        let iov_array = unsafe { iov_ptr.read_array(msg_hdr.msg_iovlen)? };
+
+        let mut total_len = 0;
+        for iov in iov_array.iter() {
+            total_len += iov.iov_len;
+        }
+
+        if total_len == 0 {
+            recv_count += 1;
+            continue;
+        }
+
+        let mut temp_buf = vec![0u8; total_len];
+        let (bytes_received, remote_addr) = socket.sk.recvfrom(&mut temp_buf).await?;
+
+        let mut offset = 0;
+        for iov in iov_array.iter() {
+            if offset >= bytes_received || iov.iov_len == 0 || iov.iov_base == 0 {
+                break;
+            }
+
+            let copy_len = core::cmp::min(iov.iov_len, bytes_received - offset);
+            let mut data_ptr = UserWritePtr::<u8>::new(iov.iov_base, &addrspace);
+            let data_slice = unsafe { data_ptr.try_into_mut_slice(copy_len)? };
+            data_slice.copy_from_slice(&temp_buf[offset..offset + copy_len]);
+            offset += copy_len;
+        }
+
+        if msg_hdr.msg_name != 0 && msg_hdr.msg_namelen > 0 {
+            write_sockaddr(
+                addrspace.clone(),
+                msg_hdr.msg_name,
+                msg_hdr.msg_namelen as usize,
+                remote_addr,
+            )?;
+        }
+
+        let mut result_ptr = UserWritePtr::<u32>::new(
+            msgvec + i * core::mem::size_of::<MmsgHdr>() + core::mem::offset_of!(MmsgHdr, msg_len),
+            &addrspace,
+        );
+        unsafe {
+            result_ptr.write(bytes_received as u32)?;
+        }
+
+        recv_count += 1;
+
+        // if block and recv parts of data, continue
+        if bytes_received == 0 {
+            break;
+        }
+    }
+
+    task.set_state(TaskState::Running);
+
+    log::debug!("[sys_recvmmsg] received {} messages", recv_count);
+
+    Ok(recv_count)
 }

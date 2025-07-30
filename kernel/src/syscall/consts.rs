@@ -11,10 +11,16 @@ use strum::FromRepr;
 #[repr(usize)]
 #[allow(non_camel_case_types)]
 pub enum SyscallNo {
+    IO_SETUP = 0,
+    IO_DESTROY = 1,
+    IO_SUBMIT = 2,
+    IO_CANCEL = 3,
+    IO_GETEVENTS = 4,
     SETXATTR = 5,
     LSETXATTR = 6,
     FSETXATTR = 7,
     GETXATTR = 8,
+    LGETXATTR = 9,
     FGETXATTR = 10,
     REMOVEXATTR = 14,
     FREMOVEXATTR = 16,
@@ -163,6 +169,7 @@ pub enum SyscallNo {
     GETMEMPOLICY = 236,
     PERF_EVENT_OPEN = 241,
     ACCEPT4 = 242,
+    RECVMMSG = 243,
     WAIT4 = 260,
     PRLIMIT64 = 261,
     FANOTIFY_INIT = 262,
@@ -170,6 +177,7 @@ pub enum SyscallNo {
     NAME_TO_HANDLE_AT = 264,
     OPEN_BY_HANDLE_AT = 265,
     CLOCK_ADJTIME = 266,
+    SENDMMSG = 269,
     RENAMEAT2 = 276,
     GETRANDOM = 278,
     MEMFD_CREATE = 279,
@@ -197,7 +205,7 @@ pub enum SyscallNo {
 
 impl core::fmt::Display for SyscallNo {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{}", self.as_str())
+        write!(f, "{:?}", self)
     }
 }
 
@@ -206,7 +214,7 @@ impl SyscallNo {
         use self::SyscallNo::*;
         match self {
             SETXATTR => "setxattr",
-            LSETXATTR => ";setxattr",
+            LSETXATTR => "lsetxattr",
             FSETXATTR => "fsetxattr",
             GETXATTR => "getxattr",
             FGETXATTR => "fgetxattr",
@@ -387,6 +395,7 @@ impl SyscallNo {
             CLONE3 => "clone3",
             CLOSE_RANGE => "close_range",
             PIDFD_GETFD => "pidfd_getfd",
+            _ => "unknown",
         }
     }
 }

@@ -10,7 +10,7 @@ use mutex::SpinNoIrqLock;
 static mut LOGOUT: AtomicBool = AtomicBool::new(false);
 static LOG_LOCK: SpinNoIrqLock<()> = SpinNoIrqLock::new(());
 
-static FLITER_LIST: [&[&str]; 3] = [&["/fd/3"], &["/fd/3"], &["/fd/3"]];
+static FLITER_LIST: [&[&str]; 3] = [&["objects/29"], &["/fd/3"], &["/fd/3"]];
 static mut FILTER_ID: AtomicUsize = AtomicUsize::new(0);
 
 pub fn print_in_color(args: fmt::Arguments, color_code: u8) {

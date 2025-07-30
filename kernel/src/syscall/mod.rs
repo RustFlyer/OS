@@ -294,6 +294,8 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         }
         FSOPEN => sys_fsopen(args[0], args[1] as u32),
         OPEN_TREE => sys_open_tree(args[0] as i32, args[1], args[2] as u32),
+        SENDMMSG => sys_sendmmsg(args[0], args[1], args[2], args[3]).await,
+        RECVMMSG => sys_recvmmsg(args[0], args[1], args[2], args[3], args[4]).await,
         _ => {
             log::error!("Syscall not implemented: {}", syscall_no.as_str());
             panic!("Syscall not implemented: {}", syscall_no.as_str());

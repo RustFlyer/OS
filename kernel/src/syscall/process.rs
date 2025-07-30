@@ -562,6 +562,9 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
     );
     envs.push(argpath);
 
+    let arghome = "HOME=/";
+    envs.push(arghome.to_string());
+
     log::info!("[sys_execve]: open file {}", dentry.path());
     let file = <dyn File>::open(dentry)?;
 

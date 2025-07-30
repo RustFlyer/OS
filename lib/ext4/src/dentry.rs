@@ -133,7 +133,7 @@ impl Dentry for ExtDentry {
         let old_path = CString::new(old_dentry.path()).unwrap();
         let new_path = CString::new(dentry.path()).unwrap();
         ExtFile::link(&old_path, &new_path)?;
-        dentry.set_inode(self.inode().unwrap());
+        dentry.set_inode(old_dentry.inode().unwrap());
         Ok(())
     }
 
@@ -194,11 +194,31 @@ impl Dentry for ExtDentry {
                 return Err(SysError::ENOTDIR);
             }
         }
-        if old_type == InodeType::Dir {
-            ExtDir::rename(&old_path, &new_path)?;
+        let err = if old_type == InodeType::Dir {
+            ExtDir::rename(&old_path, &new_path)
         } else {
-            ExtFile::rename(&old_path, &new_path)?;
+            ExtFile::rename(&old_path, &new_path)
+        };
+
+        match err {
+            Err(e) if e == SysError::EEXIST => {
+                if old_type == InodeType::Dir {
+                    if ExtDir::open(&new_path)?.next().is_some() {
+                        return Err(SysError::ENOTEMPTY);
+                    }
+                    ExtDir::remove_recur(&new_path)?;
+                    ExtDir::rename(&old_path, &new_path)?;
+                } else {
+                    ExtFile::unlink(&new_path)?;
+                    ExtFile::rename(&old_path, &new_path)?;
+                };
+            }
+            Err(e) => {
+                return Err(e);
+            }
+            Ok(_) => {}
         }
+
         new_dentry.set_inode(dentry.inode().unwrap());
         dentry.get_meta().children.lock().clear();
         self.remove_child(dentry);

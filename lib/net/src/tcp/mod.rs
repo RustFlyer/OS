@@ -37,7 +37,7 @@ pub(crate) const STATE_LISTENING: u8 = 4;
 
 lazy_static::lazy_static! {
     pub static ref LISTEN_TABLE:  ListenTable = {
-        driver::println!("when LISTEN_TABLE init");
+        // driver::println!("when LISTEN_TABLE init");
         ListenTable::new()
     };
 }

@@ -324,13 +324,13 @@ impl dyn Dentry {
         old_dentry: &Arc<dyn Dentry>,
         new_dentry: &Arc<dyn Dentry>,
     ) -> SysResult<()> {
-        debug_assert!(!self.is_negative());
-        debug_assert!(self.inode().unwrap().inotype().is_dir());
-        debug_assert!(!old_dentry.is_negative());
-        debug_assert!(new_dentry.is_negative());
-        debug_assert!(Arc::ptr_eq(
+        assert!(!self.is_negative());
+        assert!(self.inode().unwrap().inotype().is_dir());
+        assert!(!old_dentry.is_negative());
+        assert!(new_dentry.is_negative());
+        assert!(Arc::ptr_eq(
             &old_dentry.inode().unwrap().get_meta().superblock,
-            &new_dentry.inode().unwrap().get_meta().superblock
+            &self.inode().unwrap().get_meta().superblock
         ));
 
         let file_name = new_dentry.name();

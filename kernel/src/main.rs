@@ -27,7 +27,7 @@ use core::ptr;
 use arch::mm::fence;
 use config::mm::{DTB_ADDR, DTB_END, DTB_START};
 use driver::println;
-use logging::{disable_log, enable_log};
+use logging::{disable_log, enable_filter, enable_log};
 use mm::{self, frame, heap};
 use osdriver::test_serial_output;
 
@@ -62,6 +62,7 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         logger::init();
         disable_log();
         // enable_log();
+        enable_filter(1);
 
         log::info!("dtb_addr: {:#x}", dtb_addr);
 
