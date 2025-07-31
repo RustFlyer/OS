@@ -353,13 +353,21 @@ unzip:
 	-rm -rf /vendor
 	tar xf submit/vendor.tar.gz
 
-PHONY += board
-board:
+PHONY += board-rv
+board-rv:
 # make kernel-build ARCH=riscv64 MODE=release
 # @cp $(KERNEL_ELF) kernel-rv
-	@riscv64-unknown-elf-objcopy -O binary kernel-rv ./board/kernel-rv.bin 
-	@mkimage -A riscv -O linux -T kernel -C none -a 0x80200000 -e 0x80200000 -n "NighthawkOS" -d ./board/kernel-rv.bin ./board/uImage
-	@echo "success create uImage"
+	@riscv64-unknown-elf-objcopy -O binary kernel-rv ./board/riscv/kernel-rv.bin 
+	@mkimage -A riscv -O linux -T kernel -C none -a 0x80200000 -e 0x80200000 -n "NighthawkOS-Rv" -d ./board/riscv/kernel-rv.bin ./board/riscv/uImage
+	@echo "success create uImage(rv)"
+
+PHONY += board-la
+board-la:
+# make kernel-build ARCH=riscv64 MODE=release
+# @cp $(KERNEL_ELF) kernel-rv
+	@loongarch64-linux-gnu-objcopy -R .eh_frame_hdr -R .eh_frame -O binary kernel-la ./board/loongarch/kernel-la.bin 
+	@mkimage -A loongarch -O linux -T kernel -C none -a 0x80200000 -e 0x80200000 -n "NighthawkOS-La" -d ./board/loongarch/kernel-la.bin ./board/loongarch/uImage
+	@echo "success create uImage(la)"
 
 .PHONY: $(PHONY)
 

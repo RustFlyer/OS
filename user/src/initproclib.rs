@@ -229,6 +229,8 @@ pub fn usershell() {
 }
 
 pub fn riscv_init() {
+    close(2);
+
     if open(-100, "/bin/ls", OpenFlags::empty(), InodeMode::empty()) > 0 {
         println!("The device has been initialized");
         let fd = open(0, "/dev/tty", OpenFlags::O_WRONLY, InodeMode::CHAR);
@@ -254,8 +256,6 @@ pub fn riscv_init() {
     mkdir("/bin");
     mkdir("/lib");
     mkdir("/usr");
-
-    close(2);
 
     run_cmd("./busybox ln -s /musl/lib/libc.so /lib/ld-musl-riscv64-sf.so.1");
     run_cmd("./busybox ln -s /musl/lib/libc.so /lib/ld-musl-riscv64.so.1");
@@ -287,20 +287,27 @@ pub fn riscv_init() {
 }
 
 pub fn loongarch_init() {
-    // if open(-100, "/bin/ls", OpenFlags::empty(), InodeMode::empty()) > 0 {
-    //     println!("The device has been initialized");
-    //     let fd = open(0, "/dev/tty", OpenFlags::O_WRONLY, InodeMode::CHAR);
-    //     if fd != 2 {
-    //         dup(fd as usize);
-    //         close(fd as usize);
-    //     }
-    //     return;
-    // }
+    close(2);
+
+    if open(-100, "/bin/ls", OpenFlags::empty(), InodeMode::empty()) > 0 {
+        println!("The device has been initialized");
+        let fd = open(0, "/dev/tty", OpenFlags::O_WRONLY, InodeMode::CHAR);
+        if fd != 2 {
+            dup(fd as usize);
+            close(fd as usize);
+        }
+        return;
+    }
 
     if chdir("musl") < 0 {
         println!("The device uses disk-la");
         mkdir("/bin");
         run_cmd("./busybox --install -s /bin");
+        let fd = open(0, "/dev/tty", OpenFlags::O_WRONLY, InodeMode::CHAR);
+        if fd != 2 {
+            dup(fd as usize);
+            close(fd as usize);
+        }
         return;
     }
 
@@ -308,8 +315,6 @@ pub fn loongarch_init() {
     mkdir("/lib64");
     mkdir("/usr");
     mkdir("/usr/lib64");
-
-    close(2);
 
     run_cmd("./busybox ln -s /musl/lib/* /lib64/");
     println!("loading user lib: 20%");
