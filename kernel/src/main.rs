@@ -62,7 +62,7 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         logger::init();
         disable_log();
         // enable_log();
-        enable_filter(1);
+        // enable_filter(1);
 
         log::info!("dtb_addr: {:#x}", dtb_addr);
 
