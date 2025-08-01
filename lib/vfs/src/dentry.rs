@@ -11,7 +11,6 @@ use crate::fanotify::{FanotifyEntrySet, FanotifyGroupKey};
 use crate::file::File;
 use crate::handle::FileHandle;
 use crate::inode::Inode;
-use crate::path::split_parent_and_name;
 use crate::superblock::SuperBlock;
 
 /// Data that is common to all dentries.
@@ -138,11 +137,9 @@ pub trait Dentry: Send + Sync {
     /// `dentry` points to. An implementation of this function should first create a
     /// hard link to `dentry` in `new_dentry`, and then remove the old dentry.
     ///
-    /// `new_dentry` and `dentry` are sure not to be the same dentry. This constraint
-    /// may be changed in the future.
-    ///
-    /// `dentry` can be a directory, but in which case `new_dentry` must be a negative
-    /// dentry. In other words, this operation never replaces an existing directory.
+    /// The path of `dentry` must not be a prefix of the path of `new_dentry`. `dentry`
+    /// and `new_dentry` must not refer to the same inode. If `new_dentry` is valid and a
+    /// directory, it must be empty.
     ///
     /// This function does not follow symbolic links.
     fn base_rename(
@@ -415,8 +412,10 @@ impl dyn Dentry {
     /// If the path of `dentry` is a prefix of the path of `new_dentry`, this function
     /// returns `EINVAL`.
     ///
+    /// If `dentry` and `new_dentry` refer to the same inode, this function does nothing.
+    ///
     /// `dentry` can be a directory, but in which case `new_dentry` must be a negative
-    /// dentry. In other words, this operation never replaces an existing directory.
+    /// dentry or an empty directory.
     ///
     /// This function does not follow symbolic links.
     pub fn rename(
@@ -434,11 +433,19 @@ impl dyn Dentry {
         if Arc::ptr_eq(dentry, new_dentry) {
             return Ok(());
         }
-
-        let (dparent, _name) = split_parent_and_name(&dentry.path());
-        let (dnparent, _name) = split_parent_and_name(&new_dentry.path());
-        if dparent != dnparent && dparent.starts_with(&dnparent) && !dparent.is_empty() {
+        if Arc::ptr_eq(dentry, new_dir) {
             return Err(SysError::EINVAL);
+        }
+        if !new_dentry.is_negative() && new_dentry.inode().unwrap().inotype().is_dir() {
+            <dyn File>::open(Arc::clone(new_dentry))?.load_dir()?;
+            if !new_dentry.get_meta().children.lock().is_empty() {
+                return Err(SysError::ENOTEMPTY);
+            }
+        }
+        if !new_dentry.is_negative()
+            && new_dentry.inode().unwrap().ino() == dentry.inode().unwrap().ino()
+        {
+            return Ok(());
         }
 
         let old_name = dentry.name();
