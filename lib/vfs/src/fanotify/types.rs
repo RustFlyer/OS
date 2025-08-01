@@ -294,29 +294,44 @@ bitflags! {
         /// is not a file event, it is a directory event. Note that flags `ONDIR`,
         /// `EVENT_ON_CHILD`, and `Q_OVERFLOW` are not included in this mask, so the
         /// user should be careful when using this mask to check for file events.
-        const FILE_EVENT_MASK = Self::ACCESS.bits()
-            | Self::MODIFY.bits()
-            | Self::CLOSE_WRITE.bits()
-            | Self::CLOSE_NOWRITE.bits()
-            | Self::OPEN.bits()
-            | Self::OPEN_EXEC.bits()
-            | Self::ATTRIB.bits()
-            | Self::DELETE_SELF.bits()
-            | Self::FS_ERROR.bits()
-            | Self::MOVE_SELF.bits()
-            | Self::ACCESS_PERM.bits()
-            | Self::OPEN_PERM.bits()
-            | Self::OPEN_EXEC_PERM.bits();
+        const FILE_EVENT_MASK =
+            Self::ACCESS.bits()
+          | Self::MODIFY.bits()
+          | Self::CLOSE_WRITE.bits()
+          | Self::CLOSE_NOWRITE.bits()
+          | Self::OPEN.bits()
+          | Self::OPEN_EXEC.bits()
+          | Self::ATTRIB.bits()
+          | Self::DELETE_SELF.bits()
+          | Self::FS_ERROR.bits()
+          | Self::MOVE_SELF.bits()
+          | Self::ACCESS_PERM.bits()
+          | Self::OPEN_PERM.bits()
+          | Self::OPEN_EXEC_PERM.bits();
 
         /// This bit mask is used to check whether an event is a directory event. If an
         /// event is not a directory event, it is a file event. Note that flags `ONDIR`,
         /// `EVENT_ON_CHILD`, and `Q_OVERFLOW` are not included in this mask, so the
         /// user should be careful when using this mask to check for directory events.
-        const DIR_EVENT_MASK = Self::CREATE.bits()
-            | Self::DELETE.bits()
-            | Self::MOVED_FROM.bits()
-            | Self::MOVED_TO.bits()
-            | Self::RENAME.bits();
+        const DIR_EVENT_MASK =
+            Self::CREATE.bits()
+          | Self::DELETE.bits()
+          | Self::MOVED_FROM.bits()
+          | Self::MOVED_TO.bits()
+          | Self::RENAME.bits();
+
+        /// This bit mask contains all events that need the group to identify filesystem
+        /// objects by file handles.
+        const FID_EVENT_MASK =
+            Self::ATTRIB.bits()
+          | Self::CREATE.bits()
+          | Self::DELETE.bits()
+          | Self::DELETE_SELF.bits()
+          | Self::FS_ERROR.bits()
+          | Self::MOVED_FROM.bits()
+          | Self::MOVED_TO.bits()
+          | Self::RENAME.bits()
+          | Self::MOVE_SELF.bits();
     }
 }
 

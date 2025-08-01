@@ -89,6 +89,11 @@ impl FanotifyGroup {
         }
     }
 
+    /// Returns the flags of the fanotify group.
+    pub fn flags(&self) -> FanInitFlags {
+        self.flags
+    }
+
     /// Subscribes to events on a filesystem object.
     ///
     /// This method creates an entry in the fanotify group for the specified filesystem
