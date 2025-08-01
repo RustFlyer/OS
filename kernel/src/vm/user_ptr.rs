@@ -32,7 +32,7 @@
 //!   for `read_unchecked` and `write_unchecked` functions.
 
 use alloc::{ffi::CString, vec::Vec};
-use core::{cmp, fmt::Debug, marker::PhantomData, ops::ControlFlow, slice};
+use core::{cmp, fmt::Debug, marker::PhantomData, ops::ControlFlow, slice, str::FromStr};
 
 use config::mm::{PAGE_SIZE, USER_END};
 use mm::address::VirtAddr;
@@ -332,24 +332,32 @@ where
 
         let mut vec: Vec<u8> = Vec::new();
         let mut push_and_check = |byte: u8| {
-            if byte == 0 {
-                return ControlFlow::Break(());
-            }
             vec.push(byte);
-            ControlFlow::Continue(())
+            if byte == 0 {
+                ControlFlow::Break(())
+            } else {
+                ControlFlow::Continue(())
+            }
         };
         // SAFETY: every `u8` is valid.
         unsafe {
             access_with_checking(
                 self.addr_space,
                 self.ptr as usize,
-                len - 1,
+                len,
                 MappingFlags::R,
                 &mut push_and_check,
             )?;
         }
-        // SAFETY: `vec` has no null byte in the middle.
-        Ok(unsafe { CString::from_vec_unchecked(vec) })
+        match vec.last() {
+            Some(&0) => {
+                vec.pop(); // Remove the null terminator.
+                // SAFETY: `vec` has no null byte in the middle.
+                Ok(unsafe { CString::from_vec_unchecked(vec) })
+            }
+            Some(_) => Err(SysError::ENAMETOOLONG),
+            None => Ok(CString::from_str("").unwrap()),
+        }
     }
 }
 
