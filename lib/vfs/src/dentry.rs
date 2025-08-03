@@ -436,11 +436,16 @@ impl dyn Dentry {
         if Arc::ptr_eq(dentry, new_dir) {
             return Err(SysError::EINVAL);
         }
-        if !new_dentry.is_negative()
-            && new_dentry.inode().unwrap().ino() == dentry.inode().unwrap().ino()
-        {
-            return Ok(());
-        }
+
+        // a problem happens here
+        // the rename target has a different path from source one but with a same ino
+        // , which cause failure of git.
+        // if !new_dentry.is_negative()
+        //     && new_dentry.inode().unwrap().ino() == dentry.inode().unwrap().ino()
+        // {
+        //     return Ok(());
+        // }
+
         if !new_dentry.is_negative() {
             let old_type = dentry.inode().unwrap().inotype();
             let new_type = new_dentry.inode().unwrap().inotype();
