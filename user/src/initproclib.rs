@@ -3,7 +3,7 @@ extern crate alloc;
 use core::str::from_utf8;
 
 use crate::{
-    chdir, close, console::getchar, dup, execve, exit, fork, getcwd, getdents, mkdir, open, print,
+    chdir, close, console::getchar, dup, execve, exit, faccessat, fork, getcwd, getdents, mkdir, open, print,
     println, waitpid,
 };
 
@@ -466,47 +466,59 @@ pub fn supple_cmd(buf: &mut [u8; 256], bptr: &mut usize) {
     *bptr = tbptr;
 }
 
+pub fn file_exists(path: &str) -> bool {
+    faccessat(-100, path, 0) == 0
+}
+
+/// Create a symbolic link only if the target doesn't exist
+pub fn new_link(target: &str, link_path: &str) {
+    if !file_exists(link_path) {
+        let cmd = format!("./busybox ln -s {} {}", target, link_path);
+        run_cmd(&cmd);
+    }
+}
+
 pub fn software_init() {
     gcc_init();
     git_init();
-    run_cmd("./busybox ln -s /vim/vim /bin/vim");
+    new_link("/vim/vim", "/bin/vim");
 }
 
 pub fn gcc_init() {
 
     #[cfg(target_arch = "riscv64")]
     {
-        run_cmd("./busybox ln -s /lib/ld-musl-riscv64.so.1 /lib/libc.musl-riscv64.so.1");
-        run_cmd("./busybox ln -s /lib/ld-musl-riscv64.so.1 /lib/libc.so");
+        new_link("/lib/ld-musl-riscv64.so.1", "/lib/libc.musl-riscv64.so.1");
+        new_link("/lib/ld-musl-riscv64.so.1", "/lib/libc.so");
     }
     #[cfg(target_arch = "loongarch64")] {
-        run_cmd("./busybox ln -s /lib/ld-musl-loongarch64.so.1 /lib/libc.musl-loongarch64.so.1");
-        run_cmd("./busybox ln -s /lib/ld-musl-loongarch64.so.1 /lib/libc.so");
+        new_link("/lib/ld-musl-loongarch64.so.1", "/lib/libc.musl-loongarch64.so.1");
+        new_link("/lib/ld-musl-loongarch64.so.1", "/lib/libc.so");
     }
 
-    run_cmd("./busybox ln -s /lib/libcc1.so.0.0.0 /lib/libcc1.so");
-    run_cmd("./busybox ln -s /lib/libmagic.so.1.0.0 /lib/libmagic.so.1");
-    run_cmd("./busybox ln -s /lib/libctf-nobfd.so.0.0.0 /lib/libctf-nobfd.so.0");
-    run_cmd("./busybox ln -s /lib/libcp1plugin.so.0.0.0 /lib/libcp1plugin.so.0");
-    run_cmd("./busybox ln -s /lib/libgomp.so.1.0.0 /lib/libgomp.so.1");
-    run_cmd("./busybox ln -s /lib/libcc1plugin.so.0.0.0 /lib/libcc1plugin.so");
-    run_cmd("./busybox ln -s /lib/libjansson.so.4.14.1 /lib/libjansson.so.4");
-    run_cmd("./busybox ln -s /lib/liblto_plugin.so /lib/liblto_plugin.so");
-    run_cmd("./busybox ln -s /lib/libz.so.1.3.1 /lib/libz.so.1");
-    run_cmd("./busybox ln -s /lib/libmpfr.so.6.2.1 /lib/libmpfr.so.6");
-    run_cmd("./busybox ln -s /lib/libgmp.so.10.5.0 /lib/libgmp.so.10");
-    run_cmd("./busybox ln -s /lib/libmpc.so.3.3.1 /lib/libmpc.so.3");
-    run_cmd("./busybox ln -s /lib/libctf.so.0.0.0 /lib/libctf.so.0");
-    run_cmd("./busybox ln -s /lib/libisl.so.23.3.0 /lib/libisl.so.23");
-    run_cmd("./busybox ln -s /lib/libstdc++.so.6.0.33 /lib/libstdc++.so.6");
-    run_cmd("./busybox ln -s /lib/libsframe.so.1.0.0 /lib/libsframe.so.1");
-    run_cmd("./busybox ln -s /lib/libatomic.so.1.2.0 /lib/libatomic.so.1");
-    run_cmd("./busybox ln -s /lib/libcc1plugin.so.0.0.0 /lib/libcc1plugin.so.0");
-    run_cmd("./busybox ln -s /lib/libgomp.so.1.0.0 /lib/libgomp.so.1");
-    run_cmd("./busybox ln -s /lib/libzstd.so.1.5.7 /lib/libzstd.so.1");
-    run_cmd("./busybox ln -s /lib/libstdc++.so.6.0.33 /lib/libstdc++.so");
+    new_link("/lib/libcc1.so.0.0.0", "/lib/libcc1.so");
+    new_link("/lib/libmagic.so.1.0.0", "/lib/libmagic.so.1");
+    new_link("/lib/libctf-nobfd.so.0.0.0", "/lib/libctf-nobfd.so.0");
+    new_link("/lib/libcp1plugin.so.0.0.0", "/lib/libcp1plugin.so.0");
+    new_link("/lib/libgomp.so.1.0.0", "/lib/libgomp.so.1");
+    new_link("/lib/libcc1plugin.so.0.0.0", "/lib/libcc1plugin.so");
+    new_link("/lib/libjansson.so.4.14.1", "/lib/libjansson.so.4");
+    new_link("/lib/liblto_plugin.so", "/lib/liblto_plugin.so");
+    new_link("/lib/libz.so.1.3.1", "/lib/libz.so.1");
+    new_link("/lib/libmpfr.so.6.2.1", "/lib/libmpfr.so.6");
+    new_link("/lib/libgmp.so.10.5.0", "/lib/libgmp.so.10");
+    new_link("/lib/libmpc.so.3.3.1", "/lib/libmpc.so.3");
+    new_link("/lib/libctf.so.0.0.0", "/lib/libctf.so.0");
+    new_link("/lib/libisl.so.23.3.0", "/lib/libisl.so.23");
+    new_link("/lib/libstdc++.so.6.0.33", "/lib/libstdc++.so.6");
+    new_link("/lib/libsframe.so.1.0.0", "/lib/libsframe.so.1");
+    new_link("/lib/libatomic.so.1.2.0", "/lib/libatomic.so.1");
+    new_link("/lib/libcc1plugin.so.0.0.0", "/lib/libcc1plugin.so.0");
+    new_link("/lib/libgomp.so.1.0.0", "/lib/libgomp.so.1");
+    new_link("/lib/libzstd.so.1.5.7", "/lib/libzstd.so.1");
+    new_link("/lib/libstdc++.so.6.0.33", "/lib/libstdc++.so");
 
-    run_cmd("./busybox ln -s /usr/bin/gcc /bin/gcc");
+    new_link("/usr/bin/gcc", "/bin/gcc");
     
 }
 pub fn git_init() {
@@ -656,12 +668,10 @@ pub fn git_init() {
     const GIT_BASE_PATH: &str = "/git/libexec/git-core";
 
     for cmd in GIT_COMMANDS {
-        let command = format!(
-            "./busybox ln -s {}/git {}/{}",
-            GIT_BASE_PATH, GIT_BASE_PATH, cmd
-        );
-        run_cmd(&command);
+        let target = format!("{}/git", GIT_BASE_PATH);
+        let link_path = format!("{}/{}", GIT_BASE_PATH, cmd);
+        new_link(&target, &link_path);
     }
 
-    run_cmd("./busybox ln -s /git/bin/git /bin/git");
+    new_link("/git/bin/git", "/bin/git");
 }

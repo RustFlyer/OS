@@ -310,6 +310,7 @@ syscall!(
     usize
 );
 syscall!(sys_openat, SYSCALL_OPEN, usize, *const u8, usize, usize);
+syscall!(sys_faccessat, SYSCALL_FACCESSAT, usize, *const u8, i32);
 syscall!(sys_lseek, SYSCALL_LSEEK, usize, isize, usize);
 syscall!(sys_getdents64, SYSCALL_GETDENTS, usize, *const u8, usize);
 
