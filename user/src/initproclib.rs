@@ -277,8 +277,6 @@ pub fn riscv_init() {
     println!("loading user lib: 100%");
     println!("loading user lib: complete!");
 
-    git_init();
-
     let fd = open(0, "/dev/tty", OpenFlags::O_WRONLY, InodeMode::CHAR);
     if fd != 2 {
         dup(fd as usize);
@@ -333,8 +331,6 @@ pub fn loongarch_init() {
     run_cmd("./busybox --install -s /bin");
     println!("loading user lib: 100%");
     println!("loading user lib: complete!");
-
-    git_init();
 
     let fd = open(0, "/dev/tty", OpenFlags::O_WRONLY, InodeMode::CHAR);
     if fd != 2 {
@@ -470,6 +466,46 @@ pub fn supple_cmd(buf: &mut [u8; 256], bptr: &mut usize) {
     *bptr = tbptr;
 }
 
+pub fn software_init() {
+    gcc_init();
+    git_init();
+}
+
+pub fn gcc_init() {
+
+    #[cfg(target_arch = "riscv64")]
+    {
+        run_cmd("./busybox ln -s /lib/ld-musl-riscv64.so.1 /lib/libc.musl-riscv64.so.1");
+        run_cmd("./busybox ln -s /lib/ld-musl-riscv64.so.1 /lib/libc.so");
+    }
+    #[cfg(target_arch = "loongarch64")] {
+        run_cmd("./busybox ln -s /lib/ld-musl-loongarch64.so.1 /lib/libc.musl-loongarch64.so.1");
+        run_cmd("./busybox ln -s /lib/ld-musl-loongarch64.so.1 /lib/libc.so");
+    }
+
+    run_cmd("./busybox ln -s /lib/libcc1.so.0.0.0 /lib/libcc1.so");
+    run_cmd("./busybox ln -s /lib/libmagic.so.1.0.0 /lib/libmagic.so.1");
+    run_cmd("./busybox ln -s /lib/libctf-nobfd.so.0.0.0 /lib/libctf-nobfd.so.0");
+    run_cmd("./busybox ln -s /lib/libcp1plugin.so.0.0.0 /lib/libcp1plugin.so.0");
+    run_cmd("./busybox ln -s /lib/libgomp.so.1.0.0 /lib/libgomp.so.1");
+    run_cmd("./busybox ln -s /lib/libcc1plugin.so.0.0.0 /lib/libcc1plugin.so");
+    run_cmd("./busybox ln -s /lib/libjansson.so.4.14.1 /lib/libjansson.so.4");
+    run_cmd("./busybox ln -s /lib/liblto_plugin.so /lib/liblto_plugin.so");
+    run_cmd("./busybox ln -s /lib/libz.so.1.3.1 /lib/libz.so.1");
+    run_cmd("./busybox ln -s /lib/libmpfr.so.6.2.1 /lib/libmpfr.so.6");
+    run_cmd("./busybox ln -s /lib/libgmp.so.10.5.0 /lib/libgmp.so.10");
+    run_cmd("./busybox ln -s /lib/libmpc.so.3.3.1 /lib/libmpc.so.3");
+    run_cmd("./busybox ln -s /lib/libctf.so.0.0.0 /lib/libctf.so.0");
+    run_cmd("./busybox ln -s /lib/libisl.so.23.3.0 /lib/libisl.so.23");
+    run_cmd("./busybox ln -s /lib/libstdc++.so.6.0.33 /lib/libstdc++.so.6");
+    run_cmd("./busybox ln -s /lib/libsframe.so.1.0.0 /lib/libsframe.so.1");
+    run_cmd("./busybox ln -s /lib/libatomic.so.1.2.0 /lib/libatomic.so.1");
+    run_cmd("./busybox ln -s /lib/libcc1plugin.so.0.0.0 /lib/libcc1plugin.so.0");
+    run_cmd("./busybox ln -s /lib/libgomp.so.1.0.0 /lib/libgomp.so.1");
+    run_cmd("./busybox ln -s /lib/libzstd.so.1.5.7 /lib/libzstd.so.1");
+    run_cmd("./busybox ln -s /lib/libstdc++.so.6.0.33 /lib/libstdc++.so");
+    
+}
 pub fn git_init() {
     const GIT_COMMANDS: &[&str] = &[
         "git-add",

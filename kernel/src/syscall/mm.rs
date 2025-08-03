@@ -92,9 +92,9 @@ pub async fn sys_mmap(
         None
     };
 
-    log::info!(
-        "[sys_mmap] addr: {addr:#x}, length: {length:#x}, flags: {flags:?}, fd: {fd}, prot: {prot:?}, seals: {seals:?}"
-    );
+    // log::info!(
+    //     "[sys_mmap] addr: {addr:#x}, length: {length:#x}, flags: {flags:?}, fd: {fd}, prot: {prot:?}, seals: {seals:?}"
+    // );
 
     if addr == 0 && flags.contains(MmapFlags::MAP_FIXED) {
         return Err(SysError::EINVAL);
@@ -124,7 +124,7 @@ pub async fn sys_mmap(
     //     }
     // }
 
-    log::info!("[sys_mmap] allocated at: {:#x}", result?);
+    // log::info!("[sys_mmap] allocated at: {:#x}", result?);
     result
 }
 

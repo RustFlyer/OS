@@ -4,12 +4,13 @@
 extern crate alloc;
 extern crate user_lib;
 
-use user_lib::{fork, loongarch_init, usershell, waitpid};
+use user_lib::{fork, loongarch_init, software_init, usershell, waitpid};
 
 #[unsafe(no_mangle)]
 fn main() {
     if fork() == 0 {
         loongarch_init();
+        software_init();
         usershell();
     }
 
