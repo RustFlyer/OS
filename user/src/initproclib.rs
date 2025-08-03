@@ -469,6 +469,7 @@ pub fn supple_cmd(buf: &mut [u8; 256], bptr: &mut usize) {
 pub fn software_init() {
     gcc_init();
     git_init();
+    run_cmd("./busybox ln -s /vim/vim /bin/vim");
 }
 
 pub fn gcc_init() {
@@ -504,6 +505,8 @@ pub fn gcc_init() {
     run_cmd("./busybox ln -s /lib/libgomp.so.1.0.0 /lib/libgomp.so.1");
     run_cmd("./busybox ln -s /lib/libzstd.so.1.5.7 /lib/libzstd.so.1");
     run_cmd("./busybox ln -s /lib/libstdc++.so.6.0.33 /lib/libstdc++.so");
+
+    run_cmd("./busybox ln -s /usr/bin/gcc /bin/gcc");
     
 }
 pub fn git_init() {
@@ -650,7 +653,7 @@ pub fn git_init() {
         "git-write-tree",
     ];
 
-    const GIT_BASE_PATH: &str = "/git_r_m/libexec/git-core";
+    const GIT_BASE_PATH: &str = "/git/libexec/git-core";
 
     for cmd in GIT_COMMANDS {
         let command = format!(
@@ -659,4 +662,6 @@ pub fn git_init() {
         );
         run_cmd(&command);
     }
+
+    run_cmd("./busybox ln -s /git/bin/git /bin/git");
 }

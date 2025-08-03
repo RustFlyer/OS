@@ -481,11 +481,13 @@ fn __sys_clone(
 pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult {
     let task = current_task();
 
+    const PATH_LEMGTH:usize = 4096;
+
     let read_string = |addr| {
         let addr_space = task.addr_space();
         let mut user_ptr = UserReadPtr::<u8>::new(addr, &addr_space);
         user_ptr
-            .read_c_string(256)?
+            .read_c_string(PATH_LEMGTH)?
             .into_string()
             .map_err(|_| SysError::EINVAL)
     };
@@ -496,11 +498,11 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
         let mut args = Vec::new();
         let addr_space = task.addr_space();
         let mut user_ptr = UserReadPtr::<usize>::new(addr, &addr_space);
-        let pointers = user_ptr.read_ptr_array(256)?;
+        let pointers = user_ptr.read_ptr_array(PATH_LEMGTH)?;
         for ptr in pointers {
             let mut user_ptr = UserReadPtr::<u8>::new(ptr, &addr_space);
             let string = user_ptr
-                .read_c_string(256)?
+                .read_c_string(PATH_LEMGTH)?
                 .into_string()
                 .map_err(|_| SysError::EINVAL)?;
             args.push(string);
