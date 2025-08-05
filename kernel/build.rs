@@ -23,7 +23,7 @@ fn main() {
     // architecture, not the target architecture of the kernel.
     let VIRT_START: usize = match target_arch.as_str() {
         "riscv64" => 0xffff_ffc0_8000_0000,
-        "loongarch64" => 0x9000_0000_0000_0000,
+        "loongarch64" => 0x9000_0000_8000_0000,
         _ => panic!("Unsupported target architecture"),
     };
     let KERNEL_START: usize = VIRT_START + KERNEL_RAM_OFFSET;
