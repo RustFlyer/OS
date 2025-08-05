@@ -11,7 +11,7 @@ pub const RAM_END: usize = RAM_START + RAM_SIZE;
 #[cfg(target_arch = "riscv64")]
 pub const VIRT_START: usize = 0xffff_ffc0_8000_0000;
 #[cfg(target_arch = "loongarch64")]
-pub const VIRT_START: usize = 0x9000_0000_8000_0000;
+pub const VIRT_START: usize = 0x9000_0000_0000_0000;
 #[cfg(not(any(target_arch = "riscv64", target_arch = "loongarch64")))]
 // Fallback to make `build.rs` happy (actually never used)
 pub const VIRT_START: usize = 0x8000_0000_0000_0000;

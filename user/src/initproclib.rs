@@ -3,8 +3,8 @@ extern crate alloc;
 use core::str::from_utf8;
 
 use crate::{
-    chdir, close, console::getchar, dup, execve, exit, fork, getcwd, getdents, mkdir, open, print,
-    println, waitpid,
+    chdir, close, console::getchar, dup, execve, exit, fork, getcwd, getdents, ltpauto, mkdir,
+    open, print, println, waitpid,
 };
 
 use alloc::{
@@ -64,6 +64,10 @@ pub fn easy_cmd(s: String) -> String {
             let args: Vec<&str> = sf.split(" ").collect();
             let arg = args.get(1).unwrap();
             format!("ltp/testcases/bin/{}", arg).to_string()
+        }
+        sf if sf.starts_with("ltprun") => {
+            ltpauto::ltprun::autorun();
+            format!(" ").to_string()
         }
         _ => s,
     }
@@ -473,13 +477,13 @@ pub fn software_init() {
 }
 
 pub fn gcc_init() {
-
     #[cfg(target_arch = "riscv64")]
     {
         run_cmd("./busybox ln -s /lib/ld-musl-riscv64.so.1 /lib/libc.musl-riscv64.so.1");
         run_cmd("./busybox ln -s /lib/ld-musl-riscv64.so.1 /lib/libc.so");
     }
-    #[cfg(target_arch = "loongarch64")] {
+    #[cfg(target_arch = "loongarch64")]
+    {
         run_cmd("./busybox ln -s /lib/ld-musl-loongarch64.so.1 /lib/libc.musl-loongarch64.so.1");
         run_cmd("./busybox ln -s /lib/ld-musl-loongarch64.so.1 /lib/libc.so");
     }
@@ -507,7 +511,6 @@ pub fn gcc_init() {
     run_cmd("./busybox ln -s /lib/libstdc++.so.6.0.33 /lib/libstdc++.so");
 
     run_cmd("./busybox ln -s /usr/bin/gcc /bin/gcc");
-    
 }
 pub fn git_init() {
     const GIT_COMMANDS: &[&str] = &[

@@ -11,6 +11,8 @@ mod lang_items;
 #[allow(unused)]
 mod syscall;
 
+mod ltpauto;
+
 extern crate alloc;
 
 use alloc::{ffi::CString, vec::Vec};

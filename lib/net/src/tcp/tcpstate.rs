@@ -229,7 +229,7 @@ impl TcpSocket {
                 SOCKET_SET.with_socket_mut::<tcp::Socket, _, _>(sock_handle, |sock| {
                     sock.listen(bound_endpoint).unwrap();
                 });
-                log::error!("[listen] add {}", sock_handle);
+                log::debug!("[listen] add {}", sock_handle);
                 self.listen_handles.lock().push(sock_handle);
             }
 

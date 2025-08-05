@@ -76,7 +76,7 @@ impl Drop for TcpSocket {
                 sock.abort();
             });
 
-            log::error!("remove {}", handle);
+            log::debug!("remove {}", handle);
             SOCKET_SET.remove(handle);
         }
 
@@ -85,7 +85,7 @@ impl Drop for TcpSocket {
             SOCKET_SET.with_socket_mut::<tcp::Socket, _, _>(handle, |sock| {
                 sock.abort();
             });
-            log::error!("remove {}", handle);
+            log::debug!("remove {}", handle);
             SOCKET_SET.remove(handle);
         }
         let timestamp = SOCKET_SET.poll_interfaces();
