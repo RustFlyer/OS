@@ -7,11 +7,12 @@ use arch::{
 };
 use mm::address::VirtAddr;
 use timer::TIMER_MANAGER;
+use crate::trap::trap_context::KernelTrapContext;
 
 use crate::{task::TaskState, trap::trap_handler::TRAP_STATS};
 
 #[unsafe(no_mangle)]
-pub fn kernel_trap_handler() {
+pub fn kernel_trap_handler(cx: &mut KernelTrapContext) {
     let estat = estat::read();
     match estat.cause() {
         Trap::Exception(e) => kernel_exception_handler(e),

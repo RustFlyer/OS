@@ -14,6 +14,7 @@
     .globl __try_read_user
     .globl __try_write_user
 
+.equ KERNEL_CTX_SIZE, 33*8
 
 .align 2
 # __trap_from_user: This label marks the entry point for traps originating from user mode
@@ -118,11 +119,16 @@ __return_to_user:
 __trap_from_kernel:
     # only need to save caller-saved regs
     # note that we don't save sepc & stvec here
-    addi sp, sp, -KernelTrapContext
+    addi sp, sp, -KERNEL_CTX_SIZE
+    
+    sd x1, 1*8(sp)
 
+    addi t0, sp, KERNEL_CTX_SIZE
+    sd t0, 2*8(sp) # t0 = new_sp + size = original_sp
+    
     # Save x3~x31
-    .set n, 1
-    .rept 31
+    .set n, 3
+    .rept 29
         SAVE_GP %n
         .set n, n+1
     .endr
@@ -133,9 +139,11 @@ __trap_from_kernel:
     mv a0, sp
 
     call kernel_trap_handler
-    
-    .set n, 1
-    .rept 31
+
+    ld x1, 1*8(sp)
+    // sp should be recovered by addi below
+    .set n, 3
+    .rept 29
         LOAD_GP %n
         .set n, n+1
     .endr
@@ -143,7 +151,7 @@ __trap_from_kernel:
     ld t1, 32*8(sp)
     csrw sepc, t1
 
-    addi sp, sp, KernelTrapContext
+    addi sp, sp, KERNEL_CTX_SIZE
     sret
 
 # arg: (user_ptr)

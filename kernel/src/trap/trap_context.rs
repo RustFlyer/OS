@@ -312,6 +312,7 @@ impl TrapContext {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct KernelTrapContext {
     pub user_reg: [usize; 32],
     pub sepc: usize,
