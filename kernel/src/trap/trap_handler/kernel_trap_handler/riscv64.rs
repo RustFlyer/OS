@@ -9,11 +9,12 @@ use arch::time::{get_time_duration, set_nx_timer_irq};
 use mm::address::{PhysPageNum, VirtAddr};
 use timer::TIMER_MANAGER;
 
+use crate::trap::trap_context::KernelTrapContext;
 use crate::vm::trace_page_table_lookup;
 use crate::{osdriver::manager::device_manager, trap::trap_handler::TRAP_STATS};
 
 #[unsafe(no_mangle)]
-pub fn kernel_trap_handler() {
+pub fn kernel_trap_handler(cx: &mut KernelTrapContext) {
     let scause = scause::read();
     match scause.cause() {
         Trap::Exception(e) => exception_handler(Exception::from_number(e).unwrap()),
