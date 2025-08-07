@@ -117,18 +117,11 @@ __return_to_user:
 
 # kernel -> kernel
 __trap_from_kernel:
-    # only need to save caller-saved regs
-    # note that we don't save sepc & stvec here
     addi sp, sp, -KERNEL_CTX_SIZE
-    
-    sd x1, 1*8(sp)
 
-    addi t0, sp, KERNEL_CTX_SIZE
-    sd t0, 2*8(sp) # t0 = new_sp + size = original_sp
-    
-    # Save x3~x31
-    .set n, 3
-    .rept 29
+    # Save x1~x31
+    .set n, 1
+    .rept 31
         SAVE_GP %n
         .set n, n+1
     .endr
@@ -140,16 +133,14 @@ __trap_from_kernel:
 
     call kernel_trap_handler
 
-    ld x1, 1*8(sp)
-    // sp should be recovered by addi below
-    .set n, 3
-    .rept 29
+    ld t1, 32*8(sp)
+    csrw sepc, t1
+
+    .set n, 1
+    .rept 31
         LOAD_GP %n
         .set n, n+1
     .endr
-
-    ld t1, 32*8(sp)
-    csrw sepc, t1
 
     addi sp, sp, KERNEL_CTX_SIZE
     sret
