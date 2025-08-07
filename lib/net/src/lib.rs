@@ -2,6 +2,7 @@
 #![no_main]
 #![feature(ip)]
 #![allow(unused)]
+#![feature(box_as_ptr)]
 
 use alloc::{boxed::Box, sync::Arc, vec};
 use driver::net::NetDevice;
@@ -42,9 +43,12 @@ pub(crate) static ETH0: Once<InterfaceWrapper> = Once::new();
 
 /// This funtion is used to initialize `ETH0`, setting correct device, ips and gateway.
 pub fn init_network(net_dev: Box<dyn NetDevice>, is_loopback: bool) {
+    log::debug!("init_network begin");
     let ether_addr = EthernetAddress(net_dev.mac_address().0);
+    log::debug!("eth0 init");
     let eth0 = InterfaceWrapper::new("eth0", net_dev, ether_addr);
 
+    log::debug!("gateway parse");
     let gateway = GATEWAY.parse().unwrap();
     let ip_addrs = if is_loopback {
         let ip = "127.0.0.1".parse().unwrap();
@@ -57,9 +61,12 @@ pub fn init_network(net_dev: Box<dyn NetDevice>, is_loopback: bool) {
         ]
     };
 
+    log::debug!("eth0 setup_ip_addr");
     eth0.setup_ip_addr(ip_addrs);
+    log::debug!("eth0 setup_gateway");
     eth0.setup_gateway(gateway);
 
+    log::debug!("ETH0 INIT...");
     ETH0.call_once(|| eth0);
 }
 

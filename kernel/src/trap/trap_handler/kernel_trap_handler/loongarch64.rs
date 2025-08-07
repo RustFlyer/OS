@@ -8,7 +8,10 @@ use arch::{
 use mm::address::VirtAddr;
 use timer::TIMER_MANAGER;
 
+use crate::processor::current_task;
 use crate::{task::TaskState, trap::trap_handler::TRAP_STATS};
+
+use super::unaligned_la::emulate_load_store_insn;
 
 #[unsafe(no_mangle)]
 pub fn kernel_trap_handler() {
@@ -21,6 +24,14 @@ pub fn kernel_trap_handler() {
 }
 
 fn kernel_exception_handler(_e: Exception) {
+    match _e {
+        Exception::AddressNotAligned => unsafe {
+            let task = current_task();
+            let trap_context = task.trap_context_mut();
+            emulate_load_store_insn(trap_context);
+        },
+        _ => (),
+    }
     trap_panic();
 }
 

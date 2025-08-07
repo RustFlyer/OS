@@ -91,6 +91,10 @@ unsafe impl<T: Transport, const QS: usize> Send for VirtIoNetDev<T, QS> {}
 unsafe impl<T: Transport, const QS: usize> Sync for VirtIoNetDev<T, QS> {}
 
 impl<T: Transport + 'static, const QS: usize> NetDevice for VirtIoNetDev<T, QS> {
+    fn fill_capabilities(&self, out: &mut DeviceCapabilities) {
+        todo!()
+    }
+
     fn alloc_tx_buffer(&mut self, size: usize) -> DevResult<Box<dyn super::NetBufPtrOps>> {
         // 0. Allocate a buffer from the queue.
         let mut net_buf = self.free_tx_bufs.pop().ok_or(DevError::NoMemory)?;

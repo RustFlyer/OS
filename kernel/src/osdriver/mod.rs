@@ -44,13 +44,20 @@ pub fn probe_device_tree() {
 
     #[cfg(target_arch = "loongarch64")]
     unsafe {
-        dtb_addr = 0x00100000;
+        // dtb_addr = 0x00100000;
+        dtb_addr = 0x0cbec000;
     }
 
     let device_tree = unsafe {
         println!("dt: {:#x}", dtb_addr + KERNEL_MAP_OFFSET);
-        Fdt::from_ptr((dtb_addr + KERNEL_MAP_OFFSET) as *const u8).expect("Parse DTB failed")
+        // Fdt::from_ptr((dtb_addr + KERNEL_MAP_OFFSET) as *const u8).expect("Parse DTB failed")
+
+        let fdt_ref: &[u8] = include_bytes!("../../../board/loongarch/ls2k1000_dp.dtb");
+        let original_pointer = fdt_ref.as_ptr();
+        println!("original_pointer: {:#x}", original_pointer as usize);
+        unsafe { Fdt::from_ptr(original_pointer) }.unwrap()
     };
+    println!("FIND DTB TREE {:?}", device_tree);
 
     if let Ok(chosen) = device_tree.chosen() {
         if let Some(bootargs) = chosen.bootargs() {
@@ -58,6 +65,7 @@ pub fn probe_device_tree() {
         }
     }
 
+    #[cfg(target_arch = "riscv64")]
     unsafe {
         if let Ok(freq) = device_tree.cpus().next().unwrap().timebase_frequency() {
             CLOCK_FREQ = freq;
@@ -65,7 +73,6 @@ pub fn probe_device_tree() {
     }
     log::warn!("clock freq set to {} Hz", unsafe { CLOCK_FREQ });
 
-    println!("FIND DTB TREE {:?}", device_tree);
     probe_tree(&device_tree);
 
     let manager = device_manager();
@@ -76,6 +83,7 @@ pub fn probe_device_tree() {
 }
 
 pub fn ioremap_if_need(paddr: usize, size: usize) -> usize {
+    log::debug!("map paddr: {paddr:#x}, size: {size:#x}");
     #[cfg(target_arch = "riscv64")]
     {
         crate::vm::iomap::ioremap(paddr, size).expect("can not ioremap");
@@ -89,6 +97,7 @@ pub fn ioremap_if_need(paddr: usize, size: usize) -> usize {
 
 /// Guaranteed to have a PLIC
 pub fn probe_plic(root: &Fdt) -> Option<PLIC> {
+    log::debug!("probe_plic begin");
     if let Some(plic_node) = root.find_compatible(&["riscv,plic0", "sifive,plic-1.0.0"]) {
         let plic_reg = plic_node.reg().next().unwrap();
         let mmio_base = plic_reg.starting_address as usize;
@@ -103,6 +112,7 @@ pub fn probe_plic(root: &Fdt) -> Option<PLIC> {
 }
 
 pub fn probe_char_device_by_serial(root: &Fdt) -> Option<Arc<Serial>> {
+    log::debug!("probe_char_device_by_serial begin");
     let chosen = root.chosen();
 
     if chosen.is_err() {

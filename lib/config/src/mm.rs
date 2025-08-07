@@ -84,7 +84,7 @@ pub fn bss_end() -> usize {
 pub const KERNEL_MAP_OFFSET: usize = KERNEL_START - KERNEL_START_PHYS;
 
 /// Size of kernel stack
-pub const KERNEL_STACK_SIZE: usize = 2 * 1024 * 1024;
+pub const KERNEL_STACK_SIZE: usize = 4 * 1024 * 1024;
 /// Size of kernel heap
 pub const KERNEL_HEAP_SIZE: usize = 512 * 1024 * 1024;
 

@@ -39,6 +39,7 @@ pub fn probe_tree(fdt: &Fdt) {
     log::debug!("probe_tree begin");
 
     // Local Net Device (For Qemu)
+    #[cfg(target_arch = "riscv64")]
     init_network(LoopbackDev::new(), true);
 
     if let Some(plic) = probe_plic(fdt) {
@@ -88,6 +89,7 @@ pub fn probe_tree(fdt: &Fdt) {
     probe_pci_tree(fdt);
 
     if !net_device_exist() {
+        #[cfg(target_arch = "riscv64")]
         init_network(LoopbackDev::new(), true);
     }
 
@@ -340,6 +342,7 @@ impl From<u32> for PciRangeType {
 }
 
 fn probe_char_device(fdt: &Fdt) {
+    log::debug!("probe_char_device begin");
     let chosen = fdt.chosen().ok();
     let mut stdout = chosen.and_then(|c| c.stdout().map(|n| n.node()));
     if stdout.is_none() {
@@ -349,6 +352,7 @@ fn probe_char_device(fdt: &Fdt) {
         let reg = node.reg().next().unwrap();
         let base = ioremap_if_need(reg.starting_address as usize, reg.size.unwrap());
         let uart = unsafe { MmioSerialPort::new(base) };
+        println!("[CHAR_DEVICE] INIT...");
         CHAR_DEVICE.call_once(|| Arc::new(QUartDevice::new_from_mmio(uart)));
     }
 }

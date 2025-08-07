@@ -10,7 +10,7 @@ use spin::Mutex;
 /// I don't know why the address is in the `0x9xxx_...` range, which has MAT = 1.
 // #[allow(unknown_lints)]
 // #[cfg(not(board = "2k1000"))]
-const UART_ADDR: usize = 0x9000_0000_1fe0_01e0;
+// const UART_ADDR: usize = 0x9000_0000_1fe0_01e0;
 
 /// UART address of stdout device for Loongson 2K1000 machine.
 ///
@@ -19,7 +19,7 @@ const UART_ADDR: usize = 0x9000_0000_1fe0_01e0;
 /// See https://github.com/LoongsonLab/oscomp-documents/blob/main/platforms.md
 // #[allow(unknown_lints)]
 // #[cfg(board = "2k1000")]
-// const UART_ADDR: usize = 0x8000_0000_1fe2_0000;
+const UART_ADDR: usize = 0x8000_0000_1fe2_0000;
 
 static COM1: Mutex<Uart> = Mutex::new(Uart::new(UART_ADDR));
 

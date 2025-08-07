@@ -1,7 +1,10 @@
 use core::{ops::DerefMut, time::Duration};
 
 use alloc::{boxed::Box, sync::Arc, vec::Vec};
-use arch::time::{get_time_duration, get_time_us};
+use arch::{
+    mm::tlb_flush_all,
+    time::{get_time_duration, get_time_us},
+};
 use driver::net::NetDevice;
 use mutex::{ShareMutex, SpinNoIrqLock};
 use smoltcp::{
@@ -37,7 +40,7 @@ pub(crate) struct InterfaceWrapper {
     name: &'static str,
     ether_addr: EthernetAddress,
     dev: SpinNoIrqLock<DeviceWrapper>,
-    pub(crate) iface: SpinNoIrqLock<Interface>,
+    pub(crate) iface: SpinNoIrqLock<Box<Interface>>,
 }
 
 impl InterfaceWrapper {
@@ -48,15 +51,44 @@ impl InterfaceWrapper {
         dev: Box<dyn NetDevice>,
         ether_addr: EthernetAddress,
     ) -> Self {
-        let mut config = match dev.capabilities().medium {
+        log::debug!(
+            "[InterfaceWrapper::new] config dev addr: {:#x}",
+            Box::as_ptr(&dev) as *const usize as usize
+        );
+
+        log::debug!("test output1");
+
+        let r = unsafe { (Box::as_ptr(&dev) as *const usize).read() };
+
+        log::debug!("test output2: {r}");
+
+        log::debug!("test output3: {:?}", dev.mac_address());
+        log::debug!("test output4: {:?}", dev.can_receive());
+        let mut cap = smoltcp::phy::DeviceCapabilities::default();
+        dev.fill_capabilities(&mut cap);
+
+        log::debug!("test output5: {r}");
+
+        log::debug!("[InterfaceWrapper::new] config new {:?}", cap);
+
+        let mut config = match cap.medium {
             Medium::Ethernet => Config::new(HardwareAddress::Ethernet(ether_addr)),
             Medium::Ip => Config::new(HardwareAddress::Ip),
         };
+
+        log::debug!("[InterfaceWrapper::new] when init by static");
         config.random_seed = RANDOM_SEED;
 
+        log::debug!("[InterfaceWrapper::new] dev new");
         let mut dev = DeviceWrapper::new(dev);
 
-        let iface = SpinNoIrqLock::new(Interface::new(config, &mut dev, Self::current_time()));
+        log::debug!("[InterfaceWrapper::new] interface new");
+
+        let interface = Interface::new(config, Self::current_time(), cap);
+        log::debug!("[InterfaceWrapper::new] iface new");
+
+        let iface = SpinNoIrqLock::new(interface);
+        log::debug!("[InterfaceWrapper::new] return");
         Self {
             name,
             ether_addr,

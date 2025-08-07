@@ -314,7 +314,7 @@ lkernel-run-wrapped: lkernel-build
 	$(QEMU) -kernel $(KERNEL_ELF) -m 1G -nographic -smp 1 -drive file=sdcard-la.img,if=none,format=raw,id=x0 \
                         -device virtio-blk-pci,drive=x0 -no-reboot  -device virtio-net-pci,netdev=net0 \
                         -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555 \
-                        -rtc base=utc 
+                        -rtc base=utc -machine virt
 # -drive file=disk-la.img,if=none,format=raw,id=x1 -device virtio-blk-pci,drive=x1
 
 
@@ -363,9 +363,8 @@ board-rv:
 	@echo "success create uImage(rv)"
 
 PHONY += board-la
-board-la:
-# make kernel-build ARCH=riscv64 MODE=release
-# @cp $(KERNEL_ELF) kernel-rv
+board-la: 
+	make lkernel-build ARCH=loongarch64 MODE=release
 	@loongarch64-linux-gnu-objcopy -R .eh_frame_hdr -R .eh_frame -O binary kernel-la ./board/loongarch/kernel-la.bin 
 	@mkimage -A loongarch -O linux -T kernel -C none -a 0x80200000  -e 0x80200000  -n "NighthawkOS-La" -d ./board/loongarch/kernel-la.bin ./board/loongarch/uImage
 	@echo "success create uImage(la)"

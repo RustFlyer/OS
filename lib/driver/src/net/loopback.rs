@@ -1,4 +1,5 @@
 use alloc::{boxed::Box, collections::VecDeque, vec, vec::Vec};
+use arch::mm::tlb_shootdown_all;
 use smoltcp::phy::{DeviceCapabilities, Medium};
 
 use super::{DevError, DevResult, EthernetAddress, NetDevice, netbuf::NetBufPtrOps};
@@ -20,13 +21,65 @@ impl LoopbackDev {
     }
 }
 
+static mut DEV_CAP: Option<DeviceCapabilities> = None;
+
 impl NetDevice for LoopbackDev {
+    fn fill_capabilities(&self, out: &mut DeviceCapabilities) {
+        out.medium = Medium::Ip;
+        out.max_burst_size = None;
+        out.max_transmission_unit = 65535;
+    }
+
     #[inline]
+    #[allow(static_mut_refs)]
     fn capabilities(&self) -> DeviceCapabilities {
-        let mut cap = DeviceCapabilities::default();
-        cap.max_transmission_unit = 65535;
-        cap.max_burst_size = None;
-        cap.medium = Medium::Ip;
+        // unsafe {
+        //     log::debug!("test4");
+        //     // DEV_CAP = Some(DeviceCapabilities::default());
+        //     // log::debug!("DEV_CAP: {:#x}", core::ptr::addr_of!(DEV_CAP) as usize);
+        //     log::debug!("test5");
+
+        //     let sp: usize;
+        //     core::arch::asm!("move {}, $sp", out(reg) sp);
+        //     log::debug!("stack pointer: {:#x}", sp);
+
+        //     let mut cap = DeviceCapabilities::default();
+        //     log::debug!("test6");
+        //     cap.medium = Medium::Ip;
+        //     cap.max_burst_size = None;
+        //     cap.max_transmission_unit = 65535;
+
+        //     log::debug!("cap: {:#x}", core::ptr::addr_of!(cap) as usize);
+        //     cap
+        // }
+
+        log::debug!(
+            "DeviceCapabilities size: {}",
+            core::mem::size_of::<DeviceCapabilities>()
+        );
+
+        log::debug!(
+            "DeviceCapabilities align: {}",
+            core::mem::align_of::<DeviceCapabilities>()
+        );
+
+        let mut cap = smoltcp::phy::DeviceCapabilities::default();
+        self.fill_capabilities(&mut cap);
+        log::debug!("cap addr: {:x}", &cap as *const _ as usize);
+        log::debug!("cap.medium addr: {:x}", &cap.medium as *const _ as usize);
+        log::debug!(
+            "cap.max_transmission_unit addr: {:x}",
+            &cap.max_transmission_unit as *const _ as usize
+        );
+        log::debug!(
+            "cap.max_burst_size addr: {:x}",
+            &cap.max_burst_size as *const _ as usize
+        );
+        log::debug!(
+            "cap.checksum addr: {:x}",
+            &cap.checksum as *const _ as usize
+        );
+
         cap
     }
 

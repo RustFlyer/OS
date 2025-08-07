@@ -62,7 +62,6 @@ static HEAP_ALLOCATOR: NoIrqLockedHeap<32> = NoIrqLockedHeap::new();
 
 #[alloc_error_handler]
 fn alloc_error_handler(layout: Layout) -> ! {
-    simdebug::stop0();
     panic!("heap allocation error, layout = {:?}", layout)
 }
 

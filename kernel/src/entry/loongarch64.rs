@@ -29,8 +29,9 @@ unsafe extern "C" fn _start() -> ! {
 
             # Set up the stack pointer
             la.global   $sp, {boot_stack}
+            csrrd       $t0, 0x20
             addi.d      $t0, $t0, 1
-            slli.d      $t0, $t0, 16        # t0 = (hart_id + 1) * KERNEL_STACK_SIZE
+            slli.d      $t0, $t0, 22        # t0 = (hart_id + 1) * KERNEL_STACK_SIZE
             add.d       $sp, $sp, $t0
             csrrd       $a0, 0x20           # Pass the hart id to rust_main as the first argument
             la.global   $t0, {entry}

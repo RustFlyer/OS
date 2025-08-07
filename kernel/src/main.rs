@@ -24,7 +24,7 @@ mod vm;
 
 use core::ptr;
 
-use arch::mm::fence;
+use arch::mm::{fence, tlb_flush_all};
 use config::mm::{DTB_ADDR, DTB_END, DTB_START};
 use driver::println;
 use logging::{disable_log, enable_filter, enable_log};
@@ -34,7 +34,7 @@ use osdriver::test_serial_output;
 #[macro_use]
 extern crate alloc;
 
-static mut INITIALIZED: bool = false;
+static mut UNINITIALIZED: bool = true;
 
 pub static NIGHTHAWK_OS_BANNER: &str = r#"
   _   _ _       _     _   _                    _     ____   _____ 
@@ -49,20 +49,25 @@ pub static NIGHTHAWK_OS_BANNER: &str = r#"
 "#;
 
 pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
-    println!("hart id: {}, dtb_addr: {:#x}", hart_id, dtb_addr);
+    // when single core
+
     // SAFETY: Only the first hart will run this code block.
-    if unsafe { !INITIALIZED } {
-        println!("print init");
+    if unsafe { UNINITIALIZED } {
+        // println!("print init");
         /* Initialize logger */
 
-        println!("hart id: {}, dtb_addr: {:#p}", hart_id, &dtb_addr);
         boot::clear_bss();
 
         // too much log delay, cut up!
         logger::init();
-        disable_log();
-        // enable_log();
-        // enable_filter(1);
+        enable_log();
+
+        println!("hart id: {}, dtb_addr: {:#x}", hart_id, dtb_addr);
+
+        println!(
+            "kernel physical memory start at: {:#p}",
+            &config::mm::KERNEL_START_PHYS,
+        );
 
         log::info!("dtb_addr: {:#x}", dtb_addr);
 
@@ -74,6 +79,7 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
 
         println!("mem init");
         /* Initialize heap allocator and page table */
+
         unsafe {
             DTB_ADDR = dtb_addr;
 
@@ -81,36 +87,63 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
 
             heap::init_heap_allocator();
             log::info!("hart {}: initialized heap allocator", hart_id);
-            println!("init_heap_allocator");
 
             frame::init_frame_allocator();
             log::info!("hart {}: initialized frame allocator", hart_id);
-            println!("init_frame_allocator");
+
+            println!(
+                "kernel physical memory start at: {:#p}",
+                &config::mm::KERNEL_START_PHYS,
+            );
 
             vm::switch_to_kernel_page_table();
             log::info!("hart {}: switched to kernel page table", hart_id);
-            println!("switch_to_kernel_page_table");
+
+            arch::trap::init();
+            trap::trap_env::set_kernel_trap_entry();
+            arch::time::init_timer();
 
             fence();
-            ptr::write_volatile(&raw mut INITIALIZED, true);
+            ptr::write_volatile(&raw mut UNINITIALIZED, false);
+
+            #[cfg(target_arch = "loongarch64")]
+            trap::trap_handler::tlb_init();
         }
-        println!("memory init success");
+        println!("memory init before");
+
+        println!(
+            "kernel physical memory start at: {:#p}",
+            &config::mm::KERNEL_START_PHYS,
+        );
+
+        println!("memory init");
 
         println!(
             "kernel physical memory: {:#x} - {:#x}",
             config::mm::KERNEL_START_PHYS,
             config::mm::kernel_end_phys(),
         );
+
+        println!("memory init pass");
+
+        println!(
+            "kernel physical memory: {:#x} - {:#x}",
+            config::mm::KERNEL_START_PHYS,
+            config::mm::kernel_end_phys(),
+        );
+
         println!(
             "kernel virtual memory: {:#x} - {:#x}",
             config::mm::KERNEL_START,
             config::mm::kernel_end()
         );
+
         println!(
             ".text {:#x} - {:#x}",
             config::mm::text_start(),
             config::mm::text_end()
         );
+
         println!(
             ".rodata {:#x} - {:#x}",
             config::mm::rodata_start(),
@@ -159,21 +192,17 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         unsafe {
             vm::switch_to_kernel_page_table();
         }
+        arch::trap::init();
+        trap::trap_env::set_kernel_trap_entry();
+        arch::time::init_timer();
         println!("[HART {}] INIT SUCCESS", hart_id);
         panic!("multi-core unsupported");
+
+        #[cfg(target_arch = "loongarch64")]
+        trap::trap_handler::tlb_init();
     }
 
-    #[cfg(target_arch = "loongarch64")]
-    trap::trap_handler::tlb_init();
-
-    // println!("init trap");
-    arch::trap::init();
-    // println!("set_kernel_trap_entry");
-    trap::trap_env::set_kernel_trap_entry();
-    // println!("init_timer");
-    arch::time::init_timer();
-
-    vfs::path::test_split_parent_and_name();
+    // vfs::path::test_split_parent_and_name();
 
     // hart::init(hart_id);
     log::info!("hart {}: running", hart_id);

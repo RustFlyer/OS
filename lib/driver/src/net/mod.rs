@@ -48,8 +48,11 @@ pub(crate) const fn as_dev_err(e: virtio_drivers::Error) -> DevError {
 /// A specialized `Result` type for device operations.
 pub type DevResult<T = ()> = Result<T, DevError>;
 
+#[derive(Debug)]
 pub struct EthernetAddress(pub [u8; 6]);
+
 pub trait NetDevice: Sync + Send {
+    fn fill_capabilities(&self, out: &mut DeviceCapabilities);
     fn capabilities(&self) -> DeviceCapabilities;
     /// The ethernet address of the NIC.
     fn mac_address(&self) -> EthernetAddress;
