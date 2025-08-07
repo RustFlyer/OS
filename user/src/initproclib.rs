@@ -67,7 +67,7 @@ pub fn easy_cmd(s: String) -> String {
         }
         sf if sf.starts_with("ltprun") => {
             ltpauto::ltprun::autorun();
-            format!(" ").to_string()
+            format!("ltp").to_string()
         }
         _ => s,
     }
@@ -511,6 +511,14 @@ pub fn gcc_init() {
     run_cmd("./busybox ln -s /lib/libstdc++.so.6.0.33 /lib/libstdc++.so");
 
     run_cmd("./busybox ln -s /usr/bin/gcc /bin/gcc");
+    run_cmd("./busybox ln -s /usr/bin/ld /bin/ld");
+    run_cmd("./busybox ln -s /usr/bin/ar /bin/ar");
+    run_cmd("./busybox ln -s /usr/bin/nm /bin/nm");
+    run_cmd("./busybox ln -s /usr/bin/objcopy /bin/objcopy");
+    run_cmd("./busybox ln -s /usr/bin/objdump /bin/objdump");
+    run_cmd("./busybox ln -s /usr/bin/ranlib /bin/ranlib");
+    run_cmd("./busybox ln -s /usr/bin/readelf /bin/readelf");
+    run_cmd("./busybox ln -s /usr/bin/strip /bin/strip");
 }
 pub fn git_init() {
     const GIT_COMMANDS: &[&str] = &[

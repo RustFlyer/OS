@@ -1,0 +1,747 @@
+// Statistic and classification of LTP testcases (on RISC-V musl)
+// Testcases are composed of units
+// Classification rules:
+// 1. all pass:			pass all units
+// 2. skip pass:			at least one passed but some units stay not tested due to unimplemented feature
+// 3. part fail: 			at least one failed units(if there is a fail, ignore "skip")
+// 4. skip:				skip without pass
+// 4. all fail:			fail all units
+// 5. defect panic: 			paniced with wrong implementation
+// 6. unimplemented panic: 		paniced with 
+// 7. timeout with pass: 		timeout(stick for more than 1 min) but pass at least unit
+// 8. timeout no pass:			timeout and no pass units
+// 9. not run:			some how totally skipped
+
+name			type		pass	fail+broken
+abort01			all pass		2	0
+abs01			all pass		2	0
+accept01			all pass		5	0
+accept02			all fail		0	1
+accept03			part fail		20	2
+accept4_01			part fail		4	4
+access01			part fail		181	18
+access02			all pass		16	0
+access03			all pass		8	0
+access04			part fail		8	4
+acct01			unimplemented panic	0	0
+acct02			not run		0	0
+acct02_helper		not run		0	0
+acl1			not run		0	0
+add_ipv6addr		not run		0	0
+add_key01			all pass		8	0
+add_key02			all pass		9	0
+add_key03			all pass		1	0
+add_key04			all pass		1	0
+add_key05			skip		0	0
+adjtimex01			all pass		2	0
+adjtimex02			part fail		1	6
+adjtimex03			all fail		0	1
+af_alg01			all fail		0	1
+af_alg02			all fail		0	1
+af_alg03			all fail		0	1
+af_alg04			all fail		0	1
+af_alg05			all fail		0	1
+af_alg06			all fail		0	1
+af_alg07			all fail		0	0
+aio-stress			skip		0	0
+aio01			skip		0	0
+aio02			skip		0	0
+aiocp			skip		0	0
+aiodio_append		skip		0	0
+aiodio_sparse		skip		0	0
+alarm02			all pass		6	0
+alarm03			all pass		2	0
+alarm05			all pass		3	0
+alarm06			all pass		2	0
+alarm07			all pass		2	0
+ar01.sh			skip		0	0
+arch_prctl01		skip		0	0
+arping01.sh			part fail		9	3
+asapi_01			skip		0	0
+asapi_02			skip		0	0
+asapi_03			skip		0	0
+ask_password.sh		skip		0	0
+aslr01			skip		0	0
+assign_password.sh		skip		0	0
+atof01			part fail		3	1
+autogroup01			skip		0	0
+bbr01.sh			skip		0	0
+bbr02.sh			skip		0	0
+bind01			all pass		7	0
+bind02			all fail		0	1
+bind03			part fail		2	1
+bind04			all fail		0	1
+bind05			all fail		0	1
+bind06			skip		0	0
+bind_noport01.sh		skip		0	0
+binfmt_misc01.sh		skip		0	0
+binfmt_misc02.sh		skip		0	0
+binfmt_misc_lib.sh		skip		0	0
+block_dev			skip		0	0
+bpf_map01			part fail		1	2
+bpf_prog01			part fail		1	1
+bpf_prog02			part fail		1	1
+bpf_prog03			all fail		0	1
+bpf_prog04			all fail		0	2
+bpf_prog05			part fail		1	1
+bpf_prog06			all fail		0	1
+bpf_prog07			all fail		0	1
+brk01			all fail		0	1
+brk02			skip pass		1	0
+broken_ip-checksum.sh		skip		0	0
+broken_ip-dstaddr.sh		skip		0	0
+broken_ip-fragment.sh		skip		0	0
+broken_ip-ihl.sh		skip		0	0
+broken_ip-nexthdr.sh		skip		0	0
+broken_ip-plen.sh		skip		0	0
+broken_ip-protcol.sh		skip		0	0
+broken_ip-version.sh		skip		0	0
+busy_poll01.sh		skip		0	0
+busy_poll02.sh		skip		0	0
+busy_poll03.sh		skip		0	0
+busy_poll_lib.sh		skip		0	0
+cacheflush01		skip		0	0
+can_bcm01			skip		0	0
+can_filter			skip		0	0
+can_rcv_own_msgs		skip		0	0
+cap_bounds_r		skip		0	0
+cap_bounds_rw		skip		0	0
+cap_bset_inh_bounds		skip		0	0
+capget01			all pass		6	0
+capget02			part fail		4	1
+capset01			all pass		3	0
+capset02			all fail		0	1
+capset03			all pass		1	0
+capset04			part fail		0	2
+cfs_bandwidth01		skip		0	0
+cgroup_core01		all fail		0	1
+cgroup_core02		all fail		0	1
+cgroup_core03		all fail		0	1
+cgroup_fj_common.sh		all fail		0	1
+cgroup_fj_function.sh		skip		0	0
+cgroup_fj_proc		skip		0	0
+cgroup_fj_stress.sh		skip		0	0
+cgroup_lib.sh		all fail		0	1
+cgroup_regression_3_1.sh	timeout no pass	0	0
+cgroup_regression_3_2.sh	timeout no pass	0	0
+cgroup_regression_5_1.sh	timeout no pass	0	0
+cgroup_regression_5_2.sh	timeout no pass	0	0
+cgroup_regression_6_1.sh	timeout no pass	0	0
+cgroup_regression_6_2.sh	timeout no pass	0	0
+cgroup_regression_fork_processes	timeout no pass	0	0
+cgroup_regression_getdelays	skip		0	0
+cgroup_regression_test.sh	skip		0	0
+cgroup_xattr		skip		0	0
+change_password.sh		skip		0	0
+chdir01			all pass		135	0
+chdir04			all pass		3	0
+check_envval		skip		0	0
+check_icmpv4_connectivity	skip		0	0
+check_icmpv6_connectivity	skip		0	0
+check_keepcaps		skip		0	0
+check_netem			skip		0	0
+check_pe			skip		0	0
+check_setkey		skip		0	0
+check_simple_capset		skip		0	0
+chmod01			all pass		32	0
+chmod03			all fail		0	1
+chmod05			part fail		0	1
+chmod06			part fail		5	4
+chmod07			all fail		0	1
+chown01			all pass		1	0
+chown01_16			skip		0	0
+chown02			part fail		2	1
+chown02_16			skip		0	0
+chown03			all fail		0	1
+chown03_16			all fail		0	1
+chown04			part fail		4	4
+chown04_16			skip		0	0
+chown05			all pass		6	0
+chown05_16			skip		0	0
+chroot01			part fail		0	1
+chroot02			part fail		1	1
+chroot03			part fail		4	1
+chroot04			part fail		0	1
+cleanup_lvm.sh		skip		0	0
+clock_adjtime01		all pass		9	0
+clock_adjtime02		part fail		3	3
+clock_getres01		all pass		44	0
+clock_gettime01		all pass		16	0
+clock_gettime02		all pass		10	0
+clock_gettime03		unimplemented panic	0	0
+clock_gettime04		all pass		6	0
+clock_nanosleep01		skip pass		12	0
+clock_nanosleep02		part fail		1	6
+clock_nanosleep03		unimplemented panic	0	0
+clock_nanosleep04		all pass		4	0
+clock_settime01		all pass		4	0
+clock_settime02		all pass		12	0
+clock_settime03		all fail		0	1
+clone01			all pass		2	0
+clone02			skip		0	0
+clone03			all pass		1	0
+clone04			all fail		1	0
+clone05			all pass		1	0
+clone06			all pass		1	0
+clone07			all pass		1	0
+clone08			all pass		5	0
+clone09			all fail		0	1
+clone301			part fail		4	1
+clone302			part fail		6	1
+clone303			all fail		0	1
+close01			all pass		3	0
+close02			all pass		1	0
+close_range01		part fail		1	2
+close_range02		part fail		10	1
+cmdlib.sh			skip		0	0
+cn_pec.sh			skip		0	0
+confstr01			all pass		32	0
+connect01			part fail		2	4
+connect02			all fail		0	1
+copy_file_range01		all pass		36	0
+copy_file_range02		unimplemented panic	0	0
+copy_file_range03		all fail		0	1
+cp_tests.sh			skip		0	0
+cpio_tests.sh		skip		0	0	
+cpuacct.sh			skip		0	0
+cpuacct_task		skip		0	0
+cpuctl_def_task01		timeout no pass	0	2
+cpuctl_def_task02		timeout no pass	0	2
+cpuctl_def_task03		timeout no pass	0	2
+cpuctl_def_task04		timeout no pass	0	2
+cpuctl_fj_cpu-hog		skip		0	0
+cpuctl_fj_simple_echo		skip		0	0
+cpuctl_latency_check_task	skip		0	0
+cpuctl_latency_test		all fail		0	1
+cpuctl_test01		timeout no pass	0	2
+cpuctl_test02		timeout no pass	0	2
+cpuctl_test03		timeout no pass	0	2
+cpuctl_test04		timeout no pass	0	2
+cpufreq_boost		skip		0	0
+cpuhotplug01.sh		skip		0	0
+cpuhotplug02.sh		skip		0	0
+cpuhotplug03.sh		skip		0	0
+cpuhotplug04.sh		skip		0	0
+cpuhotplug05.sh		skip		0	0
+cpuhotplug06.sh		skip		0	0
+cpuhotplug07.sh		skip		0	0
+cpuhotplug_do_disk_write_loop	timeout no pass	0	0
+cpuhotplug_do_kcompile_loop	skip		0	0
+cpuhotplug_do_spin_loop		timeout no pass	0	0
+cpuhotplug_hotplug.sh		skip		0	0
+cpuhotplug_report_proc_interrupts	skip		0	0
+cpuhotplug_testsuite.sh		skip		0	0
+cpuset01			skip		0	0
+crash01			all pass		1	0
+crash02			unimplemented panic	0	0
+creat01			part fail		4	2
+creat03			all pass		1	0
+creat04			all pass		2	0
+creat05			all pass		1	0
+creat06			part fail		7	1
+creat07			all fail		0	1
+creat07_child		skip		0	0
+creat08			all fail		0	1
+creat09			all fail		0	1
+create_datafile		skip		0	0
+create_file			skip		0	0
+crypto_user01		all fail		0	1
+crypto_user02		all fail		0	1
+cve-2014-0196		all fail		0	1
+cve-2015-3290		skip		0	0
+cve-2016-10044		unimplemented panic	0	0
+cve-2016-7042		skip		0	0
+cve-2016-7117		timeout no pass	0	0
+cve-2017-16939		skip		0	0
+cve-2017-17052		all pass		1	0
+cve-2017-17053		skip		0	0		
+cve-2017-2618		skip		0	0
+cve-2017-2671		skip		0	0
+cve-2022-4378		skip		0	0
+daemonlib.sh		skip		0	0
+data			skip		0	0
+data_space			skip		0	0
+datafiles			skip		0	0
+dccp01.sh			skip		0	0
+dccp_ipsec.sh		skip		0	0
+dccp_ipsec_vti.sh		skip		0	0
+dctcp01.sh			skip		0	0
+delete_module01		all fail		0	1
+delete_module02		unimplemented panic	0	0
+delete_module03		all fail		0	1	
+df01.sh			skip		0	0
+dhcp_lib.sh			skip		0	0
+dhcpd_tests.sh		skip		0	0
+dio_append			skip		0	0
+dio_read			all pass		1	0
+dio_sparse			all pass		1	0		
+dio_truncate		timeout no pass	0	0
+diotest1			all pass		1	0
+diotest2			all pass		3	0
+diotest3			all pass		3	0
+diotest4			part fail		12	6
+diotest5			all pass		3	0
+diotest6			all pass		3	0
+dirty			skip		0	0
+dirtyc0w			part fail		1	1
+dirtyc0w_child		all fail		0	1
+dirtyc0w_shmem		part fail		0	1
+dirtyc0w_shmem_child		skip		0	0
+dirtypipe			all pass		1	0
+dma_thread_diotest		skip		0	0
+dns-stress-lib.sh		skip		0	0
+dns-stress.sh		all fail		0	1
+dns-stress01-rmt.sh		all fail		0	1
+dns-stress02-rmt.sh		all fail		0	1
+dnsmasq_tests.sh		skip		0	0
+doio
+du01.sh
+dup01
+dup02
+dup03
+dup04
+dup05
+dup06
+dup07
+dup201
+dup202
+dup203
+dup204
+dup205
+dup206
+dup207
+dup3_01
+dup3_02
+dynamic_debug01.sh
+ebizzy
+eject-tests.sh
+eject_check_tray
+endian_switch01
+epoll-ltp
+epoll_create01
+epoll_create02
+epoll_create1_01
+epoll_create1_02
+epoll_ctl01
+epoll_ctl02
+epoll_ctl03
+epoll_ctl04
+epoll_ctl05
+epoll_pwait01
+epoll_pwait02
+epoll_pwait03
+epoll_pwait04
+epoll_pwait05
+epoll_wait01
+epoll_wait02
+epoll_wait03
+epoll_wait04
+epoll_wait05
+epoll_wait06
+epoll_wait07
+event_generator
+eventfd01
+eventfd02
+eventfd03
+eventfd04
+eventfd05
+eventfd06
+eventfd2_01
+eventfd2_02
+eventfd2_03
+evm_overlay.sh
+exec_with_inh
+exec_without_inh
+execl01
+execl01_child
+execle01
+execle01_child
+execlp01
+execlp01_child
+execv01
+execv01_child
+execve01
+execve01_child
+execve02
+execve03
+execve04
+execve05
+execve06
+execve06_child
+execve_child
+execveat01
+execveat02
+execveat03
+execveat_child
+execveat_errno
+execvp01
+execvp01_child
+exit01
+exit02
+exit_group01
+f00f
+faccessat01
+faccessat02
+faccessat201
+faccessat202
+fallocate01
+fallocate02
+fallocate03
+fallocate04
+fallocate05
+fallocate06
+fanotify01
+fanotify02
+fanotify03
+fanotify04
+fanotify05
+fanotify06
+fanotify07
+fanotify08
+fanotify09
+fanotify10
+fanotify11
+fanotify12
+fanotify13
+fanotify14
+fanotify15
+fanotify16
+fanotify17
+fanotify18
+fanotify19
+fanotify20
+fanotify21
+fanotify22
+fanotify23
+fanotify_child
+fanout01
+fchdir01
+fchdir02
+fchdir03
+fchmod01
+fchmod02
+fchmod03
+fchmod04
+fchmod05
+fchmod06
+fchmodat01
+fchmodat02
+fchown01
+fchown01_16
+fchown02
+fchown02_16
+fchown03
+fchown03_16
+fchown04
+fchown04_16
+fchown05
+fchown05_16
+fchownat01
+fchownat02
+fcntl01
+fcntl01_64
+fcntl02
+fcntl02_64
+fcntl03
+fcntl03_64
+fcntl04
+fcntl04_64
+fcntl05
+fcntl05_64
+fcntl07
+fcntl07_64
+fcntl08
+fcntl08_64
+fcntl09
+fcntl09_64
+fcntl10
+fcntl10_64
+fcntl11
+fcntl11_64
+fcntl12
+fcntl12_64
+fcntl13
+fcntl13_64
+fcntl14
+fcntl14_64
+fcntl15
+fcntl15_64
+fcntl16
+fcntl16_64
+fcntl17
+fcntl17_64
+fcntl18
+fcntl18_64
+fcntl19
+fcntl19_64
+fcntl20
+fcntl20_64
+fcntl21
+fcntl21_64
+fcntl22
+fcntl22_64
+fcntl23
+fcntl23_64
+fcntl24
+fcntl24_64
+fcntl25
+fcntl25_64
+fcntl26
+fcntl26_64
+fcntl27
+fcntl27_64
+fcntl29
+fcntl29_64
+fcntl30
+fcntl30_64
+fcntl31
+fcntl31_64
+fcntl32
+fcntl32_64
+fcntl33
+fcntl33_64
+fcntl34
+fcntl34_64
+fcntl35
+fcntl35_64
+fcntl36
+fcntl36_64
+fcntl37
+fcntl37_64
+fcntl38
+fcntl38_64
+fcntl39
+fcntl39_64
+fdatasync01
+fdatasync02
+fdatasync03
+fgetxattr01
+fgetxattr02
+fgetxattr03
+file01.sh
+filecapstest.sh
+find_portbundle
+finit_module01
+finit_module02
+flistxattr01
+flistxattr02
+flistxattr03
+float_bessel
+float_exp_log
+float_iperb
+float_power
+float_trigo
+flock01
+flock02
+flock03
+flock04
+flock06
+force_erase.sh
+fork01
+fork03
+fork04
+fork05
+fork07
+fork08
+fork09
+fork10
+fork13
+fork14
+fork_exec_loop
+fork_freeze.sh
+fork_procs
+fou01.sh
+fpathconf01
+fptest01
+fptest02
+frag
+freeze_cancel.sh
+freeze_kill_thaw.sh
+freeze_move_thaw.sh
+freeze_self_thaw.sh
+freeze_sleep_thaw.sh
+freeze_thaw.sh
+freeze_write_freezing.sh
+fremovexattr01
+fremovexattr02
+fs_bind01.sh
+fs_bind02.sh
+fs_bind03.sh
+fs_bind04.sh
+fs_bind05.sh
+fs_bind06.sh
+fs_bind07-2.sh
+fs_bind07.sh
+fs_bind08.sh
+fs_bind09.sh
+fs_bind10.sh
+fs_bind11.sh
+fs_bind12.sh
+fs_bind13.sh
+fs_bind14.sh
+fs_bind15.sh
+fs_bind16.sh
+fs_bind17.sh
+fs_bind18.sh
+fs_bind19.sh
+fs_bind20.sh
+fs_bind21.sh
+fs_bind22.sh
+fs_bind23.sh
+fs_bind24.sh
+fs_bind_cloneNS01.sh
+fs_bind_cloneNS02.sh
+fs_bind_cloneNS03.sh
+fs_bind_cloneNS04.sh
+fs_bind_cloneNS05.sh
+fs_bind_cloneNS06.sh
+fs_bind_cloneNS07.sh
+fs_bind_lib.sh
+fs_bind_move01.sh
+fs_bind_move02.sh
+fs_bind_move03.sh
+fs_bind_move04.sh
+fs_bind_move05.sh
+fs_bind_move06.sh
+fs_bind_move07.sh
+fs_bind_move08.sh
+fs_bind_move09.sh
+fs_bind_move10.sh
+fs_bind_move11.sh
+fs_bind_move12.sh
+fs_bind_move13.sh
+fs_bind_move14.sh
+fs_bind_move15.sh
+fs_bind_move16.sh
+fs_bind_move17.sh
+fs_bind_move18.sh
+fs_bind_move19.sh
+fs_bind_move20.sh
+fs_bind_move21.sh
+fs_bind_move22.sh
+fs_bind_rbind01.sh
+fs_bind_rbind02.sh
+fs_bind_rbind03.sh
+fs_bind_rbind04.sh
+fs_bind_rbind05.sh
+fs_bind_rbind06.sh
+fs_bind_rbind07-2.sh
+fs_bind_rbind07.sh
+fs_bind_rbind08.sh
+fs_bind_rbind09.sh
+fs_bind_rbind10.sh
+fs_bind_rbind11.sh
+fs_bind_rbind12.sh
+fs_bind_rbind13.sh
+fs_bind_rbind14.sh
+fs_bind_rbind15.sh
+fs_bind_rbind16.sh
+fs_bind_rbind17.sh
+fs_bind_rbind18.sh
+fs_bind_rbind19.sh
+fs_bind_rbind20.sh
+fs_bind_rbind21.sh
+fs_bind_rbind22.sh
+fs_bind_rbind23.sh
+fs_bind_rbind24.sh
+fs_bind_rbind25.sh
+fs_bind_rbind26.sh
+fs_bind_rbind27.sh
+fs_bind_rbind28.sh
+fs_bind_rbind29.sh
+fs_bind_rbind30.sh
+fs_bind_rbind31.sh
+fs_bind_rbind32.sh
+fs_bind_rbind33.sh
+fs_bind_rbind34.sh
+fs_bind_rbind35.sh
+fs_bind_rbind36.sh
+fs_bind_rbind37.sh
+fs_bind_rbind38.sh
+fs_bind_rbind39.sh
+fs_bind_regression.sh
+fs_di
+fs_fill
+fs_inod
+fs_perms
+fs_racer.sh
+fs_racer_dir_create.sh
+fs_racer_dir_test.sh
+fs_racer_file_concat.sh
+fs_racer_file_create.sh
+fs_racer_file_link.sh
+fs_racer_file_list.sh
+fs_racer_file_rename.sh
+fs_racer_file_rm.sh
+fs_racer_file_symlink.sh
+fsconfig01
+fsconfig02
+fsconfig03
+fsetxattr01
+fsetxattr02
+fsmount01
+fsmount02
+fsopen01
+fsopen02
+fspick01
+fspick02
+fsstress
+fstat02
+fstat02_64
+fstat03
+fstat03_64
+fstatat01
+fstatfs01
+fstatfs01_64
+fstatfs02
+fstatfs02_64
+fsx-linux
+fsx.sh
+fsync01
+fsync02
+fsync03
+fsync04
+ftest01
+ftest02
+ftest03
+ftest04
+ftest05
+ftest06
+ftest07
+ftest08
+ftp-download-stress.sh
+ftp-download-stress01-rmt.sh
+ftp-download-stress02-rmt.sh
+ftp-upload-stress.sh
+ftp-upload-stress01-rmt.sh
+ftp-upload-stress02-rmt.sh
+ftp01.sh
+ftrace_lib.sh
+ftrace_regression01.sh
+ftrace_regression02.sh
+ftrace_stress
+ftrace_stress_test.sh
+ftruncate01
+ftruncate01_64
+ftruncate03
+ftruncate03_64
+ftruncate04
+ftruncate04_64
+futex_cmp_requeue01
+futex_cmp_requeue02
+futex_wait01
+futex_wait02
+futex_wait03
+futex_wait04
+futex_wait05
+futex_wait_bitset01
+futex_waitv01
+futex_waitv02
+futex_waitv03
+futex_wake01
+futex_wake02
+futex_wake03
+futex_wake04
+futimesat01
+fw_load
+                                               
