@@ -31,8 +31,8 @@ use virtio_drivers::{
 };
 
 use crate::osdriver::{
-    ioremap_if_need, manager::device_manager, probe_char_device_by_serial, probe_cpu, probe_plic,
-    probe_sdio_blk,
+    ioremap_if_need, manager::device_manager, probe_ahci_blk, probe_char_device,
+    probe_char_device_by_serial, probe_cpu, probe_plic, probe_sdio_blk,
 };
 
 pub fn probe_tree(fdt: &Fdt) {
@@ -42,6 +42,7 @@ pub fn probe_tree(fdt: &Fdt) {
     #[cfg(target_arch = "riscv64")]
     init_network(LoopbackDev::new(), true);
 
+    #[cfg(target_arch = "riscv64")]
     if let Some(plic) = probe_plic(fdt) {
         device_manager().set_plic(plic);
         println!("[PLIC] INIT SUCCESS");
@@ -65,6 +66,21 @@ pub fn probe_tree(fdt: &Fdt) {
     #[cfg(target_arch = "riscv64")]
     if let Some(cpus) = probe_cpu(&fdt) {
         device_manager().set_cpus(cpus);
+    }
+
+    #[cfg(target_arch = "loongarch64")]
+    {
+        if let Some(char) = probe_char_device(fdt) {
+            device_manager().add_device(char.dev_id(), char.clone());
+            CHAR_DEVICE.call_once(|| char);
+            println!("[CHAR] INIT SUCCESS");
+        }
+
+        if let Some(ahci) = probe_ahci_blk(fdt) {
+            device_manager().add_device(ahci.dev_id(), ahci.clone());
+            BLOCK_DEVICE.call_once(|| ahci.clone());
+            println!("[AHCIBLK] INIT SUCCESS");
+        }
     }
 
     for node in fdt.all_nodes() {
@@ -338,22 +354,6 @@ impl From<u32> for PciRangeType {
             3 => Self::Memory64,
             _ => panic!("Tried to convert invalid range type {}", value),
         }
-    }
-}
-
-fn probe_char_device(fdt: &Fdt) {
-    log::debug!("probe_char_device begin");
-    let chosen = fdt.chosen().ok();
-    let mut stdout = chosen.and_then(|c| c.stdout().map(|n| n.node()));
-    if stdout.is_none() {
-        stdout = fdt.find_compatible(&["ns16550a", "snps,dw-apb-uart", "sifive,uart0"])
-    }
-    if let Some(node) = stdout {
-        let reg = node.reg().next().unwrap();
-        let base = ioremap_if_need(reg.starting_address as usize, reg.size.unwrap());
-        let uart = unsafe { MmioSerialPort::new(base) };
-        println!("[CHAR_DEVICE] INIT...");
-        CHAR_DEVICE.call_once(|| Arc::new(QUartDevice::new_from_mmio(uart)));
     }
 }
 

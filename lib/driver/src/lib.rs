@@ -1,6 +1,8 @@
 #![no_std]
 #![allow(unused)]
 #![allow(unknown_lints)]
+#![feature(sync_unsafe_cell)]
+#![feature(c_variadic)]
 
 use alloc::boxed::Box;
 use alloc::sync::Arc;

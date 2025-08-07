@@ -122,7 +122,7 @@ macro_rules! includes_trap_macros {
 use core::arch::naked_asm;
 use loongArch64::register::badv;
 
-use crate::trap::trap_context::TrapContext;
+use crate::trap::trap_context::{KernelTrapContext, TrapContext};
 
 pub const LDH_OP: u32 = 0xa1;
 pub const LDHU_OP: u32 = 0xa9;
@@ -254,7 +254,7 @@ pub struct TrapFrame {
 
 #[allow(unused_assignments)]
 #[allow(unsafe_op_in_unsafe_fn)]
-pub unsafe fn emulate_load_store_insn(pt_regs: &mut TrapContext) {
+pub unsafe fn emulate_load_store_insn(pt_regs: &mut KernelTrapContext) {
     let la_inst: u32;
     let addr: u64;
     let rd: usize;
@@ -267,7 +267,7 @@ pub unsafe fn emulate_load_store_insn(pt_regs: &mut TrapContext) {
     unsafe {
         core::arch::asm!(
             "ld.w {val}, {addr}, 0 ",
-             addr = in(reg) pt_regs.k_ra as u64,
+             addr = in(reg) pt_regs.sepc as u64,
              val = out(reg) la_inst,
         )
     }
@@ -354,5 +354,5 @@ pub unsafe fn emulate_load_store_insn(pt_regs: &mut TrapContext) {
         panic!("Address Error @ {:#x}", addr)
     }
 
-    pt_regs.k_ra += 4;
+    pt_regs.sepc += 4;
 }

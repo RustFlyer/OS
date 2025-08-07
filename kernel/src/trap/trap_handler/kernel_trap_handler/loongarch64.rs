@@ -1,13 +1,13 @@
 use loongArch64::register::estat::{self, Exception, Interrupt, Trap};
 use loongArch64::register::{badv, ecfg, era, pgdh, pgdl, prmd, ticlr};
 
+use crate::trap::trap_context::KernelTrapContext;
 use arch::{
     time::{get_time_duration, set_nx_timer_irq},
     trap::TIMER_IRQ,
 };
 use mm::address::VirtAddr;
 use timer::TIMER_MANAGER;
-use crate::trap::trap_context::KernelTrapContext;
 
 use crate::processor::current_task;
 use crate::{task::TaskState, trap::trap_handler::TRAP_STATS};
@@ -18,22 +18,19 @@ use super::unaligned_la::emulate_load_store_insn;
 pub fn kernel_trap_handler(cx: &mut KernelTrapContext) {
     let estat = estat::read();
     match estat.cause() {
-        Trap::Exception(e) => kernel_exception_handler(e),
+        Trap::Exception(e) => kernel_exception_handler(e, cx),
         Trap::Interrupt(i) => kernel_interrupt_handler(i),
         _ => trap_panic(),
     }
 }
 
-fn kernel_exception_handler(_e: Exception) {
+fn kernel_exception_handler(_e: Exception, cx: &mut KernelTrapContext) {
     match _e {
         Exception::AddressNotAligned => unsafe {
-            let task = current_task();
-            let trap_context = task.trap_context_mut();
-            emulate_load_store_insn(trap_context);
+            emulate_load_store_insn(cx);
         },
-        _ => (),
+        _ => trap_panic(),
     }
-    trap_panic();
 }
 
 fn kernel_interrupt_handler(i: Interrupt) {

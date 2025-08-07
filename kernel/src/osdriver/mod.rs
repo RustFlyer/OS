@@ -5,11 +5,12 @@ use core::ptr::NonNull;
 use alloc::{boxed::Box, sync::Arc, vec::Vec};
 use driver::{
     CHAR_DEVICE, DeviceType,
-    block::{dw_mshc::MMC, virtblk::VirtBlkDevice},
+    block::{ahci::ahci::AHCI, dw_mshc::MMC, virtblk::VirtBlkDevice},
     cpu::CPU,
     device::OSDevice,
     plic::PLIC,
     println,
+    qemu::QUartDevice,
     serial::{Serial, uart8250::Uart},
 };
 use manager::{device_manager, init_device_manager};
@@ -170,22 +171,29 @@ fn probe_serial_console(stdout: &FdtNode) -> Serial {
     let base_vaddr = base_paddr + KERNEL_MAP_OFFSET;
     let irq_number = stdout.property("interrupts").unwrap().as_usize().unwrap();
     log::warn!("[probe_serial_console] IRQ number: {}", irq_number);
+
     let first_compatible = stdout
         .compatible()
         .unwrap()
         .first()
         .expect("no first_compatible");
+
     match first_compatible {
         "ns16550a" | "snps,dw-apb-uart" => {
             // VisionFive 2 (FU740)
             // virt QEMU
 
             // Parse clock frequency
-            let freq_raw = stdout
-                .property("clock-frequency")
-                .expect("No clock-frequency property of stdout serial device")
-                .as_usize()
-                .expect("Parse clock-frequency to usize failed");
+            let freq_raw = if stdout.property("clock-frequency").is_some() {
+                stdout
+                    .property("clock-frequency")
+                    .expect("No clock-frequency property of stdout serial device")
+                    .as_usize()
+                    .expect("Parse clock-frequency to usize failed")
+            } else {
+                unsafe { CLOCK_FREQ }
+            };
+
             let mut reg_io_width = 1;
             if let Some(reg_io_width_raw) = stdout.property("reg-io-width") {
                 reg_io_width = reg_io_width_raw
@@ -198,6 +206,7 @@ fn probe_serial_console(stdout: &FdtNode) -> Serial {
                     .as_usize()
                     .expect("Parse reg-shift to usize failed");
             }
+
             log::error!(
                 "uart: base_paddr:{base_paddr:#x}, size:{size:#x}, reg_io_width:{reg_io_width}, reg_shift:{reg_shift}, first_compatible:{first_compatible}"
             );
@@ -283,6 +292,42 @@ pub fn probe_sdio_blk(root: &Fdt) -> Option<Arc<MMC>> {
     }
     log::warn!("SD Card Host Controller not found");
     None
+}
+
+pub fn probe_ahci_blk(root: &Fdt) -> Option<Arc<AHCI>> {
+    // Parse SD Card Host Controller
+    if let Some(ahcinod) = root.find_node("/2k1000-soc/ahci@400e0000") {
+        let base_address = ahcinod.reg().next().unwrap().starting_address as usize;
+        let size = ahcinod.reg().next().unwrap().size.unwrap();
+        let irq_number = 33; // Hard-coded from JH7110
+        let ahci = AHCI::new(base_address, size, irq_number);
+        log::info!("AHCI Controller found at 0x{:x}", base_address);
+        return Some(Arc::new(ahci));
+    }
+    log::warn!("AHCI Controller not found");
+    None
+}
+
+pub fn probe_char_device(fdt: &Fdt) -> Option<Arc<QUartDevice>> {
+    log::debug!("probe_char_device begin");
+    let chosen = fdt.chosen().ok();
+    let mut stdout = chosen.and_then(|c| c.stdout().map(|n| n.node()));
+    if stdout.is_none() {
+        stdout = fdt.find_compatible(&["ns16550a", "snps,dw-apb-uart", "sifive,uart0"])
+    }
+
+    if let Some(node) = stdout {
+        let reg = node.reg().next().unwrap();
+        let _base = ioremap_if_need(reg.starting_address as usize, reg.size.unwrap());
+        println!("[CHAR_DEVICE] INIT...");
+        Some(Arc::new(QUartDevice::new(
+            reg.starting_address as usize,
+            reg.size.unwrap(),
+            0,
+        )))
+    } else {
+        None
+    }
 }
 
 pub async fn test_serial_output() {

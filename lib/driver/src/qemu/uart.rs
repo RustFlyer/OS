@@ -1,7 +1,10 @@
 use core::error::Error;
 
-use crate::{CharDevice, device::OSDevice};
-use alloc::boxed::Box;
+use crate::{
+    CharDevice,
+    device::{OSDevId, OSDevice, OSDeviceKind, OSDeviceMajor, OSDeviceMeta},
+};
+use alloc::{boxed::Box, string::ToString};
 use async_trait::async_trait;
 use mutex::SpinNoIrqLock;
 use uart_16550::MmioSerialPort;
@@ -13,45 +16,46 @@ use config::device::PCI_SERIAL_PORT_ADDR;
 use virtio_drivers::transport::mmio::MmioError;
 
 pub struct QUartDevice {
+    meta: OSDeviceMeta,
     pub device: SpinNoIrqLock<MmioSerialPort>,
 }
 
 impl QUartDevice {
-    pub fn new() -> Self {
+    pub fn new(mmio_base: usize, mmio_size: usize, irq_no: usize) -> Self {
+        let meta = OSDeviceMeta {
+            dev_id: OSDevId {
+                major: OSDeviceMajor::Serial,
+                minor: 0,
+            },
+            name: "serial".to_string(),
+            mmio_base,
+            mmio_size,
+            irq_no: Some(irq_no),
+            dtype: OSDeviceKind::Uart,
+            pci_bar: None,
+            pci_bdf: None,
+            pci_ids: None,
+        };
+
         #[cfg(target_arch = "loongarch64")]
         let serialport = unsafe { MmioSerialPort::new(PCI_SERIAL_PORT_ADDR) };
         #[cfg(target_arch = "riscv64")]
         let serialport = unsafe { MmioSerialPort::new(MMIO_SERIAL_PORT_ADDR) };
         Self {
+            meta,
             device: SpinNoIrqLock::new(serialport),
         }
-    }
-
-    pub fn new_from_mmio(serialport: MmioSerialPort) -> Self {
-        Self {
-            device: SpinNoIrqLock::new(serialport),
-        }
-    }
-}
-
-impl Default for QUartDevice {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
 impl OSDevice for QUartDevice {
     fn meta(&self) -> &crate::device::OSDeviceMeta {
-        todo!()
+        &self.meta
     }
 
-    fn init(&self) {
-        todo!()
-    }
+    fn init(&self) {}
 
-    fn handle_irq(&self) {
-        todo!()
-    }
+    fn handle_irq(&self) {}
 }
 
 #[async_trait]
