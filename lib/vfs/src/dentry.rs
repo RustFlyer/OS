@@ -26,6 +26,8 @@ pub struct DentryMeta {
     pub inode: SpinNoIrqLock<Option<Arc<dyn Inode>>>,
     /// Dentry before mount. This field is `None` if this dentry has been not mounted.
     pub mdentry: SpinNoIrqLock<Option<Arc<dyn Dentry>>>,
+    /// Dentry bind mount. This field is `None` if this dentry has been not bind mounted.
+    pub bdentry: SpinNoIrqLock<Option<Arc<dyn Dentry>>>,
 }
 
 impl DentryMeta {
@@ -42,6 +44,7 @@ impl DentryMeta {
             children: SpinNoIrqLock::new(BTreeMap::new()),
             inode: SpinNoIrqLock::new(inode),
             mdentry: SpinNoIrqLock::new(None),
+            bdentry: SpinNoIrqLock::new(None),
         }
     }
 }
@@ -298,9 +301,17 @@ impl dyn Dentry {
         match self.get_child(name) {
             Some(dentry) => Ok(dentry),
             None => {
-                log::debug!("lookup: neg child {}", name);
+                // look for bind-mount dentry
+                let lock = self.get_meta().bdentry.lock();
+                if lock.is_some() {
+                    let bdentry = lock.as_ref().unwrap();
+                    if let Some(dentry) = bdentry.get_child(name) {
+                        return Ok(dentry);
+                    }
+                }
+
+                // neg child created in main dentry, not bind dentry
                 let dentry = self.new_neg_child(name);
-                log::debug!("then lookup: neg child {}", name);
                 match self.base_lookup(dentry.as_ref()) {
                     Ok(_) | Err(SysError::ENOENT) => Ok(dentry),
                     Err(e) => Err(e),
@@ -512,6 +523,16 @@ impl dyn Dentry {
     /// Stores dentry which is mounted.
     pub fn store_mount_dentry(self: &Arc<Self>, dentry: Arc<dyn Dentry>) {
         *self.get_meta().mdentry.lock() = Some(dentry);
+    }
+
+    /// Stores dentry which is mounted.
+    pub fn bind_mount_dentry(self: &Arc<Self>, dentry: Arc<dyn Dentry>) {
+        *self.get_meta().bdentry.lock() = Some(dentry);
+    }
+
+    /// Stores dentry which is mounted.
+    pub fn unbind_mount_dentry(self: &Arc<Self>) {
+        *self.get_meta().bdentry.lock() = None;
     }
 
     /// Fetches dentry which is stored when mounted and reset mdentry as None.

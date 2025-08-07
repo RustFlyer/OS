@@ -99,7 +99,7 @@ impl File for SimpleFileFile {
         let inode = self.inode();
         let cache = inode.page_cache();
 
-        log::debug!("[base_write] simple file");
+        // log::debug!("[base_write] simple file");
 
         while !buf.is_empty() {
             let file_offset = cur_pos / PAGE_SIZE * PAGE_SIZE;

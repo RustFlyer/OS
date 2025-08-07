@@ -823,6 +823,11 @@ pub async fn sys_mount(
 
         log::error!("[sys_mount] parent dentry is {}", parent.path());
         let d = fs_type.mount(&dname, Some(parent), flags, dev)?;
+
+        if flags.contains(MountFlags::MS_BIND) {
+            d.bind_mount_dentry(mdentry.clone());
+        }
+
         d.store_mount_dentry(mdentry);
 
         return Ok(0);
@@ -869,26 +874,24 @@ pub async fn sys_mount(
 /// - to write when the basic functions are implemented...
 pub async fn sys_umount2(target: usize, flags: u32) -> SyscallResult {
     let task = current_task();
-
     let target = UserReadPtr::<u8>::new(target, &task.addr_space())
         .read_c_string(256)?
         .into_string()
         .map_err(|_| SysError::EINVAL)?;
 
-    log::error!("[sys_umount2] target:{target:?}");
+    log::debug!("[sys_umount2] target:{target:?}");
 
     let _flags = MountFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
-
     let (parent, name) = split_parent_and_name(&target);
 
-    log::error!("[sys_umount2] parent: {}, name: {}", parent, name);
+    log::info!("[sys_umount2] parent: {}, name: {}", parent, name);
 
     let parent = task.walk_at(AtFd::FdCwd, parent)?;
     let child = parent.lookup(&name)?;
 
+    child.unbind_mount_dentry();
     let mdentry = child.fetch_mount_dentry();
     parent.remove_child(child.as_ref());
-
     if let Some(mdentry) = mdentry {
         parent.add_child(mdentry);
     } else {
@@ -3056,9 +3059,10 @@ pub fn sys_name_to_handle_at(
     {
         return Err(SysError::EINVAL);
     }
-    if flags.contains(AtFlags::AT_HANDLE_FID) {
-        unimplemented!()
-    }
+
+    // if flags.contains(AtFlags::AT_HANDLE_FID) {
+    //     unimplemented!()
+    // }
 
     // Find the target dentry.
     let dirfd = AtFd::from(dirfd as isize);
