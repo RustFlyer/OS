@@ -14,6 +14,7 @@
     .globl __try_read_user
     .globl __try_write_user
 
+.equ KERNEL_CTX_SIZE, 33*8
 
 .align 2
 # __trap_from_user: This label marks the entry point for traps originating from user mode
@@ -116,43 +117,32 @@ __return_to_user:
 
 # kernel -> kernel
 __trap_from_kernel:
-    # only need to save caller-saved regs
-    # note that we don't save sepc & stvec here
-    addi sp, sp, -17*8
-    sd  ra,  1*8(sp)
-    sd  t0,  2*8(sp)
-    sd  t1,  3*8(sp)
-    sd  t2,  4*8(sp)
-    sd  t3,  5*8(sp)
-    sd  t4,  6*8(sp)
-    sd  t5,  7*8(sp)
-    sd  t6,  8*8(sp)
-    sd  a0,  9*8(sp)
-    sd  a1, 10*8(sp)
-    sd  a2, 11*8(sp)
-    sd  a3, 12*8(sp)
-    sd  a4, 13*8(sp)
-    sd  a5, 14*8(sp)
-    sd  a6, 15*8(sp)
-    sd  a7, 16*8(sp)
+    addi sp, sp, -KERNEL_CTX_SIZE
+
+    # Save x1~x31
+    .set n, 1
+    .rept 31
+        SAVE_GP %n
+        .set n, n+1
+    .endr
+
+    csrr t1, sepc       # Read the exception program counter into t1
+    sd t1, 32*8(sp)     # Save sepc into the TrapContext
+
+    mv a0, sp
+
     call kernel_trap_handler
-    ld  ra,  1*8(sp)
-    ld  t0,  2*8(sp)
-    ld  t1,  3*8(sp)
-    ld  t2,  4*8(sp)
-    ld  t3,  5*8(sp)
-    ld  t4,  6*8(sp)
-    ld  t5,  7*8(sp)
-    ld  t6,  8*8(sp)
-    ld  a0,  9*8(sp)
-    ld  a1, 10*8(sp)
-    ld  a2, 11*8(sp)
-    ld  a3, 12*8(sp)
-    ld  a4, 13*8(sp)
-    ld  a5, 14*8(sp)
-    ld  a6, 15*8(sp)
-    ld  a7, 16*8(sp)
-    addi sp, sp, 17*8
+
+    ld t1, 32*8(sp)
+    csrw sepc, t1
+
+    .set n, 1
+    .rept 31
+        LOAD_GP %n
+        .set n, n+1
+    .endr
+
+    addi sp, sp, KERNEL_CTX_SIZE
     sret
 
 # arg: (user_ptr)

@@ -8,7 +8,7 @@ use arch::trap::disable_interrupt;
 /// when sp points to user stack of a task/process,
 /// sscratch(in RISCV) points to the start
 /// of the TrapContext of this task/process in user address space,
-/// until they switch when __trap_from_user, and the context begin to be saved
+/// until they switch when __trap_from_user, and the context begins to be saved
 #[derive(Clone, Copy)]
 #[repr(C)]
 pub struct TrapContext {
@@ -307,6 +307,24 @@ impl TrapContext {
         #[cfg(target_arch = "loongarch64")]
         {
             self.user_reg[4] = self.last_a0;
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Debug)]
+pub struct KernelTrapContext {
+    pub user_reg: [usize; 32],
+    pub sepc: usize,
+}
+
+impl KernelTrapContext {
+    pub const KERNEL_CONTEXT_SIZE: usize = core::mem::size_of::<Self>();
+
+    pub fn new(entry: usize, sp: usize) -> Self {
+        Self {
+            user_reg: [0; 32],
+            sepc: entry // as era(0x6) in LoongArch
         }
     }
 }

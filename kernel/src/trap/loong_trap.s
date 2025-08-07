@@ -1,10 +1,12 @@
-.macro LOAD_CR n
-    ld.d $s\n, $sp, (\n+36)*8
+.altmacro
+.macro LOAD_GP n
+    ld.d $r\n, $sp, \n*8
 .endm
 
-.macro LOAD_GP n
-    ld x\n, \n*8(sp)
+.macro SAVE_GP n
+    st.d $r\n, $sp, \n*8
 .endm
+
     .section .text   //originally k_eentry
     .globl __trap_from_user
     .globl __return_to_user
@@ -150,49 +152,33 @@ __return_to_user:
 # kernel -> kernel
     .align 12
 __trap_from_kernel:
-    # only need to save caller-saved regs
-    addi.d $sp, $sp, -19*8
-    st.d  $ra, $sp, 1*8
-    st.d  $t0, $sp, 2*8
-    st.d  $t1, $sp, 3*8
-    st.d  $t2, $sp, 4*8
-    st.d  $t3, $sp, 5*8
-    st.d  $t4, $sp, 6*8
-    st.d  $t5, $sp, 7*8
-    st.d  $t6, $sp, 8*8
-    st.d  $t7, $sp, 9*8
-    st.d  $t8, $sp, 10*8
-    st.d  $a0, $sp, 11*8
-    st.d  $a1, $sp, 12*8
-    st.d  $a2, $sp, 13*8
-    st.d  $a3, $sp, 14*8
-    st.d  $a4, $sp, 15*8
-    st.d  $a5, $sp, 16*8
-    st.d  $a6, $sp, 17*8
-    st.d  $a7, $sp, 18*8
+    addi.d $sp, $sp, -33*8
+
+    # Save x1~x31
+    .set n, 1
+    .rept 31
+        SAVE_GP %n
+        .set n, n+1
+    .endr
+
+    csrrd   $t1, 0x6        #era, as sepc in RV
+    st.d    $t1, $sp, 32*8
+
+    move    $a0, $sp
 
     la.abs  $t0, kernel_trap_handler
     jirl $ra, $t0, 0
 
-    ld.d  $ra, $sp, 1*8
-    ld.d  $t0, $sp, 2*8
-    ld.d  $t1, $sp, 3*8
-    ld.d  $t2, $sp, 4*8
-    ld.d  $t3, $sp, 5*8
-    ld.d  $t4, $sp, 6*8
-    ld.d  $t5, $sp, 7*8
-    ld.d  $t6, $sp, 8*8
-    ld.d  $t7, $sp, 9*8
-    ld.d  $t8, $sp, 10*8
-    ld.d  $a0, $sp, 11*8
-    ld.d  $a1, $sp, 12*8
-    ld.d  $a2, $sp, 13*8
-    ld.d  $a3, $sp, 14*8
-    ld.d  $a4, $sp, 15*8
-    ld.d  $a5, $sp, 16*8
-    ld.d  $a6, $sp, 17*8
-    ld.d  $a7, $sp, 18*8
-    addi.d $sp, $sp, 19*8
+    ld.d $t1, $sp, 32*8
+    csrwr $t1, 0x6
+
+    .set n, 1
+    .rept 31
+        LOAD_GP %n
+        .set n, n+1
+    .endr
+
+    addi.d $sp, $sp, 33*8
     ertn
 
 __try_read_user:
