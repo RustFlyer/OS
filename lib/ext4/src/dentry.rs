@@ -52,6 +52,7 @@ impl Dentry for ExtDentry {
                 let new_dir = ExtDir::open(&path)?;
                 let inode = ExtDirInode::new(superblock, new_dir);
                 inode.set_inotype(InodeType::Dir);
+                inode.get_meta().inner.lock().nlink = 2;
                 inode
             }
             InodeType::File => {
@@ -61,12 +62,12 @@ impl Dentry for ExtDentry {
                 )?;
                 let inode = ExtFileInode::new(superblock, new_file);
                 inode.set_inotype(InodeType::File);
+                inode.get_meta().inner.lock().nlink = 1;
                 inode
             }
             _ => unimplemented!("Unsupported file type"),
         };
         dentry.set_inode(new_inode);
-        // log::error!("[base_create] {} set inode", dentry.path());
         Ok(())
     }
 
@@ -74,26 +75,25 @@ impl Dentry for ExtDentry {
         let superblock = self.superblock().unwrap();
         let path = CString::new(dentry.path()).unwrap();
         // log::error!("path: {:?}", path);
-        if ExtInode::exists(&path, InodeTypes::EXT4_DE_DIR)? {
+        let inode: Arc<dyn Inode> = if ExtInode::exists(&path, InodeTypes::EXT4_DE_DIR)? {
             let new_file = ExtDir::open(&path)?;
             let inode = ExtDirInode::new(superblock, new_file);
             inode.set_inotype(InodeType::Dir);
-            dentry.set_inode(inode);
-            Ok(())
+            inode
         } else if ExtInode::exists(&path, InodeTypes::EXT4_DE_REG_FILE)? {
             let new_file = ExtFile::open2(&path, OpenFlags::empty())?;
             let inode = ExtFileInode::new(superblock, new_file);
             inode.set_inotype(InodeType::File);
-            dentry.set_inode(inode);
-            Ok(())
+            inode
         } else if ExtInode::exists(&path, InodeTypes::EXT4_DE_SYMLINK)? {
             let inode = ExtLinkInode::new(superblock);
             inode.set_inotype(InodeType::SymLink);
-            dentry.set_inode(inode);
-            Ok(())
+            inode
         } else {
-            Err(SysError::ENOENT)
-        }
+            return Err(SysError::ENOENT);
+        };
+        dentry.set_inode(inode);
+        Ok(())
     }
 
     fn base_new_neg_child(self: Arc<Self>, name: &str) -> Arc<dyn Dentry> {
@@ -133,14 +133,27 @@ impl Dentry for ExtDentry {
         let old_path = CString::new(old_dentry.path()).unwrap();
         let new_path = CString::new(dentry.path()).unwrap();
         ExtFile::link(&old_path, &new_path)?;
+
+        old_dentry.inode().unwrap().get_meta().inner.lock().nlink += 1;
+
+        log::warn!(
+            "nlink: {}",
+            old_dentry.inode().unwrap().get_meta().inner.lock().nlink
+        );
+
         dentry.set_inode(old_dentry.inode().unwrap());
+
         Ok(())
     }
 
     fn base_unlink(&self, dentry: &dyn Dentry) -> SysResult<()> {
         let path = CString::new(dentry.path()).unwrap();
         ExtFile::unlink(&path)?;
+
+        dentry.inode().unwrap().get_meta().inner.lock().nlink -= 1;
+
         self.remove_child(dentry);
+
         Ok(())
     }
 

@@ -1677,7 +1677,7 @@ pub fn sys_linkat(
 ) -> SyscallResult {
     let task = current_task();
     let addrspace = task.addr_space();
-    let _flags = OpenFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
+    let flags = AtFlags::from_bits(flags).ok_or(SysError::EINVAL)?;
 
     let coldpath = UserReadPtr::<u8>::new(oldpath, &addrspace).read_c_string(256)?;
     let cnewpath = UserReadPtr::<u8>::new(newpath, &addrspace).read_c_string(256)?;
@@ -1685,21 +1685,46 @@ pub fn sys_linkat(
     let oldpath = coldpath.into_string().map_err(|_| SysError::EINVAL)?;
     let newpath = cnewpath.into_string().map_err(|_| SysError::EINVAL)?;
 
+    if oldpath.is_empty() && !flags.contains(AtFlags::AT_EMPTY_PATH) {
+        return Err(SysError::ENOENT);
+    }
+    if newpath.is_empty() {
+        return Err(SysError::ENOENT);
+    }
+
     let olddirfd = AtFd::from(olddirfd);
     let newdirfd = AtFd::from(newdirfd);
 
-    log::info!("[sys_linkat] path: {} -> {}", newpath, oldpath);
-
-    let old_dentry = task.walk_at(olddirfd, oldpath)?;
+    let mut old_dentry = task.walk_at(olddirfd, oldpath)?;
     let new_dentry = task.walk_at(newdirfd, newpath)?;
 
     log::info!(
-        "[sys_linkat] dentry: {} -> {}",
+        "[sys_linkat] dentry: {} -> {}, flags: {:?}",
         old_dentry.path(),
-        new_dentry.path()
+        new_dentry.path(),
+        flags
     );
 
-    let parent = new_dentry.parent().ok_or(SysError::ENOENT)?;
+    if old_dentry.is_negative() {
+        return Err(SysError::ENOENT);
+    }
+
+    let old_type = old_dentry.inode().unwrap().inotype();
+    if old_type.is_dir() {
+        return Err(SysError::EPERM);
+    }
+    if flags.contains(AtFlags::AT_SYMLINK_FOLLOW) && old_type.is_symlink() {
+        old_dentry = Path::resolve_symlink_through(old_dentry)?;
+        if old_dentry.is_negative() {
+            return Err(SysError::ENOENT);
+        }
+    }
+
+    if !new_dentry.is_negative() {
+        return Err(SysError::EEXIST);
+    }
+
+    let parent = new_dentry.parent().unwrap();
     parent.link(&old_dentry, &new_dentry)?;
 
     Ok(0)
