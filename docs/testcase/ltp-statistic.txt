@@ -2,199 +2,200 @@
 // Testcases are composed of units
 // Classification rules:
 // 1. all pass:			pass all units
-// 2. skip pass:			no failed but some units stay not tested due to unimplemented feature
-// 3. part failed: 			at least one failed units(if there is a failed, ignore "skip")
-// 4. all failed:			fail all units
+// 2. skip pass:			at least one passed but some units stay not tested due to unimplemented feature
+// 3. part fail: 			at least one failed units(if there is a fail, ignore "skip")
+// 4. skip:				skip without pass
+// 4. all fail:			fail all units
 // 5. defect panic: 			paniced with wrong implementation
 // 6. unimplemented panic: 		paniced with 
-// 7. timeout with pass: 		timeout(stick for more than 1 min) but passed at least unit
-// 8. timeout no pass:			timeout and no passed units
+// 7. timeout with pass: 		timeout(stick for more than 1 min) but pass at least unit
+// 8. timeout no pass:			timeout and no pass units
 // 9. not run:			some how totally skipped
 
-name		type		passed	failed+broken
-abort01		all pass		2	0
-abs01		all pass		2	0
-accept01		all pass		5	0
-accept02		all failed		0	1
-accept03		part failed		20	2
-accept4_01		part failed		4	4
-access01		part failed		181	18
-access02		all pass		16	0
-access03		all pass		8	0
-access04		part failed		8	4
-acct01		unimplemented panic	0	0
-acct02		not run		0	0
-acct02_helper	not run		0	0
-acl1		not run		0	0
-add_ipv6addr	not run		0	0
-add_key01		all pass		8	0
-add_key02		all pass		9	0
-add_key03		all pass		1	0
-add_key04		all pass		1	0
-add_key05		skip pass		0	0
-adjtimex01		all pass		2	0
-adjtimex02		part failed		1	6
-adjtimex03		all failed		0	1
-af_alg01		all failed		0	1
-af_alg02		all failed		0	1
-af_alg03		all failed		0	1
-af_alg04		all failed		0	1
-af_alg05		all failed		0	1
-af_alg06		all failed		0	1
-af_alg07		all failed		0	0
-aio-stress		skip pass		0	0
-aio01		skip pass		0	0
-aio02		skip pass		0	0
-aiocp		skip pass		0	0
-aiodio_append	skip pass		0	0
-aiodio_sparse	skip pass		0	0
-alarm02		all pass		6	0
-alarm03		all pass		2	0
-alarm05		all pass		3	0
-alarm06		all pass		2	0
-alarm07		all pass		2	0
-ar01.sh		skip pass		0	0
-arch_prctl01	skip pass		0	0
-arping01.sh		part failed		9	3
-asapi_01		skip pass		0	0
-asapi_02		skip pass		0	0
-asapi_03		skip pass		0	0
-ask_password.sh	skip pass		0	0
-aslr01		skip pass		0	0
-assign_password.sh	skip pass		0	0
-atof01		part failed		3	1
-autogroup01		skip pass		0	0
-bbr01.sh
-bbr02.sh
-bind01
-bind02
-bind03
-bind04
-bind05
-bind06
-bind_noport01.sh
-binfmt_misc01.sh
-binfmt_misc02.sh
-binfmt_misc_lib.sh
-block_dev
-bpf_map01
-bpf_prog01
-bpf_prog02
-bpf_prog03
-bpf_prog04
-bpf_prog05
-bpf_prog06
-bpf_prog07
-brk01
-brk02
-broken_ip-checksum.sh
-broken_ip-dstaddr.sh
-broken_ip-fragment.sh
-broken_ip-ihl.sh
-broken_ip-nexthdr.sh
-broken_ip-plen.sh
-broken_ip-protcol.sh
-broken_ip-version.sh
-busy_poll01.sh
-busy_poll02.sh
-busy_poll03.sh
-busy_poll_lib.sh
-cacheflush01
-can_bcm01
-can_filter
-can_rcv_own_msgs
-cap_bounds_r
-cap_bounds_rw
-cap_bset_inh_bounds
-capget01
-capget02
-capset01
-capset02
-capset03
-capset04
-cfs_bandwidth01
-cgroup_core01
-cgroup_core02
-cgroup_core03
-cgroup_fj_common.sh
-cgroup_fj_function.sh
-cgroup_fj_proc
-cgroup_fj_stress.sh
-cgroup_lib.sh
-cgroup_regression_3_1.sh
-cgroup_regression_3_2.sh
-cgroup_regression_5_1.sh
-cgroup_regression_5_2.sh
-cgroup_regression_6_1.sh
-cgroup_regression_6_2.sh
-cgroup_regression_fork_processes
-cgroup_regression_getdelays
-cgroup_regression_test.sh
-cgroup_xattr
-change_password.sh
-chdir01
-chdir04
-check_envval
-check_icmpv4_connectivity
-check_icmpv6_connectivity
-check_keepcaps
-check_netem
-check_pe
-check_setkey
-check_simple_capset
-chmod01
-chmod03
-chmod05
-chmod06
-chmod07
-chown01
-chown01_16
-chown02
-chown02_16
-chown03
-chown03_16
-chown04
-chown04_16
-chown05
-chown05_16
-chroot01
-chroot02
-chroot03
-chroot04
-cleanup_lvm.sh
-clock_adjtime01
-clock_adjtime02
-clock_getres01
-clock_gettime01
-clock_gettime02
-clock_gettime03
-clock_gettime04
-clock_nanosleep01
-clock_nanosleep02
-clock_nanosleep03
-clock_nanosleep04
-clock_settime01
-clock_settime02
-clock_settime03
-clone01
-clone02
-clone03
-clone04
-clone05
-clone06
-clone07
-clone08
-clone09
-clone301
-clone302
-clone303
-close01
-close02
-close_range01
-close_range02
-cmdlib.sh
-cn_pec.sh
-confstr01
+name			type		pass	fail+broken
+abort01			all pass		2	0
+abs01			all pass		2	0
+accept01			all pass		5	0
+accept02			all fail		0	1
+accept03			part fail		20	2
+accept4_01			part fail		4	4
+access01			part fail		181	18
+access02			all pass		16	0
+access03			all pass		8	0
+access04			part fail		8	4
+acct01			unimplemented panic	0	0
+acct02			not run		0	0
+acct02_helper		not run		0	0
+acl1			not run		0	0
+add_ipv6addr		not run		0	0
+add_key01			all pass		8	0
+add_key02			all pass		9	0
+add_key03			all pass		1	0
+add_key04			all pass		1	0
+add_key05			skip		0	0
+adjtimex01			all pass		2	0
+adjtimex02			part fail		1	6
+adjtimex03			all fail		0	1
+af_alg01			all fail		0	1
+af_alg02			all fail		0	1
+af_alg03			all fail		0	1
+af_alg04			all fail		0	1
+af_alg05			all fail		0	1
+af_alg06			all fail		0	1
+af_alg07			all fail		0	0
+aio-stress			skip		0	0
+aio01			skip		0	0
+aio02			skip		0	0
+aiocp			skip		0	0
+aiodio_append		skip		0	0
+aiodio_sparse		skip		0	0
+alarm02			all pass		6	0
+alarm03			all pass		2	0
+alarm05			all pass		3	0
+alarm06			all pass		2	0
+alarm07			all pass		2	0
+ar01.sh			skip		0	0
+arch_prctl01		skip		0	0
+arping01.sh			part fail		9	3
+asapi_01			skip		0	0
+asapi_02			skip		0	0
+asapi_03			skip		0	0
+ask_password.sh		skip		0	0
+aslr01			skip		0	0
+assign_password.sh		skip		0	0
+atof01			part fail		3	1
+autogroup01			skip		0	0
+bbr01.sh			skip		0	0
+bbr02.sh			skip		0	0
+bind01			all pass		7	0
+bind02			all fail		0	1
+bind03			part fail		2	1
+bind04			all fail		0	1
+bind05			all fail		0	1
+bind06			skip		0	0
+bind_noport01.sh		skip		0	0
+binfmt_misc01.sh		skip		0	0
+binfmt_misc02.sh		skip		0	0
+binfmt_misc_lib.sh		skip		0	0
+block_dev			skip		0	0
+bpf_map01			part fail		1	2
+bpf_prog01			part fail		1	1
+bpf_prog02			part fail		1	1
+bpf_prog03			all fail		0	1
+bpf_prog04			all fail		0	2
+bpf_prog05			part fail		1	1
+bpf_prog06			all fail		0	1
+bpf_prog07			all fail		0	1
+brk01			all fail		0	1
+brk02			skip pass		1	0
+broken_ip-checksum.sh		skip		0	0
+broken_ip-dstaddr.sh		skip		0	0
+broken_ip-fragment.sh		skip		0	0
+broken_ip-ihl.sh		skip		0	0
+broken_ip-nexthdr.sh		skip		0	0
+broken_ip-plen.sh		skip		0	0
+broken_ip-protcol.sh		skip		0	0
+broken_ip-version.sh		skip		0	0
+busy_poll01.sh		skip		0	0
+busy_poll02.sh		skip		0	0
+busy_poll03.sh		skip		0	0
+busy_poll_lib.sh		skip		0	0
+cacheflush01		skip		0	0
+can_bcm01			skip		0	0
+can_filter			skip		0	0
+can_rcv_own_msgs		skip		0	0
+cap_bounds_r		skip		0	0
+cap_bounds_rw		skip		0	0
+cap_bset_inh_bounds		skip		0	0
+capget01			all pass		6	0
+capget02			part fail		4	1
+capset01			all pass		3	0
+capset02			all fail		0	1
+capset03			all pass		1	0
+capset04			part fail		0	2
+cfs_bandwidth01		skip		0	0
+cgroup_core01		all fail		0	1
+cgroup_core02		all fail		0	1
+cgroup_core03		all fail		0	1
+cgroup_fj_common.sh		all fail		0	1
+cgroup_fj_function.sh		skip		0	0
+cgroup_fj_proc		skip		0	0
+cgroup_fj_stress.sh		skip		0	0
+cgroup_lib.sh		all fail		0	1
+cgroup_regression_3_1.sh	timeout no pass	0	0
+cgroup_regression_3_2.sh	timeout no pass	0	0
+cgroup_regression_5_1.sh	timeout no pass	0	0
+cgroup_regression_5_2.sh	timeout no pass	0	0
+cgroup_regression_6_1.sh	timeout no pass	0	0
+cgroup_regression_6_2.sh	timeout no pass	0	0
+cgroup_regression_fork_processes	timeout no pass	0	0
+cgroup_regression_getdelays	skip		0	0
+cgroup_regression_test.sh	skip		0	0
+cgroup_xattr		skip		0	0
+change_password.sh		skip		0	0
+chdir01			all pass		135	0
+chdir04			all pass		3	0
+check_envval		skip		0	0
+check_icmpv4_connectivity	skip		0	0
+check_icmpv6_connectivity	skip		0	0
+check_keepcaps		skip		0	0
+check_netem			skip		0	0
+check_pe			skip		0	0
+check_setkey		skip		0	0
+check_simple_capset		skip		0	0
+chmod01			all pass		32	0
+chmod03			all fail		0	1
+chmod05			part fail		0	1
+chmod06			part fail		5	4
+chmod07			all fail		0	1
+chown01			all pass		1	0
+chown01_16			skip		0	0
+chown02			part fail		2	1
+chown02_16			skip		0	0
+chown03			all fail		0	1
+chown03_16			all fail		0	1
+chown04			part fail		4	4
+chown04_16			skip		0	0
+chown05			all pass		6	0
+chown05_16			skip		0	0
+chroot01			part fail		0	1
+chroot02			part fail		1	1
+chroot03			part fail		4	1
+chroot04			part fail		0	1
+cleanup_lvm.sh		skip		0	0
+clock_adjtime01		all pass		9	0
+clock_adjtime02		part fail		3	3
+clock_getres01		all pass		44	0
+clock_gettime01		all pass		16	0
+clock_gettime02		all pass		10	0
+clock_gettime03		unimplemented panic	0	0
+clock_gettime04		all pass		6	0
+clock_nanosleep01		skip pass		12	0
+clock_nanosleep02		part fail		1	6
+clock_nanosleep03		unimplemented panic	0	0
+clock_nanosleep04		all pass		4	0
+clock_settime01		all pass		4	0
+clock_settime02		all pass		12	0
+clock_settime03		all fail		0	1
+clone01			all pass		2	0
+clone02			skip		0	0
+clone03			all pass		1	0
+clone04			all fail		1	0
+clone05			all pass		1	0
+clone06			all pass		1	0
+clone07			all pass		1	0
+clone08			all pass		5	0
+clone09			all fail		0	1
+clone301			part fail		4	1
+clone302			part fail		6	1
+clone303			all fail		0	1
+close01			all pass		3	0
+close02			all pass		1	0
+close_range01		part fail		1	2
+close_range02		part fail		10	1
+cmdlib.sh			skip		0	0
+cn_pec.sh			skip		0	0
+confstr01			all pass		32	0
 connect01
 connect02
 copy_file_range01
@@ -275,24 +276,24 @@ dio_append
 dio_read
 dio_sparse
 dio_truncate
-diotest1
-diotest2
-diotest3
-diotest4
-diotest5
-diotest6
-dirty
-dirtyc0w
-dirtyc0w_child
-dirtyc0w_shmem
-dirtyc0w_shmem_child
-dirtypipe
-dma_thread_diotest
-dns-stress-lib.sh
-dns-stress.sh
-dns-stress01-rmt.sh
-dns-stress02-rmt.sh
-dnsmasq_tests.sh
+diotest1			all pass		1	0
+diotest2			all pass		3	0
+diotest3			all pass		3	0
+diotest4			part fail		12	6
+diotest5			all pass		3	0
+diotest6			all pass		3	0
+dirty			skip		0	0
+dirtyc0w			part fail		1	1
+dirtyc0w_child		skip		0	0
+dirtyc0w_shmem		part fail		1	1
+dirtyc0w_shmem_child		skip		0	0
+dirtypipe			all pass		1	0
+dma_thread_diotest		skip		0	0
+dns-stress-lib.sh		skip		0	0
+dns-stress.sh		all fail		0	1
+dns-stress01-rmt.sh		all fail		0	1
+dns-stress02-rmt.sh		all fail		0	1
+dnsmasq_tests.sh		skip		0	0
 doio
 du01.sh
 dup01
