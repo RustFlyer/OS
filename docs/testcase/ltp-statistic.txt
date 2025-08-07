@@ -196,86 +196,86 @@ close_range02		part fail		10	1
 cmdlib.sh			skip		0	0
 cn_pec.sh			skip		0	0
 confstr01			all pass		32	0
-connect01
-connect02
-copy_file_range01
-copy_file_range02
-copy_file_range03
-cp_tests.sh
-cpio_tests.sh
-cpuacct.sh
-cpuacct_task
-cpuctl_def_task01
-cpuctl_def_task02
-cpuctl_def_task03
-cpuctl_def_task04
-cpuctl_fj_cpu-hog
-cpuctl_fj_simple_echo
-cpuctl_latency_check_task
-cpuctl_latency_test
-cpuctl_test01
-cpuctl_test02
-cpuctl_test03
-cpuctl_test04
-cpufreq_boost
-cpuhotplug01.sh
-cpuhotplug02.sh
-cpuhotplug03.sh
-cpuhotplug04.sh
-cpuhotplug05.sh
-cpuhotplug06.sh
-cpuhotplug07.sh
-cpuhotplug_do_disk_write_loop
-cpuhotplug_do_kcompile_loop
-cpuhotplug_do_spin_loop
-cpuhotplug_hotplug.sh
-cpuhotplug_report_proc_interrupts
-cpuhotplug_testsuite.sh
-cpuset01
-crash01
-crash02
-creat01
-creat03
-creat04
-creat05
-creat06
-creat07
-creat07_child
-creat08
-creat09
-create_datafile
-create_file
-crypto_user01
-crypto_user02
-cve-2014-0196
-cve-2015-3290
-cve-2016-10044
-cve-2016-7042
-cve-2016-7117
-cve-2017-16939
-cve-2017-17052
-cve-2017-17053
-cve-2017-2618
-cve-2017-2671
-cve-2022-4378
-daemonlib.sh
-data
-data_space
-datafiles
-dccp01.sh
-dccp_ipsec.sh
-dccp_ipsec_vti.sh
-dctcp01.sh
-delete_module01
-delete_module02
-delete_module03
-df01.sh
-dhcp_lib.sh
-dhcpd_tests.sh
-dio_append
-dio_read
-dio_sparse
-dio_truncate
+connect01			part fail		2	4
+connect02			all fail		0	1
+copy_file_range01		all pass		36	0
+copy_file_range02		unimplemented panic	0	0
+copy_file_range03		all fail		0	1
+cp_tests.sh			skip		0	0
+cpio_tests.sh		skip		0	0	
+cpuacct.sh			skip		0	0
+cpuacct_task		skip		0	0
+cpuctl_def_task01		timeout no pass	0	2
+cpuctl_def_task02		timeout no pass	0	2
+cpuctl_def_task03		timeout no pass	0	2
+cpuctl_def_task04		timeout no pass	0	2
+cpuctl_fj_cpu-hog		skip		0	0
+cpuctl_fj_simple_echo		skip		0	0
+cpuctl_latency_check_task	skip		0	0
+cpuctl_latency_test		all fail		0	1
+cpuctl_test01		timeout no pass	0	2
+cpuctl_test02		timeout no pass	0	2
+cpuctl_test03		timeout no pass	0	2
+cpuctl_test04		timeout no pass	0	2
+cpufreq_boost		skip		0	0
+cpuhotplug01.sh		skip		0	0
+cpuhotplug02.sh		skip		0	0
+cpuhotplug03.sh		skip		0	0
+cpuhotplug04.sh		skip		0	0
+cpuhotplug05.sh		skip		0	0
+cpuhotplug06.sh		skip		0	0
+cpuhotplug07.sh		skip		0	0
+cpuhotplug_do_disk_write_loop	timeout no pass	0	0
+cpuhotplug_do_kcompile_loop	skip		0	0
+cpuhotplug_do_spin_loop		timeout no pass	0	0
+cpuhotplug_hotplug.sh		skip		0	0
+cpuhotplug_report_proc_interrupts	skip		0	0
+cpuhotplug_testsuite.sh		skip		0	0
+cpuset01			skip		0	0
+crash01			all pass		1	0
+crash02			unimplemented panic	0	0
+creat01			part fail		4	2
+creat03			all pass		1	0
+creat04			all pass		2	0
+creat05			all pass		1	0
+creat06			part fail		7	1
+creat07			all fail		0	1
+creat07_child		skip		0	0
+creat08			all fail		0	1
+creat09			all fail		0	1
+create_datafile		skip		0	0
+create_file			skip		0	0
+crypto_user01		all fail		0	1
+crypto_user02		all fail		0	1
+cve-2014-0196		all fail		0	1
+cve-2015-3290		skip		0	0
+cve-2016-10044		unimplemented panic	0	0
+cve-2016-7042		skip		0	0
+cve-2016-7117		timeout no pass	0	0
+cve-2017-16939		skip		0	0
+cve-2017-17052		all pass		1	0
+cve-2017-17053		skip		0	0		
+cve-2017-2618		skip		0	0
+cve-2017-2671		skip		0	0
+cve-2022-4378		skip		0	0
+daemonlib.sh		skip		0	0
+data			skip		0	0
+data_space			skip		0	0
+datafiles			skip		0	0
+dccp01.sh			skip		0	0
+dccp_ipsec.sh		skip		0	0
+dccp_ipsec_vti.sh		skip		0	0
+dctcp01.sh			skip		0	0
+delete_module01		all fail		0	1
+delete_module02		unimplemented panic	0	0
+delete_module03		all fail		0	1	
+df01.sh			skip		0	0
+dhcp_lib.sh			skip		0	0
+dhcpd_tests.sh		skip		0	0
+dio_append			skip		0	0
+dio_read			all pass		1	0
+dio_sparse			all pass		1	0		
+dio_truncate		timeout no pass	0	0
 diotest1			all pass		1	0
 diotest2			all pass		3	0
 diotest3			all pass		3	0
@@ -284,8 +284,8 @@ diotest5			all pass		3	0
 diotest6			all pass		3	0
 dirty			skip		0	0
 dirtyc0w			part fail		1	1
-dirtyc0w_child		skip		0	0
-dirtyc0w_shmem		part fail		1	1
+dirtyc0w_child		all fail		0	1
+dirtyc0w_shmem		part fail		0	1
 dirtyc0w_shmem_child		skip		0	0
 dirtypipe			all pass		1	0
 dma_thread_diotest		skip		0	0

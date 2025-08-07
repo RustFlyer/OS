@@ -6,24 +6,6 @@ pub mod ltprun {
     #[allow(non_snake_case)]
     pub fn autorun() {
         let TESTCASES = Vec::from([
-"diotest1",
-"diotest2",
-"diotest3",
-"diotest4",
-"diotest5",
-"diotest6",
-"dirty",
-"dirtyc0w",
-"dirtyc0w_child",
-"dirtyc0w_shmem",
-"dirtyc0w_shmem_child",
-"dirtypipe",
-"dma_thread_diotest",
-"dns-stress-lib.sh",
-"dns-stress.sh",
-"dns-stress01-rmt.sh",
-"dns-stress02-rmt.sh",
-"dnsmasq_tests.sh",
 "doio",
 "du01.sh",
 "dup01",
@@ -43,6 +25,7 @@ pub mod ltprun {
 "dup3_01",
 "dup3_02",
 "dynamic_debug01.sh",
+
         ]);
 
         for test in TESTCASES {
