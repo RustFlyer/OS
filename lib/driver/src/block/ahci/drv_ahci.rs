@@ -40,8 +40,10 @@ fn ahci_print_info(ahci_dev: &ahci_device) {
     let impl_0: u32 = ahci_dev.port_map;
     let speed: u32 = (ahci_dev.cap >> 20) & 0xf;
 
+    log::debug!("try to ahci_print_info");
+
     let scc_s: *const u8 = b"SATA\0" as *const u8;
-    let mut speed_s: *const u8 = null_mut();
+    let mut speed_s: *const u8;
     if speed == 1 {
         speed_s = b"1.5\0" as *const u8;
     } else if speed == 2 {
@@ -212,7 +214,9 @@ fn ahci_host_init(ahci_dev: &mut ahci_device) -> i32 {
     let mut port_mmio: u64 = 0;
     let host_mmio: u64 = ahci_dev.mmio_base;
 
-    log::debug!("try to reset ahci controller");
+    tmp = ahci_readl(host_mmio + HOST_VERSION);
+
+    log::debug!("try to reset ahci controller, version: {tmp:#x}");
     // reset ahci controller
     tmp = ahci_readl(host_mmio + HOST_CTL);
     log::debug!("ret: {tmp:#x}");
@@ -225,7 +229,6 @@ fn ahci_host_init(ahci_dev: &mut ahci_device) -> i32 {
     loop {
         unsafe { ahci_mdelay(1) };
         tmp = ahci_readl(host_mmio + HOST_CTL);
-        log::debug!("loop-ret: {tmp:#x}");
         if tmp & HOST_RESET == 0 {
             break;
         }
@@ -473,6 +476,7 @@ fn ahci_port_start(ahci_dev: &mut ahci_device, port: u8) -> i32 {
     unsafe {
         mem = ahci_malloc_align(AHCI_PORT_PRIV_DMA_SZ as u64, 1024);
         (mem as *mut u8).write_bytes(0, AHCI_PORT_PRIV_DMA_SZ as usize);
+        log::debug!("ahci_malloc_align success")
     }
 
     pp.cmd_slot = mem as *mut ahci_cmd_hdr;
@@ -894,23 +898,25 @@ pub extern "C" fn ahci_sata_write_common(
 // ahci初始化函数
 #[unsafe(no_mangle)]
 pub extern "C" fn ahci_init(ahci_dev: &mut ahci_device) -> i32 {
-    ahci_dev.mmio_base = unsafe { ahci_phys_to_uncached(0x400e0000) };
+    // ahci_dev.mmio_base = unsafe { ahci_phys_to_uncached(0x400e0000) };
 
     log::debug!("ahci_dev.mmio_base = {:#x}", ahci_dev.mmio_base);
     let mut ret: i32 = ahci_host_init(ahci_dev);
     log::debug!("finish ahci_host_init");
     if ret != 0 {
+        log::error!("fail to ahci_init");
         return -1;
     }
 
     ret = ahci_port_scan(ahci_dev);
     log::debug!("finish ahci_dev");
     if ret != 0 {
+        log::error!("fail to ahci_init");
         return -1;
     }
 
-    ahci_print_info(ahci_dev);
-    log::debug!("finish ahci_print_info");
+    // ahci_print_info(ahci_dev);
+    // log::debug!("finish ahci_print_info");
 
     ahci_sata_scan(ahci_dev);
     log::debug!("finish ahci_sata_scan");

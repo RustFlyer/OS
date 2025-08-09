@@ -90,6 +90,7 @@ impl OSDevice for AHCI {
     fn init(&self) {
         log::debug!("try to init ahci");
         let mut dev = self.device.lock();
+        dev.mmio_base = 0x8000_0000_400e_0000;
         ahci_init(dev.deref_mut());
     }
 
