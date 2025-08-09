@@ -51,7 +51,14 @@ impl FdInfo {
         } else {
             FanEventMask::CLOSE_NOWRITE
         };
-        self.file.fanotify_publish(event);
+
+        let ondir_mask = if self.file.inode().inotype().is_dir() {
+            FanEventMask::ONDIR
+        } else {
+            FanEventMask::empty()
+        };
+
+        self.file.fanotify_publish(event | ondir_mask);
     }
 }
 
@@ -105,7 +112,14 @@ impl FdTable {
             log::info!("alloc fd [{}]", fd);
             crate::proc::fd::create_self_fd_file(fd)?;
             crate::special::inotify::vfs_create_notify(file.clone());
-            file.fanotify_publish(FanEventMask::OPEN);
+
+            let ondir_mask = if file.inode().inotype().is_dir() {
+                FanEventMask::ONDIR
+            } else {
+                FanEventMask::empty()
+            };
+            file.fanotify_publish(FanEventMask::OPEN | ondir_mask);
+
             self.table[fd] = Some(FdInfo::new(file, flags.into()));
             Ok(fd)
         } else {

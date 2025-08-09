@@ -73,7 +73,7 @@ use vfs::{
     dentry::Dentry,
     fanotify::fs::file::FanotifyGroupFile,
     file::File,
-    handle::{FileHandleData, FileHandleHeader, HANDLE_LEN},
+    handle::{self, FileHandleData, FileHandleHeader},
     inode::Inode,
     kstat::Kstat,
     path::{Path, split_parent_and_name},
@@ -3095,30 +3095,22 @@ pub fn sys_name_to_handle_at(
     }
 
     // Create the file handle.
-    let handle = dentry.file_handle();
+    let handle = dentry.inode().unwrap().file_handle();
 
     // Check if `handle_bytes` in the file handler provided by the user is valid.
     let mut user_handle_header = {
         let mut user_ptr = UserReadPtr::<u8>::new(handle_ptr, &addrspace);
-        let header = unsafe { user_ptr.try_into_slice(8)? };
+        let header = unsafe { user_ptr.try_into_slice(handle::HEADER_LEN)? };
         FileHandleHeader::from_raw_bytes(header)
     };
-    if user_handle_header.handle_bytes() > HANDLE_LEN as u32 {
-        log::warn!(
-            "[sys_name_to_handle_at] handle_bytes too large: {}, max: {}",
-            user_handle_header.handle_bytes(),
-            HANDLE_LEN
-        );
-        return Err(SysError::EINVAL);
-    }
-    if user_handle_header.handle_bytes() < handle.handle_bytes() {
+    if user_handle_header.handle_bytes < handle.handle_bytes() {
         log::warn!(
             "[sys_name_to_handle_at] handle_bytes too small: {}, required: {}",
-            user_handle_header.handle_bytes(),
+            user_handle_header.handle_bytes,
             handle.handle_bytes()
         );
         // Return the required size in the header.
-        user_handle_header.set_handle_bytes(HANDLE_LEN as u32);
+        user_handle_header.handle_bytes = handle::HANDLE_LEN as u32;
         unsafe {
             UserWritePtr::<FileHandleHeader>::new(handle_ptr, &addrspace)
                 .write(user_handle_header)?;
@@ -3127,11 +3119,11 @@ pub fn sys_name_to_handle_at(
     }
 
     // Write the file handle to the user space.
-    let file_handle_bytes = handle.to_raw_bytes();
+    let file_handle_bytes = handle.as_raw_bytes();
     unsafe {
         UserWritePtr::<u8>::new(handle_ptr, &addrspace)
             .try_into_mut_slice(file_handle_bytes.len())?
-            .copy_from_slice(&file_handle_bytes);
+            .copy_from_slice(file_handle_bytes);
     }
 
     Ok(0)
@@ -3180,11 +3172,11 @@ pub fn sys_open_by_handle_at(mount_fd: i32, handle_ptr: usize, flags: i32) -> Sy
         FileHandleHeader::from_raw_bytes(header_bytes)
     };
 
-    let handle_bytes = handle_header.handle_bytes();
-    let handle_type = handle_header.handle_type();
+    let handle_bytes = handle_header.handle_bytes;
+    let handle_type = handle_header.handle_type;
 
     // Validate handle parameters.
-    if handle_bytes == 0 || handle_bytes > HANDLE_LEN as u32 {
+    if handle_bytes == 0 || handle_bytes > handle::HANDLE_LEN as u32 {
         return Err(SysError::EINVAL);
     }
 
@@ -3201,22 +3193,19 @@ pub fn sys_open_by_handle_at(mount_fd: i32, handle_ptr: usize, flags: i32) -> Sy
     };
 
     log::info!(
-        "[sys_open_by_handle_at] file handle path: {}, flags: {:?}",
-        handle_data.path(),
+        "[sys_open_by_handle_at] open file inode: {}, generation: {}, flags: {:?}",
+        handle_data.inode,
+        handle_data.generation,
         flags
     );
 
-    // Find the dentry for the file path.
-    let dentry = task
-        .walk_at(AtFd::FdCwd, handle_data.path().to_string())
-        .map_err(|err| match err {
-            SysError::ENOENT => SysError::ESTALE,
-            _ => err,
-        })?;
-    let inode = dentry.inode().ok_or(SysError::ESTALE)?;
-    if inode.inotype().is_symlink() && !flags.contains(OpenFlags::O_PATH) {
-        return Err(SysError::ELOOP);
-    }
+    // Create an anonymous file for the inode.
+    let index = handle_data.inode;
+    let mount = mount_dentry.inode().unwrap().superblock();
+    let dentry = mount_dentry.base_new_anonymous();
+    let file = <dyn File>::open_by_inode_number(&mount, index, Arc::clone(&dentry))?;
+
+    let inode = file.inode();
 
     let _cred = task.perm_mut();
     let cred = _cred.lock();
