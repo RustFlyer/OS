@@ -2,8 +2,15 @@ use alloc::{collections::BTreeMap, string::String, sync::Arc};
 
 use config::vfs::OpenFlags;
 use mutex::ShareMutex;
-use osfs::{dev::loopx::externf::KernelTableIf, fd_table::FdTable, proc::KernelProcIf};
-use systype::{error::SysResult, kinterface::KernelTaskOperations};
+use osfs::{
+    dev::loopx::externf::KernelTableIf,
+    fd_table::FdTable,
+    proc::{KernelProcIf, fdinfo::info::ProcFdInfo},
+};
+use systype::{
+    error::{SysError, SysResult},
+    kinterface::KernelTaskOperations,
+};
 use vfs::{fanotify::kinterface::KernelFdTableOperations, file::File};
 
 use super::manager::TASK_MANAGER;
@@ -51,6 +58,21 @@ impl KernelProcIf for KernelProcIfImpl {
 
     fn fd(fd: usize) -> String {
         current_task().with_mut_fdtable(|table| table.get_file(fd).unwrap().dentry().path())
+    }
+
+    fn fdinfo_from_tid_and_fd(tid: usize, fd: usize) -> SysResult<ProcFdInfo> {
+        let task = TASK_MANAGER.get_task(tid).ok_or(SysError::EINVAL)?;
+        let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
+
+        let ret = ProcFdInfo {
+            flags: file.flags().bits() as u32,
+            pos: file.pos() as u64,
+            minflt: 0,
+            majflt: 0,
+            nflock: 1,
+        };
+
+        Ok(ret)
     }
 }
 

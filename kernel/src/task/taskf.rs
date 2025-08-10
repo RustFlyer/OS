@@ -271,6 +271,7 @@ impl Task {
         } else {
             new_share_mutex(self.fdtable_mut().lock().clone())
         };
+        fd_table.lock().set_tid(tid.0 as u64);
 
         let perm = (*self.perm_mut().lock()).clone();
 
