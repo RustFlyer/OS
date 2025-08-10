@@ -76,6 +76,7 @@ pub fn can_filter() -> bool {
     unsafe { FILTER_ID.load(Ordering::Relaxed) > 0 }
 }
 
+/// Enable Filter(1,2,3)
 #[allow(static_mut_refs)]
 pub fn enable_filter(id: usize) {
     assert_ne!(id, 0, "You should not set filter as zero");

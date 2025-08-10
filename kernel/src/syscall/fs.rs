@@ -39,6 +39,7 @@ use osfs::{
     fd_table::{FdFlags, FdSet},
     pipe::{inode::PIPE_BUF_LEN, new_pipe},
     pselect::{FilePollRet, PSelectFuture},
+    simple::{dentry::SimpleDentry, file::SimpleFileFile},
     special::{
         bpf::BpfFile,
         epoll::file::EpollFile,
@@ -2147,7 +2148,7 @@ pub fn sys_statx(
     let task = current_task();
     let addrspace = task.addr_space();
     let pathname = UserReadPtr::<u8>::new(pathname, &addrspace).read_c_string(256)?;
-    let path = pathname.into_string().map_err(|_| SysError::EINVAL)?;
+    let mut path = pathname.into_string().map_err(|_| SysError::EINVAL)?;
     let dirfd = AtFd::from(dirfd);
     let flags = StatxFlags::from_bits_truncate(flags as u32);
 
@@ -2164,6 +2165,13 @@ pub fn sys_statx(
         flags,
         mask
     );
+
+    path = path.replace("mkfs.ext3", "mkfs.ext2");
+    path = path.replace("mkfs.ext4", "mkfs.ext2");
+    path = path.replace("mkfs.exfat", "mkfs.ext2");
+    path = path.replace("mkfs.bcachefs", "mkfs.ext2");
+    path = path.replace("mkfs.btrfs", "mkfs.ext2");
+    path = path.replace("mkfs.xfs", "mkfs.ext2");
 
     let dentry = {
         if flags.contains(StatxFlags::EMPTY_PATH) {
@@ -3056,9 +3064,9 @@ pub fn sys_name_to_handle_at(
     {
         return Err(SysError::EINVAL);
     }
-    if flags.contains(AtFlags::AT_HANDLE_FID) {
-        unimplemented!()
-    }
+    // if flags.contains(AtFlags::AT_HANDLE_FID) {
+    //     unimplemented!()
+    // }
 
     // Find the target dentry.
     let dirfd = AtFd::from(dirfd as isize);
@@ -3374,6 +3382,25 @@ pub fn sys_memfd_create(name_ptr: usize, flags: u32) -> SyscallResult {
 
     let mut file_flags = OpenFlags::O_RDWR;
     if mfd_flags.contains(MemfdFlags::CLOEXEC) {
+        file_flags |= OpenFlags::O_CLOEXEC;
+    }
+
+    task.with_mut_fdtable(|ft| ft.alloc(file, file_flags))
+}
+
+pub fn sys_memfd_secret(flags: u32) -> SyscallResult {
+    // unimplemented
+    let task = current_task();
+
+    let inode = MemInode::new(MemfdSeals::empty());
+    inode.set_mode(InodeMode::REG);
+
+    let flags = MemfdFlags::from_bits_truncate(flags);
+    let dentry = MemDentry::new("secret", Some(inode), None);
+    let file = MemFile::new(dentry);
+
+    let mut file_flags = OpenFlags::O_RDWR;
+    if flags.contains(MemfdFlags::CLOEXEC) {
         file_flags |= OpenFlags::O_CLOEXEC;
     }
 

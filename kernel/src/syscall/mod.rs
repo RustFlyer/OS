@@ -48,6 +48,8 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
             "Syscall number not included: {syscall_no} | {}",
             syscall_no as isize
         );
+        // return -(SysError::ENOSYS.code() as isize) as usize;
+
         panic!("Syscall number not included: {syscall_no}");
     };
 
@@ -296,6 +298,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         OPEN_TREE => sys_open_tree(args[0] as i32, args[1], args[2] as u32),
         SENDMMSG => sys_sendmmsg(args[0], args[1], args[2], args[3]).await,
         RECVMMSG => sys_recvmmsg(args[0], args[1], args[2], args[3], args[4]).await,
+        MEMFD_SECRET => sys_memfd_secret(args[1] as u32),
         _ => {
             log::error!("Syscall not implemented: {}", syscall_no.as_str());
             panic!("Syscall not implemented: {}", syscall_no.as_str());

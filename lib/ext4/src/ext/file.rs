@@ -9,9 +9,9 @@ use core::{cell::SyncUnsafeCell, ffi::CStr, mem::MaybeUninit};
 
 use lwext4_rust::bindings::{
     SEEK_CUR, SEEK_END, SEEK_SET, ext4_fclose, ext4_file, ext4_flink, ext4_fopen, ext4_fopen2,
-    ext4_fread, ext4_fremove, ext4_fs_get_inode_ref, ext4_fs_put_inode_ref, ext4_fseek, ext4_fsize,
-    ext4_fsymlink, ext4_ftell, ext4_ftruncate, ext4_fwrite, ext4_inode, ext4_inode_ref,
-    ext4_readlink,
+    ext4_fread, ext4_fremove, ext4_frename, ext4_fs_get_inode_ref, ext4_fs_put_inode_ref,
+    ext4_fseek, ext4_fsize, ext4_fsymlink, ext4_ftell, ext4_ftruncate, ext4_fwrite, ext4_inode,
+    ext4_inode_ref, ext4_readlink,
 };
 
 use config::vfs::{OpenFlags, SeekFrom};
@@ -296,7 +296,7 @@ impl ExtFile {
 
     /// Change the name or location of a file.
     pub(crate) fn rename(path: &CStr, new_path: &CStr) -> SysResult<()> {
-        let err = unsafe { ext4_flink(path.as_ptr(), new_path.as_ptr()) };
+        let err = unsafe { ext4_frename(path.as_ptr(), new_path.as_ptr()) };
         match err {
             0 => Ok(()),
             _ => {

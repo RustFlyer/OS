@@ -37,7 +37,7 @@ pub fn init_sysfs(root_dentry: Arc<dyn Dentry>) -> SysResult<()> {
     );
     devices_dentry.add_child(system_dentry.clone());
 
-    return Ok(());
+    // return Ok(());
 
     // /sys/devices/system/node
     let node_inode = SimpleInode::new(root_dentry.superblock().unwrap());
