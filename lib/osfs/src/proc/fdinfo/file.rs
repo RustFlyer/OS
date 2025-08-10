@@ -1,4 +1,4 @@
-use alloc::boxed::Box;
+use alloc::{boxed::Box, format};
 
 use async_trait::async_trait;
 use crate_interface::call_interface;
@@ -36,12 +36,13 @@ impl File for FdInfoFile {
         let fd = inode.file_descriptor;
 
         let fdinfo = call_interface!(KernelProcIf::fdinfo_from_tid_and_fd(tid, fd))?;
-        let filelen = size_of::<ProcFdInfo>();
+        let fdinfo_str = fdinfo.as_text();
+        let filelen = fdinfo_str.len();
         if buf.len() < filelen {
             log::warn!("buf not big enough");
             return Err(SysError::EINVAL);
         }
-        buf[..filelen].copy_from_slice(&fdinfo.as_bytes());
+        buf[..filelen].copy_from_slice(&fdinfo_str.as_bytes());
         Ok(filelen)
     }
 

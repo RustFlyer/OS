@@ -1,4 +1,4 @@
-use alloc::vec::Vec;
+use alloc::{format, string::String, vec::Vec};
 
 pub struct ProcFdInfo {
     pub flags: u32,  // file's flag
@@ -27,5 +27,12 @@ impl ProcFdInfo {
         bytes.extend_from_slice(&self.majflt.to_le_bytes());
         bytes.extend_from_slice(&self.nflock.to_le_bytes());
         bytes
+    }
+
+    pub fn as_text(&self) -> String {
+        format!(
+            "flags: {:#x}\npos: {}\nminflt: {}\nmajflt: {}\nnflock: {}\n",
+            self.flags, self.pos, self.minflt, self.majflt, self.nflock
+        )
     }
 }
