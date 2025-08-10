@@ -34,7 +34,7 @@
 - [x] [  33] splice08                    36             32
 - [x] [  34] confstr01                   34             36
 - [ ] [  35] mq_timedsend01              34
-- [ ] [  36] utimensat01                 34
+- [ ] [  36] utimensat01                 34             12
 - [ ] [  37] memcontrol04                33
 - [x] [  38] chmod01                     32             32
 - [ ] [  39] creat09                     32
