@@ -11,8 +11,6 @@ use vfs::{
 
 use crate::proc::{__KernelProcIf_mod, fdinfo::inode::FdInfoInode};
 
-use super::info::ProcFdInfo;
-
 pub struct FdInfoFile {
     pub(crate) meta: FileMeta,
 }

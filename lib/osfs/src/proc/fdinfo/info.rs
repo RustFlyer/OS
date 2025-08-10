@@ -1,38 +1,30 @@
 use alloc::{format, string::String, vec::Vec};
 
 pub struct ProcFdInfo {
-    pub flags: u32,  // file's flag
+    pub flags: u32,  // file's flags
     pub pos: u64,    // file's pos
-    pub minflt: u64, // mini-file err cnt
-    pub majflt: u64, // max-file err cnt
-    pub nflock: u32, // file lock cnt
+    pub mnt_id: u32, // mount point ID
+    pub ino: u64,    // inode id
 }
 
 impl ProcFdInfo {
-    pub fn new(flags: u32, pos: u64, minflt: u64, majflt: u64, nflock: u32) -> Self {
+    pub fn new(flags: u32, pos: u64, mnt_id: u32, ino: u64) -> Self {
         ProcFdInfo {
             flags,
             pos,
-            minflt,
-            majflt,
-            nflock,
+            mnt_id,
+            ino,
         }
-    }
-
-    pub fn as_bytes(&self) -> Vec<u8> {
-        let mut bytes = Vec::new();
-        bytes.extend_from_slice(&self.flags.to_le_bytes());
-        bytes.extend_from_slice(&self.pos.to_le_bytes());
-        bytes.extend_from_slice(&self.minflt.to_le_bytes());
-        bytes.extend_from_slice(&self.majflt.to_le_bytes());
-        bytes.extend_from_slice(&self.nflock.to_le_bytes());
-        bytes
     }
 
     pub fn as_text(&self) -> String {
         format!(
-            "flags: {:#x}\npos: {}\nminflt: {}\nmajflt: {}\nnflock: {}\n",
-            self.flags, self.pos, self.minflt, self.majflt, self.nflock
+            "pos:\t{}\nflags:\t{:o}\nmnt_id:\t{}\nino:\t{}\n",
+            self.pos, self.flags, self.mnt_id, self.ino
         )
+    }
+
+    pub fn as_bytes(&self) -> Vec<u8> {
+        self.as_text().into_bytes()
     }
 }

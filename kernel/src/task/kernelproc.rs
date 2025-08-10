@@ -67,9 +67,8 @@ impl KernelProcIf for KernelProcIfImpl {
         let ret = ProcFdInfo {
             flags: file.flags().bits() as u32,
             pos: file.pos() as u64,
-            minflt: 0,
-            majflt: 0,
-            nflock: 1,
+            mnt_id: file.inode().dev_id().0,
+            ino: file.inode().ino() as u64,
         };
 
         Ok(ret)
