@@ -15,6 +15,7 @@ mod signal;
 mod time;
 mod user;
 
+use driver::print;
 pub use key::init_key;
 
 use bpf::*;
@@ -44,11 +45,12 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
             return -(SysError::ENOSYS.code() as isize) as usize;
         }
 
-        log::error!(
+        print!(
             "Syscall number not included: {syscall_no} | {}",
             syscall_no as isize
         );
-        panic!("Syscall number not included: {syscall_no}");
+        return -(SysError::ENOSYS.code() as isize) as usize;
+        // panic!("Syscall number not included: {syscall_no}");
     };
 
     log::debug!(
@@ -297,8 +299,9 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         SENDMMSG => sys_sendmmsg(args[0], args[1], args[2], args[3]).await,
         RECVMMSG => sys_recvmmsg(args[0], args[1], args[2], args[3], args[4]).await,
         _ => {
-            log::error!("Syscall not implemented: {}", syscall_no.as_str());
-            panic!("Syscall not implemented: {}", syscall_no.as_str());
+            print!("Syscall not implemented: {}", syscall_no.as_str());
+            // panic!("Syscall not implemented: {}", syscall_no.as_str());
+            return -(SysError::ENOSYS.code() as isize) as usize;
         }
     };
 
