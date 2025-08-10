@@ -52,7 +52,6 @@ impl Path {
     /// characters in `path`, or if `path` is empty, the behavior is undefined. The
     /// caller must ensure that `path` is a valid path string.
     pub fn new(start: Arc<dyn Dentry>, path: String) -> Self {
-        debug_assert!(!path.is_empty());
         debug_assert!(!path.contains('\0'));
         Self { start, path }
     }
