@@ -104,6 +104,10 @@ impl Dentry for ExtDentry {
         dentry as Arc<dyn Dentry>
     }
 
+    fn base_new_anonymous(self: Arc<Self>) -> Arc<dyn Dentry> {
+        ExtDentry::new("<anonymous>", None, None)
+    }
+
     fn base_open(self: Arc<Self>) -> SysResult<Arc<dyn File>> {
         let inode = self.inode().unwrap();
         match inode.inotype() {

@@ -486,14 +486,13 @@ impl FanotifyGroup {
                 || info_type == FanotifyEventInfoType::NewDfidName,
         );
 
-        // let mut handle_bytes = object.file_handle().to_raw_bytes();
-        let file_handle = object.file_handle();
+        let file_handle = object.inode().unwrap().file_handle();
         log::info!(
             "[FanotifyGroup::create_fid_info] Creating fid info: object={:?}, file_handle={:?}",
             object.path(),
             file_handle,
         );
-        let mut handle_bytes = file_handle.to_raw_bytes();
+        let mut handle_bytes = file_handle.as_raw_bytes().to_vec();
         if let Some(name) = file_name {
             handle_bytes.extend_from_slice(name.as_bytes());
             handle_bytes.push(0); // Null terminator

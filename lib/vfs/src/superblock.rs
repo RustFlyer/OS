@@ -1,6 +1,5 @@
 use alloc::{
-    sync::{Arc, Weak},
-    vec::Vec,
+    collections::btree_map::BTreeMap, sync::{Arc, Weak}, vec::Vec
 };
 
 use config::vfs::StatFs;
@@ -9,7 +8,7 @@ use mutex::SpinNoIrqLock;
 use spin::Once;
 use systype::error::SysResult;
 
-use crate::{dentry::Dentry, fanotify::FanotifyEntry, fstype::FileSystemType};
+use crate::{dentry::Dentry, fanotify::FanotifyEntry, fstype::FileSystemType, inode::Inode};
 
 static _VIRTUAL_DEV_COUNTER: core::sync::atomic::AtomicU64 =
     core::sync::atomic::AtomicU64::new(0x1000);
@@ -20,6 +19,7 @@ pub struct SuperBlockMeta {
     pub fs_type: Arc<dyn FileSystemType>,
     pub root_dentry: Once<Arc<dyn Dentry>>,
     pub fanotify_entries: SpinNoIrqLock<Vec<Weak<FanotifyEntry>>>,
+    pub inode_mapping: SpinNoIrqLock<BTreeMap<u32, Arc<dyn Inode>>>,
 }
 
 impl SuperBlockMeta {
@@ -35,6 +35,7 @@ impl SuperBlockMeta {
             fs_type,
             root_dentry: Once::new(),
             fanotify_entries: SpinNoIrqLock::new(Vec::new()),
+            inode_mapping: SpinNoIrqLock::new(BTreeMap::new()),
         }
     }
 }

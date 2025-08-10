@@ -9,7 +9,6 @@ use systype::error::{SysError, SysResult};
 use crate::fanotify::types::FanEventMask;
 use crate::fanotify::{FanotifyEntrySet, FanotifyGroupKey};
 use crate::file::File;
-use crate::handle::FileHandle;
 use crate::inode::Inode;
 use crate::superblock::SuperBlock;
 
@@ -26,6 +25,8 @@ pub struct DentryMeta {
     pub inode: SpinNoIrqLock<Option<Arc<dyn Inode>>>,
     /// Dentry before mount. This field is `None` if this dentry has been not mounted.
     pub mdentry: SpinNoIrqLock<Option<Arc<dyn Dentry>>>,
+    /// Dentry bind mount. This field is `None` if this dentry has been not bind mounted.
+    pub bdentry: SpinNoIrqLock<Option<Arc<dyn Dentry>>>,
 }
 
 impl DentryMeta {
@@ -42,6 +43,7 @@ impl DentryMeta {
             children: SpinNoIrqLock::new(BTreeMap::new()),
             inode: SpinNoIrqLock::new(inode),
             mdentry: SpinNoIrqLock::new(None),
+            bdentry: SpinNoIrqLock::new(None),
         }
     }
 }
@@ -154,6 +156,11 @@ pub trait Dentry: Send + Sync {
     /// `self` must be a valid directory.
     fn base_new_neg_child(self: Arc<Self>, name: &str) -> Arc<dyn Dentry>;
 
+    /// Creates a new anonymous dentry of the type of `self`.
+    fn base_new_anonymous(self: Arc<Self>) -> Arc<dyn Dentry> {
+        unimplemented!("`base_new_anonymous` is not implemented for this file system")
+    }
+
     /// Returns the inode of this dentry.
     fn inode(&self) -> Option<Arc<dyn Inode>> {
         self.get_meta().inode.lock().clone()
@@ -244,10 +251,21 @@ impl dyn Dentry {
         debug_assert!(dentry.is_negative());
         debug_assert!(mode.to_type().is_reg());
 
+        self.base_create(dentry.as_ref(), mode)?;
+
+        let inode_number = dentry.inode().unwrap().ino() as u32;
+        let inode = Arc::clone(&dentry.inode().unwrap());
+        self.superblock()
+            .unwrap()
+            .meta()
+            .inode_mapping
+            .lock()
+            .insert(inode_number, Arc::clone(&inode));
+
         let file_name = dentry.name();
         self.fanotify_publish(Some(dentry), FanEventMask::CREATE, file_name, file_name);
 
-        self.base_create(dentry.as_ref(), mode)
+        Ok(())
     }
 
     /// Creates a directory in directory `self` with the name given in `dentry` and the mode
@@ -261,6 +279,17 @@ impl dyn Dentry {
         debug_assert!(dentry.is_negative());
         debug_assert!(mode.to_type().is_dir());
 
+        self.base_create(dentry.as_ref(), mode)?;
+
+        let inode_number = dentry.inode().unwrap().ino() as u32;
+        let inode = Arc::clone(&dentry.inode().unwrap());
+        self.superblock()
+            .unwrap()
+            .meta()
+            .inode_mapping
+            .lock()
+            .insert(inode_number, Arc::clone(&inode));
+
         let file_name = dentry.name();
         self.fanotify_publish(
             Some(dentry),
@@ -269,7 +298,7 @@ impl dyn Dentry {
             file_name,
         );
 
-        self.base_create(dentry.as_ref(), mode)
+        Ok(())
     }
 
     /// Creates a symbolic link in directory `self` with the name given in `dentry` which contains
@@ -282,10 +311,21 @@ impl dyn Dentry {
         debug_assert!(self.inode().unwrap().inotype().is_dir());
         debug_assert!(dentry.is_negative());
 
+        self.base_symlink(dentry.as_ref(), target)?;
+
+        let inode_number = dentry.inode().unwrap().ino() as u32;
+        let inode = Arc::clone(&dentry.inode().unwrap());
+        self.superblock()
+            .unwrap()
+            .meta()
+            .inode_mapping
+            .lock()
+            .insert(inode_number, Arc::clone(&inode));
+
         let file_name = dentry.name();
         self.fanotify_publish(Some(dentry), FanEventMask::CREATE, file_name, file_name);
 
-        self.base_symlink(dentry.as_ref(), target)
+        Ok(())
     }
 
     /// Returns a reference to directory `self`'s child dentry which has the given name.
@@ -298,11 +338,31 @@ impl dyn Dentry {
         match self.get_child(name) {
             Some(dentry) => Ok(dentry),
             None => {
-                log::debug!("lookup: neg child {}", name);
+                // look for bind-mount dentry
+                let lock = self.get_meta().bdentry.lock();
+                if lock.is_some() {
+                    let bdentry = lock.as_ref().unwrap();
+                    if let Some(dentry) = bdentry.get_child(name) {
+                        return Ok(dentry);
+                    }
+                }
+
+                // neg child created in main dentry, not bind dentry
                 let dentry = self.new_neg_child(name);
-                log::debug!("then lookup: neg child {}", name);
                 match self.base_lookup(dentry.as_ref()) {
-                    Ok(_) | Err(SysError::ENOENT) => Ok(dentry),
+                    Ok(_) | Err(SysError::ENOENT) => {
+                        if let Some(inode_number) = dentry.inode().map(|i| i.ino() as u32) {
+                            // Insert the inode into the inode mapping.
+                            let inode = Arc::clone(&dentry.inode().unwrap());
+                            self.superblock()
+                                .unwrap()
+                                .meta()
+                                .inode_mapping
+                                .lock()
+                                .insert(inode_number, Arc::clone(&inode));
+                        }
+                        Ok(dentry)
+                    }
                     Err(e) => Err(e),
                 }
             }
@@ -330,10 +390,21 @@ impl dyn Dentry {
             &self.inode().unwrap().get_meta().superblock
         ));
 
+        self.base_link(new_dentry.as_ref(), old_dentry.as_ref())?;
+
+        let inode_number = new_dentry.inode().unwrap().ino() as u32;
+        let inode = Arc::clone(&new_dentry.inode().unwrap());
+        self.superblock()
+            .unwrap()
+            .meta()
+            .inode_mapping
+            .lock()
+            .insert(inode_number, Arc::clone(&inode));
+
         let file_name = new_dentry.name();
         self.fanotify_publish(Some(new_dentry), FanEventMask::CREATE, file_name, file_name);
 
-        self.base_link(new_dentry.as_ref(), old_dentry.as_ref())
+        Ok(())
     }
 
     /// Removes the child dentry from directory `self`.
@@ -477,6 +548,9 @@ impl dyn Dentry {
             old_name,
             old_name,
         );
+
+        self.base_rename(dentry.as_ref(), new_dir.as_ref(), new_dentry.as_ref())?;
+
         new_dir.fanotify_publish(
             Some(new_dentry),
             FanEventMask::MOVED_TO | ondir_mask,
@@ -492,7 +566,7 @@ impl dyn Dentry {
             );
         }
 
-        self.base_rename(dentry.as_ref(), new_dir.as_ref(), new_dentry.as_ref())
+        Ok(())
     }
 
     /// Creates a new negative child dentry with the given name in directory `self`.
@@ -504,14 +578,19 @@ impl dyn Dentry {
         Arc::clone(self).base_new_neg_child(name)
     }
 
-    /// Returns a file handle for this dentry.
-    pub fn file_handle(&self) -> FileHandle {
-        FileHandle::new(0x1ef, self.path())
-    }
-
     /// Stores dentry which is mounted.
     pub fn store_mount_dentry(self: &Arc<Self>, dentry: Arc<dyn Dentry>) {
         *self.get_meta().mdentry.lock() = Some(dentry);
+    }
+
+    /// Stores dentry which is mounted.
+    pub fn bind_mount_dentry(self: &Arc<Self>, dentry: Arc<dyn Dentry>) {
+        *self.get_meta().bdentry.lock() = Some(dentry);
+    }
+
+    /// Stores dentry which is mounted.
+    pub fn unbind_mount_dentry(self: &Arc<Self>) {
+        *self.get_meta().bdentry.lock() = None;
     }
 
     /// Fetches dentry which is stored when mounted and reset mdentry as None.
