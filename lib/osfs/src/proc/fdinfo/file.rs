@@ -34,13 +34,13 @@ impl File for FdInfoFile {
         let fd = inode.file_descriptor;
 
         let fdinfo = call_interface!(KernelProcIf::fdinfo_from_tid_and_fd(tid, fd))?;
-        let fdinfo_str = fdinfo.as_text();
+        let fdinfo_str = fdinfo.to_text();
         let filelen = fdinfo_str.len();
         if buf.len() < filelen {
             log::warn!("buf not big enough");
             return Err(SysError::EINVAL);
         }
-        buf[..filelen].copy_from_slice(&fdinfo_str.as_bytes());
+        buf[..filelen].copy_from_slice(fdinfo_str.as_bytes());
         Ok(filelen)
     }
 

@@ -12,7 +12,7 @@
 - [x] [  11] getpid01                   100             100
 - [ ] [  12] fsmount01                   96
 - [x] [  13] chdir01                     92             135 all fs-type
-- [ ] [  14] fanotify09                  76
+- [ ] [  14] fanotify09                  76             76
 - [x] [  15] pipe11                      70             70
 - [x] [  16] fsync01                     60             90
 - [ ] [  17] mount07                     56

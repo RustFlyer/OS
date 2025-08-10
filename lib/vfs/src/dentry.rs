@@ -635,7 +635,7 @@ impl dyn Dentry {
                         Some(entry) => entry,
                         None => return false,
                     };
-                    if event.contains(FanEventMask::MODIFY) {
+                    if stringify!($field) == "object" && event.contains(FanEventMask::MODIFY) {
                         entry.clear_ignore();
                     }
 
