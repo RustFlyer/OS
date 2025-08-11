@@ -89,9 +89,21 @@ impl FanotifyGroup {
         }
     }
 
+    /// Returns the entries in the fanotify group.
+    ///
+    /// # Note
+    /// This function is only for exposing data; do not mutate it!
+    pub fn entries(&self) -> &SpinNoIrqLock<BTreeMap<FsObjectId, Arc<FanotifyEntry>>> {
+        &self.entries
+    }
+
     /// Returns the flags of the fanotify group.
     pub fn flags(&self) -> FanInitFlags {
         self.flags
+    }
+
+    pub fn event_file_flags(&self) -> FanEventFileFlags {
+        self.event_file_flags
     }
 
     /// Subscribes to events on a filesystem object.
@@ -119,13 +131,12 @@ impl FanotifyGroup {
             flags: SpinNoIrqLock::new(flags),
             mark: SpinNoIrqLock::new(mark),
             ignore: SpinNoIrqLock::new(ignore),
-            permission_queue: SpinNoIrqLock::new(VecDeque::new()),
         });
 
         let object_id = match &entry.object {
             FsObject::Inode(inode) => {
                 let inode = inode.upgrade().unwrap();
-                FsObjectId::Inode(inode.ino())
+                FsObjectId::Inode(inode.ino() as u32)
             }
             FsObject::Mount(mount) => {
                 let mount = mount.upgrade().unwrap();
@@ -229,7 +240,7 @@ impl FanotifyGroup {
         object: &Arc<dyn Dentry>,
         subobject: Option<&Arc<dyn Dentry>>,
         entries: FanotifyEntrySet,
-        event: FanEventMask,
+        mut event: FanEventMask,
         old_name: &str,
         new_name: &str,
     ) {
@@ -291,6 +302,12 @@ impl FanotifyGroup {
                 fs_ignore
             );
             return;
+        }
+
+        // TODO: On what conditions should we include the ONDIR flag in the final event
+        // data which is to be sent to user processes?
+        if event.contains(FanEventMask::CLOSE_NOWRITE) {
+            event = event.difference(FanEventMask::ONDIR);
         }
 
         log::info!(
@@ -375,11 +392,7 @@ impl FanotifyGroup {
             && (FanEventMask::DIR_EVENT_MASK | FanEventMask::ONDIR).contains(event)
         {
             let subobject = subobject.unwrap();
-            let info = Self::create_fid_info(
-                subobject,
-                FanotifyEventInfoType::Fid,
-                None,
-            );
+            let info = Self::create_fid_info(subobject, FanotifyEventInfoType::Fid, None);
             event_data.add_datum(FanotifyEventDatum::Info(info));
         }
 
@@ -535,9 +548,6 @@ pub struct FanotifyEntry {
     ///
     /// This is a weak reference, because the filesystem object may be removed or
     /// become inaccessible.
-    ///
-    /// TODO: Consider using an enum to represent either a reference to an inode or a
-    /// reference to a mount.
     object: FsObject,
 
     /// The flags that specify the behavior of the fanotify entry.
@@ -558,15 +568,16 @@ pub struct FanotifyEntry {
     /// The ignore mask, which specifies the event kinds that the group is not interested
     /// in.
     ignore: SpinNoIrqLock<FanEventMask>,
-
-    /// Permission events that are waiting for responses from userspace.
-    permission_queue: SpinNoIrqLock<VecDeque<FanotifyPermissionEvent>>,
 }
 
 impl FanotifyEntry {
     /// Returns a reference to the group this entry belongs to.
     pub fn group(&self) -> Arc<FanotifyGroup> {
         self.group.upgrade().unwrap()
+    }
+
+    pub fn object(&self) -> &FsObject {
+        &self.object
     }
 
     /// Returns the flags of the entry.
@@ -672,7 +683,7 @@ pub enum FsObject {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum FsObjectId {
     /// Inode number.
-    Inode(i32),
+    Inode(u32),
     /// Mount ID.
     Mount(u64),
 }

@@ -170,19 +170,26 @@ pub fn sys_sysinfo(info: usize) -> SyscallResult {
 ///
 /// Attention: For convenience, we choose a simple way to implement it.
 pub fn sys_getrandom(buf: usize, buflen: usize, flags: i32) -> SyscallResult {
+    log::error!("read random!");
     let task = current_task();
     let addrspace = task.addr_space();
     let mut buf = UserWritePtr::<u8>::new(buf, &addrspace);
 
+    static mut RANDOM_SEED: usize = 0;
+    unsafe { RANDOM_SEED += 0xbeef }
+
+    let rseed = unsafe { RANDOM_SEED } as u64;
     let mut seed = (task.pid() as u64) ^ (buflen as u64) ^ (flags as u64);
-    fn simple_rand(mut state: u64) -> u8 {
-        state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
+    fn simple_rand(mut state: u64, r: u64) -> u8 {
+        state = state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(r as u64);
         (state >> 24) as u8
     }
 
     let mut random_array: Vec<u8> = Vec::with_capacity(buflen);
     for _ in 0..buflen {
-        let byte = simple_rand(seed);
+        let byte = simple_rand(seed, rseed);
         random_array.push(byte);
         seed = seed.wrapping_add(byte as u64);
     }

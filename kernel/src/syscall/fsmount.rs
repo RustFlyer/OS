@@ -1,14 +1,19 @@
 use crate::{processor::current_task, vm::user_ptr::UserReadPtr};
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::sync::Arc;
-use config::vfs::{AtFd, AtFlags, OpenFlags};
+use config::inode::InodeMode;
+use config::vfs::{AtFd, AtFlags, MountFlags, OpenFlags};
+use driver::BLOCK_DEVICE;
+use osfs::FS_MANAGER;
 use osfs::special::fscontext::{
     FsConfigCmd, FsConfigCommand, FsContextDentry, FsContextFile, FsContextInode, FsParameterValue,
     FsmountFlags, FsopenFlags,
 };
 use osfs::special::opentree::{OpenTreeDentry, OpenTreeFile, OpenTreeFlags, OpenTreeInode};
 use systype::error::{SysError, SyscallResult};
+use vfs::dentry::Dentry;
 use vfs::inode::Inode;
+use vfs::path::split_parent_and_name;
 use vfs::sys_root_dentry;
 
 bitflags::bitflags! {
@@ -53,29 +58,6 @@ pub fn sys_fspick(dirfd: usize, pathname: usize, flags: u32) -> SyscallResult {
     Ok(fd)
 }
 
-// pub fn sys_fsconfig(fs_fd: usize, cmd: u32, key: usize, value: usize, aux: usize) -> SyscallResult {
-//     let task = current_task();
-//     let addr_space = task.addr_space();
-//     let key_str = if key != 0 {
-//         Some(UserReadPtr::<u8>::new(key, &addr_space).read_c_string(256)?)
-//     } else {
-//         None
-//     };
-
-//     let value_str = if value != 0 {
-//         Some(UserReadPtr::<u8>::new(value, &addr_space).read_c_string(256)?)
-//     } else {
-//         None
-//     };
-
-//     let cmd = FsconfigCmd::from_bits_truncate(cmd);
-
-//     match cmd {
-//         FsconfigCmd::SetString | FsconfigCmd::SetFlag | FsconfigCmd::CmdReconfigure => Ok(0),
-//         _ => Err(SysError::EINVAL),
-//     }
-// }
-
 pub fn sys_fsopen(fs_name_ptr: usize, flags: u32) -> SyscallResult {
     let task = current_task();
 
@@ -96,7 +78,7 @@ pub fn sys_fsopen(fs_name_ptr: usize, flags: u32) -> SyscallResult {
         .into_string()
         .map_err(|_| SysError::EINVAL)?;
 
-    log::debug!(
+    log::error!(
         "[sys_fsopen] fs_name: {}, flags: {:?}",
         fs_name,
         fsopen_flags
@@ -133,7 +115,7 @@ pub fn sys_fsopen(fs_name_ptr: usize, flags: u32) -> SyscallResult {
 
     // Create filesystem context inode
     let inode = FsContextInode::new(fsopen_flags, fs_name.clone());
-    inode.set_mode(config::inode::InodeMode::REG);
+    inode.set_mode(InodeMode::REG);
 
     // Create dentry
     let dentry = FsContextDentry::new(
@@ -145,6 +127,10 @@ pub fn sys_fsopen(fs_name_ptr: usize, flags: u32) -> SyscallResult {
 
     // Create file
     let file = FsContextFile::new(dentry);
+
+    if fsopen_flags.contains(FsopenFlags::O_WRONLY) {
+        file.into_dyn_ref().set_flags(OpenFlags::O_WRONLY);
+    }
 
     // Set file flags
     let mut file_flags = OpenFlags::O_RDWR;
@@ -174,6 +160,8 @@ pub fn sys_fsconfig(
         .ok_or(SysError::EINVAL)?;
 
     let addr_space = task.addr_space();
+
+    log::debug!("[sys_fsconfig] key_ptr: {key_ptr:#x}, cmd: {}", cmd);
 
     // Parse command
     let fs_cmd = match cmd {
@@ -206,6 +194,11 @@ pub fn sys_fsconfig(
                 .into_string()
                 .map_err(|_| SysError::EINVAL)?;
 
+            log::error!(
+                "FsConfigCommand: cmd: {cmd}, key {key}, value: {:?}",
+                FsParameterValue::None
+            );
+
             FsConfigCommand {
                 cmd,
                 key: Some(key),
@@ -229,6 +222,11 @@ pub fn sys_fsconfig(
 
             let mut val_ptr = UserReadPtr::<u8>::new(value_ptr, &addr_space);
             let data = unsafe { val_ptr.read_array(aux as usize)? };
+
+            log::error!(
+                "FsConfigCommand: cmd: {cmd}, key {key}, value: {:?}",
+                FsParameterValue::Blob(data.clone())
+            );
 
             FsConfigCommand {
                 cmd,
@@ -288,7 +286,7 @@ pub fn sys_fsconfig(
         _ => return Err(SysError::EINVAL),
     };
 
-    log::debug!("[sys_fsconfig] fd: {}, cmd: {}, aux: {}", fd, cmd, aux);
+    log::info!("[sys_fsconfig] fd: {}, cmd: {}, aux: {}", fd, cmd, aux);
 
     // Execute the command
     fs_file.execute_command(fs_cmd)?;
@@ -322,12 +320,15 @@ pub fn sys_fsmount(fd: usize, flags: u32, attr_flags: u32) -> SyscallResult {
 
     // Get the filesystem context
     let context = fs_file.get_context()?;
-    let fs_type = fs_file.get_fs_type()?;
+    let fstype = fs_file.get_fs_type()?;
+
+    let source = context.source;
+    let target = String::from("/fsmount1");
 
     log::debug!(
         "[sys_fsmount] fd: {}, fs_type: {}, flags: {}",
         fd,
-        fs_type,
+        fstype,
         flags
     );
 
@@ -337,7 +338,59 @@ pub fn sys_fsmount(fd: usize, flags: u32, attr_flags: u32) -> SyscallResult {
     // 3. Create a mount point file descriptor
     // 4. Return the mount fd
 
-    todo!()
+    log::error!(
+        "[sys_fsmount] source:{source:?}, target:{target:?}, fstype:{fstype:?}, flags:{flags:?}",
+    );
+
+    let name2fstype = if fstype.contains("ext") {
+        String::from("tmpfs")
+    } else if fstype.contains("fat") {
+        String::from("tmpfs")
+    } else if fstype.contains("tmp") {
+        String::from("tmpfs")
+    } else {
+        String::from("tmpfs")
+    };
+
+    let ext4_type = FS_MANAGER.lock().get("ext4").unwrap().clone();
+    let fs_type = FS_MANAGER
+        .lock()
+        .get(&name2fstype)
+        .unwrap_or(&ext4_type.clone())
+        .clone();
+
+    let mdentry = task.walk_at(AtFd::FdCwd, target.clone())?;
+    let dev = if name2fstype.contains("ext4") || name2fstype.contains("tmpfs") {
+        Some(BLOCK_DEVICE.get().unwrap().clone())
+    } else {
+        None
+    };
+
+    let (parent, name) = split_parent_and_name(&target);
+    log::debug!("[sys_fsmount] parent: {:?}, name: {:?}", parent, name);
+
+    let dname;
+    let pdentry = task.walk_at(AtFd::FdCwd, parent.to_string())?;
+    let parent: Arc<dyn Dentry>;
+    if name.is_empty() {
+        dname = pdentry.name().to_string();
+        parent = pdentry.parent().ok_or(SysError::ENOENT)?;
+    } else {
+        dname = name;
+        parent = pdentry.clone();
+    }
+
+    log::error!("[sys_fsmount] parent dentry is {}", parent.path());
+    let d = fs_type.mount(
+        &dname,
+        Some(parent),
+        MountFlags::from_bits_truncate(flags),
+        dev,
+    )?;
+
+    d.store_mount_dentry(mdentry);
+
+    return Ok(0);
 }
 
 /// move_mount syscall - move a mount to a new location
@@ -350,14 +403,12 @@ pub fn sys_move_mount(
 ) -> SyscallResult {
     let task = current_task();
 
-    // Check permissions
     if task.uid() != 0 {
         return Err(SysError::EPERM);
     }
 
     let addr_space = task.addr_space();
 
-    // Read paths from user space
     let mut from_ptr = UserReadPtr::<u8>::new(from_pathname_ptr, &addr_space);
     let from_path = from_ptr
         .read_c_string(4096)?
@@ -377,13 +428,48 @@ pub fn sys_move_mount(
         flags
     );
 
-    // In a real implementation, this would:
-    // 1. Resolve the source mount point
-    // 2. Resolve the destination path
-    // 3. Move the mount atomically
-    // 4. Update mount namespace
+    // source from_parent_dentry & from_child_dentry
+    let (from_parent, from_name) = split_parent_and_name(&from_path);
+    let from_parent_dentry = task.walk_at(AtFd::FdCwd, from_parent)?;
+    let from_child_dentry = from_parent_dentry.lookup(&from_name)?;
 
-    todo!()
+    // unmount
+    from_child_dentry.unbind_mount_dentry();
+    let mdentry = from_child_dentry.fetch_mount_dentry();
+    from_parent_dentry.remove_child(from_child_dentry.as_ref());
+    if let Some(mdentry) = mdentry {
+        from_parent_dentry.add_child(mdentry);
+    }
+
+    // target from_parent_dentry & from_child_dentry
+    let (to_parent, to_name) = split_parent_and_name(&to_path);
+    let to_parent_dentry = task.walk_at(AtFd::FdCwd, to_parent)?;
+
+    log::debug!(
+        "[sys_move_mount] mount to target: {:?}",
+        to_parent_dentry.path()
+    );
+    let dname = to_name;
+    let new_mount_point = to_parent_dentry.lookup(&dname)?;
+
+    if let Ok(bdentry) = task.walk_at(AtFd::FdCwd, to_path) {
+        if !bdentry.is_negative() {
+            new_mount_point.store_mount_dentry(bdentry);
+        }
+    }
+
+    // mount
+    let lock = FS_MANAGER.lock();
+    let fs_type = lock.get(&String::from("tmpfs")).unwrap();
+
+    fs_type.mount(
+        dname.as_str(),
+        Some(to_parent_dentry.clone()),
+        MountFlags::from_bits_truncate(flags),
+        Some(BLOCK_DEVICE.get().unwrap().clone()),
+    )?;
+
+    Ok(0)
 }
 
 pub fn sys_open_tree(dfd: i32, pathname_ptr: usize, flags: u32) -> SyscallResult {

@@ -1,10 +1,25 @@
-use alloc::{collections::BTreeMap, string::String, sync::Arc};
+use alloc::{collections::BTreeMap, string::String, sync::Arc, vec::Vec};
 
 use config::vfs::OpenFlags;
 use mutex::ShareMutex;
-use osfs::{dev::loopx::externf::KernelTableIf, fd_table::FdTable, proc::KernelProcIf};
-use systype::{error::SysResult, kinterface::KernelTaskOperations};
-use vfs::{fanotify::kinterface::KernelFdTableOperations, file::File};
+use osfs::{
+    dev::loopx::externf::KernelTableIf,
+    fd_table::FdTable,
+    proc::{
+        KernelProcIf,
+        fdinfo::info::{ExtraFdInfo, FanotifyFdInfo, FanotifyMarkInfo, ProcFdInfo},
+    },
+};
+use systype::{
+    error::{SysError, SysResult},
+    kinterface::KernelTaskOperations,
+};
+use vfs::{
+    fanotify::{
+        FsObject, FsObjectId, fs::file::FanotifyGroupFile, kinterface::KernelFdTableOperations,
+    },
+    file::File,
+};
 
 use super::manager::TASK_MANAGER;
 use crate::{processor::current_task, trap::trap_handler::TRAP_STATS};
@@ -51,6 +66,59 @@ impl KernelProcIf for KernelProcIfImpl {
 
     fn fd(fd: usize) -> String {
         current_task().with_mut_fdtable(|table| table.get_file(fd).unwrap().dentry().path())
+    }
+
+    fn fdinfo_from_tid_and_fd(tid: usize, fd: usize) -> SysResult<ProcFdInfo> {
+        let task = TASK_MANAGER.get_task(tid).ok_or(SysError::EINVAL)?;
+        let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
+
+        let extra_info = if let Ok(group_file) = file.clone().downcast_arc::<FanotifyGroupFile>() {
+            let group = group_file.group();
+            let flags = group.flags();
+            let event_flags = group.event_file_flags();
+
+            let mut marks = Vec::new();
+            for (&object_id, entry) in group.entries().lock().iter() {
+                let ino = match object_id {
+                    FsObjectId::Inode(ino) => ino,
+                    // TODO: Are marks on mounts and filesystems not reported?
+                    _ => continue,
+                };
+                let inode = if let FsObject::Inode(inode) = entry.object() {
+                    inode.upgrade().unwrap()
+                } else {
+                    unreachable!()
+                };
+                let sdev = inode.dev_id_as_u64();
+                let mask = entry.mark();
+                let ignored_mask = entry.ignore();
+                let mflags = entry.flags();
+
+                marks.push(FanotifyMarkInfo {
+                    ino,
+                    sdev,
+                    mask,
+                    ignored_mask,
+                    mflags,
+                });
+            }
+
+            ExtraFdInfo::Fanotify(FanotifyFdInfo {
+                flags,
+                event_flags,
+                marks,
+            })
+        } else {
+            ExtraFdInfo::Normal
+        };
+
+        Ok(ProcFdInfo {
+            flags: file.inode().get_meta().inner.lock().mode,
+            pos: file.pos() as u64,
+            mnt_id: 0,
+            ino: file.inode().ino() as u32,
+            extra_info,
+        })
     }
 }
 

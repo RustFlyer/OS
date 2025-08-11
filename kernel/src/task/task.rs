@@ -229,7 +229,7 @@ impl Task {
             sig_cx_ptr: AtomicUsize::new(0),
 
             tid_address: SyncUnsafeCell::new(TidAddress::new()),
-            fd_table: new_share_mutex(FdTable::new()),
+            fd_table: new_share_mutex(FdTable::new(1)),
             pkey_table: new_share_mutex(PKeyTable::new()),
             sigfd_queue: new_share_mutex(Vec::new()),
             cwd: new_share_mutex(sys_root_dentry()),

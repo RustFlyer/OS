@@ -12,7 +12,7 @@
 - [x] [  11] getpid01                   100             100
 - [ ] [  12] fsmount01                   96
 - [x] [  13] chdir01                     92             135 all fs-type
-- [ ] [  14] fanotify09                  76
+- [ ] [  14] fanotify09                  76             76
 - [x] [  15] pipe11                      70             70
 - [x] [  16] fsync01                     60             90
 - [ ] [  17] mount07                     56
@@ -34,7 +34,7 @@
 - [x] [  33] splice08                    36             32
 - [x] [  34] confstr01                   34             36
 - [ ] [  35] mq_timedsend01              34
-- [ ] [  36] utimensat01                 34
+- [ ] [  36] utimensat01                 34             12
 - [ ] [  37] memcontrol04                33
 - [x] [  38] chmod01                     32             32
 - [ ] [  39] creat09                     32
