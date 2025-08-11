@@ -1,6 +1,6 @@
 use alloc::{collections::btree_map::BTreeMap, sync::Arc, vec::Vec};
 use arch::{interrupt::enable_external_interrupt, trap::disable_interrupt};
-use config::{board, device::MAX_HARTS};
+use config::device::MAX_HARTS;
 use driver::{
     cpu::CPU,
     device::{OSDevId, OSDevice, OSDeviceMajor, OSDeviceMeta},
@@ -106,10 +106,6 @@ impl DeviceTreeManager {
 
         let total = MAX_HARTS;
         for i in 0..total * 2 {
-            // for irq in 1..=64 {
-            //     self.plic().enable_irq(irq, i);
-            // }
-
             for dev in self.devices.values() {
                 if let Some(irq) = dev.irq_no() {
                     self.plic().enable_irq(irq, i);

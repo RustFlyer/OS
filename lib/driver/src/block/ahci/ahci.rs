@@ -119,7 +119,7 @@ impl BlockDevice for AHCI {
         let dev = self.device.lock();
         let sector_size = dev.blk_dev.blksz as usize;
 
-        let sectors_needed = (BLOCK_SIZE + sector_size - 1) / sector_size; // 向上取整
+        let sectors_needed = (BLOCK_SIZE + sector_size - 1) / sector_size;
         let start_sector = (block_id * BLOCK_SIZE) / sector_size;
 
         let result = ahci_sata_read_common(
@@ -139,7 +139,7 @@ impl BlockDevice for AHCI {
         let dev = self.device.lock();
         let sector_size = dev.blk_dev.blksz as usize;
 
-        let sectors_needed = (BLOCK_SIZE + sector_size - 1) / sector_size; // 向上取整
+        let sectors_needed = (BLOCK_SIZE + sector_size - 1) / sector_size;
         let start_sector = (block_id * BLOCK_SIZE) / sector_size;
 
         let result = ahci_sata_write_common(

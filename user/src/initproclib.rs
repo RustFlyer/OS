@@ -3,8 +3,8 @@ extern crate alloc;
 use core::str::from_utf8;
 
 use crate::{
-    chdir, close, console::getchar, dup, execve, exit, fork, getcwd, getdents, ltpauto, mkdir,
-    open, print, println, waitpid,
+    chdir, close, console::getchar, execve, exit, fork, getcwd, getdents, ltpauto, mkdir, open,
+    print, println, syscall::sys_dup3, waitpid,
 };
 
 use alloc::{
@@ -233,27 +233,19 @@ pub fn usershell() {
 }
 
 pub fn riscv_init() {
-    close(2);
+    disable_err();
 
     if chdir("musl") < 0 {
         println!("The device uses disk-rv");
         mkdir("/bin");
         run_cmd("./busybox --install -s /bin");
-        let fd = open(0, "/dev/tty", OpenFlags::O_WRONLY, InodeMode::CHAR);
-        if fd != 2 {
-            dup(fd as usize);
-            close(fd as usize);
-        }
+        enable_usrlog();
         return;
     }
 
     if open(-100, "/bin/ls", OpenFlags::empty(), InodeMode::empty()) > 0 {
         println!("The device has been initialized");
-        let fd = open(0, "/dev/tty", OpenFlags::O_WRONLY, InodeMode::CHAR);
-        if fd != 2 {
-            dup(fd as usize);
-            close(fd as usize);
-        }
+        enable_usrlog();
         return;
     }
 
@@ -281,35 +273,23 @@ pub fn riscv_init() {
     println!("loading user lib: 100%");
     println!("loading user lib: complete!");
 
-    let fd = open(0, "/dev/tty", OpenFlags::O_WRONLY, InodeMode::CHAR);
-    if fd != 2 {
-        dup(fd as usize);
-        close(fd as usize);
-    }
+    enable_err();
 }
 
 pub fn loongarch_init() {
-    close(2);
+    disable_err();
 
     if chdir("musl") < 0 {
         println!("The device uses disk-la");
         mkdir("/bin");
         run_cmd("./busybox --install -s /bin");
-        let fd = open(0, "/dev/tty", OpenFlags::O_WRONLY, InodeMode::CHAR);
-        if fd != 2 {
-            dup(fd as usize);
-            close(fd as usize);
-        }
+        enable_usrlog();
         return;
     }
 
     if open(-100, "/bin/ls", OpenFlags::empty(), InodeMode::empty()) > 0 {
         println!("The device has been initialized");
-        let fd = open(0, "/dev/tty", OpenFlags::O_WRONLY, InodeMode::CHAR);
-        if fd != 2 {
-            dup(fd as usize);
-            close(fd as usize);
-        }
+        enable_usrlog();
         return;
     }
 
@@ -336,11 +316,25 @@ pub fn loongarch_init() {
     println!("loading user lib: 100%");
     println!("loading user lib: complete!");
 
+    enable_err();
+}
+
+fn disable_err() {
+    close(2);
+}
+
+fn enable_err() {
+    close(2);
     let fd = open(0, "/dev/tty", OpenFlags::O_WRONLY, InodeMode::CHAR);
+    sys_dup3(fd as usize, 2, 0);
     if fd != 2 {
-        dup(fd as usize);
         close(fd as usize);
     }
+}
+
+fn enable_usrlog() {
+    let fd = open(0, "/dev/tty", OpenFlags::O_WRONLY, InodeMode::CHAR);
+    close(fd as usize);
 }
 
 const BUF_SIZE: usize = 4096;
@@ -471,9 +465,11 @@ pub fn supple_cmd(buf: &mut [u8; 256], bptr: &mut usize) {
 }
 
 pub fn software_init() {
+    disable_err();
     gcc_init();
     git_init();
     run_cmd("./busybox ln -s /vim/vim /bin/vim");
+    enable_err();
 }
 
 pub fn gcc_init() {
@@ -512,6 +508,7 @@ pub fn gcc_init() {
 
     run_cmd("./busybox ln -s /usr/bin/gcc /bin/gcc");
 }
+
 pub fn git_init() {
     const GIT_COMMANDS: &[&str] = &[
         "git-add",

@@ -51,4 +51,7 @@ loongArch64 = { workspace = true }
 [build-dependencies]
 config = { path = "../lib/config/" }
 
-
+[features]
+default = ["qemu"]
+qemu = []
+board = []
