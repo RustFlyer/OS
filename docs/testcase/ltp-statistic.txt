@@ -2157,680 +2157,680 @@ sysinfo02			all pass		1	0
 sysinfo03			unimplement panic(97)	0	1
 syslog11			all fail		0	1
 syslog12			all fail		0	6
-tar_tests.sh			
-tbio				
-tc01.sh				
-tcindex01			
-tcp4-multi-diffip01			
-tcp4-multi-diffip02			
-tcp4-multi-diffip03			
-tcp4-multi-diffip04			
-tcp4-multi-diffip05			
-tcp4-multi-diffip06			
-tcp4-multi-diffip07			
-tcp4-multi-diffip08			
-tcp4-multi-diffip09			
-tcp4-multi-diffip10			
-tcp4-multi-diffip11			
-tcp4-multi-diffip12			
-tcp4-multi-diffip13			
-tcp4-multi-diffip14			
-tcp4-multi-diffnic01			
-tcp4-multi-diffnic02			
-tcp4-multi-diffnic03			
-tcp4-multi-diffnic04			
-tcp4-multi-diffnic05			
-tcp4-multi-diffnic06			
-tcp4-multi-diffnic07			
-tcp4-multi-diffnic08			
-tcp4-multi-diffnic09			
-tcp4-multi-diffnic10			
-tcp4-multi-diffnic11			
-tcp4-multi-diffnic12			
-tcp4-multi-diffnic13			
-tcp4-multi-diffnic14			
-tcp4-multi-diffport01		
-tcp4-multi-diffport02		
-tcp4-multi-diffport03		
-tcp4-multi-diffport04		
-tcp4-multi-diffport05		
-tcp4-multi-diffport06		
-tcp4-multi-diffport07		
-tcp4-multi-diffport08		
-tcp4-multi-diffport09		
-tcp4-multi-diffport10		
-tcp4-multi-diffport11		
-tcp4-multi-diffport12		
-tcp4-multi-diffport13		
-tcp4-multi-diffport14		
-tcp4-multi-sameport01		
-tcp4-multi-sameport02		
-tcp4-multi-sameport03		
-tcp4-multi-sameport04		
-tcp4-multi-sameport05		
-tcp4-multi-sameport06		
-tcp4-multi-sameport07		
-tcp4-multi-sameport08		
-tcp4-multi-sameport09		
-tcp4-multi-sameport10		
-tcp4-multi-sameport11		
-tcp4-multi-sameport12		
-tcp4-multi-sameport13		
-tcp4-multi-sameport14		
-tcp4-uni-basic01			
-tcp4-uni-basic02			
-tcp4-uni-basic03			
-tcp4-uni-basic04			
-tcp4-uni-basic05			
-tcp4-uni-basic06			
-tcp4-uni-basic07			
-tcp4-uni-basic08			
-tcp4-uni-basic09			
-tcp4-uni-basic10			
-tcp4-uni-basic11			
-tcp4-uni-basic12			
-tcp4-uni-basic13			
-tcp4-uni-basic14			
-tcp4-uni-dsackoff01			
-tcp4-uni-dsackoff02			
-tcp4-uni-dsackoff03			
-tcp4-uni-dsackoff04			
-tcp4-uni-dsackoff05			
-tcp4-uni-dsackoff06			
-tcp4-uni-dsackoff07			
-tcp4-uni-dsackoff08			
-tcp4-uni-dsackoff09			
-tcp4-uni-dsackoff10			
-tcp4-uni-dsackoff11			
-tcp4-uni-dsackoff12			
-tcp4-uni-dsackoff13			
-tcp4-uni-dsackoff14			
-tcp4-uni-pktlossdup01		
-tcp4-uni-pktlossdup02		
-tcp4-uni-pktlossdup03		
-tcp4-uni-pktlossdup04		
-tcp4-uni-pktlossdup05		
-tcp4-uni-pktlossdup06		
-tcp4-uni-pktlossdup07		
-tcp4-uni-pktlossdup08		
-tcp4-uni-pktlossdup09		
-tcp4-uni-pktlossdup10		
-tcp4-uni-pktlossdup11		
-tcp4-uni-pktlossdup12		
-tcp4-uni-pktlossdup13		
-tcp4-uni-pktlossdup14		
-tcp4-uni-sackoff01			
-tcp4-uni-sackoff02			
-tcp4-uni-sackoff03			
-tcp4-uni-sackoff04			
-tcp4-uni-sackoff05			
-tcp4-uni-sackoff06			
-tcp4-uni-sackoff07			
-tcp4-uni-sackoff08			
-tcp4-uni-sackoff09			
-tcp4-uni-sackoff10			
-tcp4-uni-sackoff11			
-tcp4-uni-sackoff12			
-tcp4-uni-sackoff13			
-tcp4-uni-sackoff14			
-tcp4-uni-smallsend01			
-tcp4-uni-smallsend02			
-tcp4-uni-smallsend03			
-tcp4-uni-smallsend04			
-tcp4-uni-smallsend05			
-tcp4-uni-smallsend06			
-tcp4-uni-smallsend07			
-tcp4-uni-smallsend08			
-tcp4-uni-smallsend09			
-tcp4-uni-smallsend10			
-tcp4-uni-smallsend11			
-tcp4-uni-smallsend12			
-tcp4-uni-smallsend13			
-tcp4-uni-smallsend14			
-tcp4-uni-tso01			
-tcp4-uni-tso02			
-tcp4-uni-tso03			
-tcp4-uni-tso04			
-tcp4-uni-tso05			
-tcp4-uni-tso06			
-tcp4-uni-tso07			
-tcp4-uni-tso08			
-tcp4-uni-tso09			
-tcp4-uni-tso10			
-tcp4-uni-tso11			
-tcp4-uni-tso12			
-tcp4-uni-tso13			
-tcp4-uni-tso14			
-tcp4-uni-winscale01			
-tcp4-uni-winscale02			
-tcp4-uni-winscale03			
-tcp4-uni-winscale04			
-tcp4-uni-winscale05			
-tcp4-uni-winscale06			
-tcp4-uni-winscale07			
-tcp4-uni-winscale08			
-tcp4-uni-winscale09			
-tcp4-uni-winscale10			
-tcp4-uni-winscale11			
-tcp4-uni-winscale12			
-tcp4-uni-winscale13			
-tcp4-uni-winscale14			
-tcp6-multi-diffip01			
-tcp6-multi-diffip02			
-tcp6-multi-diffip03			
-tcp6-multi-diffip04			
-tcp6-multi-diffip05			
-tcp6-multi-diffip06			
-tcp6-multi-diffip07			
-tcp6-multi-diffip08			
-tcp6-multi-diffip09			
-tcp6-multi-diffip10			
-tcp6-multi-diffip11			
-tcp6-multi-diffip12			
-tcp6-multi-diffip13			
-tcp6-multi-diffip14			
-tcp6-multi-diffnic01			
-tcp6-multi-diffnic02			
-tcp6-multi-diffnic03			
-tcp6-multi-diffnic04			
-tcp6-multi-diffnic05			
-tcp6-multi-diffnic06			
-tcp6-multi-diffnic07			
-tcp6-multi-diffnic08			
-tcp6-multi-diffnic09			
-tcp6-multi-diffnic10			
-tcp6-multi-diffnic11			
-tcp6-multi-diffnic12			
-tcp6-multi-diffnic13			
-tcp6-multi-diffnic14			
-tcp6-multi-diffport01		
-tcp6-multi-diffport02		
-tcp6-multi-diffport03		
-tcp6-multi-diffport04		
-tcp6-multi-diffport05		
-tcp6-multi-diffport06		
-tcp6-multi-diffport07		
-tcp6-multi-diffport08		
-tcp6-multi-diffport09		
-tcp6-multi-diffport10		
-tcp6-multi-diffport11		
-tcp6-multi-diffport12		
-tcp6-multi-diffport13		
-tcp6-multi-diffport14		
-tcp6-multi-sameport01		
-tcp6-multi-sameport02		
-tcp6-multi-sameport03		
-tcp6-multi-sameport04		
-tcp6-multi-sameport05		
-tcp6-multi-sameport06		
-tcp6-multi-sameport07		
-tcp6-multi-sameport08		
-tcp6-multi-sameport09		
-tcp6-multi-sameport10		
-tcp6-multi-sameport11		
-tcp6-multi-sameport12		
-tcp6-multi-sameport13		
-tcp6-multi-sameport14		
-tcp6-uni-basic01			
-tcp6-uni-basic02			
-tcp6-uni-basic03			
-tcp6-uni-basic04			
-tcp6-uni-basic05			
-tcp6-uni-basic06			
-tcp6-uni-basic07			
-tcp6-uni-basic08			
-tcp6-uni-basic09			
-tcp6-uni-basic10			
-tcp6-uni-basic11			
-tcp6-uni-basic12			
-tcp6-uni-basic13			
-tcp6-uni-basic14			
-tcp6-uni-dsackoff01			
-tcp6-uni-dsackoff02			
-tcp6-uni-dsackoff03			
-tcp6-uni-dsackoff04			
-tcp6-uni-dsackoff05			
-tcp6-uni-dsackoff06			
-tcp6-uni-dsackoff07			
-tcp6-uni-dsackoff08			
-tcp6-uni-dsackoff09			
-tcp6-uni-dsackoff10			
-tcp6-uni-dsackoff11			
-tcp6-uni-dsackoff12			
-tcp6-uni-dsackoff13			
-tcp6-uni-dsackoff14			
-tcp6-uni-pktlossdup01		
-tcp6-uni-pktlossdup02		
-tcp6-uni-pktlossdup03		
-tcp6-uni-pktlossdup04		
-tcp6-uni-pktlossdup05		
-tcp6-uni-pktlossdup06		
-tcp6-uni-pktlossdup07		
-tcp6-uni-pktlossdup08		
-tcp6-uni-pktlossdup09		
-tcp6-uni-pktlossdup10		
-tcp6-uni-pktlossdup11		
-tcp6-uni-pktlossdup12		
-tcp6-uni-pktlossdup13		
-tcp6-uni-pktlossdup14		
-tcp6-uni-sackoff01			
-tcp6-uni-sackoff02			
-tcp6-uni-sackoff03			
-tcp6-uni-sackoff04			
-tcp6-uni-sackoff05			
-tcp6-uni-sackoff06			
-tcp6-uni-sackoff07			
-tcp6-uni-sackoff08			
-tcp6-uni-sackoff09			
-tcp6-uni-sackoff10			
-tcp6-uni-sackoff11			
-tcp6-uni-sackoff12			
-tcp6-uni-sackoff13			
-tcp6-uni-sackoff14			
-tcp6-uni-smallsend01			
-tcp6-uni-smallsend02			
-tcp6-uni-smallsend03			
-tcp6-uni-smallsend04			
-tcp6-uni-smallsend05			
-tcp6-uni-smallsend06			
-tcp6-uni-smallsend07			
-tcp6-uni-smallsend08			
-tcp6-uni-smallsend09			
-tcp6-uni-smallsend10			
-tcp6-uni-smallsend11			
-tcp6-uni-smallsend12			
-tcp6-uni-smallsend13			
-tcp6-uni-smallsend14			
-tcp6-uni-tso01			
-tcp6-uni-tso02			
-tcp6-uni-tso03			
-tcp6-uni-tso04			
-tcp6-uni-tso05			
-tcp6-uni-tso06			
-tcp6-uni-tso07			
-tcp6-uni-tso08			
-tcp6-uni-tso09			
-tcp6-uni-tso10			
-tcp6-uni-tso11			
-tcp6-uni-tso12			
-tcp6-uni-tso13			
-tcp6-uni-tso14			
-tcp6-uni-winscale01			
-tcp6-uni-winscale02			
-tcp6-uni-winscale03			
-tcp6-uni-winscale04			
-tcp6-uni-winscale05			
-tcp6-uni-winscale06			
-tcp6-uni-winscale07			
-tcp6-uni-winscale08			
-tcp6-uni-winscale09			
-tcp6-uni-winscale10			
-tcp6-uni-winscale11			
-tcp6-uni-winscale12			
-tcp6-uni-winscale13			
-tcp6-uni-winscale14			
-tcp_cc_lib.sh			
-tcp_fastopen_run.sh			
-tcp_ipsec.sh			
-tcp_ipsec_vti.sh			
-tcpdump01.sh			
-tee01				
-tee02				
-test.sh				
-test_1_to_1_accept_close		
-test_1_to_1_addrs			
-test_1_to_1_connect			
-test_1_to_1_connectx			
-test_1_to_1_events			
-test_1_to_1_initmsg_connect		
-test_1_to_1_nonblock			
-test_1_to_1_recvfrom			
-test_1_to_1_recvmsg			
-test_1_to_1_rtoinfo			
-test_1_to_1_send			
-test_1_to_1_sendmsg			
-test_1_to_1_sendto			
-test_1_to_1_shutdown			
-test_1_to_1_socket_bind_listen		
-test_1_to_1_sockopt			
-test_1_to_1_threads			
-test_assoc_abort			
-test_assoc_shutdown			
-test_autoclose			
-test_basic			
-test_basic_v6			
-test_connect			
-test_connectx			
-test_controllers.sh			
-test_fragments			
-test_fragments_v6			
-test_getname			
-test_getname_v6			
-test_inaddr_any			
-test_inaddr_any_v6			
-test_ioctl			
-test_peeloff			
-test_peeloff_v6			
-test_recvmsg			
-test_robind.sh			
-test_sctp_sendrecvmsg		
-test_sctp_sendrecvmsg_v6		
-test_sockopt			
-test_sockopt_v6			
-test_tcp_style			
-test_tcp_style_v6			
-test_timetolive			
-test_timetolive_v6			
-testsf_c				
-testsf_c6			
-testsf_s				
-testsf_s6			
-tgkill01				
-tgkill02				
-tgkill03				
-thp01				
-thp02				
-thp03				
-thp04				
-time-schedule			
-time01				
-timed_forkbomb			
-timens01				
-timer_delete01			
-timer_delete02			
-timer_getoverrun01			
-timer_gettime01			
-timer_settime01			
-timer_settime02			
-timer_settime03			
-timerfd01			
-timerfd02			
-timerfd04			
-timerfd_create01			
-timerfd_gettime01			
-timerfd_settime01			
-timerfd_settime02			
-times01				
-times03				
-tkill01				
-tkill02				
-tpci				
-tpm_changeauth_tests.sh		
-tpm_changeauth_tests_exp01.sh		
-tpm_changeauth_tests_exp02.sh		
-tpm_changeauth_tests_exp03.sh		
-tpm_clear_tests.sh			
-tpm_clear_tests_exp01.sh		
-tpm_getpubek_tests.sh		
-tpm_getpubek_tests_exp01.sh		
-tpm_restrictpubek_tests.sh		
-tpm_restrictpubek_tests_exp01.sh		
-tpm_restrictpubek_tests_exp02.sh		
-tpm_restrictpubek_tests_exp03.sh		
-tpm_selftest_tests.sh		
-tpm_takeownership_tests.sh		
-tpm_takeownership_tests_exp01.sh		
-tpm_version_tests.sh			
-tpmtoken_import_tests.sh		
-tpmtoken_import_tests_exp01.sh		
-tpmtoken_import_tests_exp02.sh		
-tpmtoken_import_tests_exp03.sh		
-tpmtoken_import_tests_exp04.sh		
-tpmtoken_import_tests_exp05.sh		
-tpmtoken_import_tests_exp06.sh		
-tpmtoken_import_tests_exp07.sh		
-tpmtoken_import_tests_exp08.sh		
-tpmtoken_init_tests.sh		
-tpmtoken_init_tests_exp00.sh		
-tpmtoken_init_tests_exp01.sh		
-tpmtoken_init_tests_exp02.sh		
-tpmtoken_init_tests_exp03.sh		
-tpmtoken_objects_tests.sh		
-tpmtoken_objects_tests_exp01.sh		
-tpmtoken_protect_tests.sh		
-tpmtoken_protect_tests_exp01.sh		
-tpmtoken_protect_tests_exp02.sh		
-tpmtoken_setpasswd_tests.sh		
-tpmtoken_setpasswd_tests_exp01.sh	
-tpmtoken_setpasswd_tests_exp02.sh	
-tpmtoken_setpasswd_tests_exp03.sh	
-tpmtoken_setpasswd_tests_exp04.sh	
-trace_sched			
-tracepath01.sh			
-traceroute01.sh			
-truncate02			
-truncate02_64			
-truncate03			
-truncate03_64			
-tst_ansi_color.sh			
-tst_brk				
-tst_brkm				
-tst_cgctl			
-tst_check_drivers			
-tst_check_kconfigs			
-tst_checkpoint			
-tst_device			
-tst_exit				
-tst_fs_has_free			
-tst_fsfreeze			
-tst_get_free_pids			
-tst_get_median			
-tst_get_unused_port			
-tst_getconf			
-tst_hexdump			
-tst_kvcmp			
-tst_lockdown_enabled			
-tst_ncpus			
-tst_ncpus_conf			
-tst_ncpus_max			
-tst_net.sh			
-tst_net_iface_prefix			
-tst_net_ip_prefix			
-tst_net_stress.sh			
-tst_net_vars			
-tst_ns_create			
-tst_ns_exec			
-tst_ns_ifmove			
-tst_random			
-tst_res				
-tst_resm				
-tst_rod				
-tst_secureboot_enabled		
-tst_security.sh			
-tst_sleep			
-tst_supported_fs			
-tst_test.sh			
-tst_timeout_kill			
-uaccess				
-udp4-multi-diffip01			
-udp4-multi-diffip02			
-udp4-multi-diffip03			
-udp4-multi-diffip04			
-udp4-multi-diffip05			
-udp4-multi-diffip06			
-udp4-multi-diffip07			
-udp4-multi-diffnic01			
-udp4-multi-diffnic02			
-udp4-multi-diffnic03			
-udp4-multi-diffnic04			
-udp4-multi-diffnic05			
-udp4-multi-diffnic06			
-udp4-multi-diffnic07			
-udp4-multi-diffport01		
-udp4-multi-diffport02		
-udp4-multi-diffport03		
-udp4-multi-diffport04		
-udp4-multi-diffport05		
-udp4-multi-diffport06		
-udp4-multi-diffport07		
-udp4-uni-basic01			
-udp4-uni-basic02			
-udp4-uni-basic03			
-udp4-uni-basic04			
-udp4-uni-basic05			
-udp4-uni-basic06			
-udp4-uni-basic07			
-udp6-multi-diffip01			
-udp6-multi-diffip02			
-udp6-multi-diffip03			
-udp6-multi-diffip04			
-udp6-multi-diffip05			
-udp6-multi-diffip06			
-udp6-multi-diffip07			
-udp6-multi-diffnic01			
-udp6-multi-diffnic02			
-udp6-multi-diffnic03			
-udp6-multi-diffnic04			
-udp6-multi-diffnic05			
-udp6-multi-diffnic06			
-udp6-multi-diffnic07			
-udp6-multi-diffport01		
-udp6-multi-diffport02		
-udp6-multi-diffport03		
-udp6-multi-diffport04		
-udp6-multi-diffport05		
-udp6-multi-diffport06		
-udp6-multi-diffport07		
-udp6-uni-basic01			
-udp6-uni-basic02			
-udp6-uni-basic03			
-udp6-uni-basic04			
-udp6-uni-basic05			
-udp6-uni-basic06			
-udp6-uni-basic07			
-udp_ipsec.sh			
-udp_ipsec_vti.sh			
-uevent01				
-uevent02				
-uevent03				
-ulimit01				
-umask01				
-umip_basic_test			
-umount01				
-umount02				
-umount03				
-umount2_01			
-umount2_02			
-uname01				
-uname02				
-uname04				
-unlink05				
-unlink07				
-unlink08				
-unlink09				
-unlinkat01			
-unshare01			
-unshare01.sh			
-unshare02			
-unzip01.sh			
-userfaultfd01			
-userns01				
-userns02				
-userns03				
-userns04				
-userns05				
-userns06				
-userns06_capcheck			
-userns07				
-userns08				
-ustat01				
-ustat02				
-utime01				
-utime02				
-utime03				
-utime04				
-utime05				
-utime06				
-utime07				
-utimensat01			
-utimes01				
-utsname01			
-utsname02			
-utsname03			
-utsname04			
-verify_caps_exec			
-vfork				
-vfork01				
-vfork02				
-vfork_freeze.sh			
-vhangup01			
-vhangup02			
-virt_lib.sh			
-vlan01.sh			
-vlan02.sh			
-vlan03.sh			
-vma01				
-vma02				
-vma03				
-vma04				
-vma05.sh				
-vma05_vdso			
-vmsplice01			
-vmsplice02			
-vmsplice03			
-vmsplice04			
-vsock01				
-vxlan01.sh			
-vxlan02.sh			
-vxlan03.sh			
-vxlan04.sh			
-wait01				
-wait02				
-wait401				
-wait402				
-wait403				
-waitid01				
-waitid02				
-waitid03				
-waitid04				
-waitid05				
-waitid06				
-waitid07				
-waitid08				
-waitid09				
-waitid10				
-waitid11				
-waitpid01			
-waitpid03			
-waitpid04			
-waitpid06			
-waitpid07			
-waitpid08			
-waitpid09			
-waitpid10			
-waitpid11			
-waitpid12			
-waitpid13			
-wc01.sh				
-which01.sh			
-wireguard01.sh			
-wireguard02.sh			
-wireguard_lib.sh			
-wqueue01				
-wqueue02				
-wqueue03				
-wqueue04				
-wqueue05				
-wqueue06				
-wqueue07				
-wqueue08				
-wqueue09				
-write01				
-write02				
-write03				
-write04				
-write05				
-write06				
-write_freezing.sh			
-writetest			
-writev01				
-writev02				
-writev03				
-writev05				
-writev06				
-writev07				
-zram01.sh			
-zram02.sh			
-zram03				
-zram_lib.sh			
+tar_tests.sh		skip		0	0	
+tbio			skip		0	0	
+tc01.sh			skip		0	0	
+tcindex01			skip		0	0
+tcp4-multi-diffip01		skip		0	0	
+tcp4-multi-diffip02		skip		0	0	
+tcp4-multi-diffip03		skip		0	0	
+tcp4-multi-diffip04		skip		0	0	
+tcp4-multi-diffip05		skip		0	0	
+tcp4-multi-diffip06		skip		0	0	
+tcp4-multi-diffip07		skip		0	0	
+tcp4-multi-diffip08		skip		0	0	
+tcp4-multi-diffip09		skip		0	0	
+tcp4-multi-diffip10		skip		0	0	
+tcp4-multi-diffip11		skip		0	0	
+tcp4-multi-diffip12		skip		0	0	
+tcp4-multi-diffip13		skip		0	0	
+tcp4-multi-diffip14		skip		0	0	
+tcp4-multi-diffnic01		skip		0	0	
+tcp4-multi-diffnic02		skip		0	0	
+tcp4-multi-diffnic03		skip		0	0	
+tcp4-multi-diffnic04		skip		0	0	
+tcp4-multi-diffnic05		skip		0	0	
+tcp4-multi-diffnic06		skip		0	0	
+tcp4-multi-diffnic07		skip		0	0	
+tcp4-multi-diffnic08		skip		0	0	
+tcp4-multi-diffnic09		skip		0	0	
+tcp4-multi-diffnic10		skip		0	0	
+tcp4-multi-diffnic11		skip		0	0	
+tcp4-multi-diffnic12		skip		0	0	
+tcp4-multi-diffnic13		skip		0	0	
+tcp4-multi-diffnic14		skip		0	0	
+tcp4-multi-diffport01		skip		0	0
+tcp4-multi-diffport02		skip		0	0
+tcp4-multi-diffport03		skip		0	0
+tcp4-multi-diffport04		skip		0	0
+tcp4-multi-diffport05		skip		0	0
+tcp4-multi-diffport06		skip		0	0
+tcp4-multi-diffport07		skip		0	0
+tcp4-multi-diffport08		skip		0	0
+tcp4-multi-diffport09		skip		0	0
+tcp4-multi-diffport10		skip		0	0
+tcp4-multi-diffport11		skip		0	0
+tcp4-multi-diffport12		skip		0	0
+tcp4-multi-diffport13		skip		0	0
+tcp4-multi-diffport14		skip		0	0
+tcp4-multi-sameport01		skip		0	0
+tcp4-multi-sameport02		skip		0	0
+tcp4-multi-sameport03		skip		0	0
+tcp4-multi-sameport04		skip		0	0
+tcp4-multi-sameport05		skip		0	0
+tcp4-multi-sameport06		skip		0	0
+tcp4-multi-sameport07		skip		0	0
+tcp4-multi-sameport08		skip		0	0
+tcp4-multi-sameport09		skip		0	0
+tcp4-multi-sameport10		skip		0	0
+tcp4-multi-sameport11		skip		0	0
+tcp4-multi-sameport12		skip		0	0
+tcp4-multi-sameport13		skip		0	0
+tcp4-multi-sameport14		skip		0	0
+tcp4-uni-basic01		skip		0	0	
+tcp4-uni-basic02		skip		0	0	
+tcp4-uni-basic03		skip		0	0	
+tcp4-uni-basic04		skip		0	0	
+tcp4-uni-basic05		skip		0	0	
+tcp4-uni-basic06		skip		0	0	
+tcp4-uni-basic07		skip		0	0	
+tcp4-uni-basic08		skip		0	0	
+tcp4-uni-basic09		skip		0	0	
+tcp4-uni-basic10		skip		0	0	
+tcp4-uni-basic11		skip		0	0	
+tcp4-uni-basic12		skip		0	0	
+tcp4-uni-basic13		skip		0	0	
+tcp4-uni-basic14		skip		0	0	
+tcp4-uni-dsackoff01		skip		0	0	
+tcp4-uni-dsackoff02		skip		0	0	
+tcp4-uni-dsackoff03		skip		0	0	
+tcp4-uni-dsackoff04		skip		0	0	
+tcp4-uni-dsackoff05		skip		0	0	
+tcp4-uni-dsackoff06		skip		0	0	
+tcp4-uni-dsackoff07		skip		0	0	
+tcp4-uni-dsackoff08		skip		0	0	
+tcp4-uni-dsackoff09		skip		0	0	
+tcp4-uni-dsackoff10		skip		0	0	
+tcp4-uni-dsackoff11		skip		0	0	
+tcp4-uni-dsackoff12		skip		0	0	
+tcp4-uni-dsackoff13		skip		0	0	
+tcp4-uni-dsackoff14		skip		0	0	
+tcp4-uni-pktlossdup01		skip		0	0
+tcp4-uni-pktlossdup02		skip		0	0
+tcp4-uni-pktlossdup03		skip		0	0
+tcp4-uni-pktlossdup04		skip		0	0
+tcp4-uni-pktlossdup05		skip		0	0
+tcp4-uni-pktlossdup06		skip		0	0
+tcp4-uni-pktlossdup07		skip		0	0
+tcp4-uni-pktlossdup08		skip		0	0
+tcp4-uni-pktlossdup09		skip		0	0
+tcp4-uni-pktlossdup10		skip		0	0
+tcp4-uni-pktlossdup11		skip		0	0
+tcp4-uni-pktlossdup12		skip		0	0
+tcp4-uni-pktlossdup13		skip		0	0
+tcp4-uni-pktlossdup14		skip		0	0
+tcp4-uni-sackoff01		skip		0	0	
+tcp4-uni-sackoff02		skip		0	0	
+tcp4-uni-sackoff03		skip		0	0	
+tcp4-uni-sackoff04		skip		0	0	
+tcp4-uni-sackoff05		skip		0	0	
+tcp4-uni-sackoff06		skip		0	0	
+tcp4-uni-sackoff07		skip		0	0	
+tcp4-uni-sackoff08		skip		0	0	
+tcp4-uni-sackoff09		skip		0	0	
+tcp4-uni-sackoff10		skip		0	0	
+tcp4-uni-sackoff11		skip		0	0	
+tcp4-uni-sackoff12		skip		0	0	
+tcp4-uni-sackoff13		skip		0	0	
+tcp4-uni-sackoff14		skip		0	0	
+tcp4-uni-smallsend01		skip		0	0	
+tcp4-uni-smallsend02		skip		0	0	
+tcp4-uni-smallsend03		skip		0	0	
+tcp4-uni-smallsend04		skip		0	0	
+tcp4-uni-smallsend05		skip		0	0	
+tcp4-uni-smallsend06		skip		0	0	
+tcp4-uni-smallsend07		skip		0	0	
+tcp4-uni-smallsend08		skip		0	0	
+tcp4-uni-smallsend09		skip		0	0	
+tcp4-uni-smallsend10		skip		0	0	
+tcp4-uni-smallsend11		skip		0	0	
+tcp4-uni-smallsend12		skip		0	0	
+tcp4-uni-smallsend13		skip		0	0	
+tcp4-uni-smallsend14		skip		0	0	
+tcp4-uni-tso01		skip		0	0	
+tcp4-uni-tso02		skip		0	0	
+tcp4-uni-tso03		skip		0	0	
+tcp4-uni-tso04		skip		0	0	
+tcp4-uni-tso05		skip		0	0	
+tcp4-uni-tso06		skip		0	0	
+tcp4-uni-tso07		skip		0	0	
+tcp4-uni-tso08		skip		0	0	
+tcp4-uni-tso09		skip		0	0	
+tcp4-uni-tso10		skip		0	0	
+tcp4-uni-tso11		skip		0	0	
+tcp4-uni-tso12		skip		0	0	
+tcp4-uni-tso13		skip		0	0	
+tcp4-uni-tso14		skip		0	0	
+tcp4-uni-winscale01		skip		0	0	
+tcp4-uni-winscale02		skip		0	0	
+tcp4-uni-winscale03		skip		0	0	
+tcp4-uni-winscale04		skip		0	0	
+tcp4-uni-winscale05		skip		0	0	
+tcp4-uni-winscale06		skip		0	0	
+tcp4-uni-winscale07		skip		0	0	
+tcp4-uni-winscale08		skip		0	0	
+tcp4-uni-winscale09		skip		0	0	
+tcp4-uni-winscale10		skip		0	0	
+tcp4-uni-winscale11		skip		0	0	
+tcp4-uni-winscale12		skip		0	0	
+tcp4-uni-winscale13		skip		0	0	
+tcp4-uni-winscale14		skip		0	0	
+tcp6-multi-diffip01		skip		0	0	
+tcp6-multi-diffip02		skip		0	0	
+tcp6-multi-diffip03		skip		0	0	
+tcp6-multi-diffip04		skip		0	0	
+tcp6-multi-diffip05		skip		0	0	
+tcp6-multi-diffip06		skip		0	0	
+tcp6-multi-diffip07		skip		0	0	
+tcp6-multi-diffip08		skip		0	0	
+tcp6-multi-diffip09		skip		0	0	
+tcp6-multi-diffip10		skip		0	0	
+tcp6-multi-diffip11		skip		0	0	
+tcp6-multi-diffip12		skip		0	0	
+tcp6-multi-diffip13		skip		0	0	
+tcp6-multi-diffip14		skip		0	0	
+tcp6-multi-diffnic01		skip		0	0	
+tcp6-multi-diffnic02		skip		0	0	
+tcp6-multi-diffnic03		skip		0	0	
+tcp6-multi-diffnic04		skip		0	0	
+tcp6-multi-diffnic05		skip		0	0	
+tcp6-multi-diffnic06		skip		0	0	
+tcp6-multi-diffnic07		skip		0	0	
+tcp6-multi-diffnic08		skip		0	0	
+tcp6-multi-diffnic09		skip		0	0	
+tcp6-multi-diffnic10		skip		0	0	
+tcp6-multi-diffnic11		skip		0	0	
+tcp6-multi-diffnic12		skip		0	0	
+tcp6-multi-diffnic13		skip		0	0	
+tcp6-multi-diffnic14		skip		0	0	
+tcp6-multi-diffport01		skip		0	0
+tcp6-multi-diffport02		skip		0	0
+tcp6-multi-diffport03		skip		0	0
+tcp6-multi-diffport04		skip		0	0
+tcp6-multi-diffport05		skip		0	0
+tcp6-multi-diffport06		skip		0	0
+tcp6-multi-diffport07		skip		0	0
+tcp6-multi-diffport08		skip		0	0
+tcp6-multi-diffport09		skip		0	0
+tcp6-multi-diffport10		skip		0	0
+tcp6-multi-diffport11		skip		0	0
+tcp6-multi-diffport12		skip		0	0
+tcp6-multi-diffport13		skip		0	0
+tcp6-multi-diffport14		skip		0	0
+tcp6-multi-sameport01		skip		0	0
+tcp6-multi-sameport02		skip		0	0
+tcp6-multi-sameport03		skip		0	0
+tcp6-multi-sameport04		skip		0	0
+tcp6-multi-sameport05		skip		0	0
+tcp6-multi-sameport06		skip		0	0
+tcp6-multi-sameport07		skip		0	0
+tcp6-multi-sameport08		skip		0	0
+tcp6-multi-sameport09		skip		0	0
+tcp6-multi-sameport10		skip		0	0
+tcp6-multi-sameport11		skip		0	0
+tcp6-multi-sameport12		skip		0	0
+tcp6-multi-sameport13		skip		0	0
+tcp6-multi-sameport14		skip		0	0
+tcp6-uni-basic01		skip		0	0	
+tcp6-uni-basic02		skip		0	0	
+tcp6-uni-basic03		skip		0	0	
+tcp6-uni-basic04		skip		0	0	
+tcp6-uni-basic05		skip		0	0	
+tcp6-uni-basic06		skip		0	0	
+tcp6-uni-basic07		skip		0	0	
+tcp6-uni-basic08		skip		0	0	
+tcp6-uni-basic09		skip		0	0	
+tcp6-uni-basic10		skip		0	0	
+tcp6-uni-basic11		skip		0	0	
+tcp6-uni-basic12		skip		0	0	
+tcp6-uni-basic13		skip		0	0	
+tcp6-uni-basic14		skip		0	0	
+tcp6-uni-dsackoff01		skip		0	0	
+tcp6-uni-dsackoff02		skip		0	0	
+tcp6-uni-dsackoff03		skip		0	0	
+tcp6-uni-dsackoff04		skip		0	0	
+tcp6-uni-dsackoff05		skip		0	0	
+tcp6-uni-dsackoff06		skip		0	0	
+tcp6-uni-dsackoff07		skip		0	0	
+tcp6-uni-dsackoff08		skip		0	0	
+tcp6-uni-dsackoff09		skip		0	0	
+tcp6-uni-dsackoff10		skip		0	0	
+tcp6-uni-dsackoff11		skip		0	0	
+tcp6-uni-dsackoff12		skip		0	0	
+tcp6-uni-dsackoff13		skip		0	0	
+tcp6-uni-dsackoff14		skip		0	0	
+tcp6-uni-pktlossdup01		skip		0	0
+tcp6-uni-pktlossdup02		skip		0	0
+tcp6-uni-pktlossdup03		skip		0	0
+tcp6-uni-pktlossdup04		skip		0	0
+tcp6-uni-pktlossdup05		skip		0	0
+tcp6-uni-pktlossdup06		skip		0	0
+tcp6-uni-pktlossdup07		skip		0	0
+tcp6-uni-pktlossdup08		skip		0	0
+tcp6-uni-pktlossdup09		skip		0	0
+tcp6-uni-pktlossdup10		skip		0	0
+tcp6-uni-pktlossdup11		skip		0	0
+tcp6-uni-pktlossdup12		skip		0	0
+tcp6-uni-pktlossdup13		skip		0	0
+tcp6-uni-pktlossdup14		skip		0	0
+tcp6-uni-sackoff01		skip		0	0	
+tcp6-uni-sackoff02		skip		0	0	
+tcp6-uni-sackoff03		skip		0	0	
+tcp6-uni-sackoff04		skip		0	0	
+tcp6-uni-sackoff05		skip		0	0	
+tcp6-uni-sackoff06		skip		0	0	
+tcp6-uni-sackoff07		skip		0	0	
+tcp6-uni-sackoff08		skip		0	0	
+tcp6-uni-sackoff09		skip		0	0	
+tcp6-uni-sackoff10		skip		0	0	
+tcp6-uni-sackoff11		skip		0	0	
+tcp6-uni-sackoff12		skip		0	0	
+tcp6-uni-sackoff13		skip		0	0	
+tcp6-uni-sackoff14		skip		0	0	
+tcp6-uni-smallsend01		skip		0	0	
+tcp6-uni-smallsend02		skip		0	0	
+tcp6-uni-smallsend03		skip		0	0	
+tcp6-uni-smallsend04		skip		0	0	
+tcp6-uni-smallsend05		skip		0	0	
+tcp6-uni-smallsend06		skip		0	0	
+tcp6-uni-smallsend07		skip		0	0	
+tcp6-uni-smallsend08		skip		0	0	
+tcp6-uni-smallsend09		skip		0	0	
+tcp6-uni-smallsend10		skip		0	0	
+tcp6-uni-smallsend11		skip		0	0	
+tcp6-uni-smallsend12		skip		0	0	
+tcp6-uni-smallsend13		skip		0	0	
+tcp6-uni-smallsend14		skip		0	0	
+tcp6-uni-tso01		skip		0	0	
+tcp6-uni-tso02		skip		0	0	
+tcp6-uni-tso03		skip		0	0	
+tcp6-uni-tso04		skip		0	0	
+tcp6-uni-tso05		skip		0	0	
+tcp6-uni-tso06		skip		0	0	
+tcp6-uni-tso07		skip		0	0	
+tcp6-uni-tso08		skip		0	0	
+tcp6-uni-tso09		skip		0	0	
+tcp6-uni-tso10		skip		0	0	
+tcp6-uni-tso11		skip		0	0	
+tcp6-uni-tso12		skip		0	0	
+tcp6-uni-tso13		skip		0	0	
+tcp6-uni-tso14		skip		0	0	
+tcp6-uni-winscale01		skip		0	0	
+tcp6-uni-winscale02		skip		0	0	
+tcp6-uni-winscale03		skip		0	0	
+tcp6-uni-winscale04		skip		0	0	
+tcp6-uni-winscale05		skip		0	0	
+tcp6-uni-winscale06		skip		0	0	
+tcp6-uni-winscale07		skip		0	0	
+tcp6-uni-winscale08		skip		0	0	
+tcp6-uni-winscale09		skip		0	0	
+tcp6-uni-winscale10		skip		0	0	
+tcp6-uni-winscale11		skip		0	0	
+tcp6-uni-winscale12		skip		0	0	
+tcp6-uni-winscale13		skip		0	0	
+tcp6-uni-winscale14		skip		0	0	
+tcp_cc_lib.sh		all fail		0	1
+tcp_fastopen_run.sh		skip		0	0
+tcp_ipsec.sh		skip		0	0
+tcp_ipsec_vti.sh		skip		0	0
+tcpdump01.sh		all fail		0	1
+tee01			unimplement panic(77)	0	1
+tee02			unimplement panic(77)	0	3
+test.sh			all fail		0	1
+test_1_to_1_accept_close	skip		0	0
+test_1_to_1_addrs		skip		0	0
+test_1_to_1_connect		skip		0	0
+test_1_to_1_connectx		skip		0	0
+test_1_to_1_events		skip		0	0
+test_1_to_1_initmsg_connect	skip		0	0
+test_1_to_1_nonblock		skip		0	0
+test_1_to_1_recvfrom		skip		0	0
+test_1_to_1_recvmsg		skip		0	0
+test_1_to_1_rtoinfo		skip		0	0
+test_1_to_1_send		skip		0	0
+test_1_to_1_sendmsg		skip		0	0
+test_1_to_1_sendto		skip		0	0
+test_1_to_1_shutdown		skip		0	0
+test_1_to_1_socket_bind_listen	skip		0	0
+test_1_to_1_sockopt		skip		0	0
+test_1_to_1_threads		skip		0	0
+test_assoc_abort		skip		0	0
+test_assoc_shutdown		skip		0	0
+test_autoclose		skip		0	0
+test_basic			skip		0	0
+test_basic_v6		skip		0	0
+test_connect		skip		0	0
+test_connectx		skip		0	0
+test_controllers.sh		skip		0	0
+test_fragments		skip		0	0
+test_fragments_v6		skip		0	0
+test_getname		skip		0	0
+test_getname_v6		skip		0	0
+test_inaddr_any		skip		0	0
+test_inaddr_any_v6		skip		0	0
+test_ioctl			skip		0	0
+test_peeloff		skip		0	0
+test_peeloff_v6		skip		0	0
+test_recvmsg		skip		0	0
+test_robind.sh		skip		0	0
+test_sctp_sendrecvmsg		skip		0	0
+test_sctp_sendrecvmsg_v6	skip		0	0
+test_sockopt		skip		0	0
+test_sockopt_v6		skip		0	0
+test_tcp_style		skip		0	0
+test_tcp_style_v6		skip		0	0
+test_timetolive		skip		0	0
+test_timetolive_v6		skip		0	0
+testsf_c			all fail		0	2
+testsf_c6			all fail		0	2
+testsf_s			all fail		0	2
+testsf_s6			all fail		0	2
+tgkill01			all pass		1	0
+tgkill02			all fail		0	1
+tgkill03			all pass		6	0
+thp01			all fail		0	1
+thp02			skip		0	0
+thp03			skip		0	0
+thp04			skip		0	0
+time-schedule		unimplement panic(230)	0	0
+time01			all pass		2	0	
+timed_forkbomb		timeout no pass	0	0	
+timens01			unimplement panic(97)	0	1	
+timer_delete01		unimplement panic(111)	0	0
+timer_delete02		unimplement panic(111)	0	0
+timer_getoverrun01		unimplement panic(109)	0	0
+timer_gettime01		unimplement panic(108)	0	0
+timer_settime01		unimplement panic(108)	0	0
+timer_settime02		unimplement panic(111)	0	1
+timer_settime03		all fail		0	1
+timerfd01			unimplement panic(86)	0	0
+timerfd02			part fail		4	2
+timerfd04			unimplement panic(97)	0	1
+timerfd_create01		all pass		2	0
+timerfd_gettime01		unimplement panic(87)	0	0
+timerfd_settime01		unimplement panic(86)	0	0
+timerfd_settime02		unimplement panic(86)	0	0
+times01			all pass		1	0
+times03			part fail		10	2
+tkill01			all pass		2	0
+tkill02			all pass		2	0
+tpci			skip		0	0
+tpm_changeauth_tests.sh		all fail		0	2
+tpm_changeauth_tests_exp01.sh	skip		0	0
+tpm_changeauth_tests_exp02.sh	skip		0	0
+tpm_changeauth_tests_exp03.sh	skip		0	0
+tpm_clear_tests.sh		all fail		0	2
+tpm_clear_tests_exp01.sh	skip		0	0
+tpm_getpubek_tests.sh		all fail		0	2
+tpm_getpubek_tests_exp01.sh	skip		0	0
+tpm_restrictpubek_tests.sh	all fail		0	2
+tpm_restrictpubek_tests_exp01.sh	skip		0	0
+tpm_restrictpubek_tests_exp02.sh	skip		0	0
+tpm_restrictpubek_tests_exp03.sh	skip		0	0
+tpm_selftest_tests.sh		all fail		0	2
+tpm_takeownership_tests.sh	all fail		0	2
+tpm_takeownership_tests_exp01.sh	skip		0	0
+tpm_version_tests.sh		all fail		0	2
+tpmtoken_import_tests.sh	all fail		0	2
+tpmtoken_import_tests_exp01.sh	skip		0	0
+tpmtoken_import_tests_exp02.sh	skip		0	0
+tpmtoken_import_tests_exp03.sh	skip		0	0
+tpmtoken_import_tests_exp04.sh	skip		0	0
+tpmtoken_import_tests_exp05.sh	skip		0	0
+tpmtoken_import_tests_exp06.sh	skip		0	0
+tpmtoken_import_tests_exp07.sh	skip		0	0
+tpmtoken_import_tests_exp08.sh	skip		0	0
+tpmtoken_init_tests.sh		all fail		0	2
+tpmtoken_init_tests_exp00.sh	skip		0	0
+tpmtoken_init_tests_exp01.sh	skip		0	0
+tpmtoken_init_tests_exp02.sh	skip		0	0
+tpmtoken_init_tests_exp03.sh	skip		0	0
+tpmtoken_objects_tests.sh	all fail		0	2
+tpmtoken_objects_tests_exp01.sh	skip		0	0
+tpmtoken_protect_tests.sh	all fail		0	2
+tpmtoken_protect_tests_exp01.sh	skip		0	0
+tpmtoken_protect_tests_exp02.sh	skip		0	0
+tpmtoken_setpasswd_tests.sh	all fail		0	2
+tpmtoken_setpasswd_tests_exp01.sh	skip		0	0
+tpmtoken_setpasswd_tests_exp02.sh	skip		0	0
+tpmtoken_setpasswd_tests_exp03.sh	skip		0	0
+tpmtoken_setpasswd_tests_exp04.sh	skip		0	0
+trace_sched			skip		0	0
+tracepath01.sh		skip		0	0
+traceroute01.sh		skip		0	0
+truncate02			all pass		2	0
+truncate02_64		all pass		2	0
+truncate03			all fail		0	1
+truncate03_64		all fail		0	1
+tst_ansi_color.sh		skip		0	0
+tst_brk			skip		0	0
+tst_brkm			skip		0	0
+tst_cgctl			skip		0	0
+tst_check_drivers		skip		0	0
+tst_check_kconfigs		skip		0	0
+tst_checkpoint		skip		0	0
+tst_device			skip		0	0
+tst_exit			skip		0	0
+tst_fs_has_free		skip		0	0
+tst_fsfreeze		skip		0	0
+tst_get_free_pids		all fail		0	1
+tst_get_median		skip		0	0
+tst_get_unused_port		skip		0	0
+tst_getconf			skip		0	0
+tst_hexdump			timeout no pass	0	0
+tst_kvcmp			skip		0	0
+tst_lockdown_enabled		skip		0	0
+tst_ncpus			skip		0	0
+tst_ncpus_conf		skip		0	0
+tst_ncpus_max		skip		0	0
+tst_net.sh			all fail		0	1
+tst_net_iface_prefix		skip		0	0
+tst_net_ip_prefix		skip		0	0
+tst_net_stress.sh		all fail		0	1
+tst_net_vars		skip		0	0
+tst_ns_create		skip		0	0
+tst_ns_exec			skip		0	0
+tst_ns_ifmove		skip		0	0
+tst_random			skip		0	0
+tst_res			skip		0	0
+tst_resm			skip		0	0
+tst_rod			skip		0	0
+tst_secureboot_enabled		skip		0	0
+tst_security.sh		skip		0	0
+tst_sleep			skip		0	0
+tst_supported_fs		skip		0	0
+tst_test.sh			all fail		0	1
+tst_timeout_kill		skip		0	0
+uaccess			skip		0	0
+udp4-multi-diffip01		skip		0	0
+udp4-multi-diffip02		skip		0	0
+udp4-multi-diffip03		skip		0	0
+udp4-multi-diffip04		skip		0	0
+udp4-multi-diffip05		skip		0	0
+udp4-multi-diffip06		skip		0	0
+udp4-multi-diffip07		skip		0	0
+udp4-multi-diffnic01		skip		0	0
+udp4-multi-diffnic02		skip		0	0
+udp4-multi-diffnic03		skip		0	0
+udp4-multi-diffnic04		skip		0	0
+udp4-multi-diffnic05		skip		0	0
+udp4-multi-diffnic06		skip		0	0
+udp4-multi-diffnic07		skip		0	0
+udp4-multi-diffport01		skip		0	0
+udp4-multi-diffport02		skip		0	0
+udp4-multi-diffport03		skip		0	0
+udp4-multi-diffport04		skip		0	0
+udp4-multi-diffport05		skip		0	0
+udp4-multi-diffport06		skip		0	0
+udp4-multi-diffport07		skip		0	0
+udp4-uni-basic01		skip		0	0
+udp4-uni-basic02		skip		0	0
+udp4-uni-basic03		skip		0	0
+udp4-uni-basic04		skip		0	0
+udp4-uni-basic05		skip		0	0
+udp4-uni-basic06		skip		0	0
+udp4-uni-basic07		skip		0	0
+udp6-multi-diffip01		skip		0	0
+udp6-multi-diffip02		skip		0	0
+udp6-multi-diffip03		skip		0	0
+udp6-multi-diffip04		skip		0	0
+udp6-multi-diffip05		skip		0	0
+udp6-multi-diffip06		skip		0	0
+udp6-multi-diffip07		skip		0	0
+udp6-multi-diffnic01		skip		0	0
+udp6-multi-diffnic02		skip		0	0
+udp6-multi-diffnic03		skip		0	0
+udp6-multi-diffnic04		skip		0	0
+udp6-multi-diffnic05		skip		0	0
+udp6-multi-diffnic06		skip		0	0
+udp6-multi-diffnic07		skip		0	0
+udp6-multi-diffport01		skip		0	0
+udp6-multi-diffport02		skip		0	0
+udp6-multi-diffport03		skip		0	0
+udp6-multi-diffport04		skip		0	0
+udp6-multi-diffport05		skip		0	0
+udp6-multi-diffport06		skip		0	0
+udp6-multi-diffport07		skip		0	0
+udp6-uni-basic01		skip		0	0
+udp6-uni-basic02		skip		0	0
+udp6-uni-basic03		skip		0	0
+udp6-uni-basic04		skip		0	0
+udp6-uni-basic05		skip		0	0
+udp6-uni-basic06		skip		0	0
+udp6-uni-basic07		skip		0	0
+udp_ipsec.sh		skip		0	0
+udp_ipsec_vti.sh		skip		0	0
+uevent01			skip		0	0
+uevent02			skip		0	0
+uevent03			skip		0	0
+ulimit01			all pass		3	0
+umask01			all fail		0	1
+umip_basic_test		skip		0	0
+umount01			all pass		1	0
+umount02			defect panic	2	3	
+umount03			all fail		0	1
+umount2_01			defect panic	0	0
+umount2_02			part fail		2	5
+uname01			all pass		2	0	
+uname02			all pass		1	0	
+uname04			all pass		1	0	
+unlink05			all pass		2	0	
+unlink07			part fail		5	1	
+unlink08			part fail		2	2
+unlink09			unimplement panic	0	1
+unlinkat01			all pass		7	0
+unshare01			unimplement panic(97)	0	3
+unshare01.sh		skip		0	0
+unshare02			unimplement panic(97)	0	2
+unzip01.sh			skip		0	0
+userfaultfd01		all fail		0	1
+userns01			skip		0	0
+userns02			skip		0	0
+userns03			skip		0	0
+userns04			skip		0	0
+userns05			skip		0	0
+userns06			skip		0	0
+userns06_capcheck		all fail		0	1
+userns07			skip		0	0
+userns08			skip		0	0
+ustat01			skip		0	0
+ustat02			skip		0	0
+utime01			all pass		21	0
+utime02			all pass		21	0
+utime03			all pass		7	0
+utime04			all pass		21	0
+utime05			all fail		0	1
+utime06			all fail		0	4
+utime07			part fail		1	4
+utimensat01			skip pass		12	0
+utimes01			all fail		0	1
+utsname01			all pass		1	0
+utsname02			unimplement panic(161)	0	4
+utsname03			unimplement panic(161)	1	3
+utsname04			part fail		2	2
+verify_caps_exec		skip		0	0
+vfork			skip		0	0
+vfork01			unimplement panic(148)	0	1
+vfork02			unimplement panic(136)	0	2
+vfork_freeze.sh		skip		0	0
+vhangup01			unimplement panic(58)	0	0
+vhangup02			unimplement panic(58)	0	0
+virt_lib.sh			skip		0	0
+vlan01.sh			skip		0	0
+vlan02.sh			skip		0	0
+vlan03.sh			skip		0	0
+vma01			timeout no pass	0	0
+vma02			skip		0	0
+vma03			skip		0	0
+vma04			skip		0	0	
+vma05.sh			skip		0	0	
+vma05_vdso			skip		0	0
+vmsplice01			unimplement panic(75)	0	1
+vmsplice02			unimplement panic(75)	0	3
+vmsplice03			unimplement panic(75)	0	1
+vmsplice04			unimplement panic(75)	0	1
+vsock01			skip		0	0
+vxlan01.sh			skip		0	0
+vxlan02.sh			skip		0	0
+vxlan03.sh			skip		0	0
+vxlan04.sh			skip		0	0
+wait01			all pass		1	0
+wait02			all pass		1	0
+wait401			all fail		0	1
+wait402			all pass		1	0			
+wait403			unimplement panic	0	0	
+waitid01			unimplement panic(95)	0	6
+waitid02			unimplement panic(95)	0	1
+waitid03			unimplement panic(95)	0	1
+waitid04			unimplement panic(95)	1	1
+waitid05			unimplement panic(95)	1	5
+waitid06			unimplement panic(95)	1	5
+waitid07			unimplement panic(95)	0	5
+waitid08			unimplement panic(95)	0	10
+waitid09			unimplement panic(95)	0	1
+waitid10			all fail		0	1
+waitid11			unimplement panic(95)	0	6		
+waitpid01			all pass		126	0
+waitpid03			all pass		2	0
+waitpid04			unimplement panic	2	1
+waitpid06			all pass		1	0
+waitpid07			all pass		1	0
+waitpid08			all pass		1	0
+waitpid09			all pass		4	0	
+waitpid10			defect panic	0	0
+waitpid11			all fail		0	1
+waitpid12			unimplement panic	0	0
+waitpid13			unimplement panic	0	0
+wc01.sh			skip		0	0
+which01.sh			skip		0	0
+wireguard01.sh		skip		0	0
+wireguard02.sh		skip		0	0
+wireguard_lib.sh		skip		0	0
+wqueue01			all fail		0	1
+wqueue02			all fail		0	1
+wqueue03			all fail		0	1
+wqueue04			all fail		0	1
+wqueue05			all fail		0	1
+wqueue06			all fail		0	1
+wqueue07			all fail		0	1
+wqueue08			all fail		0	1
+wqueue09			all fail		0	1
+write01			all pass		1	0
+write02			all pass		2	0
+write03			all pass		1	0
+write04			unimplement panic	0	0
+write05			part fail		3	1
+write06			all pass		2	0
+write_freezing.sh		skip		0	0
+writetest			all pass		2	0
+writev01			part fail		4	2
+writev02			all pass		1	0
+writev03			skip		0	0
+writev05			all pass		1	0
+writev06			all pass		1	0
+writev07			part fail		2	6
+zram01.sh			skip		0	0
+zram02.sh			skip		0	0
+zram03			skip		0	0
+zram_lib.sh			skip		0	0
                                                
