@@ -35,7 +35,7 @@ fn interrupt_handler(i: Interrupt) {
             TRAP_STATS.inc(i.number());
         }
         Interrupt::SupervisorExternal => {
-            // log::error!("[kernel] receive externel interrupt {}", i.number());
+            log::info!("[kernel] receive externel interrupt {}", i.number());
             device_manager().handle_irq();
             TRAP_STATS.inc(i.number());
         }

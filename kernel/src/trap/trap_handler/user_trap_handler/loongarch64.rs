@@ -8,6 +8,7 @@ use loongArch64::register::{
     prmd, pwch, pwcl, stlbps, ticlr, tlbidx, tlbrehi, tlbrentry,
 };
 
+use crate::osdriver::manager::device_manager;
 use arch::{
     mm::tlb_fill,
     time::{get_time_duration, set_nx_timer_irq},
@@ -147,6 +148,7 @@ pub fn user_interrupt_handler(task: &Task, i: Interrupt) {
         | Interrupt::HWI6
         | Interrupt::HWI7 => {
             log::info!("[kernel] receive external interrupt: {:?}", i);
+            device_manager().handle_irq();
             TRAP_STATS.inc(i as usize);
         }
         _ => panic!("Unknown user interrupt: {:?}", i),

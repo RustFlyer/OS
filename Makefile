@@ -262,9 +262,6 @@ all:
 # make fs-img-submit-rv
 # cp fsimg/riscv64-sdcard.img disk-rv.img
 
-	-rm -rf vendor/
-	tar xf submit/vendor.tar.gz
-
 	make build ARCH=loongarch64 LOG= MODE=release
 	cp target/loongarch64-unknown-none/release/kernel kernel-la
 # make fs-img-submit-la

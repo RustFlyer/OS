@@ -9,6 +9,7 @@ use arch::{
 use mm::address::VirtAddr;
 use timer::TIMER_MANAGER;
 
+use crate::osdriver::manager::device_manager;
 use crate::processor::current_task;
 use crate::{task::TaskState, trap::trap_handler::TRAP_STATS};
 
@@ -50,6 +51,7 @@ fn kernel_interrupt_handler(i: Interrupt) {
         | Interrupt::HWI6
         | Interrupt::HWI7 => {
             log::info!("[kernel] receive external interrupt: {:?}", i);
+            device_manager().handle_irq();
             TRAP_STATS.inc(i as usize);
         }
         _ => trap_panic(),
