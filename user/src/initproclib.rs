@@ -67,7 +67,7 @@ pub fn easy_cmd(s: String) -> String {
         }
         sf if sf.starts_with("ltprun") => {
             ltpauto::ltprun::autorun();
-            format!(" ").to_string()
+            format!("fq").to_string()
         }
         _ => s,
     }

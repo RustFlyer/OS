@@ -201,6 +201,7 @@ pub enum SyscallNo {
     CLONE3 = 435,
     CLOSE_RANGE = 436,
     PIDFD_GETFD = 438,
+    MEMFD_SECRET = 447,
 }
 
 impl core::fmt::Display for SyscallNo {
