@@ -8,10 +8,7 @@ pub mod pbla;
 #[cfg(target_arch = "riscv64")]
 pub mod pbrv;
 
-use config::{
-    board::CLOCK_FREQ,
-    mm::{DTB_ADDR, KERNEL_MAP_OFFSET},
-};
+use config::mm::{DTB_ADDR, KERNEL_MAP_OFFSET};
 use driver::{CHAR_DEVICE, println};
 use flat_device_tree::Fdt;
 use manager::{device_manager, init_device_manager};
@@ -21,7 +18,6 @@ use probe::*;
 pub fn probe_device_tree() {
     println!("DTB_ADDR: {:#x}", unsafe { DTB_ADDR });
     let mut dtb_addr = unsafe { DTB_ADDR };
-    println!("[CONSOLE] INIT SUCCESS");
 
     init_device_manager();
     println!("[DEVICE-MANAGER] INIT SUCCESS");
@@ -36,10 +32,13 @@ pub fn probe_device_tree() {
 
     let device_tree = unsafe {
         println!("dt: {:#x}", dtb_addr + KERNEL_MAP_OFFSET);
-        let fdt;
+        let mut fdt;
 
         #[cfg(not(all(target_arch = "loongarch64", feature = "board")))]
-        fdt = Fdt::from_ptr((dtb_addr + KERNEL_MAP_OFFSET) as *const u8).expect("Parse DTB failed");
+        {
+            fdt = Fdt::from_ptr((dtb_addr + KERNEL_MAP_OFFSET) as *const u8)
+                .expect("Parse DTB failed");
+        }
 
         #[cfg(all(target_arch = "loongarch64", feature = "board"))]
         {
@@ -51,14 +50,6 @@ pub fn probe_device_tree() {
 
         fdt
     };
-
-    #[cfg(target_arch = "riscv64")]
-    unsafe {
-        if let Ok(freq) = device_tree.cpus().next().unwrap().timebase_frequency() {
-            CLOCK_FREQ = freq;
-        }
-    }
-    log::warn!("clock freq set to {} Hz", unsafe { CLOCK_FREQ });
 
     probe_tree(&device_tree);
 

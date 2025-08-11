@@ -2,7 +2,7 @@ use alloc::{boxed::Box, sync::Arc, vec::Vec};
 use driver::{
     block::dw_mshc::MMC,
     cpu::CPU,
-    plic::PLIC,
+    icu::plic::PLIC,
     println,
     qemu::QUartDevice,
     serial::{Serial, uart8250::Uart},

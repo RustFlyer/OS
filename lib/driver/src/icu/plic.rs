@@ -5,6 +5,8 @@
 //! Controller setup helper
 
 use config::mm::KERNEL_MAP_OFFSET;
+
+use super::ICU;
 pub struct PLIC {
     /// MMIO base address.
     pub mmio_base: usize,
@@ -22,7 +24,7 @@ impl PLIC {
         }
     }
 
-    pub fn enable_irq(&self, irq: usize, ctx_id: usize) {
+    pub(crate) fn _enable_irq(&self, irq: usize, ctx_id: usize) {
         log::error!("enable irq {irq}, ctx_id: {ctx_id}");
         let plic = (self.mmio_base + KERNEL_MAP_OFFSET) as *mut plic::Plic;
 
@@ -36,7 +38,7 @@ impl PLIC {
     }
 
     /// Return the IRQ number of the highest priority pending interrupt
-    pub fn claim_irq(&self, ctx_id: usize) -> Option<usize> {
+    pub(crate) fn _claim_irq(&self, ctx_id: usize) -> Option<usize> {
         let plic = (self.mmio_base + KERNEL_MAP_OFFSET) as *mut plic::Plic;
         let ctx = PLICCtxWrapper::new(ctx_id);
 
@@ -44,7 +46,7 @@ impl PLIC {
         irq.map(|irq| irq.get() as usize)
     }
 
-    pub fn complete_irq(&self, irq: usize, ctx_id: usize) {
+    pub(crate) fn _complete_irq(&self, irq: usize, ctx_id: usize) {
         let plic = (self.mmio_base + KERNEL_MAP_OFFSET) as *mut plic::Plic;
         let src = PLICSrcWrapper::new(irq);
         let ctx = PLICCtxWrapper::new(ctx_id);
@@ -83,5 +85,21 @@ impl PLICCtxWrapper {
 impl plic::HartContext for PLICCtxWrapper {
     fn index(self) -> usize {
         self.ctx
+    }
+}
+
+impl ICU for PLIC {
+    fn enable_irq(&self, irq: usize, ctx_id: usize) {
+        self._enable_irq(irq, ctx_id)
+    }
+
+    fn disable_irq(&self, irq: usize) {}
+
+    fn claim_irq(&self, ctx_id: usize) -> Option<usize> {
+        self._claim_irq(ctx_id)
+    }
+
+    fn complete_irq(&self, irq: usize, _cpu_id: usize) {
+        self._complete_irq(irq, _cpu_id);
     }
 }

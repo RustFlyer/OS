@@ -1,11 +1,7 @@
-use alloc::sync::Arc;
-use config::board::CLOCK_FREQ;
+use alloc::{boxed::Box, sync::Arc};
 use core::{mem::size_of, ptr::NonNull};
 use driver::{
-    BLOCK_DEVICE, CHAR_DEVICE,
-    device::OSDevice,
-    net::{loopback::LoopbackDev, virtnet::create_virt_net_dev},
-    println,
+    BLOCK_DEVICE, CHAR_DEVICE, device::OSDevice, net::virtnet::create_virt_net_dev, println,
     qemu::QVirtBlkDevice,
 };
 use flat_device_tree::Fdt;
@@ -22,7 +18,7 @@ pub fn probe_tree(fdt: &Fdt) {
     {
         // PLIC
         if let Some(plic) = crate::osdriver::pbrv::probe_plic(fdt) {
-            device_manager().set_plic(plic);
+            device_manager().set_plic(Box::new(plic));
             println!("[PLIC] INIT SUCCESS");
 
             // SERIAL
@@ -52,21 +48,28 @@ pub fn probe_tree(fdt: &Fdt) {
         }
 
         // NetWork Simple
+        use driver::net::loopback::LoopbackDev;
         init_network(LoopbackDev::new(), true);
 
         // CLOCK FREQ
         #[allow(static_mut_refs)]
         unsafe {
             if let Ok(freq) = fdt.cpus().next().unwrap().timebase_frequency() {
-                CLOCK_FREQ = freq;
+                config::board::CLOCK_FREQ = freq;
             }
-            log::warn!("clock freq set to {} Hz", CLOCK_FREQ);
+            log::warn!("clock freq set to {} Hz", config::board::CLOCK_FREQ);
         }
     }
 
     // for loongarch probe
     #[cfg(target_arch = "loongarch64")]
     {
+        // INTERRUPT CONTROL
+        if let Some(icu) = crate::osdriver::pbla::probe_icu(fdt) {
+            device_manager().set_plic(Box::new(icu));
+            println!("[LAICU] INIT SUCCESS");
+        }
+
         // CHAR(used by both qemu & board)
         if let Some(char) = crate::osdriver::pbla::probe_char_device(fdt) {
             device_manager().add_device(char.dev_id(), char.clone());
@@ -79,6 +82,11 @@ pub fn probe_tree(fdt: &Fdt) {
             device_manager().add_device(ahci.dev_id(), ahci.clone());
             BLOCK_DEVICE.call_once(|| ahci.clone());
             println!("[AHCIBLK] INIT SUCCESS");
+        }
+
+        // CPUs
+        if let Some(cpus) = crate::osdriver::pbla::probe_cpu(&fdt) {
+            device_manager().set_cpus(cpus);
         }
     }
 

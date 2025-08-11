@@ -1,10 +1,10 @@
-use alloc::{collections::btree_map::BTreeMap, sync::Arc, vec::Vec};
+use alloc::{boxed::Box, collections::btree_map::BTreeMap, sync::Arc, vec::Vec};
 use arch::{interrupt::enable_external_interrupt, trap::disable_interrupt};
 use config::device::MAX_HARTS;
 use driver::{
     cpu::CPU,
     device::{OSDevId, OSDevice, OSDeviceMajor, OSDeviceMeta},
-    plic::PLIC,
+    icu::{ICU, plic::PLIC},
 };
 
 use crate::osdriver::ioremap_if_need;
@@ -26,7 +26,7 @@ pub fn device_manager() -> &'static mut DeviceTreeManager {
 pub struct DeviceTreeManager {
     /// Optional PLIC (Platform-Level Interrupt Controller) to manage external
     /// interrupts.
-    pub plic: Option<PLIC>,
+    pub plic: Option<Box<dyn ICU>>,
 
     /// Vector containing CPU instances. The capacity is set to accommodate up
     /// to 8 CPUs.
@@ -77,7 +77,7 @@ impl DeviceTreeManager {
         }
     }
 
-    fn plic(&self) -> &PLIC {
+    fn plic(&self) -> &Box<dyn ICU> {
         self.plic.as_ref().unwrap()
     }
 
@@ -159,7 +159,7 @@ impl DeviceTreeManager {
         self.devices.insert(id, device);
     }
 
-    pub fn set_plic(&mut self, plic: PLIC) {
+    pub fn set_plic(&mut self, plic: Box<dyn ICU>) {
         self.plic = Some(plic);
     }
 
