@@ -2793,7 +2793,7 @@ waitid10			all fail		0	1
 waitid11			unimplement panic(95)	0	6		
 waitpid01			all pass		126	0
 waitpid03			all pass		2	0
-waitpid04			unimplement panic	2	1
+waitpid04			all pass		4	0
 waitpid06			all pass		1	0
 waitpid07			all pass		1	0
 waitpid08			all pass		1	0

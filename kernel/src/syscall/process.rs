@@ -121,7 +121,7 @@ pub async fn sys_sched_yield() -> SyscallResult {
 pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult {
     let task = current_task();
     log::info!("[sys_wait4] {} wait for recycling", task.get_name());
-    let option = WaitOptions::from_bits_truncate(options);
+    let option = WaitOptions::from_bits(options).ok_or(SysError::EINVAL)?;
     let target = match pid {
         -1 => WaitFor::AnyChild,
         0 => WaitFor::AnyChildInGroup,
@@ -165,7 +165,26 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
                 return Err(SysError::ECHILD);
             }
         }
-        WaitFor::PGid(_) => unimplemented!(),
+        WaitFor::PGid(pgid) => {
+            let mut result = None;
+            for process in PROCESS_GROUP_MANAGER
+                .get_group(pgid)
+                .ok_or(SysError::ESRCH)?
+                .into_iter()
+                .filter_map(|t| t.upgrade())
+                .filter(|t| t.is_process())
+            {
+                let children = process.children_mut().lock();
+                if let Some(child) = children
+                    .values()
+                    .find(|c| c.is_in_state(TaskState::WaitForRecycle))
+                {
+                    result = Some(child.clone());
+                    break;
+                }
+            }
+            result
+        }
         WaitFor::AnyChildInGroup => {
             let pgid = task.get_pgid();
             let mut result = None;
@@ -279,7 +298,26 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
                             None
                         }
                     }
-                    WaitFor::PGid(_) => unimplemented!(),
+                    WaitFor::PGid(pgid) => {
+                        let mut result = None;
+                        for process in PROCESS_GROUP_MANAGER
+                            .get_group(pgid)
+                            .ok_or(SysError::ESRCH)?
+                            .into_iter()
+                            .filter_map(|t| t.upgrade())
+                            .filter(|t| t.is_process())
+                        {
+                            let children = process.children_mut().lock();
+                            if let Some(child) = children
+                                .values()
+                                .find(|c| c.is_in_state(TaskState::WaitForRecycle))
+                            {
+                                result = Some(child.clone());
+                                break;
+                            }
+                        }
+                        result
+                    }
                     WaitFor::AnyChildInGroup => {
                         let pgid = task.get_pgid();
                         let mut result = None;
@@ -655,7 +693,24 @@ bitflags! {
         /// Report status of stopped children.
         const WUNTRACED = 0x00000002;
         /// Report continued child.
-        const WCONTINUED = 0x00000004;
+        const WCONTINUED = 0x00000008;
+    }
+}
+
+bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+    /// Defined in <sys/wait.h> and related headers.
+    pub struct WaitIdOptions: i32 {
+        /// Don't block waiting.
+        const WNOHANG = 0x00000001;
+        /// Report status of stopped children.
+        const WSTOPPED = 0x00000002;
+        /// Report status of terminated children.
+        const WEXITED = 0x00000004;
+        /// Report continued child.
+        const WCONTINUED = 0x00000008;
+        /// Leave the child in a waitable state.
+        const WNOWAIT = 0x01000000;
     }
 }
 
