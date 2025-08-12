@@ -146,10 +146,10 @@ pub fn chdir(path: &str) -> isize {
     sys_chdir(pathname.as_ptr() as _)
 }
 
-pub fn faccessat(dirfd: i32, pathname: &str, mode: i32) -> isize {
-    let pathname = CString::new(pathname).unwrap();
-    sys_faccessat(dirfd as usize, pathname.as_ptr() as _, mode)
-}
+// pub fn faccessat(dirfd: i32, pathname: &str, mode: i32) -> isize {
+//     let pathname = CString::new(pathname).unwrap();
+//     sys_faccessat(dirfd as usize, pathname.as_ptr() as _, mode)
+// }
 
 pub fn mkdir(path: &str) -> isize {
     let pathname = CString::new(path).unwrap();

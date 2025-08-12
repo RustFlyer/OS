@@ -466,16 +466,12 @@ pub fn supple_cmd(buf: &mut [u8; 256], bptr: &mut usize) {
     *bptr = tbptr;
 }
 
-pub fn file_exists(path: &str) -> bool {
-    faccessat(-100, path, 0) == 0
-}
-
 /// Create a symbolic link only if the target doesn't exist
 pub fn new_link(target: &str, link_path: &str) {
-    if !file_exists(link_path) {
-        let cmd = format!("./busybox ln -s {} {}", target, link_path);
-        run_cmd(&cmd);
-    }
+    let cmd = format!("./busybox rm -f {}", link_path);
+    run_cmd(&cmd);
+    let cmd = format!("./busybox ln -s {} {}", target, link_path);
+    run_cmd(&cmd);
 }
 
 pub fn software_init() {
