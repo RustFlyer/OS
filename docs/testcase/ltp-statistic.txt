@@ -8,12 +8,11 @@
 // 3. part fail: 			at least one failed units(sometimes caused by timeout)
 // 4. skip:				skip without pass
 // 5. skip consuming time:		skip without pass and cost more than 30 seconds
-// 4. all fail:			fail all units
-// 5. defect panic: 			panicked with wrong implementation
-// 6. unimplement panic: 		panic caused by unimplemented syscall(label the syscall number parentheses) or unimplemented function
-// 7. timeout with pass: 		timeout but pass at least unit(Timeout means stuck for more than 1 min. When output say "timeout" we call it "skip")
-// 8. timeout no pass:			timeout and no pass units
-// 9. skip:				some how totally skipped
+// 6. all fail:			fail all units(maybe because timeout)
+// 7. defect panic: 			panicked with wrong implementation
+// 8. unimplement panic: 		panic caused by unimplemented syscall(label the syscall number parentheses) or unimplemented function
+// 9. timeout with pass: 		timeout but pass at least unit(Timeout means stuck for more than 1 min. When output say "timeout" we call it "skip")
+// 10. timeout no pass:			timeout and no pass units
 
 name			type		pass	fail+broken
 abort01			all pass		2	0
@@ -2779,18 +2778,18 @@ wait01			all pass		1	0
 wait02			all pass		1	0
 wait401			all fail		0	1
 wait402			all pass		1	0			
-wait403			unimplement panic	0	0	
-waitid01			unimplement panic(95)	0	6
-waitid02			unimplement panic(95)	0	1
-waitid03			unimplement panic(95)	0	1
-waitid04			unimplement panic(95)	1	1
-waitid05			unimplement panic(95)	1	5
-waitid06			unimplement panic(95)	1	5
-waitid07			unimplement panic(95)	0	5
-waitid08			unimplement panic(95)	0	10
-waitid09			unimplement panic(95)	0	1
+wait403			all pass		1	0	
+waitid01			part fail		4	1
+waitid02			all pass		1	0
+waitid03			all pass		1	0
+waitid04			all pass		2	0
+waitid05			part fail		5	1
+waitid06			all pass		6	0
+waitid07			part fail		3	3
+waitid08			part fail		3	3
+waitid09			all pass		1	0
 waitid10			all fail		0	1
-waitid11			unimplement panic(95)	0	6		
+waitid11			part fail		4	1		
 waitpid01			all pass		126	0
 waitpid03			all pass		2	0
 waitpid04			all pass		4	0

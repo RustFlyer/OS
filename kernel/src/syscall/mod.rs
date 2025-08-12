@@ -63,6 +63,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         GETTIMEOFDAY => sys_gettimeofday(args[0], args[1]).await,
         EXIT => sys_exit(args[0] as i32),
         EXIT_GROUP => sys_exit_group(args[0] as i32),
+        WAITID => sys_waitid(args[0] as i32, args[1] as i32, args[2], args[3] as i32).await,
         SCHED_YIELD => sys_sched_yield().await,
         WRITE => sys_write(args[0], args[1], args[2]).await,
         TIMES => sys_times(args[0]).await,
