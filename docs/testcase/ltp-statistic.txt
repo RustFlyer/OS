@@ -1,5 +1,6 @@
 // Statistic and classification of LTP testcases (on RISC-V musl)
-// Testcases are composed of units
+// newly passed testcases should be updated here, not in the rank files.
+// Testcases are composed of "units".
 // Classification rules:
 // 1. all pass:			pass all units
 // 2. skip pass:			at least one passed but some units stay not tested due to unimplement feature \
@@ -12,7 +13,7 @@
 // 6. unimplement panic: 		panic caused by unimplemented syscall(label the syscall number parentheses) or unimplemented function
 // 7. timeout with pass: 		timeout but pass at least unit(Timeout means stuck for more than 1 min. When output say "timeout" we call it "skip")
 // 8. timeout no pass:			timeout and no pass units
-// 9. skip:			some how totally skipped
+// 9. skip:				some how totally skipped
 
 name			type		pass	fail+broken
 abort01			all pass		2	0
@@ -1746,7 +1747,7 @@ route4-rmmod		skip		0	0
 route6-rmmod		skip		0	0
 rt_sigaction01		part fail		145	5
 rt_sigaction02		part fail		145	5	
-rt_sigaction03		part fail		5	145	
+rt_sigaction03		all pass		150	0	
 rt_sigprocmask01		skip		0	0
 rt_sigprocmask02		defect panic	0	0
 rt_sigqueueinfo01		unimplement panic(138)	0	0

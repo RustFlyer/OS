@@ -1,6 +1,6 @@
 use core::{iter, time::Duration};
 
-use config::{process::INIT_PROC_ID, vfs::OpenFlags};
+use config::{process::INIT_PROC_ID, sig, vfs::OpenFlags};
 use osfs::{
     fd_table::{FdFlags, FdInfo},
     simple::{dentry::SimpleDentry, file::SimpleFileFile, inode::SimpleInode},
@@ -488,6 +488,10 @@ pub fn sys_rt_sigaction(
         "[sys_rt_sigaction] tid {tid} signum: {signum:?}, new_sa: {new_sa:#x}, prev_sa: {prev_sa:#x}, sigsetsize: {sigsetsize:?}"
     );
 
+    if sigsetsize != size_of::<SigSet>() {
+        return Err(SysError::EINVAL);
+    }
+
     let addrspace = task.addr_space();
     let signum = Sig::from_i32(signum);
 
@@ -562,7 +566,9 @@ pub fn sys_rt_sigmask(
     let mask = task.sig_mask_mut();
     let addrspace = task.addr_space();
 
-    assert!(sigsetsize == 8);
+    if sigsetsize != size_of::<SigSet>() {
+        return Err(SysError::EINVAL);
+    }
 
     let mut input_mask = UserReadPtr::<SigSet>::new(input_mask, &addrspace);
     let mut prev_mask = UserWritePtr::<SigSet>::new(prev_mask, &addrspace);
