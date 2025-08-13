@@ -60,12 +60,8 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
 
         // too much log delay, cut up!
         logger::init();
-        // enable_log();
-        disable_log();
-        vm::trace_page_table_lookup(
-            mm::address::PhysPageNum::new(0),
-            mm::address::VirtAddr::new(0),
-        );
+        enable_log();
+        // disable_log();
 
         // println!("hart id: {}, dtb_addr: {:#x}", hart_id, dtb_addr);
 
@@ -168,9 +164,7 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         println!("device init");
 
         log::info!("hart {}: initialized driver", hart_id);
-        enable_log();
         osfs::init();
-        disable_log();
 
         log::info!("hart {}: initialized FS success", hart_id);
         println!("[FILE_SYSTEM] INIT SUCCESS");
@@ -180,8 +174,6 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         syscall::init_key();
 
         executor::init(hart_id);
-
-        task::init();
 
         println!("[USER_APP] INIT SUCCESS");
         println!("[HART {}] INIT SUCCESS", hart_id);
@@ -206,67 +198,13 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
     }
 
     // vfs::path::test_split_parent_and_name();
-    atomic_test();
     // hart::init(hart_id);
     log::info!("hart {}: running", hart_id);
     osfuture::block_on(async { test_serial_output().await });
-    block_test();
     println!("Begin to run shell..");
     enable_log();
+    task::init();
     loop {
         executor::task_run_always_alone(hart_id);
-    }
-}
-
-pub fn atomic_test() {
-    let val = AtomicBool::new(false);
-
-    let r = val.load(core::sync::atomic::Ordering::Relaxed);
-
-    if r {
-        println!("yes!");
-    } else {
-        println!("no!");
-    }
-
-    val.store(true, core::sync::atomic::Ordering::Relaxed);
-
-    let r = val.load(core::sync::atomic::Ordering::Relaxed);
-
-    if r {
-        println!("yes!");
-    } else {
-        println!("no!");
-    }
-
-    println!("expected: no!, yes!");
-
-    struct SP {
-        ab: AtomicBool,
-        op: Option<AtomicBool>,
-    }
-
-    fn return_atomicbool() -> SP {
-        println!("try return_atomicbool!");
-        SP {
-            ab: AtomicBool::new(false),
-            op: None,
-        }
-    }
-
-    let stupid = return_atomicbool();
-    let r = stupid.ab.load(core::sync::atomic::Ordering::Relaxed);
-    if r {
-        println!("yes!");
-    } else {
-        println!("no!");
-    }
-
-    let t = stupid.op;
-
-    if t.is_none() {
-        println!("yes!");
-    } else {
-        println!("no!");
     }
 }

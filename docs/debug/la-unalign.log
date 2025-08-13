@@ -1,0 +1,1920 @@
+[USER_APP] INIT SUCCESS
+[HART 0] INIT SUCCESS
+
+  _   _ _       _     _   _                    _     ____   _____
+ | \ | (_)     | |   | | | |                  | |   / __ \ / ____|
+ |  \| |_  __ _| |__ | |_| |__   __ ___      _| | _| |  | | (___
+ | . ` | |/ _` | '_ \| __| '_ \ / _` \ \ /\ / / |/ / |  | |\___ \
+ | |\  | | (_| | | | | |_| | | | (_| |\ V  V /|   <| |__| |____) |
+ |_| \_|_|\__, |_| |_|\__|_| |_|\__,_| \_/\_/ |_|\_\\____/|_____/
+           __/ |
+          |___/
+             NighthawkOS
+
+[ INFO][kernel/src/main.rs:204] hart 0: running
+Test Serial Output
+Begin to run shell..
+[DEBUG][kernel/src/logging.rs:66] Log Enable
+[DEBUG][kernel/src/task/future.rs:151] hart 0: run task [init_proc] in first time!
+--------Begin         --------
+reg0:              0x0
+reg1:              0x0
+reg2:              0x0
+reg3:     0x3ffffff000
+reg4:              0x0
+reg5:              0x0
+reg6:              0x0
+reg7:              0x0
+reg8:              0x0
+reg9:              0x0
+reg10:              0x0
+reg11:              0x0
+reg12:              0x0
+reg13:              0x0
+reg14:              0x0
+reg15:              0x0
+reg16:              0x0
+reg17:              0x0
+reg18:              0x0
+reg19:              0x0
+reg20:              0x0
+reg21:              0x0
+reg22:              0x0
+reg23:              0x0
+reg24:              0x0
+reg25:              0x0
+reg26:              0x0
+reg27:              0x0
+reg28:              0x0
+reg29:              0x0
+reg30:              0x0
+reg31:              0x0
+--------==============--------
+--------tid:1, cnt:0  --------
+reg0:              0x0
+reg1:              0x0
+reg2:              0x0
+reg3:     0x3ffffff000
+reg4:              0x0
+reg5:              0x0
+reg6:              0x0
+reg7:              0x0
+reg8:              0x0
+reg9:              0x0
+reg10:              0x0
+reg11:              0x0
+reg12:              0x0
+reg13:              0x0
+reg14:              0x0
+reg15:              0x0
+reg16:              0x0
+reg17:              0x0
+reg18:              0x0
+reg19:              0x0
+reg20:              0x0
+reg21:              0x0
+reg22:              0x0
+reg23:              0x0
+reg24:              0x0
+reg25:              0x0
+reg26:              0x0
+reg27:              0x0
+reg28:              0x0
+reg29:              0x0
+reg30:              0x0
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception F
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa3
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+--------tid:1, cnt:1  --------
+reg0:              0x0
+reg1:              0x0
+reg2:              0x0
+reg3:     0x3fffffef70
+reg4:              0x0
+reg5:              0x0
+reg6:              0x0
+reg7:              0x0
+reg8:              0x0
+reg9:              0x0
+reg10:              0x0
+reg11:              0x0
+reg12:              0x0
+reg13:              0x0
+reg14:              0x0
+reg15:              0x0
+reg16:              0x0
+reg17:              0x0
+reg18:              0x0
+reg19:              0x0
+reg20:              0x0
+reg21:              0x0
+reg22:              0x0
+reg23:              0x0
+reg24:              0x0
+reg25:              0x0
+reg26:              0x0
+reg27:              0x0
+reg28:              0x0
+reg29:              0x0
+reg30:              0x0
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception S
+--------tid:1, cnt:2  --------
+reg0:              0x0
+reg1:              0x0
+reg2:              0x0
+reg3:     0x3fffffef70
+reg4:              0x0
+reg5:              0x0
+reg6:          0x75358
+reg7:              0x1
+reg8:              0x0
+reg9:              0x0
+reg10:              0x0
+reg11:              0x0
+reg12:              0x0
+reg13:              0x0
+reg14:              0x0
+reg15:              0x0
+reg16:              0x0
+reg17:              0x0
+reg18:              0x0
+reg19:              0x0
+reg20:              0x0
+reg21:              0x0
+reg22:              0x0
+reg23:              0x0
+reg24:          0x75358
+reg25:              0x0
+reg26:              0x0
+reg27:              0x0
+reg28:              0x0
+reg29:              0x0
+reg30:              0x0
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception S
+--------tid:1, cnt:3  --------
+reg0:              0x0
+reg1:          0x2c164
+reg2:              0x0
+reg3:     0x3fffffef70
+reg4:          0x31ff8
+reg5:          0x32000
+reg6: 0xfffffffffffffff8
+reg7:              0x1
+reg8:              0x0
+reg9:              0x0
+reg10:              0x0
+reg11:              0x0
+reg12:              0x0
+reg13:              0x0
+reg14:              0x0
+reg15:              0x0
+reg16:              0x0
+reg17:              0x0
+reg18:              0x0
+reg19:              0x0
+reg20:              0x0
+reg21:              0x0
+reg22:              0x0
+reg23:              0x0
+reg24:          0x75358
+reg25:              0x0
+reg26:          0x43358
+reg27:          0x75350
+reg28:             0x1f
+reg29:       0x80000000
+reg30:              0x8
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception F
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa3
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+--------tid:1, cnt:4  --------
+reg0:              0x0
+reg1:          0x2c164
+reg2:              0x0
+reg3:     0x3fffffef70
+reg4:              0x8
+reg5:          0x75370
+reg6:              0x0
+reg7:              0x0
+reg8:              0x0
+reg9:              0x0
+reg10:              0x0
+reg11:              0x0
+reg12:              0x0
+reg13:              0x0
+reg14:              0x0
+reg15:              0x0
+reg16:              0x0
+reg17:              0x0
+reg18:              0x0
+reg19:              0x0
+reg20:              0x0
+reg21:              0x0
+reg22:              0x0
+reg23:              0x0
+reg24:          0x75358
+reg25:              0x0
+reg26:          0x43358
+reg27:          0x75350
+reg28:             0x1f
+reg29:       0x80000000
+reg30:              0x8
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception S
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa3
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+--------tid:1, cnt:5  --------
+reg0:              0x0
+reg1:          0x2c164
+reg2:              0x0
+reg3:     0x3fffffef70
+reg4:           0x4000
+reg5:          0x753c8
+reg6:              0x0
+reg7:              0x0
+reg8:              0x0
+reg9:              0x0
+reg10:              0x0
+reg11:              0x0
+reg12:              0x0
+reg13:              0x0
+reg14:              0x0
+reg15:              0x0
+reg16:              0x0
+reg17:              0x0
+reg18:              0x0
+reg19:              0x0
+reg20:              0x0
+reg21:              0x0
+reg22:              0x0
+reg23:              0x0
+reg24:          0x75358
+reg25:            0xca8
+reg26:          0x44000
+reg27:          0x75350
+reg28:             0x1f
+reg29:       0x80000000
+reg30:           0x4000
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception S
+--------tid:1, cnt:6  --------
+reg0:              0x0
+reg1:          0x2c164
+reg2:              0x0
+reg3:     0x3fffffef70
+reg4:           0x8000
+reg5:          0x753d0
+reg6:              0x0
+reg7:              0x0
+reg8:              0x0
+reg9:              0x0
+reg10:              0x0
+reg11:              0x0
+reg12:              0x0
+reg13:              0x0
+reg14:              0x0
+reg15:              0x0
+reg16:              0x0
+reg17:              0x0
+reg18:              0x0
+reg19:              0x0
+reg20:              0x0
+reg21:              0x0
+reg22:              0x0
+reg23:              0x0
+reg24:          0x75358
+reg25:           0x4ca8
+reg26:          0x48000
+reg27:          0x75350
+reg28:             0x1f
+reg29:       0x80000000
+reg30:           0x8000
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception S
+--------tid:1, cnt:7  --------
+reg0:              0x0
+reg1:          0x2c164
+reg2:              0x0
+reg3:     0x3fffffef70
+reg4:          0x10000
+reg5:          0x753d8
+reg6:              0x0
+reg7:              0x0
+reg8:              0x0
+reg9:              0x0
+reg10:              0x0
+reg11:              0x0
+reg12:              0x0
+reg13:              0x0
+reg14:              0x0
+reg15:              0x0
+reg16:              0x0
+reg17:              0x0
+reg18:              0x0
+reg19:              0x0
+reg20:              0x0
+reg21:              0x0
+reg22:              0x0
+reg23:              0x0
+reg24:          0x75358
+reg25:           0xcca8
+reg26:          0x50000
+reg27:          0x75350
+reg28:             0x1f
+reg29:       0x80000000
+reg30:          0x10000
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception S
+--------tid:1, cnt:8  --------
+reg0:              0x0
+reg1:          0x2c164
+reg2:              0x0
+reg3:     0x3fffffef70
+reg4:          0x10000
+reg5:          0x753d8
+reg6:              0x0
+reg7:          0x50000
+reg8:              0x0
+reg9:              0x0
+reg10:              0x0
+reg11:              0x0
+reg12:              0x0
+reg13:              0x0
+reg14:              0x0
+reg15:              0x0
+reg16:              0x0
+reg17:              0x0
+reg18:              0x0
+reg19:              0x0
+reg20:              0x0
+reg21:              0x0
+reg22:              0x0
+reg23:              0x0
+reg24:          0x75358
+reg25:          0x1cca8
+reg26:          0x60000
+reg27:          0x75350
+reg28:             0x1f
+reg29:       0x80000000
+reg30:          0x20000
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception S
+--------tid:1, cnt:9  --------
+reg0:              0x0
+reg1:          0x2c164
+reg2:              0x0
+reg3:     0x3fffffef70
+reg4:           0x4000
+reg5:          0x753c8
+reg6:              0x0
+reg7:          0x44000
+reg8:              0x0
+reg9:              0x0
+reg10:              0x0
+reg11:              0x0
+reg12:              0x0
+reg13:              0x0
+reg14:              0x0
+reg15:              0x0
+reg16:              0x0
+reg17:              0x0
+reg18:              0x0
+reg19:              0x0
+reg20:              0x0
+reg21:              0x0
+reg22:              0x0
+reg23:              0x0
+reg24:          0x75358
+reg25:          0x2cca8
+reg26:          0x70000
+reg27:          0x75350
+reg28:             0x1f
+reg29:       0x80000000
+reg30:          0x10000
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception S
+--------tid:1, cnt:10 --------
+reg0:              0x0
+reg1:          0x2c164
+reg2:              0x0
+reg3:     0x3fffffef70
+reg4:           0x1000
+reg5:          0x753b8
+reg6:              0x0
+reg7:              0x0
+reg8:              0x0
+reg9:              0x0
+reg10:              0x0
+reg11:              0x0
+reg12:              0x0
+reg13:              0x0
+reg14:              0x0
+reg15:              0x0
+reg16:              0x0
+reg17:              0x0
+reg18:              0x0
+reg19:              0x0
+reg20:              0x0
+reg21:              0x0
+reg22:              0x0
+reg23:              0x0
+reg24:          0x75358
+reg25:          0x30ca8
+reg26:          0x74000
+reg27:          0x75350
+reg28:             0x1f
+reg29:       0x80000000
+reg30:           0x4000
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception S
+--------tid:1, cnt:11 --------
+reg0:              0x0
+reg1:          0x2c2c4
+reg2:              0x0
+reg3:     0x3fffffef70
+reg4:              0x0
+reg5:              0x8
+reg6:              0x0
+reg7:              0x0
+reg8:              0x0
+reg9:              0x0
+reg10:              0x0
+reg11:              0x0
+reg12:              0x0
+reg13:              0x0
+reg14:              0x0
+reg15:              0x0
+reg16:              0x0
+reg17:              0x0
+reg18:              0x0
+reg19:              0x0
+reg20:              0x0
+reg21:              0x0
+reg22:              0x0
+reg23:              0x0
+reg24:          0x75358
+reg25:          0x31ff8
+reg26:          0x75350
+reg27:          0x75350
+reg28:             0x1f
+reg29:       0x80000000
+reg30:             0x40
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception F
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa3
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+--------tid:1, cnt:12 --------
+reg0:              0x0
+reg1:          0x24aa0
+reg2:              0x0
+reg3:     0x3fffffec80
+reg4:     0x3fffffed98
+reg5:              0x8
+reg6:              0x0
+reg7:              0x0
+reg8:              0x0
+reg9:              0x0
+reg10:              0x0
+reg11:              0x0
+reg12:              0x0
+reg13:              0x0
+reg14:              0x0
+reg15:              0x0
+reg16:              0x0
+reg17:              0x0
+reg18:              0x0
+reg19:              0x0
+reg20:              0x0
+reg21:              0x0
+reg22:              0x1
+reg23:              0x0
+reg24:          0x75358
+reg25:          0x31ff8
+reg26:          0x75350
+reg27:          0x75350
+reg28:             0x1f
+reg29:       0x80000000
+reg30:             0x40
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception F
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa3
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+--------tid:1, cnt:13 --------
+reg0:              0x0
+reg1:          0x2b840
+reg2:              0x0
+reg3:     0x3fffffec70
+reg4:     0x3fffffec77
+reg5:          0x12d28
+reg6:     0x3fffffed98
+reg7:              0x0
+reg8:              0x0
+reg9:              0x0
+reg10:              0x0
+reg11:              0x0
+reg12:              0x0
+reg13:              0x0
+reg14:              0x0
+reg15:              0x0
+reg16:              0x0
+reg17:              0x0
+reg18:              0x0
+reg19:              0x0
+reg20:              0x0
+reg21:              0x0
+reg22:              0x1
+reg23:              0x0
+reg24:          0x75358
+reg25:          0x31ff8
+reg26:          0x75350
+reg27:          0x75350
+reg28:             0x1f
+reg29:       0x80000000
+reg30:             0x40
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception F
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa3
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+--------tid:1, cnt:14 --------
+reg0:              0x0
+reg1:          0x2b840
+reg2:              0x0
+reg3:     0x3fffffebe0
+reg4:     0x3fffffec77
+reg5:          0x104f0
+reg6:          0x104f0
+reg7:              0x0
+reg8:          0x12d28
+reg9:              0x0
+reg10:              0x0
+reg11:              0x0
+reg12:              0x0
+reg13:              0x0
+reg14:              0x0
+reg15:              0x0
+reg16:              0x0
+reg17:              0x0
+reg18:              0x0
+reg19:              0x0
+reg20:              0x0
+reg21:              0x0
+reg22:     0x3fffffec70
+reg23:     0x3fffffed98
+reg24:              0x0
+reg25:          0x31ff8
+reg26:          0x75350
+reg27:          0x75350
+reg28:             0x1f
+reg29:       0x80000000
+reg30:             0x40
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception L
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa3
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+--------tid:1, cnt:15 --------
+reg0:              0x0
+reg1:          0x2b840
+reg2:              0x0
+reg3:     0x3fffffebe0
+reg4:     0x3fffffec77
+reg5:          0x104d8
+reg6:             0x12
+reg7:              0x0
+reg8:          0x12d28
+reg9:              0x0
+reg10:              0x0
+reg11:              0x0
+reg12:              0x0
+reg13:              0x0
+reg14:              0x0
+reg15:              0x0
+reg16:              0x0
+reg17:              0x0
+reg18:              0x0
+reg19:              0x0
+reg20:              0x0
+reg21:              0x0
+reg22:     0x3fffffec70
+reg23:     0x3fffffed98
+reg24:              0x0
+reg25:          0x31ff8
+reg26:          0x75350
+reg27:          0x75350
+reg28:             0x1f
+reg29:       0x80000000
+reg30:             0x40
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception L
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa3
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+--------tid:1, cnt:16 --------
+reg0:              0x0
+reg1:          0x2fbbc
+reg2:              0x0
+reg3:     0x3fffffebe0
+reg4:              0x1
+reg5:          0x104d8
+reg6:             0x12
+reg7:              0x0
+reg8:              0x0
+reg9:              0x0
+reg10:              0x0
+reg11:             0x40
+reg12:              0x0
+reg13:              0x0
+reg14:              0x0
+reg15:              0x0
+reg16:              0x0
+reg17:              0x0
+reg18:              0x0
+reg19:              0x0
+reg20:              0x0
+reg21:              0x0
+reg22:     0x3fffffec70
+reg23:     0x3fffffed98
+reg24:              0x0
+reg25:          0x31ff8
+reg26:          0x75350
+reg27:          0x75350
+reg28:             0x1f
+reg29:       0x80000000
+reg30:             0x40
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception S
+[DEBUG][kernel/src/syscall/mod.rs:56] task 1 call [write]
+[DEBUG][kernel/src/syscall/fs.rs:246] [sys_write] fd: 1, addr: 0x104d8, len: 0x12
+[ INFO][kernel/src/syscall/fs.rs:255] [sys_write] buf: [85, 83, 69, 82, 32, 83, 72, 69, 76, 76, 32,
+USER SHELL BEGIN!
+--------tid:1, cnt:17 --------
+reg0:              0x0
+reg1:          0x24aa0
+reg2:              0x0
+reg3:     0x3fffffec80
+reg4:              0x0
+reg5:              0x0
+reg6:              0x0
+reg7:              0x0
+reg8:              0x0
+reg9:              0x0
+reg10:              0x0
+reg11:             0xdc
+reg12:              0x0
+reg13:              0x0
+reg14:              0x0
+reg15:              0x0
+reg16:              0x0
+reg17:              0x0
+reg18:              0x0
+reg19:              0x0
+reg20:              0x0
+reg21:              0x0
+reg22:              0x1
+reg23:              0x0
+reg24:          0x75358
+reg25:          0x31ff8
+reg26:          0x75350
+reg27:          0x75350
+reg28:             0x1f
+reg29:       0x80000000
+reg30:             0x40
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception S
+[DEBUG][kernel/src/syscall/mod.rs:56] task 1 call [clone]
+[DEBUG][kernel/src/logging.rs:66] Log Enable
+[ INFO][kernel/src/syscall/process.rs:403] [sys_clone] flags:0x0, stack:0x0, tls:0x0, parent_tid:0x
+[ INFO][kernel/src/syscall/process.rs:410] [sys_clone] flags CloneFlags(0x0)
+[DEBUG][kernel/src/task/taskf.rs:220] new THREAD selected
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 4 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 6 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa3
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 6 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 7 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 0 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 0 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 0 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 0 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa6
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 0 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 0 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 0 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa3
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 7 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 8 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 6 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 7 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 6 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 8 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 6 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xe0
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 7 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa5
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 6 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[DEBUG][kernel/src/task/taskf.rs:254] new PARENT selected
+[DEBUG][kernel/src/task/taskf.rs:261] new SIG selected
+[DEBUG][kernel/src/task/taskf.rs:275] new ADDRSPACE selected
+[DEBUG][kernel/src/task/taskf.rs:280] try to cow_address_space
+[DEBUG][kernel/src/task/taskf.rs:282] new cow_address_space selected
+[DEBUG][kernel/src/vm/addr_space.rs:296] tick-2
+[DEBUG][kernel/src/vm/addr_space.rs:303] copy area: VmArea { start_va: 0x10000, end_va: 0x15000, fl: 2, map_type: FileBacked(FileBackedArea { file: "init", offset: 0 }) }
+[DEBUG][kernel/src/vm/addr_space.rs:305] copy narea: VmArea { start_va: 0x10000, end_va: 0x15000, fs: 2, map_type: FileBacked(FileBackedArea { file: "init", offset: 0 }) }
+[DEBUG][kernel/src/vm/addr_space.rs:307] end insert
+[DEBUG][kernel/src/vm/addr_space.rs:303] copy area: VmArea { start_va: 0x24000, end_va: 0x34000, fl 5, map_type: FileBacked(FileBackedArea { file: "init", offset: 16384 }) }
+[DEBUG][kernel/src/vm/addr_space.rs:305] copy narea: VmArea { start_va: 0x24000, end_va: 0x34000, f: 5, map_type: FileBacked(FileBackedArea { file: "init", offset: 16384 }) }
+[DEBUG][kernel/src/vm/addr_space.rs:307] end insert
+[DEBUG][kernel/src/vm/addr_space.rs:303] copy area: VmArea { start_va: 0x43000, end_va: 0x76000, flnum of pages: 8, map_type: FileBacked(FileBackedArea { file: "init", offset: 77824 }) }
+[DEBUG][kernel/src/vm/addr_space.rs:305] copy narea: VmArea { start_va: 0x43000, end_va: 0x76000, f num of pages: 8, map_type: FileBacked(FileBackedArea { file: "init", offset: 77824 }) }
+[DEBUG][kernel/src/vm/addr_space.rs:307] end insert
+[DEBUG][kernel/src/vm/addr_space.rs:303] copy area: VmArea { start_va: 0x76000, end_va: 0x176000, f num of pages: 0, map_type: Heap(AnonymousArea { mappings: None }) }
+[DEBUG][kernel/src/vm/addr_space.rs:305] copy narea: VmArea { start_va: 0x76000, end_va: 0x176000, , num of pages: 0, map_type: Heap(AnonymousArea { mappings: None }) }
+[DEBUG][kernel/src/vm/addr_space.rs:307] end insert
+[DEBUG][kernel/src/vm/addr_space.rs:303] copy area: VmArea { start_va: 0x3fff7ff000, end_va: 0x3fff| W | U), num of pages: 1, map_type: Anonymous(AnonymousArea { mappings: None }) }
+[DEBUG][kernel/src/vm/addr_space.rs:305] copy narea: VmArea { start_va: 0x3fff7ff000, end_va: 0x3ff | W | U), num of pages: 1, map_type: Anonymous(AnonymousArea { mappings: None }) }
+[DEBUG][kernel/src/vm/addr_space.rs:307] end insert
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 4 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 6 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa3
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 7 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 4 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 6 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[DEBUG][kernel/src/vm/addr_space.rs:332] finish clone_cow
+[DEBUG][kernel/src/task/taskf.rs:284] new cow_address_space
+[DEBUG][kernel/src/task/taskf.rs:288] new FDTABLE selected
+[DEBUG][kernel/src/task/taskf.rs:300] new clone created
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa6
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 0 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa6
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 0 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[DEBUG][kernel/src/task/task.rs:685] addchild: tid 2 -> tid 1
+[ INFO][kernel/src/task/process_manager.rs:48] tid: 2, pgid: 1
+[DEBUG][kernel/src/task/manager.rs:34] Add task 2
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 0 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 0 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 0 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[DEBUG][kernel/src/task/taskf.rs:346] clone return
+[ INFO][kernel/src/syscall/process.rs:415] [sys_clone] clone a new thread, tid 2, clone flags Clone
+[ INFO][kernel/src/syscall/process.rs:443] [sys_clone] who is your parent? 1
+[ INFO][kernel/src/syscall/process.rs:445] [sys_clone] clone success
+[DEBUG][kernel/src/task/future.rs:151] hart 0: run task [init_proc(fork)] in first time!
+--------Begin         --------
+reg0:              0x0
+reg1:          0x24aa0
+reg2:              0x0
+reg3:     0x3fffffec80
+reg4:              0x0
+reg5:              0x0
+reg6:              0x0
+reg7:              0x0
+reg8:              0x0
+reg9:              0x0
+reg10:              0x0
+reg11:             0xdc
+reg12:              0x0
+reg13:              0x0
+reg14:              0x0
+reg15:              0x0
+reg16:              0x0
+reg17:              0x0
+reg18:              0x0
+reg19:              0x0
+reg20:              0x0
+reg21:              0x0
+reg22:              0x1
+reg23:              0x0
+reg24:          0x75358
+reg25:          0x31ff8
+reg26:          0x75350
+reg27:          0x75350
+reg28:             0x1f
+reg29:       0x80000000
+reg30:             0x40
+reg31:              0x0
+--------==============--------
+--------tid:2, cnt:0  --------
+reg0:              0x0
+reg1:          0x24b08
+reg2:              0x0
+reg3:     0x3fffffec80
+reg4:              0x0
+reg5:              0x0
+reg6:              0x0
+reg7:              0x0
+reg8:              0x0
+reg9:              0x0
+reg10:              0x0
+reg11:             0xdc
+reg12:              0x0
+reg13:              0x0
+reg14:              0x0
+reg15:              0x0
+reg16:              0x0
+reg17:              0x0
+reg18:              0x0
+reg19:              0x0
+reg20:              0x0
+reg21:              0x0
+reg22:              0x1
+reg23:              0x0
+reg24:          0x75358
+reg25:          0x31ff8
+reg26:          0x75350
+reg27:          0x75350
+reg28:             0x1f
+reg29:       0x80000000
+reg30:             0x40
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception F
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa3
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+--------tid:1, cnt:18 --------
+reg0:              0x0
+reg1:          0x24aa0
+reg2:              0x0
+reg3:     0x3fffffec80
+reg4:              0x2
+reg5:              0x0
+reg6:              0x0
+reg7:              0x0
+reg8:              0x0
+reg9:              0x0
+reg10:              0x0
+reg11:             0xdc
+reg12:              0x0
+reg13:              0x0
+reg14:              0x0
+reg15:              0x0
+reg16:              0x0
+reg17:              0x0
+reg18:              0x0
+reg19:              0x0
+reg20:              0x0
+reg21:              0x0
+reg22:              0x1
+reg23:              0x0
+reg24:          0x75358
+reg25:          0x31ff8
+reg26:          0x75350
+reg27:          0x75350
+reg28:             0x1f
+reg29:       0x80000000
+reg30:             0x40
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception P
+--------tid:2, cnt:1  --------
+reg0:              0x0
+reg1:          0x24b08
+reg2:              0x0
+reg3:     0x3fffffec00
+reg4:              0x0
+reg5:              0x0
+reg6:              0x0
+reg7:              0x0
+reg8:              0x0
+reg9:              0x0
+reg10:              0x0
+reg11:             0xdc
+reg12:              0x0
+reg13:              0x0
+reg14:              0x0
+reg15:              0x0
+reg16:              0x0
+reg17:              0x0
+reg18:              0x0
+reg19:              0x0
+reg20:              0x0
+reg21:              0x0
+reg22:              0x1
+reg23:              0x0
+reg24:          0x75358
+reg25:          0x31ff8
+reg26:          0x75350
+reg27:          0x75350
+reg28:             0x1f
+reg29:       0x80000000
+reg30:             0x40
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception P
+--------tid:1, cnt:19 --------
+reg0:              0x0
+reg1:          0x24aa0
+reg2:              0x0
+reg3:     0x3fffffec80
+reg4: 0xffffffffffffffff
+reg5:     0x3fffffed98
+reg6:              0x0
+reg7:              0x0
+reg8:              0x0
+reg9:              0x0
+reg10:              0x0
+reg11:            0x104
+reg12: 0xffffffffffffffff
+reg13:              0x0
+reg14:              0x0
+reg15:              0x0
+reg16:              0x0
+reg17:              0x0
+reg18:              0x0
+reg19:              0x0
+reg20:              0x0
+reg21:              0x0
+reg22:              0x1
+reg23:              0x0
+reg24:          0x75358
+reg25:          0x31ff8
+reg26:          0x75350
+reg27:          0x75350
+reg28:             0x1f
+reg29:       0x80000000
+reg30:             0x40
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception S
+[DEBUG][kernel/src/syscall/mod.rs:56] task 1 call [wait4]
+[ INFO][kernel/src/syscall/process.rs:124] [sys_wait4] init_proc wait for recycling
+[ INFO][kernel/src/syscall/process.rs:132] [sys_wait4] target: AnyChild, option: WaitOptions(0x0),
+[DEBUG][kernel/src/task/task.rs:634] task1 state Running => Interruptible
+[ INFO][kernel/src/syscall/process.rs:246] [sys_wait4] task [init_proc] suspend for sigchld
+[DEBUG][/home/unix/file/OSkernel/myOS/OS/lib/osfuture/src/lib.rs:65] suspend
+--------tid:2, cnt:2  --------
+reg0:              0x0
+reg1:          0x24b08
+reg2:              0x0
+reg3:     0x3fffffec00
+reg4:              0x1
+reg5:          0x11110
+reg6:             0x10
+reg7:              0x0
+reg8:              0x0
+reg9:              0x0
+reg10:              0x0
+reg11:             0x40
+reg12:              0x0
+reg13:              0x0
+reg14:              0x0
+reg15:              0x0
+reg16:              0x0
+reg17:              0x0
+reg18:              0x0
+reg19:              0x0
+reg20:              0x0
+reg21:              0x0
+reg22:              0x1
+reg23:              0x0
+reg24:          0x75358
+reg25:          0x31ff8
+reg26:          0x75350
+reg27:          0x75350
+reg28:             0x1f
+reg29:       0x80000000
+reg30:             0x40
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception S
+[DEBUG][kernel/src/syscall/mod.rs:56] task 2 call [write]
+[DEBUG][kernel/src/syscall/fs.rs:246] [sys_write] fd: 1, addr: 0x11110, len: 0x10
+[ INFO][kernel/src/syscall/fs.rs:255] [sys_write] buf: [0, 0, 42, 0, 0, 0, 42, 0, 0, 0, 42, 0, 0, 0
+****--------tid:2, cnt:3  --------
+reg0:              0x0
+reg1:          0x24b08
+reg2:              0x0
+reg3:     0x3fffffec00
+reg4:              0x2
+reg5:              0x0
+reg6:              0x0
+reg7:              0x0
+reg8:              0x0
+reg9:              0x0
+reg10:              0x0
+reg11:             0x39
+reg12:              0x0
+reg13:              0x0
+reg14:              0x0
+reg15:              0x0
+reg16:              0x0
+reg17:              0x0
+reg18:              0x0
+reg19:              0x0
+reg20:              0x0
+reg21:              0x0
+reg22:              0x1
+reg23:              0x0
+reg24:          0x75358
+reg25:          0x31ff8
+reg26:          0x75350
+reg27:          0x75350
+reg28:             0x1f
+reg29:       0x80000000
+reg30:             0x40
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception S
+[DEBUG][kernel/src/syscall/mod.rs:56] task 2 call [close]
+[ INFO][kernel/src/syscall/fs.rs:485] [sys_close] fd: 0x2
+[DEBUG][lib/osfs/src/fd_table.rs:203] fd 2 remained: 2
+--------tid:2, cnt:4  --------
+reg0:              0x0
+reg1:          0x24b08
+reg2:              0x0
+reg3:     0x3fffffec00
+reg4:              0x1
+reg5:          0x112c1
+reg6:             0x13
+reg7:              0x0
+reg8:              0x0
+reg9:              0x0
+reg10:              0x0
+reg11:             0x40
+reg12:              0x0
+reg13:              0x0
+reg14:              0x0
+reg15:              0x0
+reg16:              0x0
+reg17:              0x0
+reg18:              0x0
+reg19:              0x0
+reg20:              0x0
+reg21:              0x0
+reg22:              0x1
+reg23:              0x0
+reg24:          0x75358
+reg25:          0x31ff8
+reg26:          0x75350
+reg27:          0x75350
+reg28:             0x1f
+reg29:       0x80000000
+reg30:             0x40
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception S
+[DEBUG][kernel/src/syscall/mod.rs:56] task 2 call [write]
+[DEBUG][kernel/src/syscall/fs.rs:246] [sys_write] fd: 1, addr: 0x112c1, len: 0x13
+[ INFO][kernel/src/syscall/fs.rs:255] [sys_write] buf: [0, 42, 0, 0, 0, 42, 0, 0, 0, 42, 0, 0, 0, 4
+*****--------tid:2, cnt:5  --------
+reg0:              0x0
+reg1:          0x268bc
+reg2:              0x0
+reg3:     0x3fffffec00
+reg4:     0x3fffffec48
+reg5:          0x10288
+reg6:              0x4
+reg7:              0x0
+reg8:              0x0
+reg9:              0x0
+reg10:              0x0
+reg11:             0x40
+reg12:              0x0
+reg13:              0x0
+reg14:              0x0
+reg15:              0x0
+reg16:              0x0
+reg17:              0x0
+reg18:              0x0
+reg19:              0x0
+reg20:              0x0
+reg21:              0x0
+reg22:              0x1
+reg23:              0x0
+reg24:          0x75358
+reg25:          0x31ff8
+reg26:          0x75350
+reg27:          0x75350
+reg28:             0x1f
+reg29:       0x80000000
+reg30:             0x40
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception F
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa3
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+--------tid:2, cnt:6  --------
+reg0:              0x0
+reg1:          0x2e484
+reg2:              0x0
+reg3:     0x3fffffeba0
+reg4:          0x75358
+reg5:              0x1
+reg6:              0x5
+reg7:              0x1
+reg8:          0x75358
+reg9:              0x0
+reg10:              0x0
+reg11:             0x40
+reg12:              0x0
+reg13:              0x0
+reg14:              0x0
+reg15:              0x0
+reg16:              0x0
+reg17:              0x0
+reg18:              0x0
+reg19:              0x0
+reg20:          0x2c854
+reg21:              0x0
+reg22:     0x3fffffec00
+reg23:     0x3fffffec48
+reg24:              0x5
+reg25:              0x4
+reg26:          0x10288
+reg27:          0x75350
+reg28:              0x1
+reg29:       0x80000000
+reg30:             0x40
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception P
+--------tid:2, cnt:7  --------
+reg0:              0x0
+reg1:          0x2e49c
+reg2:              0x0
+reg3:     0x3fffffeba0
+reg4:          0x43358
+reg5:          0x10288
+reg6:              0x4
+reg7:              0x0
+reg8:          0x75360
+reg9:              0x8
+reg10:              0x0
+reg11:          0x43358
+reg12: 0xffffffffffffffe3
+reg13:              0x4
+reg14:              0x0
+reg15:              0x0
+reg16:              0x0
+reg17:              0x0
+reg18:              0x0
+reg19:              0x0
+reg20:          0x2c854
+reg21:              0x0
+reg22:     0x3fffffec00
+reg23:     0x3fffffec48
+reg24:              0x5
+reg25:              0x4
+reg26:          0x10288
+reg27:          0x43358
+reg28:              0x1
+reg29:       0x80000000
+reg30:             0x40
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception F
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa3
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+--------tid:2, cnt:8  --------
+reg0:              0x0
+reg1:          0x2e49c
+reg2:              0x0
+reg3:     0x3fffffeb90
+reg4:          0x43358
+reg5:          0x10288
+reg6:              0x4
+reg7:          0x43358
+reg8:             0x6d
+reg9:              0x8
+reg10:              0x0
+reg11:          0x43358
+reg12: 0xffffffffffffffe3
+reg13:              0x4
+reg14:              0x0
+reg15:              0x0
+reg16:              0x0
+reg17:              0x0
+reg18:              0x0
+reg19:              0x0
+reg20:          0x2c854
+reg21:              0x0
+reg22:     0x3fffffeba0
+reg23:     0x3fffffec48
+reg24:              0x5
+reg25:              0x4
+reg26:          0x10288
+reg27:          0x43358
+reg28:              0x1
+reg29:       0x80000000
+reg30:             0x40
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception P
+--------tid:2, cnt:9  --------
+reg0:              0x0
+reg1:          0x268bc
+reg2:              0x0
+reg3:     0x3fffffec00
+reg4:          0x43358
+reg5:              0x0
+reg6:              0x0
+reg7:              0x0
+reg8:              0x0
+reg9:              0x0
+reg10:              0x0
+reg11:             0x31
+reg12:          0x43358
+reg13:              0x5
+reg14:              0x0
+reg15:              0x0
+reg16:              0x0
+reg17:              0x0
+reg18:              0x0
+reg19:              0x0
+reg20:          0x2c854
+reg21:              0x0
+reg22:              0x1
+reg23: 0x8000000000000000
+reg24:          0x75358
+reg25:          0x31ff8
+reg26:          0x75350
+reg27:          0x75350
+reg28:             0x1f
+reg29:       0x80000000
+reg30:             0x40
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception S
+[DEBUG][kernel/src/syscall/mod.rs:56] task 2 call [chdir]
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa3
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 6 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ INFO][kernel/src/syscall/fs.rs:612] [sys_chdir] path: musl
+[DEBUG][lib/vfs/src/dentry.rs:301] lookup: neg child musl
+[DEBUG][lib/vfs/src/dentry.rs:303] then lookup: neg child musl
+[ WARN][kernel/src/syscall/mod.rs:316] [syscall] CHDIR return err ENOENT
+--------tid:2, cnt:10 --------
+reg0:              0x0
+reg1:          0x2691c
+reg2:              0x0
+reg3:     0x3fffffec00
+reg4:          0x113b0
+reg5:              0x0
+reg6:              0x8
+reg7:              0x5
+reg8:          0x75378
+reg9:          0x75360
+reg10:              0x1
+reg11:             0x1e
+reg12:          0x43358
+reg13:              0x0
+reg14:              0x3
+reg15:              0x8
+reg16:          0x43350
+reg17:          0x75378
+reg18:              0x0
+reg19:              0x0
+reg20:          0x2c854
+reg21:              0x0
+reg22:              0x1
+reg23: 0x8000000000000000
+reg24:          0x75358
+reg25:          0x31ff8
+reg26:          0x75350
+reg27:          0x75350
+reg28:             0x1f
+reg29:       0x80000000
+reg30:             0x40
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception F
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa3
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+--------tid:2, cnt:11 --------
+reg0:              0x0
+reg1:          0x2fbbc
+reg2:              0x0
+reg3:     0x3fffffeb60
+reg4:              0x1
+reg5: 0x2a0000002a0000
+reg6: 0x2a0000002a0000
+reg7:              0x0
+reg8:              0x0
+reg9:              0x0
+reg10:              0x0
+reg11:             0x40
+reg12:          0x43358
+reg13:              0x0
+reg14:              0x3
+reg15:              0x8
+reg16:          0x43350
+reg17:          0x75378
+reg18:              0x0
+reg19:              0x0
+reg20:          0x2c854
+reg21:              0x0
+reg22:     0x3fffffebf0
+reg23:     0x3fffffec08
+reg24:              0x0
+reg25:          0x31ff8
+reg26:          0x75350
+reg27:          0x75350
+reg28:             0x1f
+reg29:       0x80000000
+reg30:             0x40
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception S
+[DEBUG][kernel/src/syscall/mod.rs:56] task 2 call [write]
+[DEBUG][kernel/src/syscall/fs.rs:246] [sys_write] fd: 1, addr: 0x2a0000002a0000, len: 0x2a0000002a0
+[ WARN][kernel/src/syscall/mod.rs:316] [syscall] WRITE return err EFAULT
+--------tid:2, cnt:12 --------
+reg0:              0x0
+reg1:          0x2fbbc
+reg2:              0x0
+reg3:     0x3fffffeb60
+reg4:              0x1
+reg5: 0x2a0000002a0000
+reg6: 0x2a0000002a0000
+reg7:              0x0
+reg8:              0x0
+reg9:              0x0
+reg10:              0x0
+reg11:             0x40
+reg12:          0x43358
+reg13:              0x0
+reg14:              0x3
+reg15:              0x8
+reg16:          0x43350
+reg17:          0x75378
+reg18:              0x0
+reg19:              0x0
+reg20:          0x2c854
+reg21:              0x0
+reg22:     0x3fffffebf0
+reg23:     0x3fffffec08
+reg24:              0x0
+reg25:          0x31ff8
+reg26:          0x75350
+reg27:          0x75350
+reg28:             0x1f
+reg29:       0x80000000
+reg30:             0x40
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception S
+[DEBUG][kernel/src/syscall/mod.rs:56] task 2 call [write]
+[DEBUG][kernel/src/syscall/fs.rs:246] [sys_write] fd: 1, addr: 0x2a0000002a0000, len: 0x2a0000002a0
+[ WARN][kernel/src/syscall/mod.rs:316] [syscall] WRITE return err EFAULT
+--------tid:2, cnt:13 --------
+reg0:              0x0
+reg1:          0x2c320
+reg2:              0x0
+reg3:     0x3fffffebb0
+reg4: 0xffffffffffffff9c
+reg5:          0x43358
+reg6:              0x0
+reg7:              0x0
+reg8:              0x0
+reg9:              0x0
+reg10:              0x0
+reg11:             0x22
+reg12:              0x5
+reg13:              0x4
+reg14:              0x3
+reg15:              0x8
+reg16:          0x43350
+reg17:          0x75378
+reg18:              0x0
+reg19:              0x0
+reg20:          0x2c854
+reg21:              0x0
+reg22:              0x1
+reg23:              0x8
+reg24:          0x75358
+reg25:          0x31ff8
+reg26:          0x75350
+reg27:          0x75350
+reg28:             0x1f
+reg29:       0x80000000
+reg30:             0x40
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception S
+[DEBUG][kernel/src/syscall/mod.rs:56] task 2 call [mkdirat]
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa3
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 6 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ INFO][kernel/src/syscall/fs.rs:563] [sys_mkdirat] dirfd: 18446744073709551516, path: /bin
+[ WARN][kernel/src/syscall/mod.rs:316] [syscall] MKDIRAT return err EEXIST
+--------tid:2, cnt:14 --------
+reg0:              0x0
+reg1:          0x27068
+reg2:              0x0
+reg3:     0x3fffffec00
+reg4:          0x11273
+reg5:             0x1b
+reg6:              0x8
+reg7:              0x5
+reg8:          0x75378
+reg9:          0x75360
+reg10:              0x1
+reg11:             0x1e
+reg12:          0x43358
+reg13:              0x0
+reg14:              0x3
+reg15:              0x8
+reg16:          0x43350
+reg17:          0x75378
+reg18:              0x0
+reg19:              0x0
+reg20:          0x2c854
+reg21:              0x0
+reg22:              0x1
+reg23:              0x8
+reg24:          0x75358
+reg25:          0x31ff8
+reg26:          0x75350
+reg27:          0x75350
+reg28:             0x1f
+reg29:       0x80000000
+reg30:             0x40
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception F
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa3
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+--------tid:2, cnt:15 --------
+reg0:              0x0
+reg1:          0x27068
+reg2:              0x0
+reg3:     0x3fffffebb0
+reg4:              0x0
+reg5:              0x0
+reg6:              0x0
+reg7:              0x0
+reg8:              0x0
+reg9:              0x0
+reg10:              0x0
+reg11:             0xdc
+reg12:             0x1b
+reg13:          0x11273
+reg14:              0x3
+reg15:              0x8
+reg16:          0x43350
+reg17:          0x75378
+reg18:              0x0
+reg19:              0x0
+reg20:          0x2c854
+reg21:              0x0
+reg22:              0x1
+reg23:              0x8
+reg24:          0x75358
+reg25:          0x31ff8
+reg26:          0x75350
+reg27:          0x75350
+reg28:             0x1f
+reg29:       0x80000000
+reg30:             0x40
+reg31:              0x0
+--------==============--------
+[TRACE][kernel/src/trap/trap_handler/user_trap_handler/loongarch64.rs:53] Handling user exception S
+[DEBUG][kernel/src/syscall/mod.rs:56] task 2 call [clone]
+[DEBUG][kernel/src/logging.rs:66] Log Enable
+[ INFO][kernel/src/syscall/process.rs:403] [sys_clone] flags:0x0, stack:0x0, tls:0x0, parent_tid:0x
+[ INFO][kernel/src/syscall/process.rs:410] [sys_clone] flags CloneFlags(0x0)
+[DEBUG][kernel/src/task/taskf.rs:220] new THREAD selected
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 4 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 6 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa3
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 6 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 7 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 0 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 0 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 0 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 0 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa6
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 0 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 0 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 0 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa3
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 7 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 8 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 6 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 7 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 6 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 5 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 8 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 6 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xe0
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 7 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:211] ---------------------
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:212] Unaligned Access PC @
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:218] opcode_reg2i12: 0xa5
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:443] Unaligned rd: 6 inst:
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:450] ---------------------
+[DEBUG][kernel/src/task/taskf.rs:254] new PARENT selected
+[DEBUG][kernel/src/task/taskf.rs:261] new SIG selected
+[DEBUG][kernel/src/task/taskf.rs:275] new ADDRSPACE selected
+[DEBUG][kernel/src/task/taskf.rs:280] try to cow_address_space
+[DEBUG][kernel/src/task/taskf.rs:282] new cow_address_space selected
+[DEBUG][kernel/src/vm/addr_space.rs:296] tick-2
+[DEBUG][kernel/src/vm/addr_space.rs:303] copy area: VmArea { start_va: 0x10000, end_va: 0x15000, fl: 3, map_type: FileBacked(FileBackedArea { file: "init", offset: 0 }) }
+[ERROR][kernel/src/vm/page_table.rs:565] Level 2: page table at 0xa5542000, entry at offset 0x4 * 6
+    ppn: 0x0,
+    flags: PteFlags(
+        0x0,
+    ),
+}
+[ERROR][kernel/src/vm/page_table.rs:565] Level 1: page table at 0x0, entry at offset 0x0 * 64 = 0x0
+    ppn: 0x0,
+    flags: PteFlags(
+        0x0,
+    ),
+}
+[ERROR][kernel/src/vm/page_table.rs:565] Level 0: page table at 0x0, entry at offset 0x0 * 64 = 0x0
+    ppn: 0x0,
+    flags: PteFlags(
+        0x0,
+    ),
+}
+[ERROR][kernel/src/trap/trap_handler/kernel_trap_handler/loongarch64.rs:79] [kernel] panicked: caus100000000, pgdl = 0xa5542000, pgdh = 0x0
+PanicInfo { message: [kernel] panicked: cause = Exception(StorePageFault), bad instruction at 0x900ation { file: "kernel/src/trap/trap_handler/kernel_trap_handler/loongarch64.rs", line: 80, col: 5 }
+[ INFO][lib/arch/src/hart/loongarch64.rs:16] Shutting down whole system

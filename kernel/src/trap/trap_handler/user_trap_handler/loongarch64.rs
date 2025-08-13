@@ -71,6 +71,7 @@ pub fn user_exception_handler(task: &Task, e: Exception, badv: Badv, era: Era) {
             let addr_space = task.addr_space();
             let fault_addr = VirtAddr::new(badv.vaddr());
             let inst_addr = era.pc();
+
             match addr_space.handle_page_fault(fault_addr, access) {
                 Ok(()) => {
                     // Fill the TLB if the page fault is resolved successfully.
@@ -85,15 +86,6 @@ pub fn user_exception_handler(task: &Task, e: Exception, badv: Badv, era: Era) {
                     tlb_fill(pte0, pte1);
                 }
                 Err(e) => {
-                    // unaligned?
-                    // let trap_context = task.trap_context_mut();
-                    // let mut kernel_trap_context = KernelTrapContext::from_tc(trap_context);
-                    // unsafe {
-                    //     crate::trap::trap_handler::unaligned_la::emulate_load_store_insn(
-                    //         &mut kernel_trap_context,
-                    //     );
-                    //     return;
-                    // }
                     log::error!(
                         "[user_exception_handler] tid: {}, unsolved page fault at {:#x}, \
                     access: {:?}, error: {:?}, bad instruction at {:#x}",

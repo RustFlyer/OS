@@ -157,9 +157,18 @@ pub async fn task_executor_unit(task: Arc<Task>) {
     task.init_before_running();
     set_nx_timer_irq();
 
+    // task.trap_context_mut().print_regs(Some("Begin"));
+
     loop {
+        tlb_flush_all();
         // trap_return connects user and kernel.
         trap::trap_return(&task);
+
+        // let cnt = task.debug_buf.load(core::sync::atomic::Ordering::Relaxed);
+        // task.trap_context_mut()
+        //     .print_regs(Some(&format!("tid:{}, cnt:{}", task.tid(), cnt)));
+        // task.debug_buf
+        //     .store(cnt + 1, core::sync::atomic::Ordering::Relaxed);
 
         match task.get_state() {
             TaskState::Zombie => break,

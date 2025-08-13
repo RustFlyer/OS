@@ -1,0 +1,82 @@
+USER SHELL BEGIN!
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x90000000802458ec bad addr: 0x9000000080ceee0f
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 4 inst: 0x29c000e4, value: 0x0
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x90000000802458f8 bad addr: 0x9000000080ceee07
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 5 inst: 0x29c00085, value: 0x0
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x9000000080245904 bad addr: 0x9000000080ceedff
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 6 inst: 0x29c00086, value: 0x0
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x9000000080245954 bad addr: 0x9000000085527211
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 5 inst: 0x29c04485, value: 0x2
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x9000000080245960 bad addr: 0x9000000080ceee0f
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 5 inst: 0x28c000a5, value: 0x9000000080ceee0f
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x9000000080245964 bad addr: 0x9000000085527219
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 6 inst: 0x29c06486, value: 0x0
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x9000000080245968 bad addr: 0x9000000085527221
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 7 inst: 0x29c08487, value: 0x0
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x9000000080245bf0 bad addr: 0x9000000080cee5a4
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 0 inst: 0x29cc1060, value: 0x0
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x9000000080245bf4 bad addr: 0x9000000080cee59c
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 0 inst: 0x29cbf060, value: 0x0
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x9000000080245bf8 bad addr: 0x9000000080cee584
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 0 inst: 0x29cb9060, value: 0x0
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x9000000080245bfc bad addr: 0x9000000080cee58c
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 0 inst: 0x29cbb060, value: 0x0
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x9000000080245c0c bad addr: 0x9000000080ceee0f
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 0 inst: 0x29800080, value: 0x0
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x9000000080245c18 bad addr: 0x9000000080ceee07
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 0 inst: 0x29c00080, value: 0x0
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x9000000080245c24 bad addr: 0x9000000080ceedff
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 0 inst: 0x29c00080, value: 0x0
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x9000000080245c84 bad addr: 0x9000000080ceee0f
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 7 inst: 0x28c000e7, value: 0x9000000080ceee0f
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x9000000080245c88 bad addr: 0x9000000085527311
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 8 inst: 0x29c04488, value: 0x2
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x9000000080245c8c bad addr: 0x9000000085527319
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 5 inst: 0x29c06485, value: 0x0
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x9000000080245c90 bad addr: 0x9000000085527321
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 6 inst: 0x29c08486, value: 0x0
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x9000000080245cac bad addr: 0x900000008552733c
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 7 inst: 0x29c0f087, value: 0x0
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x9000000080245cb0 bad addr: 0x9000000085527344
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 5 inst: 0x29c11085, value: 0x0
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x9000000080245cb8 bad addr: 0x900000008552734c
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 6 inst: 0x29c13086, value: 0x0
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x9000000080245cc4 bad addr: 0x9000000085527364
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 5 inst: 0x29c19085, value: 0x4
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x9000000080245cd8 bad addr: 0x900000008552736c
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 8 inst: 0x29c1b088, value: 0x0
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x9000000080245cdc bad addr: 0x9000000085527374
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 6 inst: 0x29c1d086, value: 0x0
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x9000000080245d14 bad addr: 0x90000000855272c9
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 7 inst: 0x38181487, value: 0x726f6628
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x9000000080245d18 bad addr: 0x90000000855272cd
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 6 inst: 0x29401106, value: 0x296b
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x90000000802b5d9c bad addr: 0x9000000080cee1d7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 4 inst: 0x29c51c64, value: 0x5
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x90000000802b5da0 bad addr: 0x9000000080cee1cf
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 5 inst: 0x29c4fc65, value: 0x0
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x90000000802b5da4 bad addr: 0x9000000080cee1c7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 6 inst: 0x29c4dc66, value: 0x9000000085527800
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x90000000802b5dc8 bad addr: 0x9000000080cee1d7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 7 inst: 0x28c51c67, value: 0x1
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x90000000802b5dcc bad addr: 0x9000000080cee5b1
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 4 inst: 0x29c006e4, value: 0xa553801d
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x90000000802b5dd0 bad addr: 0x9000000080cee5b9
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 5 inst: 0x29c026e5, value: 0x90000000855278
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x90000000802b5dd4 bad addr: 0x9000000080cee5c1
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 6 inst: 0x29c046e6, value: 0x500000000000000
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x900000008024655c bad addr: 0x9000000085531c09
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 0 inst: 0x29902700, value: 0x0
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x9000000080246560 bad addr: 0x9000000085531c06
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 0 inst: 0x29901b00, value: 0x0
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x9000000080333e94 bad addr: 0x90000000855315d5
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 0 inst: 0x29c35700, value: 0x0
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x9000000080334058 bad addr: 0x90000000855317d5
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 0 inst: 0x29c356e0, value: 0x0
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x9000000080334210 bad addr: 0x90000000855321d5
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 0 inst: 0x29c356e0, value: 0x0
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x90000000802d9754 bad addr: 0x9000000080cefddc
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 5 inst: 0x28c0f065, value: 0x1
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x90000000802d97f8 bad addr: 0x9000000080cefe44
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:209] Unaligned rd: 5 inst: 0x29c012e5, value: 0xa550dca080cefdb8
+*********[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:201] Unaligned Access PC @ 0x90000000802d9754 bad addr: 0x9000000080cefddc

@@ -286,14 +286,9 @@ pub fn riscv_init() {
     enable_err();
 }
 
+// #[inline(always)]
 #[allow(unused)]
 pub fn loongarch_init() {
-    let buf = "loongarch_init!";
-    if buf.contains("no") {
-        print!("test");
-    }
-    // println!("{}", buf);
-
     println!("loongarch_init!");
     disable_err();
     println!("DISABLE ERR OUPUT!");
@@ -304,6 +299,7 @@ pub fn loongarch_init() {
         mkdir("/bin");
         run_cmd("./busybox --install -s /bin");
         enable_usrlog();
+        // panic!("stop");
         return;
     }
 

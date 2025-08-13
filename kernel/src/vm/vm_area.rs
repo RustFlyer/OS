@@ -59,7 +59,7 @@ use super::page_table::PageTable;
 /// A VMA is a contiguous, page-aligned region of virtual memory in an address
 /// space that has a common set of attributes, such as permissions and mapping type.
 #[derive(Clone)]
-#[repr(C)]
+#[repr(C, align(8))]
 pub struct VmArea {
     /// Starting virtual address, page-aligned.
     start: VirtAddr,
@@ -973,6 +973,18 @@ impl FileBackedArea {
         let file_offset = offset + area_offset;
         let cached_page = block_on(async { file.read_page(file_offset).await })?;
 
+        if fault_addr.to_usize() >= 0x10000 && fault_addr.to_usize() < 0x15000 {
+            // let offset = fault_addr.to_usize() % PAGE_SIZE;
+            let slice = &cached_page.as_slice()[..PAGE_SIZE];
+            log::error!("addr: {:#x}, page: {:?}", fault_addr.to_usize(), slice);
+            log::error!("where page in: {:#x}", Arc::as_ptr(&cached_page) as usize);
+
+            let cached_page = block_on(async { file.read_page(0x11000).await })?;
+            let slice = &cached_page.as_slice()[..PAGE_SIZE];
+            log::error!("addr: 0x11000, page: {:?}", slice);
+            log::error!("where page in: {:#x}", Arc::as_ptr(&cached_page) as usize);
+        }
+
         if area_offset + PAGE_SIZE > region_len {
             // Part of the page is in the file region, and part of the page is not.
             // We allocate a new page and copy the first part of the page from the
@@ -1009,8 +1021,10 @@ impl FileBackedArea {
             }
             cached_page
         };
+
         page_table.map_page_to(fault_addr.page_number(), page.ppn(), pte_flags)?;
         area.pages.insert(fault_addr.page_number(), page);
+
         Ok(())
     }
 

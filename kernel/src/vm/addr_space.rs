@@ -293,7 +293,6 @@ impl AddrSpace {
     /// one of them writes to a shared page, the page is copied and the writer gets a
     /// new physical page elsewhere.
     pub fn clone_cow(&self, new_space: &mut AddrSpace) -> SysResult<()> {
-        log::debug!("tick-2");
         let _ = self.change_prot(VirtAddr::new(0x181928001), 0x1000, MappingFlags::RWX);
 
         let lock = self.vm_areas.lock();
@@ -303,6 +302,7 @@ impl AddrSpace {
             log::debug!("copy area: {:?}", area);
             let narea = area.clone();
             log::debug!("copy narea: {:?}", narea);
+
             new_vm_areas.insert(*va, narea);
             log::debug!("end insert");
         }
@@ -333,6 +333,25 @@ impl AddrSpace {
         // Because the permission of PTEs is downgraded, we need to do a TLB shootdown.
         fence();
         tlb_shootdown_all();
+
+        // this makes init_proc work, maybe cache?
+        {
+            let mut lock = new_space.vm_areas.lock();
+            for (_va, area) in &mut (*lock) {
+                if area.end_va().to_usize() == 0x15000 {
+                    if area
+                        .handle_page_fault(PageFaultInfo {
+                            fault_addr: VirtAddr::new(0x11110),
+                            page_table: &new_space.page_table,
+                            access: MappingFlags::R,
+                        })
+                        .is_err()
+                    {
+                        log::error!("fail to get narea info");
+                    }
+                }
+            }
+        }
 
         Ok(())
     }

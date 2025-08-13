@@ -1,3 +1,4 @@
+use driver::{print, println};
 #[cfg(target_arch = "loongarch64")]
 use loongArch64::register::{CpuMode, prmd};
 #[cfg(target_arch = "riscv64")]
@@ -308,6 +309,20 @@ impl TrapContext {
         {
             self.user_reg[4] = self.last_a0;
         }
+    }
+
+    pub fn print_regs(&self, exargs: Option<&str>) {
+        let str = if exargs.is_some() {
+            exargs.unwrap()
+        } else {
+            ""
+        };
+        print!("--------{:14}--------\n", str);
+        self.user_reg
+            .iter()
+            .enumerate()
+            .for_each(|(id, u)| println!("reg{}: {:#16x}", id, u));
+        print!("--------==============--------\n");
     }
 }
 

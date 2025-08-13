@@ -74,6 +74,7 @@ pub fn init_proc_by_insert_simple() {
     file.set_flags(OpenFlags::O_RDWR);
 
     let initproc_u8 = get_app_data_by_name("init_proc").unwrap();
+    // log::error!("initproc_u8: {:?}", initproc_u8);
     block_on(async { file.into_dyn_ref().write(initproc_u8).await.unwrap() });
     file.seek(config::vfs::SeekFrom::Start(0)).unwrap();
 

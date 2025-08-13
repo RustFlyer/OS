@@ -198,20 +198,9 @@ pub unsafe fn emulate_load_store_insn(pt_regs: &mut KernelTrapContext) {
     // Get the bad address that caused the unaligned access
     addr = badv::read().vaddr() as u64;
 
-    // log::warn!(
-    //     "Unaligned Access PC @ {:#x} bad addr: {:#x}",
-    //     pt_regs.sepc,
-    //     addr
-    // );
-
     // Extract destination register
     rd = (insn & 0x1f) as usize;
-    log::debug!(
-        "Unaligned rd: {} inst: {:#x}, value: {:#x}",
-        rd,
-        insn,
-        pt_regs.user_reg[rd]
-    );
+    let log_value = pt_regs.user_reg[rd];
 
     assert!(rd != 3, "sp cannot be handled!");
 
@@ -219,6 +208,19 @@ pub unsafe fn emulate_load_store_insn(pt_regs: &mut KernelTrapContext) {
     let opcode_reg2i12 = (insn >> 22) & 0x3ff;
     let opcode_reg2i14 = (insn >> 24) & 0xff;
     let opcode_reg3 = (insn >> 15) & 0x7fff;
+    log::warn!("-----------------------------------------");
+    log::warn!(
+        "Unaligned Access PC @ {:#x} bad addr: {:#x}",
+        pt_regs.sepc,
+        addr
+    );
+
+    log::warn!(
+        "opcode_reg2i12: {:#x} opcode_reg2i14: {:#x} opcode_reg3: {:#x}",
+        opcode_reg2i12,
+        opcode_reg2i14,
+        opcode_reg3
+    );
 
     // Handle different instruction types
     match opcode_reg2i12 {
@@ -234,7 +236,7 @@ pub unsafe fn emulate_load_store_insn(pt_regs: &mut KernelTrapContext) {
             if res < 0 {
                 panic!("Address Error @ {:#x}", addr);
             }
-            pt_regs.user_reg[rd] = ((value as i32) as i64) as usize;
+            pt_regs.user_reg[rd] = (((value & 0xffffffff) as i32) as i64) as usize;
         }
         LDWU_OP => {
             res = unaligned_read(addr, &mut value, 4, 0);
@@ -248,7 +250,7 @@ pub unsafe fn emulate_load_store_insn(pt_regs: &mut KernelTrapContext) {
             if res < 0 {
                 panic!("Address Error @ {:#x}", addr);
             }
-            pt_regs.user_reg[rd] = ((value as i16) as i64) as usize;
+            pt_regs.user_reg[rd] = (((value & 0xffff) as i16) as i64) as usize;
         }
         LDHU_OP => {
             res = unaligned_read(addr, &mut value, 2, 0);
@@ -355,7 +357,7 @@ pub unsafe fn emulate_load_store_insn(pt_regs: &mut KernelTrapContext) {
                             if res < 0 {
                                 panic!("Address Error @ {:#x}", addr);
                             }
-                            pt_regs.user_reg[rd] = ((value as i32) as i64) as usize;
+                            pt_regs.user_reg[rd] = (((value & 0xffffffff) as i32) as i64) as usize;
                         }
                         LDXWU_OP => {
                             res = unaligned_read(addr, &mut value, 4, 0);
@@ -369,7 +371,7 @@ pub unsafe fn emulate_load_store_insn(pt_regs: &mut KernelTrapContext) {
                             if res < 0 {
                                 panic!("Address Error @ {:#x}", addr);
                             }
-                            pt_regs.user_reg[rd] = ((value as i16) as i64) as usize;
+                            pt_regs.user_reg[rd] = (((value & 0xffff) as i16) as i64) as usize;
                         }
                         LDXHU_OP => {
                             res = unaligned_read(addr, &mut value, 2, 0);
@@ -438,6 +440,14 @@ pub unsafe fn emulate_load_store_insn(pt_regs: &mut KernelTrapContext) {
             }
         }
     }
+    log::warn!(
+        "Unaligned rd: {} inst: {:#x}, reg[rd]: {:#x} -> {:#x}",
+        rd,
+        insn,
+        log_value,
+        pt_regs.user_reg[rd]
+    );
+    log::warn!("-----------------------------------------");
 
     // Memory barrier to ensure all memory operations complete
     arch::mm::fence();

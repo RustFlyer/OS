@@ -191,7 +191,7 @@ pub struct Task {
 
     perm: ShareMutex<TaskPerm>,
 
-    debug_buf: [u8; 128],
+    pub debug_buf: AtomicU32,
     // name, used for debug
     name: SyncUnsafeCell<String>,
 }
@@ -288,7 +288,7 @@ impl Task {
             timers: new_share_mutex(Vec::new()),
 
             perm: new_share_mutex(perm),
-            debug_buf: [0u8; 128],
+            debug_buf: AtomicU32::new(0),
             name: SyncUnsafeCell::new(name),
         };
 
@@ -387,7 +387,7 @@ impl Task {
             cpus_on,
             timers: new_share_mutex(Vec::new()),
             perm,
-            debug_buf: [0u8; 128],
+            debug_buf: AtomicU32::new(0),
 
             name,
         }
