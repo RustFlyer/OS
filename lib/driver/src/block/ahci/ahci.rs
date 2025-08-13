@@ -115,42 +115,43 @@ impl BlockDevice for AHCI {
 
     fn read(&self, block_id: usize, buf: &mut [u8]) {
         assert!(buf.len() == BLOCK_SIZE);
+        let fsblocksize = BLOCK_SIZE;
 
         let dev = self.device.lock();
         let sector_size = dev.blk_dev.blksz as usize;
 
-        let sectors_needed = (BLOCK_SIZE + sector_size - 1) / sector_size;
-        let start_sector = (block_id * BLOCK_SIZE) / sector_size;
+        let sectors_needed = (fsblocksize + sector_size - 1) / sector_size;
+        let start_sector = (block_id * fsblocksize) / sector_size;
 
+        log::warn!(
+            "read sector_size: {sector_size:#x}, sectors_needed: {sectors_needed:#x}, start_sector: {start_sector:#x}, block_id: {block_id:#x}"
+        );
         let result = ahci_sata_read_common(
             &*dev,
             start_sector as u64,
             sectors_needed as u32,
             buf.as_mut_ptr(),
         );
-
-        if result != 0 {
-            panic!("AHCI read failed with error code: {}", result);
-        }
     }
 
     fn write(&self, block_id: usize, buf: &[u8]) {
         assert!(buf.len() == BLOCK_SIZE);
+        let fsblocksize = BLOCK_SIZE;
+
         let dev = self.device.lock();
         let sector_size = dev.blk_dev.blksz as usize;
 
-        let sectors_needed = (BLOCK_SIZE + sector_size - 1) / sector_size;
-        let start_sector = (block_id * BLOCK_SIZE) / sector_size;
+        let sectors_needed = (fsblocksize + sector_size - 1) / sector_size;
+        let start_sector = (block_id * fsblocksize) / sector_size;
 
+        // log::debug!(
+        //     "write sector_size: {sector_size:#x}, sectors_needed: {sectors_needed:#x}, start_sector: {start_sector:#x}, block_id: {block_id:#x}"
+        // );
         let result = ahci_sata_write_common(
             &*dev,
             start_sector as u64,
             sectors_needed as u32,
             buf.as_ptr() as *mut u8,
         );
-
-        if result != 0 {
-            panic!("AHCI write failed with error code: {}", result);
-        }
     }
 }

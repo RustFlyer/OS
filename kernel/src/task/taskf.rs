@@ -150,13 +150,23 @@ impl Task {
         log::debug!("[spawn_from_elf] entry: {:#x}", entry_point.to_usize());
         let stack = addrspace.map_stack().unwrap();
         addrspace.map_heap().unwrap();
-        let task = Arc::new(Task::new(
+        log::debug!("[spawn_from_elf] before created");
+        let _task = Task::new(
             entry_point.to_usize(),
             stack.to_usize(),
             addrspace,
             elf_file,
             name.to_string(),
-        ));
+        );
+        log::debug!(
+            "create a new task, name: {name}, ptr: {:#x}",
+            core::ptr::addr_of!(_task) as usize
+        );
+        log::debug!("task: {:?}", _task);
+        let task = Arc::new(_task);
+        log::debug!("create a new arc, ptr: {:#x}", Arc::as_ptr(&task) as usize);
+        log::debug!("another ptr: {:#x}", core::ptr::addr_of!(task) as usize);
+        log::debug!("task.is_syscall(): {:?}", task.is_syscall());
         task.with_thread_group(|tg| tg.push(task.clone()));
         PROCESS_GROUP_MANAGER.add_group(&task);
         TASK_MANAGER.add_task(&task);
@@ -207,6 +217,7 @@ impl Task {
             vfork_parent = Some(Arc::downgrade(self));
         }
 
+        log::debug!("new THREAD selected");
         if cloneflags.contains(CloneFlags::THREAD) {
             is_process = false;
             children = (*self.children_mut()).clone();
@@ -240,12 +251,14 @@ impl Task {
             name += "(fork)";
         }
 
+        log::debug!("new PARENT selected");
         if cloneflags.contains(CloneFlags::PARENT) {
             if let Some(grandparent) = (*self.parent_mut().lock()).clone() {
                 parent = new_share_mutex(Some(grandparent));
             }
         }
 
+        log::debug!("new SIG selected");
         let sig_mask = SyncUnsafeCell::new(self.get_sig_mask());
         let sig_handlers = if cloneflags.contains(CloneFlags::SIGHAND) {
             self.sig_handlers_mut().clone()
@@ -259,13 +272,20 @@ impl Task {
 
         let caps = SyncUnsafeCell::new(self.capability().clone());
 
-        let addr_space = if cloneflags.contains(CloneFlags::VM) {
-            self.addr_space()
+        log::debug!("new ADDRSPACE selected");
+        let addr_space;
+        if cloneflags.contains(CloneFlags::VM) {
+            addr_space = self.addr_space()
         } else {
-            let cow_address_space = self.addr_space().clone_cow().unwrap();
-            Arc::new(cow_address_space)
+            log::debug!("try to cow_address_space");
+            let mut cow_address_space = AddrSpace::build_user().unwrap();
+            log::debug!("new cow_address_space selected");
+            self.addr_space().clone_cow(&mut cow_address_space).unwrap();
+            log::debug!("new cow_address_space");
+            addr_space = Arc::new(cow_address_space)
         };
 
+        log::debug!("new FDTABLE selected");
         let fd_table = if cloneflags.contains(CloneFlags::FILES) {
             self.fdtable_mut().clone()
         } else {
@@ -276,6 +296,8 @@ impl Task {
 
         let cpus_on = *self.cpus_on_mut();
         let name = SyncUnsafeCell::new(name);
+
+        log::debug!("new clone created");
         let new = Arc::new(Self::new_fork_clone(
             tid,
             process,
@@ -321,6 +343,7 @@ impl Task {
         TASK_MANAGER.add_task(&new);
         create_thread_stat_file(new.tid());
 
+        log::debug!("clone return");
         new
     }
 

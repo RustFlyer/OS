@@ -11,6 +11,7 @@ use super::Task;
 const PKEY_DISABLE_ACCESS: u32 = 0x1; // Disable all access
 const PKEY_DISABLE_WRITE: u32 = 0x2; // Disable write access
 
+#[derive(Debug)]
 pub struct PKeyTable {
     count: VecIdAllocator,
     records: BTreeMap<usize, u32>,

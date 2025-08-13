@@ -29,7 +29,7 @@ pub mod ltprun {
 
         for test in TESTCASES {
             let cmd = format!("ltp/testcases/bin/{}", test);
-            run_cmd(&cmd);
+            let _ = run_cmd(&cmd);
         }
     }
 }

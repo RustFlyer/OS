@@ -84,6 +84,7 @@ impl Debug for PhysAddr {
 /// A virtual address is a 39-bit integer representing a location in virtual
 /// memory. The upper 25 bits of the address must be the same as bit 38.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(C, align(8))]
 pub struct VirtAddr {
     addr: usize,
 }

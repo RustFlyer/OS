@@ -243,7 +243,7 @@ pub async fn sys_openat(dirfd: usize, pathname: usize, flags: i32, mode: u32) ->
 /// - This is a `async` syscall, which means that it likely `yield` or `suspend` when called. Therefore, use
 ///   `lock` carefully and do not pass the `lock` across `await` as possible.
 pub async fn sys_write(fd: usize, addr: usize, len: usize) -> SyscallResult {
-    // log::debug!("[sys_write] fd: {fd}, addr: {addr:#x}, len: {len:#x}");
+    log::debug!("[sys_write] fd: {fd}, addr: {addr:#x}, len: {len:#x}");
 
     let task = current_task();
     let addr_space = task.addr_space();
@@ -251,6 +251,8 @@ pub async fn sys_write(fd: usize, addr: usize, len: usize) -> SyscallResult {
 
     let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
     let buf = unsafe { data_ptr.try_into_slice(len) }?;
+
+    log::info!("[sys_write] buf: {:?}", buf);
 
     file.write(buf).await
 }
@@ -480,7 +482,7 @@ pub fn sys_fstatat(dirfd: usize, pathname: usize, stat_buf: usize, flags: i32) -
 /// - It is probably unwise to close file descriptors while they may be in use by system calls in
 ///   other threads in the same process, since a file descriptor may be reused.
 pub fn sys_close(fd: usize) -> SyscallResult {
-    log::info!("[sys_close] fd: {fd}");
+    log::info!("[sys_close] fd: {fd:#x}");
     let task = current_task();
     task.with_mut_fdtable(|table| table.remove(fd))?;
 

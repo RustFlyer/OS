@@ -9,15 +9,7 @@ use loongArch64::register::{
 };
 
 use crate::osdriver::manager::device_manager;
-use arch::{
-    mm::tlb_fill,
-    time::{get_time_duration, set_nx_timer_irq},
-    trap::TIMER_IRQ,
-};
-use mm::address::{VirtAddr, VirtPageNum};
-use systype::memory_flags::MappingFlags;
-use timer::TIMER_MANAGER;
-
+use crate::trap::trap_context::KernelTrapContext;
 use crate::{
     processor::current_hart,
     task::{
@@ -27,6 +19,14 @@ use crate::{
     trap::{load_trap_handler, trap_handler::TRAP_STATS},
     vm::user_ptr::UserReadPtr,
 };
+use arch::{
+    mm::tlb_fill,
+    time::{get_time_duration, set_nx_timer_irq},
+    trap::TIMER_IRQ,
+};
+use mm::address::{VirtAddr, VirtPageNum};
+use systype::memory_flags::MappingFlags;
+use timer::TIMER_MANAGER;
 
 pub fn trap_handler(task: &Task) {
     let estat = estat::read();
@@ -53,6 +53,7 @@ pub fn user_exception_handler(task: &Task, e: Exception, badv: Badv, era: Era) {
     log::trace!("Handling user exception {:?} for task {}", e, task.tid());
     match e {
         Exception::Syscall => {
+            // log::debug!("[set_is_syscall] {}", task.is_syscall());
             task.set_is_syscall(true);
         }
         Exception::FetchPageFault
@@ -84,6 +85,15 @@ pub fn user_exception_handler(task: &Task, e: Exception, badv: Badv, era: Era) {
                     tlb_fill(pte0, pte1);
                 }
                 Err(e) => {
+                    // unaligned?
+                    // let trap_context = task.trap_context_mut();
+                    // let mut kernel_trap_context = KernelTrapContext::from_tc(trap_context);
+                    // unsafe {
+                    //     crate::trap::trap_handler::unaligned_la::emulate_load_store_insn(
+                    //         &mut kernel_trap_context,
+                    //     );
+                    //     return;
+                    // }
                     log::error!(
                         "[user_exception_handler] tid: {}, unsolved page fault at {:#x}, \
                     access: {:?}, error: {:?}, bad instruction at {:#x}",
@@ -116,6 +126,16 @@ pub fn user_exception_handler(task: &Task, e: Exception, badv: Badv, era: Era) {
                 },
             });
         }
+        Exception::AddressNotAligned => unsafe {
+            // panic!("User Exception::AddressNotAligned");
+            log::error!("User Exception::AddressNotAligned");
+            let trap_context = task.trap_context_mut();
+            let mut kernel_trap_context = KernelTrapContext::from_tc(trap_context);
+            crate::trap::trap_handler::unaligned_la::emulate_load_store_insn(
+                &mut kernel_trap_context,
+            );
+            kernel_trap_context.to_trapcontext(trap_context);
+        },
         _ => {
             log::error!("Unknown user exception: {:?}", e);
         }

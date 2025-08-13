@@ -2,6 +2,9 @@ use arch::hart::hart_start;
 use config::device::MAX_HARTS;
 use config::mm::HART_START_ADDR;
 use driver::println;
+use mm::address::{PhysPageNum, VirtAddr};
+
+use crate::vm::trace_page_table_lookup;
 
 /// start mutil cores
 #[allow(unused)]
@@ -27,11 +30,6 @@ pub fn clear_bss() {
         let start = _kbss as usize as *mut u64;
         let end = _ebss as usize as *mut u64;
 
-        println!(
-            "s-ekernel: {:#x} -  {:#x}",
-            _skernel as usize, _ekernel as usize
-        );
-
         println!("s-kbss: {:#x} -  {:#x}", _sbss as usize, _kbss as usize);
         println!("k-ebss: {:#x} -  {:#x}", _kbss as usize, _ebss as usize);
 
@@ -46,5 +44,19 @@ pub fn clear_bss() {
             let offset = len * 8;
             core::slice::from_raw_parts_mut(start_byte.add(offset), len_bytes - offset).fill(0);
         }
+
+        println!("try to read");
+        let r = core::ptr::read_volatile(0x8000_0000_0000_0000 as *const usize);
+        println!("r: {:#x}", r);
+
+        println!("try to write");
+        let buf = [0u8; 4096];
+        // core::ptr::copy_nonoverlapping(&buf, 0x8000_0000_0000_0000 as *mut [u8; 4096], 1);
+        core::ptr::write_volatile(0x8000_0000_0000_0000 as *mut [u8; 4096], buf);
+        println!("finish write");
+
+        println!("try to read");
+        let r = core::ptr::read_volatile(0x8000_0000_0000_0000 as *const usize);
+        println!("r: {:#x}", r);
     }
 }

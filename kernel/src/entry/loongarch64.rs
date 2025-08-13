@@ -27,11 +27,17 @@ unsafe extern "C" fn _start() -> ! {
             li.w        $t0, 0x7            # Set EUEN.FPE = 1, EUEN.SXE = 1, EUEN.ASXE = 1
             csrwr       $t0, 0x2            # Write CSR.EUEN
 
+            li.w        $t0, 0x0
+            csrwr       $t0, 0x12            # Write CSR.EUEN
+            csrwr       $t0, 0x13            # Write CSR.EUEN
+            csrwr       $t0, 0x14            # Write CSR.EUEN
+            csrwr       $t0, 0x15            # Write CSR.EUEN
+
             # Set up the stack pointer
             la.global   $sp, {boot_stack}
             csrrd       $t0, 0x20
             addi.d      $t0, $t0, 1
-            slli.d      $t0, $t0, 22        # t0 = (hart_id + 1) * KERNEL_STACK_SIZE
+            slli.d      $t0, $t0, 23        # t0 = (hart_id + 1) * KERNEL_STACK_SIZE, 8M
             add.d       $sp, $sp, $t0
             csrrd       $a0, 0x20           # Pass the hart id to rust_main as the first argument
             la.global   $t0, {entry}

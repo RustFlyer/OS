@@ -73,13 +73,22 @@ pub fn easy_cmd(s: String) -> String {
     }
 }
 
-pub fn run_cmd(cmd: &str) {
-    if fork() == 0 {
+pub fn run_cmd(cmd: &str) -> Result<(), ()> {
+    let tid = fork();
+    if tid == 0 {
         execve("./busybox", &["./busybox", "sh", "-c", cmd], &[]);
+        exit(-1);
     } else {
         let mut result: i32 = 0;
-        waitpid(-1, &mut result);
+        waitpid(tid, &mut result);
+        // println!("result addr: {:#x}", core::ptr::addr_of!(result) as usize);
+        // println!("tid {} return {}", tid, result);
+        if result != 0 {
+            return Err(());
+        }
     }
+
+    return Ok(());
 }
 
 pub fn parse_args(argstring: &str) -> Vec<String> {
@@ -232,6 +241,7 @@ pub fn usershell() {
     }
 }
 
+#[allow(unused)]
 pub fn riscv_init() {
     disable_err();
 
@@ -276,10 +286,20 @@ pub fn riscv_init() {
     enable_err();
 }
 
+#[allow(unused)]
 pub fn loongarch_init() {
+    let buf = "loongarch_init!";
+    if buf.contains("no") {
+        print!("test");
+    }
+    // println!("{}", buf);
+
+    println!("loongarch_init!");
     disable_err();
+    println!("DISABLE ERR OUPUT!");
 
     if chdir("musl") < 0 {
+        println!("fail to get in musl");
         println!("The device uses disk-la");
         mkdir("/bin");
         run_cmd("./busybox --install -s /bin");
@@ -466,50 +486,59 @@ pub fn supple_cmd(buf: &mut [u8; 256], bptr: &mut usize) {
 
 pub fn software_init() {
     disable_err();
-    gcc_init();
-    git_init();
-    run_cmd("./busybox ln -s /vim/vim /bin/vim");
+    if gcc_init().is_err() {
+        println!("fail to init gcc");
+    }
+    if git_init().is_err() {
+        println!("fail to init git");
+    }
+    if run_cmd("./busybox ln -s /vim/vim /bin/vim").is_err() {
+        println!("fail to init vim");
+    }
     enable_err();
 }
 
-pub fn gcc_init() {
+pub fn gcc_init() -> Result<(), ()> {
+    run_cmd("./busybox ln -s /lib/libcc1.so.0.0.0 /lib/libcc1.so")?;
+
     #[cfg(target_arch = "riscv64")]
     {
-        run_cmd("./busybox ln -s /lib/ld-musl-riscv64.so.1 /lib/libc.musl-riscv64.so.1");
-        run_cmd("./busybox ln -s /lib/ld-musl-riscv64.so.1 /lib/libc.so");
+        run_cmd("./busybox ln -s /lib/ld-musl-riscv64.so.1 /lib/libc.musl-riscv64.so.1")?;
+        run_cmd("./busybox ln -s /lib/ld-musl-riscv64.so.1 /lib/libc.so")?;
     }
     #[cfg(target_arch = "loongarch64")]
     {
-        run_cmd("./busybox ln -s /lib/ld-musl-loongarch64.so.1 /lib/libc.musl-loongarch64.so.1");
-        run_cmd("./busybox ln -s /lib/ld-musl-loongarch64.so.1 /lib/libc.so");
+        run_cmd("./busybox ln -s /lib/ld-musl-loongarch64.so.1 /lib/libc.musl-loongarch64.so.1")?;
+        run_cmd("./busybox ln -s /lib/ld-musl-loongarch64.so.1 /lib/libc.so")?;
     }
 
-    run_cmd("./busybox ln -s /lib/libcc1.so.0.0.0 /lib/libcc1.so");
-    run_cmd("./busybox ln -s /lib/libmagic.so.1.0.0 /lib/libmagic.so.1");
-    run_cmd("./busybox ln -s /lib/libctf-nobfd.so.0.0.0 /lib/libctf-nobfd.so.0");
-    run_cmd("./busybox ln -s /lib/libcp1plugin.so.0.0.0 /lib/libcp1plugin.so.0");
-    run_cmd("./busybox ln -s /lib/libgomp.so.1.0.0 /lib/libgomp.so.1");
-    run_cmd("./busybox ln -s /lib/libcc1plugin.so.0.0.0 /lib/libcc1plugin.so");
-    run_cmd("./busybox ln -s /lib/libjansson.so.4.14.1 /lib/libjansson.so.4");
-    run_cmd("./busybox ln -s /lib/liblto_plugin.so /lib/liblto_plugin.so");
-    run_cmd("./busybox ln -s /lib/libz.so.1.3.1 /lib/libz.so.1");
-    run_cmd("./busybox ln -s /lib/libmpfr.so.6.2.1 /lib/libmpfr.so.6");
-    run_cmd("./busybox ln -s /lib/libgmp.so.10.5.0 /lib/libgmp.so.10");
-    run_cmd("./busybox ln -s /lib/libmpc.so.3.3.1 /lib/libmpc.so.3");
-    run_cmd("./busybox ln -s /lib/libctf.so.0.0.0 /lib/libctf.so.0");
-    run_cmd("./busybox ln -s /lib/libisl.so.23.3.0 /lib/libisl.so.23");
-    run_cmd("./busybox ln -s /lib/libstdc++.so.6.0.33 /lib/libstdc++.so.6");
-    run_cmd("./busybox ln -s /lib/libsframe.so.1.0.0 /lib/libsframe.so.1");
-    run_cmd("./busybox ln -s /lib/libatomic.so.1.2.0 /lib/libatomic.so.1");
-    run_cmd("./busybox ln -s /lib/libcc1plugin.so.0.0.0 /lib/libcc1plugin.so.0");
-    run_cmd("./busybox ln -s /lib/libgomp.so.1.0.0 /lib/libgomp.so.1");
-    run_cmd("./busybox ln -s /lib/libzstd.so.1.5.7 /lib/libzstd.so.1");
-    run_cmd("./busybox ln -s /lib/libstdc++.so.6.0.33 /lib/libstdc++.so");
+    run_cmd("./busybox ln -s /lib/libmagic.so.1.0.0 /lib/libmagic.so.1")?;
+    run_cmd("./busybox ln -s /lib/libctf-nobfd.so.0.0.0 /lib/libctf-nobfd.so.0")?;
+    run_cmd("./busybox ln -s /lib/libcp1plugin.so.0.0.0 /lib/libcp1plugin.so.0")?;
+    run_cmd("./busybox ln -s /lib/libgomp.so.1.0.0 /lib/libgomp.so.1")?;
+    run_cmd("./busybox ln -s /lib/libcc1plugin.so.0.0.0 /lib/libcc1plugin.so")?;
+    run_cmd("./busybox ln -s /lib/libjansson.so.4.14.1 /lib/libjansson.so.4")?;
+    run_cmd("./busybox ln -s /lib/liblto_plugin.so /lib/liblto_plugin.so")?;
+    run_cmd("./busybox ln -s /lib/libz.so.1.3.1 /lib/libz.so.1")?;
+    run_cmd("./busybox ln -s /lib/libmpfr.so.6.2.1 /lib/libmpfr.so.6")?;
+    run_cmd("./busybox ln -s /lib/libgmp.so.10.5.0 /lib/libgmp.so.10")?;
+    run_cmd("./busybox ln -s /lib/libmpc.so.3.3.1 /lib/libmpc.so.3")?;
+    run_cmd("./busybox ln -s /lib/libctf.so.0.0.0 /lib/libctf.so.0")?;
+    run_cmd("./busybox ln -s /lib/libisl.so.23.3.0 /lib/libisl.so.23")?;
+    run_cmd("./busybox ln -s /lib/libstdc++.so.6.0.33 /lib/libstdc++.so.6")?;
+    run_cmd("./busybox ln -s /lib/libsframe.so.1.0.0 /lib/libsframe.so.1")?;
+    run_cmd("./busybox ln -s /lib/libatomic.so.1.2.0 /lib/libatomic.so.1")?;
+    run_cmd("./busybox ln -s /lib/libcc1plugin.so.0.0.0 /lib/libcc1plugin.so.0")?;
+    run_cmd("./busybox ln -s /lib/libgomp.so.1.0.0 /lib/libgomp.so.1")?;
+    run_cmd("./busybox ln -s /lib/libzstd.so.1.5.7 /lib/libzstd.so.1")?;
+    run_cmd("./busybox ln -s /lib/libstdc++.so.6.0.33 /lib/libstdc++.so")?;
 
-    run_cmd("./busybox ln -s /usr/bin/gcc /bin/gcc");
+    run_cmd("./busybox ln -s /usr/bin/gcc /bin/gcc")?;
+
+    Ok(())
 }
 
-pub fn git_init() {
+pub fn git_init() -> Result<(), ()> {
     const GIT_COMMANDS: &[&str] = &[
         "git-add",
         "git-am",
@@ -660,8 +689,13 @@ pub fn git_init() {
             "./busybox ln -s {}/git {}/{}",
             GIT_BASE_PATH, GIT_BASE_PATH, cmd
         );
-        run_cmd(&command);
+        run_cmd(&command)?;
     }
 
-    run_cmd("./busybox ln -s /git/bin/git /bin/git");
+    run_cmd("./busybox ln -s /git/bin/git /bin/git")?;
+    Ok(())
+}
+
+pub fn test(str: &str) {
+    println!("test output {} in lib", str);
 }

@@ -154,12 +154,15 @@ __return_to_user:
 __trap_from_kernel:
     addi.d $sp, $sp, -33*8
 
-    # Save x1~x31
-    .set n, 1
-    .rept 31
+    # Save x0~x31
+    .set n, 0
+    .rept 32
         SAVE_GP %n
         .set n, n+1
     .endr
+
+    // csrrd   $t0, 0x32       # KSAVE_USP
+    // st.d    $t0, $sp,  3*8
 
     csrrd   $t1, 0x6        #era, as sepc in RV
     st.d    $t1, $sp, 32*8
@@ -172,12 +175,13 @@ __trap_from_kernel:
     ld.d $t1, $sp, 32*8
     csrwr $t1, 0x6
 
-    .set n, 1
-    .rept 31
+    .set n, 0
+    .rept 32
         LOAD_GP %n
         .set n, n+1
     .endr
 
+    // ld.d    $sp, $sp, 3*8
     addi.d $sp, $sp, 33*8
     ertn
 

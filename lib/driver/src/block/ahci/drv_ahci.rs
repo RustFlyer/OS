@@ -3,6 +3,7 @@
 use crate::block::ahci::libahci::*;
 use crate::block::ahci::libata::*;
 use crate::block::ahci::platform::*;
+use crate::println;
 
 use core::ptr::{null_mut, read_volatile, write_volatile};
 
@@ -40,24 +41,23 @@ fn ahci_print_info(ahci_dev: &ahci_device) {
     let impl_0: u32 = ahci_dev.port_map;
     let speed: u32 = (ahci_dev.cap >> 20) & 0xf;
 
-    log::debug!("try to ahci_print_info");
+    println!("try to ahci_print_info");
 
-    let scc_s: *const u8 = b"SATA\0" as *const u8;
-    let mut speed_s: *const u8;
+    let scc_s: &str = "SATA\0";
+    let mut speed_s: &str;
     if speed == 1 {
-        speed_s = b"1.5\0" as *const u8;
+        speed_s = "1.5\0";
     } else if speed == 2 {
-        speed_s = b"3\0" as *const u8;
+        speed_s = "3\0";
     } else if speed == 3 {
-        speed_s = b"6\0" as *const u8;
+        speed_s = "6\0";
     } else {
-        speed_s = b"?\0" as *const u8;
+        speed_s = "?\0";
     }
 
     unsafe {
-        ahci_printf(
-            b"AHCI vers %02x%02x.%02x%02x, %u slots, %u ports, %s Gbps, 0x%x impl, %s mode\n\0"
-                as *const u8,
+        println!(
+            "AHCI vers {:2x}{:2x}.{:2x}{:2x}, {} slots, {} ports, {} Gbps, 0x{:x} impl, {} mode",
             vers >> 24 & 0xff,
             vers >> 16 & 0xff,
             vers >> 8 & 0xff,
@@ -68,122 +68,122 @@ fn ahci_print_info(ahci_dev: &ahci_device) {
             impl_0,
             scc_s,
         );
-        ahci_printf(
-            b"flags: %s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n\0" as *const u8,
+        println!(
+            "flags:  {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {}",
             if cap & HOST_CAP_64 != 0 {
-                b"64bit \0" as *const u8
+                "64bit \0"
             } else {
-                b"\0" as *const u8
+                "\0"
             },
             if cap & HOST_CAP_NCQ != 0 {
-                b"ncq \0" as *const u8
+                "ncq \0"
             } else {
-                b"\0" as *const u8
+                "\0"
             },
             if cap & HOST_CAP_SNTF != 0 {
-                b"sntf \0" as *const u8
+                "sntf \0"
             } else {
-                b"\0" as *const u8
+                "\0"
             },
             if cap & HOST_CAP_MPS != 0 {
-                b"ilck \0" as *const u8
+                "ilck \0"
             } else {
-                b"\0" as *const u8
+                "\0"
             },
             if cap & HOST_CAP_SSS != 0 {
-                b"stag \0" as *const u8
+                "stag \0"
             } else {
-                b"\0" as *const u8
+                "\0"
             },
             if cap & HOST_CAP_ALPM != 0 {
-                b"pm \0" as *const u8
+                "pm \0"
             } else {
-                b"\0" as *const u8
+                "\0"
             },
             if cap & HOST_CAP_LED != 0 {
-                b"led \0" as *const u8
+                "led \0"
             } else {
-                b"\0" as *const u8
+                "\0"
             },
             if cap & HOST_CAP_CLO != 0 {
-                b"clo \0" as *const u8
+                "clo \0"
             } else {
-                b"\0" as *const u8
+                "\0"
             },
             if cap & HOST_CAP_ONLY != 0 {
-                b"only \0" as *const u8
+                "only \0"
             } else {
-                b"\0" as *const u8
+                "\0"
             },
             if cap & HOST_CAP_PMP != 0 {
-                b"pmp \0" as *const u8
+                "pmp \0"
             } else {
-                b"\0" as *const u8
+                "\0"
             },
             if cap & HOST_CAP_FBS != 0 {
-                b"fbs \0" as *const u8
+                "fbs \0"
             } else {
-                b"\0" as *const u8
+                "\0"
             },
             if cap & HOST_CAP_PIO_MULTI != 0 {
-                b"pio \0" as *const u8
+                "pio \0"
             } else {
-                b"\0" as *const u8
+                "\0"
             },
             if cap & HOST_CAP_SSC != 0 {
-                b"slum \0" as *const u8
+                "slum \0"
             } else {
-                b"\0" as *const u8
+                "\0"
             },
             if cap & HOST_CAP_PART != 0 {
-                b"part \0" as *const u8
+                "part \0"
             } else {
-                b"\0" as *const u8
+                "\0"
             },
             if cap & HOST_CAP_CCC != 0 {
-                b"ccc \0" as *const u8
+                "ccc \0"
             } else {
-                b"\0" as *const u8
+                "\0"
             },
             if cap & HOST_CAP_EMS != 0 {
-                b"ems \0" as *const u8
+                "ems \0"
             } else {
-                b"\0" as *const u8
+                "\0"
             },
             if cap & HOST_CAP_SXS != 0 {
-                b"sxs \0" as *const u8
+                "sxs \0"
             } else {
-                b"\0" as *const u8
+                "\0"
             },
             if cap2 & HOST_CAP2_DESO != 0 {
-                b"deso \0" as *const u8
+                "deso \0"
             } else {
-                b"\0" as *const u8
+                "\0"
             },
             if cap2 & HOST_CAP2_SADM != 0 {
-                b"sadm \0" as *const u8
+                "sadm \0"
             } else {
-                b"\0" as *const u8
+                "\0"
             },
             if cap2 & HOST_CAP2_SDS != 0 {
-                b"sds \0" as *const u8
+                "sds \0"
             } else {
-                b"\0" as *const u8
+                "\0"
             },
             if cap2 & HOST_CAP2_APST != 0 {
-                b"apst \0" as *const u8
+                "apst \0"
             } else {
-                b"\0" as *const u8
+                "\0"
             },
             if cap2 & HOST_CAP2_NVMHCI != 0 {
-                b"nvmp \0" as *const u8
+                "nvmp \0"
             } else {
-                b"\0" as *const u8
+                "\0"
             },
             if cap2 & HOST_CAP2_BOH != 0 {
-                b"boh \0" as *const u8
+                "boh \0"
             } else {
-                b"\0" as *const u8
+                "\0"
             },
         );
     }
@@ -199,7 +199,7 @@ fn ahci_sata_print_info(pdev: &ahci_blk_dev) {
             &(pdev.product),
         );
         ahci_printf(b"Firmware version: %s\n\0" as *const u8, &(pdev.revision));
-        ahci_printf(b"Capacity: %lu sectors\n\0" as *const u8, pdev.lba);
+        ahci_printf(b"Capacity: %u sectors\n\0" as *const u8, pdev.lba);
     }
 }
 
@@ -516,7 +516,7 @@ fn ahci_port_start(ahci_dev: &mut ahci_device, port: u8) -> i32 {
         port_mmio + PORT_CMD,
     );
 
-    let mut timeout: u32 = 200;
+    let mut timeout: u32 = 20000;
     let mut tmp: u32 = 0;
     loop {
         unsafe { ahci_mdelay(1) };
@@ -531,8 +531,9 @@ fn ahci_port_start(ahci_dev: &mut ahci_device, port: u8) -> i32 {
     if timeout <= 0 {
         unsafe {
             ahci_printf(
-                b"ahci port %u failed to start\n\0" as *const u8,
+                b"ahci port %u failed to start, timeout: %u\n\0" as *const u8,
                 port as u32,
+                timeout as u32,
             )
         };
         return -1;
@@ -915,8 +916,8 @@ pub extern "C" fn ahci_init(ahci_dev: &mut ahci_device) -> i32 {
         return -1;
     }
 
-    // ahci_print_info(ahci_dev);
-    // log::debug!("finish ahci_print_info");
+    ahci_print_info(ahci_dev);
+    log::debug!("finish ahci_print_info");
 
     ahci_sata_scan(ahci_dev);
     log::debug!("finish ahci_sata_scan");

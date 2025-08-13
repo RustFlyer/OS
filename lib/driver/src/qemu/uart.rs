@@ -13,6 +13,8 @@ use uart_16550::MmioSerialPort;
 use config::device::MMIO_SERIAL_PORT_ADDR;
 #[cfg(target_arch = "loongarch64")]
 use config::device::PCI_SERIAL_PORT_ADDR;
+#[cfg(target_arch = "loongarch64")]
+use config::device::UART_ADDR_LA_BOARD;
 use virtio_drivers::transport::mmio::MmioError;
 
 pub struct QUartDevice {
@@ -38,9 +40,10 @@ impl QUartDevice {
         };
 
         #[cfg(target_arch = "loongarch64")]
-        let serialport = unsafe { MmioSerialPort::new(PCI_SERIAL_PORT_ADDR) };
+        let serialport = unsafe { MmioSerialPort::new(UART_ADDR_LA_BOARD) };
         #[cfg(target_arch = "riscv64")]
         let serialport = unsafe { MmioSerialPort::new(MMIO_SERIAL_PORT_ADDR) };
+
         Self {
             meta,
             device: SpinNoIrqLock::new(serialport),
@@ -86,7 +89,12 @@ impl CharDevice for QUartDevice {
     async fn write(&self, buf: &[u8]) -> usize {
         let mut r = 0;
         for data in buf {
-            self.device.lock().send(*data);
+            let mut ch = *data;
+            if ch as char == '\n' {
+                self.device.lock().send(ch);
+                ch = '\r' as u8;
+            }
+            self.device.lock().send(ch);
             r += 1;
         }
         r

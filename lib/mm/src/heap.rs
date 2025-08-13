@@ -38,11 +38,32 @@ impl<const ORDER: usize> NoIrqLockedHeap<ORDER> {
 
 unsafe impl GlobalAlloc for NoIrqLockedHeap<32> {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        self.0
+        let buf = self
+            .0
             .lock()
             .alloc(layout)
             .ok()
-            .map_or(ptr::null_mut(), |allocation| allocation.as_ptr())
+            .map_or(ptr::null_mut(), |allocation| allocation.as_ptr());
+
+        let sz = layout.size();
+        let zbuf = [0u8; 512];
+        for i in 0..((sz + 511) / 512) {
+            let p = (buf as usize + 512 * i) as *mut u8;
+            let m = 512.min(sz - i * 512);
+            unsafe {
+                p.copy_from_nonoverlapping(zbuf.as_ptr(), m);
+            }
+        }
+
+        // let mut rbuf = [0u8; 128];
+        // let min = layout.size().min(128);
+        // unsafe {
+        //     core::ptr::copy_nonoverlapping(buf, rbuf.as_mut_ptr(), min);
+        // }
+        // let tbuf = &rbuf[0..min];
+        // log::warn!("[HEAP] alloc addr: {:#x}, buf: {:?}", buf as usize, tbuf);
+
+        buf
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
@@ -85,4 +106,11 @@ pub unsafe fn init_heap_allocator() {
         start_addr,
         start_addr + KERNEL_HEAP_SIZE
     );
+}
+
+pub fn allocate_align_memory(size: usize, align: usize) -> *mut u8 {
+    unsafe {
+        let layout = Layout::from_size_align_unchecked(size, align);
+        HEAP_ALLOCATOR.alloc(layout)
+    }
 }

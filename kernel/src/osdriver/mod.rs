@@ -30,6 +30,11 @@ pub fn probe_device_tree() {
         dtb_addr = 0x100000
     }
 
+    #[cfg(feature = "qemu")]
+    println!("RUNNING ON QEMU-9.21");
+    #[cfg(feature = "board")]
+    println!("RUNNING ON BOARD");
+
     let device_tree = unsafe {
         println!("dt: {:#x}", dtb_addr + KERNEL_MAP_OFFSET);
         let mut fdt;
@@ -52,11 +57,6 @@ pub fn probe_device_tree() {
     };
 
     probe_tree(&device_tree);
-
-    #[cfg(feature = "qemu")]
-    println!("RUNNING ON QEMU-9.21");
-    #[cfg(feature = "board")]
-    println!("RUNNING ON BOARD");
 
     let manager = device_manager();
     manager.map_devices();

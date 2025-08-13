@@ -30,6 +30,7 @@ fn kernel_exception_handler(_e: Exception, cx: &mut KernelTrapContext) {
         Exception::AddressNotAligned => unsafe {
             emulate_load_store_insn(cx);
         },
+        // Exception::PageModifyFault => {}
         _ => trap_panic(),
     }
 }

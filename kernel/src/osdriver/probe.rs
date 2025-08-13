@@ -85,9 +85,9 @@ pub fn probe_tree(fdt: &Fdt) {
         }
 
         // CPUs
-        if let Some(cpus) = crate::osdriver::pbla::probe_cpu(&fdt) {
-            device_manager().set_cpus(cpus);
-        }
+        // if let Some(cpus) = crate::osdriver::pbla::probe_cpu(&fdt) {
+        //     device_manager().set_cpus(cpus);
+        // }
     }
 
     // for common probe(special for qemu)

@@ -59,6 +59,7 @@ use super::page_table::PageTable;
 /// A VMA is a contiguous, page-aligned region of virtual memory in an address
 /// space that has a common set of attributes, such as permissions and mapping type.
 #[derive(Clone)]
+#[repr(C)]
 pub struct VmArea {
     /// Starting virtual address, page-aligned.
     start: VirtAddr,

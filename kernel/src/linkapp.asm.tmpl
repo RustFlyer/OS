@@ -1,4 +1,4 @@
-    .align 3
+    .balign 4096
     .section .data
     .global _num_app
 _num_app:
@@ -25,7 +25,7 @@ _app_names:
     .section .data
     .global app_0_start
     .global app_0_end
-    .align 3
+    .balign 4096
 app_0_start:
     .incbin "./target/<cargo-target>/<cargo-profile>/init_proc-<cargo-target-acronym>"
 app_0_end:
@@ -33,7 +33,7 @@ app_0_end:
     .section .data
     .global app_1_start
     .global app_1_end
-    .align 3
+    .balign 4096
 app_1_start:
     .incbin "./target/<cargo-target>/<cargo-profile>/hello_world"
 app_1_end:
@@ -41,7 +41,7 @@ app_1_end:
     .section .data
     .global app_2_start
     .global app_2_end
-    .align 3
+    .balign 4096
 app_2_start:
     .incbin "./target/<cargo-target>/<cargo-profile>/time_test"
 app_2_end:
@@ -49,7 +49,7 @@ app_2_end:
     .section .data
     .global app_3_start
     .global app_3_end
-    .align 3
+    .balign 4096
 app_3_start:
     .incbin "./target/<cargo-target>/<cargo-profile>/add"
 app_3_end:
@@ -57,7 +57,7 @@ app_3_end:
     .section .data
     .global app_4_start
     .global app_4_end
-    .align 3
+    .balign 4096
 app_4_start:
     .incbin "./target/<cargo-target>/<cargo-profile>/submit-<cargo-target-acronym>"
 app_4_end:
@@ -65,7 +65,7 @@ app_4_end:
     .section .data
     .global app_5_start
     .global app_5_end
-    .align 3
+    .balign 4096
 app_5_start:
     .incbin "./target/<cargo-target>/<cargo-profile>/shell"
 app_5_end:
@@ -73,7 +73,7 @@ app_5_end:
     .section .data
     .global app_6_start
     .global app_6_end
-    .align 3
+    .balign 4096
 app_6_start:
     .incbin "./target/<cargo-target>/<cargo-profile>/file_test"
 app_6_end:

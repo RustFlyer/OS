@@ -28,6 +28,7 @@ pub trait IdAllocator {
 /// An ID allocator that uses a simple vector to store recycled IDs.
 ///
 /// This allocator is very fast but takes up a lot of memory.
+#[derive(Debug)]
 pub struct VecIdAllocator {
     next: usize,
     end: usize,

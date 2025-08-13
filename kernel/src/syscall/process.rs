@@ -24,6 +24,7 @@ use systype::{
 use vfs::file::File;
 use vfs::path::Path;
 
+use crate::logging::enable_log;
 use crate::task::cap::{CapUserData, CapUserHeader, CapabilitiesFlags};
 use crate::task::signal::pidfd::PF_TABLE;
 use crate::task::signal::sig_info::Sig;
@@ -128,7 +129,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
         p if p > 0 => WaitFor::Pid(p as Pid),
         p => WaitFor::PGid(p as PGid),
     };
-    log::info!("[sys_wait4] target: {target:?}, option: {option:?}");
+    log::info!("[sys_wait4] target: {target:?}, option: {option:?}, wstatus: {wstatus:#x}");
     // log::info!(
     //     "[sys_wait4] existing task number: {}",
     //     TASK_MANAGER.how_many_tasks()
@@ -398,6 +399,7 @@ fn __sys_clone(
     child_tid_ptr: usize,
     tls_ptr: usize,
 ) -> SyscallResult {
+    enable_log();
     log::info!(
         "[sys_clone] flags:{flags:#x}, stack:{stack:#x}, tls:{tls_ptr:#x}, parent_tid:{parent_tid_ptr:#x}, child_tid:{child_tid_ptr:x}"
     );
@@ -481,7 +483,7 @@ fn __sys_clone(
 pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult {
     let task = current_task();
 
-    const PATH_LEMGTH:usize = 4096;
+    const PATH_LEMGTH: usize = 4096;
 
     let read_string = |addr| {
         let addr_space = task.addr_space();

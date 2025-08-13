@@ -1,0 +1,297 @@
+[DEBUG][kernel/src/logging.rs:66] Log Enable
+[DEBUG][kernel/src/task/future.rs:151] hart 0: run task [init_proc] in first time!
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802ccaf4 bad addr: 0x90000000808eecac
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x28c0f065
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802ccb98 bad addr: 0x90000000808eed14
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x29c012e5
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802ccaf4 bad addr: 0x90000000808eecac
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x28c0f065
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802ccb98 bad addr: 0x90000000808eed14
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x29c012e5
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802ccaf4 bad addr: 0x90000000808eecac
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x28c0f065
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802ccb98 bad addr: 0x90000000808eed14
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x29c012e5
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802ccaf4 bad addr: 0x90000000808eecac
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x28c0f065
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802ccb98 bad addr: 0x90000000808eed14
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x29c012e5
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802ccaf4 bad addr: 0x90000000808eecac
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x28c0f065
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802ccb98 bad addr: 0x90000000808eed14
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x29c012e5
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802ccaf4 bad addr: 0x90000000808eecac
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x28c0f065
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802ccb98 bad addr: 0x90000000808eed14
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x29c012e5
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802ccaf4 bad addr: 0x90000000808eecac
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x28c0f065
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802ccb98 bad addr: 0x90000000808eed14
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x29c012e5
+[DEBUG][kernel/src/syscall/mod.rs:56] task 1 call [write]
+[ INFO][kernel/src/syscall/fs.rs:255] [sys_write] buf: [85, 83, 69, 82, 32, 83, 72, 69, 76, 76, 32, 66, 69, 71, 73, 78, 33, 10]
+USER SHELL BEGIN!
+                 [DEBUG][kernel/src/syscall/mod.rs:56] task 1 call [clone]
+[DEBUG][kernel/src/logging.rs:66] Log Enable
+[ INFO][kernel/src/syscall/process.rs:403] [sys_clone] flags:0x0, stack:0x0, tls:0x0, parent_tid:0x0, child_tid:0
+[ INFO][kernel/src/syscall/process.rs:410] [sys_clone] flags CloneFlags(0x0)
+[DEBUG][kernel/src/task/taskf.rs:220] new THREAD selected
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x900000008024578c bad addr: 0x90000000808edcdf
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 4 inst: 0x29c000e4
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245798 bad addr: 0x90000000808edcd7
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x29c00085
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802457a4 bad addr: 0x90000000808edccf
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 6 inst: 0x29c00086
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802457f4 bad addr: 0x90000000a18c7351
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x29c04485
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245800 bad addr: 0x90000000808edcdf
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x28c000a5
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245804 bad addr: 0x90000000a18c7359
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 6 inst: 0x29c06486
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245808 bad addr: 0x90000000a18c7361
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 7 inst: 0x29c08487
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245a90 bad addr: 0x90000000808ed474
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 0 inst: 0x29cc1060
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245a94 bad addr: 0x90000000808ed46c
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 0 inst: 0x29cbf060
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245a98 bad addr: 0x90000000808ed454
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 0 inst: 0x29cb9060
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245a9c bad addr: 0x90000000808ed45c
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 0 inst: 0x29cbb060
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245aac bad addr: 0x90000000808edcdf
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 0 inst: 0x29800080
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245ab8 bad addr: 0x90000000808edcd7
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 0 inst: 0x29c00080
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245ac4 bad addr: 0x90000000808edccf
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 0 inst: 0x29c00080
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245b24 bad addr: 0x90000000808edcdf
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 7 inst: 0x28c000e7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245b28 bad addr: 0x90000000a18c7411
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 8 inst: 0x29c04488
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245b2c bad addr: 0x90000000a18c7419
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x29c06485
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245b30 bad addr: 0x90000000a18c7421
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 6 inst: 0x29c08486
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245b4c bad addr: 0x90000000a18c743c
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 7 inst: 0x29c0f087
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245b50 bad addr: 0x90000000a18c7444
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x29c11085
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245b58 bad addr: 0x90000000a18c744c
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 6 inst: 0x29c13086
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245b64 bad addr: 0x90000000a18c7464
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x29c19085
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245b78 bad addr: 0x90000000a18c746c
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 8 inst: 0x29c1b088
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245b7c bad addr: 0x90000000a18c7474
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 6 inst: 0x29c1d086
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245bb4 bad addr: 0x90000000a18c7329
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 7 inst: 0x38181487
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245bb8 bad addr: 0x90000000a18c732d
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 6 inst: 0x29401106
+[DEBUG][kernel/src/task/taskf.rs:254] new PARENT selected
+[DEBUG][kernel/src/task/taskf.rs:261] new SIG selected
+[DEBUG][kernel/src/task/taskf.rs:275] new ADDRSPACE selected
+[DEBUG][kernel/src/task/taskf.rs:280] try to cow_address_space
+[DEBUG][kernel/src/task/taskf.rs:282] new cow_address_space selected
+[DEBUG][kernel/src/vm/addr_space.rs:296] tick-2
+[DEBUG][kernel/src/vm/addr_space.rs:303] copy area: VmArea { start_va: 0x10000, end_va: 0x15000, flags: VmaFlags(PRIVATE), pte_flags: PteFlags(V | PLV | NX | MAT_CC), prot: MappingFlags(R | U), num of pages: 2, map_type: FileBacked(FileBackedArea { file: "init", offset: 0 }) }
+[DEBUG][kernel/src/vm/addr_space.rs:305] copy narea: VmArea { start_va: 0x10000, end_va: 0x15000, flags: VmaFlags(PRIVATE), pte_flags: PteFlags(V | PLV | NX | MAT_CC), prot: MappingFlags(R | U), num of pages: 2, map_type: FileBacked(FileBackedArea { file: "init", offset: 0 }) }
+[DEBUG][kernel/src/vm/addr_space.rs:307] end insert
+[DEBUG][kernel/src/vm/addr_space.rs:303] copy area: VmArea { start_va: 0x24000, end_va: 0x34000, flags: VmaFlags(PRIVATE), pte_flags: PteFlags(V | PLV | MAT_CC), prot: MappingFlags(R | X | U), num of pages: 4, map_type: FileBacked(FileBackedArea { file: "init", offset: 16384 }) }
+[DEBUG][kernel/src/vm/addr_space.rs:305] copy narea: VmArea { start_va: 0x24000, end_va: 0x34000, flags: VmaFlags(PRIVATE), pte_flags: PteFlags(V | PLV | MAT_CC), prot: MappingFlags(R | X | U), num of pages: 4, map_type: FileBacked(FileBackedArea { file: "init", offset: 16384 }) }
+[DEBUG][kernel/src/vm/addr_space.rs:307] end insert
+[DEBUG][kernel/src/vm/addr_space.rs:303] copy area: VmArea { start_va: 0x43000, end_va: 0x76000, flags: VmaFlags(PRIVATE), pte_flags: PteFlags(V | D | PLV | W | NX | MAT_CC), prot: MappingFlags(R | W | U), num of pages: 8, map_type: FileBacked(FileBackedArea { file: "init", offset: 77824 }) }
+[DEBUG][kernel/src/vm/addr_space.rs:305] copy narea: VmArea { start_va: 0x43000, end_va: 0x76000, flags: VmaFlags(PRIVATE), pte_flags: PteFlags(V | D | PLV | W | NX | MAT_CC), prot: MappingFlags(R | W | U), num of pages: 8, map_type: FileBacked(FileBackedArea { file: "init", offset: 77824 }) }
+[DEBUG][kernel/src/vm/addr_space.rs:307] end insert
+[DEBUG][kernel/src/vm/addr_space.rs:303] copy area: VmArea { start_va: 0x76000, end_va: 0x176000, flags: VmaFlags(PRIVATE), pte_flags: PteFlags(V | D | PLV | W | NX | MAT_CC), prot: MappingFlags(R | W | U), num of pages: 0, map_type: Heap(AnonymousArea { mappings: None }) }
+[DEBUG][kernel/src/vm/addr_space.rs:305] copy narea: VmArea { start_va: 0x76000, end_va: 0x176000, flags: VmaFlags(PRIVATE), pte_flags: PteFlags(V | D | PLV | W | NX | MAT_CC), prot: MappingFlags(R | W | U), num of pages: 0, map_type: Heap(AnonymousArea { mappings: None }) }
+[DEBUG][kernel/src/vm/addr_space.rs:307] end insert
+[DEBUG][kernel/src/vm/addr_space.rs:303] copy area: VmArea { start_va: 0x3fff7ff000, end_va: 0x3ffffff000, flags: VmaFlags(PRIVATE), pte_flags: PteFlags(V | D | PLV | W | NX | MAT_CC), prot: MappingFlags(R | W | U), num of pages: 1, map_type: Anonymous(AnonymousArea { mappings: None }) }
+[DEBUG][kernel/src/vm/addr_space.rs:305] copy narea: VmArea { start_va: 0x3fff7ff000, end_va: 0x3ffffff000, flags: VmaFlags(PRIVATE), pte_flags: PteFlags(V | D | PLV | W | NX | MAT_CC), prot: MappingFlags(R | W | U), num of pages: 1, map_type: Anonymous(AnonymousArea { mappings: None }) }
+[DEBUG][kernel/src/vm/addr_space.rs:307] end insert
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x900000008028645c bad addr: 0x90000000808ed0a7
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 4 inst: 0x29c51c64
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080286460 bad addr: 0x90000000808ed09f
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x29c4fc65
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080286464 bad addr: 0x90000000808ed097
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 6 inst: 0x29c4dc66
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080286488 bad addr: 0x90000000808ed0a7
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 7 inst: 0x28c51c67
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x900000008028648c bad addr: 0x90000000808ed481
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 4 inst: 0x29c006e4
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080286490 bad addr: 0x90000000808ed489
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x29c026e5
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080286494 bad addr: 0x90000000808ed491
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 6 inst: 0x29c046e6
+[DEBUG][kernel/src/vm/addr_space.rs:332] finish clone_cow
+[DEBUG][kernel/src/task/taskf.rs:284] new cow_address_space
+[DEBUG][kernel/src/task/taskf.rs:288] new FDTABLE selected
+[DEBUG][kernel/src/task/taskf.rs:300] new clone created
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802463fc bad addr: 0x90000000a18d1c09
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 0 inst: 0x29902700
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080246400 bad addr: 0x90000000a18d1c06
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 0 inst: 0x29901b00
+[DEBUG][kernel/src/task/task.rs:685] addchild: tid 2 -> tid 1
+[ INFO][kernel/src/task/process_manager.rs:48] tid: 2, pgid: 1
+[DEBUG][kernel/src/task/manager.rs:34] Add task 2
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000803348f4 bad addr: 0x90000000a18d17d5
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 0 inst: 0x29c35700
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080334ab8 bad addr: 0x90000000a18d21d5
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 0 inst: 0x29c356e0
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080334c70 bad addr: 0x90000000a18d23d5
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 0 inst: 0x29c356e0
+[DEBUG][kernel/src/task/taskf.rs:346] clone return
+[ INFO][kernel/src/syscall/process.rs:415] [sys_clone] clone a new thread, tid 2, clone flags CloneFlags(0x0)
+[ INFO][kernel/src/syscall/process.rs:443] [sys_clone] who is your parent? 1
+[ INFO][kernel/src/syscall/process.rs:445] [sys_clone] clone success
+[DEBUG][kernel/src/task/future.rs:151] hart 0: run task [init_proc(fork)] in first time!
+[DEBUG][kernel/src/syscall/mod.rs:56] task 1 call [write]
+[ INFO][kernel/src/syscall/fs.rs:255] [sys_write] buf: [77, 65, 73, 78, 32, 79, 85, 84, 80, 85, 84, 33, 10]
+MAIN OUTPUT!
+            [DEBUG][kernel/src/syscall/mod.rs:56] task 2 call [write]
+[ INFO][kernel/src/syscall/fs.rs:255] [sys_write] buf: [70, 79, 82, 75, 32, 79, 85, 84, 80, 85, 84, 33, 10]
+FORK OUTPUT!
+            [ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802ccaf4 bad addr: 0x90000000808eecac
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x28c0f065
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802ccb98 bad addr: 0x90000000808eed14
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x29c012e5
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802ccaf4 bad addr: 0x90000000808eecac
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x28c0f065
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802ccb98 bad addr: 0x90000000808eed14
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x29c012e5
+[DEBUG][kernel/src/syscall/mod.rs:56] task 1 call [write]
+[ INFO][kernel/src/syscall/fs.rs:255] [sys_write] buf: [116, 101, 115, 116, 32, 111, 117, 116, 112, 117, 116, 32]
+test output [DEBUG][kernel/src/syscall/mod.rs:56] task 2 call [write]
+[ INFO][kernel/src/syscall/fs.rs:255] [sys_write] buf: [116, 101, 115, 116, 32, 111, 117, 116, 112, 117, 116, 32]
+test output [ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802ccaf4 bad addr: 0x90000000808eecac
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x28c0f065
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802ccb98 bad addr: 0x90000000808eed14
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x29c012e5
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802ccaf4 bad addr: 0x90000000808eecac
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x28c0f065
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802ccb98 bad addr: 0x90000000808eed14
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x29c012e5
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802ccaf4 bad addr: 0x90000000808eecac
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x28c0f065
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802ccb98 bad addr: 0x90000000808eed14
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x29c012e5
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802ccaf4 bad addr: 0x90000000808eecac
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x28c0f065
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802ccb98 bad addr: 0x90000000808eed14
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x29c012e5
+[DEBUG][kernel/src/syscall/mod.rs:56] task 1 call [write]
+[ INFO][kernel/src/syscall/fs.rs:255] [sys_write] buf: [77, 65, 73, 78]
+MAIN[DEBUG][kernel/src/syscall/mod.rs:56] task 2 call [write]
+[ INFO][kernel/src/syscall/fs.rs:255] [sys_write] buf: [70, 79, 82, 75]
+FORK[DEBUG][kernel/src/syscall/mod.rs:56] task 1 call [write]
+[ INFO][kernel/src/syscall/fs.rs:255] [sys_write] buf: [32, 105, 110, 32, 108, 105, 98, 10]
+ in lib
+       [DEBUG][kernel/src/syscall/mod.rs:56] task 2 call [write]
+[ INFO][kernel/src/syscall/fs.rs:255] [sys_write] buf: [32, 105, 110, 32, 108, 105, 98, 10]
+ in lib
+       [DEBUG][kernel/src/syscall/mod.rs:56] task 1 call [wait4]
+[ INFO][kernel/src/syscall/process.rs:124] [sys_wait4] init_proc wait for recycling
+[ INFO][kernel/src/syscall/process.rs:132] [sys_wait4] target: AnyChild, option: WaitOptions(0x0)
+[DEBUG][kernel/src/task/task.rs:634] task1 state Running => Interruptible
+[ INFO][kernel/src/syscall/process.rs:246] [sys_wait4] task [init_proc] suspend for sigchld
+[DEBUG][/home/unix/file/OSkernel/myOS/OS/lib/osfuture/src/lib.rs:65] suspend
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802ccaf4 bad addr: 0x90000000808eecac
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x28c0f065
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802ccb98 bad addr: 0x90000000808eed14
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x29c012e5
+[DEBUG][kernel/src/syscall/mod.rs:56] task 2 call [write]
+[ INFO][kernel/src/syscall/fs.rs:255] [sys_write] buf: [0, 0, 42, 0, 0, 0, 42, 0, 0, 0, 42, 0, 0, 0, 42, 0]
+****[DEBUG][kernel/src/syscall/mod.rs:56] task 2 call [close]
+[ INFO][kernel/src/syscall/fs.rs:485] [sys_close] fd: 2
+[DEBUG][lib/osfs/src/fd_table.rs:203] fd 2 remained: 2
+[DEBUG][kernel/src/syscall/mod.rs:56] task 2 call [write]
+[ INFO][kernel/src/syscall/fs.rs:255] [sys_write] buf: [0, 42, 0, 0, 0, 42, 0, 0, 0, 42, 0, 0, 0, 42, 0, 0, 0, 42, 0]
+*****[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802ccaf4 bad addr: 0x90000000808eecac
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x28c0f065
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802ccb98 bad addr: 0x90000000808eed14
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x29c012e5
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802ccaf4 bad addr: 0x90000000808eecac
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x28c0f065
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802ccb98 bad addr: 0x90000000808eed14
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x29c012e5
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802ccaf4 bad addr: 0x90000000808eecac
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x28c0f065
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802ccb98 bad addr: 0x90000000808eed14
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x29c012e5
+[DEBUG][kernel/src/syscall/mod.rs:56] task 2 call [chdir]
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x900000008021c164 bad addr: 0x90000000808eebc4
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x28d09065
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x900000008021c190 bad addr: 0x90000000808ee9f4
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 6 inst: 0x29c95066
+[ INFO][kernel/src/syscall/fs.rs:612] [sys_chdir] path: musl
+[DEBUG][lib/vfs/src/dentry.rs:301] lookup: neg child musl
+[DEBUG][lib/vfs/src/dentry.rs:303] then lookup: neg child musl
+[ WARN][kernel/src/syscall/mod.rs:316] [syscall] CHDIR return err ENOENT
+[DEBUG][kernel/src/syscall/mod.rs:56] task 2 call [write]
+[ INFO][kernel/src/syscall/fs.rs:255] [sys_write] buf: [0, 0, 42, 0, 0, 0, 42, 0, 0, 0, 42, 0, 0, 0, 42, 0, 0, 0, 42, 0]
+*****[DEBUG][kernel/src/syscall/mod.rs:56] task 2 call [write]
+[ INFO][kernel/src/syscall/fs.rs:255] [sys_write] buf: [0, 0, 42, 0, 0, 0, 42, 0, 0, 0, 42, 0, 0, 0, 42, 0, 0, 0, 42, 0, 0, 0, 42, 0]
+******[DEBUG][kernel/src/syscall/mod.rs:56] task 2 call [mkdirat]
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x900000008021bb6c bad addr: 0x90000000808eebc4
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x28d09065
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x900000008021bb98 bad addr: 0x90000000808ee9f4
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 6 inst: 0x29c95066
+[ INFO][kernel/src/syscall/fs.rs:563] [sys_mkdirat] dirfd: 18446744073709551516, path: /bin
+[ WARN][kernel/src/syscall/mod.rs:316] [syscall] MKDIRAT return err EEXIST
+[DEBUG][kernel/src/syscall/mod.rs:56] task 2 call [clone]
+[DEBUG][kernel/src/logging.rs:66] Log Enable
+[ INFO][kernel/src/syscall/process.rs:403] [sys_clone] flags:0x0, stack:0x0, tls:0x0, parent_tid:0x0, child_tid:0
+[ INFO][kernel/src/syscall/process.rs:410] [sys_clone] flags CloneFlags(0x0)
+[DEBUG][kernel/src/task/taskf.rs:220] new THREAD selected
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x900000008024578c bad addr: 0x90000000808edcdf
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 4 inst: 0x29c000e4
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245798 bad addr: 0x90000000808edcd7
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x29c00085
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802457a4 bad addr: 0x90000000808edccf
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 6 inst: 0x29c00086
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x90000000802457f4 bad addr: 0x90000000a18d28d1
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x29c04485
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245800 bad addr: 0x90000000808edcdf
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x28c000a5
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245804 bad addr: 0x90000000a18d28d9
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 6 inst: 0x29c06486
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245808 bad addr: 0x90000000a18d28e1
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 7 inst: 0x29c08487
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245a90 bad addr: 0x90000000808ed474
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 0 inst: 0x29cc1060
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245a94 bad addr: 0x90000000808ed46c
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 0 inst: 0x29cbf060
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245a98 bad addr: 0x90000000808ed454
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 0 inst: 0x29cb9060
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245a9c bad addr: 0x90000000808ed45c
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 0 inst: 0x29cbb060
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245aac bad addr: 0x90000000808edcdf
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 0 inst: 0x29800080
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245ab8 bad addr: 0x90000000808edcd7
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 0 inst: 0x29c00080
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245ac4 bad addr: 0x90000000808edccf
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 0 inst: 0x29c00080
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245b24 bad addr: 0x90000000808edcdf
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 7 inst: 0x28c000e7
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245b28 bad addr: 0x90000000a18d2a11
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 8 inst: 0x29c04488
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245b2c bad addr: 0x90000000a18d2a19
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x29c06485
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245b30 bad addr: 0x90000000a18d2a21
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 6 inst: 0x29c08486
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245b4c bad addr: 0x90000000a18d2a3c
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 7 inst: 0x29c0f087
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245b50 bad addr: 0x90000000a18d2a44
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x29c11085
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245b58 bad addr: 0x90000000a18d2a4c
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 6 inst: 0x29c13086
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245b64 bad addr: 0x90000000a18d2a64
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 5 inst: 0x29c19085
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245b78 bad addr: 0x90000000a18d2a6c
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 8 inst: 0x29c1b088
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245b7c bad addr: 0x90000000a18d2a74
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 6 inst: 0x29c1d086
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245bb4 bad addr: 0x90000000a18d298f
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 7 inst: 0x38181487
+[ WARN][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:199] Unaligned Access PC @ 0x9000000080245bb8 bad addr: 0x90000000a18d2993
+[DEBUG][kernel/src/trap/trap_handler/kernel_trap_handler/unaligned_la.rs:207] rd: 6 inst: 0x29401106

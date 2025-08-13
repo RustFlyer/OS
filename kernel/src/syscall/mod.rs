@@ -300,8 +300,13 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         RECVMMSG => sys_recvmmsg(args[0], args[1], args[2], args[3], args[4]).await,
         MEMFD_SECRET => sys_memfd_secret(args[1] as u32),
         _ => {
-            log::error!("Syscall not implemented: {}", syscall_no.as_str());
-            panic!("Syscall not implemented: {}", syscall_no.as_str());
+            log::error!(
+                "Syscall not implemented: {}, id: {}",
+                syscall_no.as_str(),
+                syscall_no
+            );
+            Ok(0)
+            // panic!("Syscall not implemented: {}", syscall_no.as_str());
         }
     };
 

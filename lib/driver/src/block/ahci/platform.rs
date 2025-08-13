@@ -6,6 +6,7 @@ use core::{
 
 use alloc::string::{String, ToString};
 use config::mm::{KERNEL_MAP_OFFSET, PAGE_SIZE};
+use mm::heap::allocate_align_memory;
 
 use crate::print;
 
@@ -44,7 +45,11 @@ pub unsafe extern "C" fn ahci_printf(fmt: *const u8, mut args: ...) -> i32 {
 
 // 等待数毫秒
 pub fn ahci_mdelay(ms: u32) {
-    spin_loop();
+    let cnt = ms * 10000;
+    for i in 0..cnt {
+        spin_loop();
+    }
+    print!("wait...");
 }
 
 // 同步dcache中所有cached和uncached访存请求
@@ -57,10 +62,12 @@ pub fn ahci_sync_dcache() {
 // 分配按align字节对齐的内存
 pub fn ahci_malloc_align(size: u64, align: u32) -> u64 {
     log::error!("malloc align mem");
-    mm::frame::FrameTracker::build()
-        .unwrap()
-        .as_mut_slice()
-        .as_mut_ptr() as u64
+    // mm::frame::FrameTracker::build()
+    //     .unwrap()
+    //     .as_mut_slice()
+    //     .as_mut_ptr() as u64
+
+    allocate_align_memory(size as usize, align as usize) as u64
 }
 
 // 物理地址转换为uncached虚拟地址

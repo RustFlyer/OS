@@ -1,4 +1,5 @@
 use alloc::sync::Arc;
+use arch::mm::tlb_flush_all;
 use arch::time::{get_time_duration, set_nx_timer_irq};
 use osfuture::{block_on_with_result, suspend_now, take_waker, yield_now};
 use timer::TIMER_MANAGER;

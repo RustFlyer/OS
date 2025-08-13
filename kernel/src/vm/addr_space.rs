@@ -292,9 +292,20 @@ impl AddrSpace {
     /// memory pages between the original address space and the new address space. When
     /// one of them writes to a shared page, the page is copied and the writer gets a
     /// new physical page elsewhere.
-    pub fn clone_cow(&self) -> SysResult<Self> {
-        let mut new_space = Self::build_user()?;
-        let new_vm_areas = self.vm_areas.lock().clone();
+    pub fn clone_cow(&self, new_space: &mut AddrSpace) -> SysResult<()> {
+        log::debug!("tick-2");
+        let _ = self.change_prot(VirtAddr::new(0x181928001), 0x1000, MappingFlags::RWX);
+
+        let lock = self.vm_areas.lock();
+        let mut new_vm_areas = BTreeMap::new();
+
+        for (va, area) in &(*lock) {
+            log::debug!("copy area: {:?}", area);
+            let narea = area.clone();
+            log::debug!("copy narea: {:?}", narea);
+            new_vm_areas.insert(*va, narea);
+            log::debug!("end insert");
+        }
 
         for vma in new_vm_areas.values() {
             for &vpn in vma.pages().keys() {
@@ -318,11 +329,12 @@ impl AddrSpace {
         }
         new_space.vm_areas = SpinLock::new(new_vm_areas);
 
+        log::debug!("finish clone_cow");
         // Because the permission of PTEs is downgraded, we need to do a TLB shootdown.
         fence();
         tlb_shootdown_all();
 
-        Ok(new_space)
+        Ok(())
     }
 
     /// Changes the size of the heap.

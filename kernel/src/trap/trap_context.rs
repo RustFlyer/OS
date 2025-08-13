@@ -10,7 +10,7 @@ use arch::trap::disable_interrupt;
 /// of the TrapContext of this task/process in user address space,
 /// until they switch when __trap_from_user, and the context begins to be saved
 #[derive(Clone, Copy)]
-#[repr(C)]
+#[repr(C, align(8))]
 pub struct TrapContext {
     // integer registers and CSR to be saved when trap from user to kernel
     // Note: It's for both RISCV and LoongArch, but only use RISCV's register name for convenience
@@ -311,7 +311,7 @@ impl TrapContext {
     }
 }
 
-#[repr(C)]
+#[repr(C, align(8))]
 #[derive(Debug)]
 pub struct KernelTrapContext {
     pub user_reg: [usize; 32],
@@ -319,12 +319,15 @@ pub struct KernelTrapContext {
 }
 
 impl KernelTrapContext {
-    pub const KERNEL_CONTEXT_SIZE: usize = core::mem::size_of::<Self>();
-
-    pub fn new(entry: usize, sp: usize) -> Self {
+    pub fn from_tc(tc: &TrapContext) -> Self {
         Self {
-            user_reg: [0; 32],
-            sepc: entry // as era(0x6) in LoongArch
+            user_reg: tc.user_reg,
+            sepc: tc.sepc,
         }
+    }
+
+    pub fn to_trapcontext(&self, tc: &mut TrapContext) {
+        tc.user_reg = self.user_reg;
+        tc.sepc = self.sepc;
     }
 }

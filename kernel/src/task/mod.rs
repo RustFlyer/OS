@@ -23,7 +23,10 @@ use net::poll_interfaces;
 use osfuture::{block_on, yield_now};
 pub use task::{Task, TaskState};
 
-use osfs::sys_root_dentry;
+use osfs::{
+    simple::{dentry::SimpleDentry, file::SimpleFileFile, inode::SimpleInode},
+    sys_root_dentry,
+};
 use timer::{TIMER_MANAGER, sleep_ms};
 use vfs::file::File;
 
@@ -32,8 +35,9 @@ use crate::{loader::get_app_data_by_name, task::signal::pidfd::init_pf_table};
 pub fn init() {
     init_pf_table();
     // init_proc_by_insert();
-    submit_init_by_insert();
+    // submit_init_by_insert();
     // init_proc();
+    init_proc_by_insert_simple();
     // submit_init();
     // timer_init();
     // net_poll_init();
@@ -58,6 +62,19 @@ pub fn init_proc_by_insert() {
     file.set_flags(OpenFlags::O_RDWR);
     let initproc_u8 = get_app_data_by_name("init_proc").unwrap();
     block_on(async { file.write(initproc_u8).await.unwrap() });
+    file.seek(config::vfs::SeekFrom::Start(0)).unwrap();
+
+    Task::spawn_from_elf(file, "init_proc");
+}
+
+pub fn init_proc_by_insert_simple() {
+    let inode = SimpleInode::new(sys_root_dentry().superblock().unwrap());
+    let dentry = SimpleDentry::new("init", Some(inode), None);
+    let file = SimpleFileFile::new(dentry);
+    file.set_flags(OpenFlags::O_RDWR);
+
+    let initproc_u8 = get_app_data_by_name("init_proc").unwrap();
+    block_on(async { file.into_dyn_ref().write(initproc_u8).await.unwrap() });
     file.seek(config::vfs::SeekFrom::Start(0)).unwrap();
 
     Task::spawn_from_elf(file, "init_proc");

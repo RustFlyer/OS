@@ -64,10 +64,12 @@ impl File for TtyFile {
                 if n == 0 {
                     break;
                 }
+
                 let mut c = ch[0];
                 if termios.is_icrnl() && c == b'\r' {
                     c = b'\n';
                 }
+
                 buf[rlen] = c;
                 rlen += 1;
                 if termios.is_echo() {
@@ -86,6 +88,7 @@ impl File for TtyFile {
                 if termios.is_icrnl() && ch == b'\r' {
                     ch = b'\n';
                 }
+
                 buf[0] = ch;
                 rlen = 1;
                 if termios.is_echo() {
@@ -105,6 +108,7 @@ impl File for TtyFile {
             .downcast_arc::<TtyInode>()
             .unwrap_or_else(|_| unreachable!())
             .char_dev;
+
         dev.write(buf).await;
 
         Ok(buf.len())

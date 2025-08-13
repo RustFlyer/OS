@@ -22,11 +22,11 @@ mod task;
 mod trap;
 mod vm;
 
-use core::ptr;
+use core::{ptr, sync::atomic::AtomicBool};
 
 use arch::mm::{fence, tlb_flush_all};
 use config::mm::{DTB_ADDR, DTB_END, DTB_START};
-use driver::println;
+use driver::{block::block_test, println};
 use logging::{disable_log, enable_filter, enable_log};
 use mm::{self, frame, heap};
 use osdriver::test_serial_output;
@@ -60,24 +60,29 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
 
         // too much log delay, cut up!
         logger::init();
-        enable_log();
-
-        println!("hart id: {}, dtb_addr: {:#x}", hart_id, dtb_addr);
-
-        println!(
-            "kernel physical memory start at: {:#p}",
-            &config::mm::KERNEL_START_PHYS,
+        // enable_log();
+        disable_log();
+        vm::trace_page_table_lookup(
+            mm::address::PhysPageNum::new(0),
+            mm::address::VirtAddr::new(0),
         );
 
-        log::info!("dtb_addr: {:#x}", dtb_addr);
+        // println!("hart id: {}, dtb_addr: {:#x}", hart_id, dtb_addr);
 
-        #[cfg(target_arch = "loongarch64")]
-        log::warn!("ARCH: loongarch64");
+        // println!(
+        //     "kernel physical memory start at: {:#p}",
+        //     &config::mm::KERNEL_START_PHYS,
+        // );
 
-        #[cfg(target_arch = "riscv64")]
-        log::warn!("ARCH: riscv64");
+        // log::info!("dtb_addr: {:#x}", dtb_addr);
 
-        println!("mem init");
+        // #[cfg(target_arch = "loongarch64")]
+        // log::warn!("ARCH: loongarch64");
+
+        // #[cfg(target_arch = "riscv64")]
+        // log::warn!("ARCH: riscv64");
+
+        // println!("mem init");
         /* Initialize heap allocator and page table */
 
         unsafe {
@@ -91,25 +96,20 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
             frame::init_frame_allocator();
             log::info!("hart {}: initialized frame allocator", hart_id);
 
-            println!(
-                "kernel physical memory start at: {:#p}",
-                &config::mm::KERNEL_START_PHYS,
-            );
-
             vm::switch_to_kernel_page_table();
             log::info!("hart {}: switched to kernel page table", hart_id);
-
-            arch::trap::init();
-            trap::trap_env::set_kernel_trap_entry();
-            arch::time::init_timer();
 
             fence();
             ptr::write_volatile(&raw mut UNINITIALIZED, false);
 
+            trap::trap_env::set_kernel_trap_entry();
+
             #[cfg(target_arch = "loongarch64")]
             trap::trap_handler::tlb_init();
+
+            arch::trap::init();
+            arch::time::init_timer();
         }
-        println!("memory init before");
 
         println!(
             "kernel physical memory start at: {:#p}",
@@ -123,8 +123,6 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
             config::mm::KERNEL_START_PHYS,
             config::mm::kernel_end_phys(),
         );
-
-        println!("memory init pass");
 
         println!(
             "kernel physical memory: {:#x} - {:#x}",
@@ -170,8 +168,10 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         println!("device init");
 
         log::info!("hart {}: initialized driver", hart_id);
-
+        enable_log();
         osfs::init();
+        disable_log();
+
         log::info!("hart {}: initialized FS success", hart_id);
         println!("[FILE_SYSTEM] INIT SUCCESS");
 
@@ -180,7 +180,9 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         syscall::init_key();
 
         executor::init(hart_id);
+
         task::init();
+
         println!("[USER_APP] INIT SUCCESS");
         println!("[HART {}] INIT SUCCESS", hart_id);
         println!("{}", NIGHTHAWK_OS_BANNER);
@@ -196,19 +198,75 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         trap::trap_env::set_kernel_trap_entry();
         arch::time::init_timer();
         println!("[HART {}] INIT SUCCESS", hart_id);
-        panic!("multi-core unsupported");
 
         #[cfg(target_arch = "loongarch64")]
         trap::trap_handler::tlb_init();
+
+        panic!("multi-core unsupported");
     }
 
     // vfs::path::test_split_parent_and_name();
-
+    atomic_test();
     // hart::init(hart_id);
     log::info!("hart {}: running", hart_id);
     osfuture::block_on(async { test_serial_output().await });
+    block_test();
     println!("Begin to run shell..");
+    enable_log();
     loop {
         executor::task_run_always_alone(hart_id);
+    }
+}
+
+pub fn atomic_test() {
+    let val = AtomicBool::new(false);
+
+    let r = val.load(core::sync::atomic::Ordering::Relaxed);
+
+    if r {
+        println!("yes!");
+    } else {
+        println!("no!");
+    }
+
+    val.store(true, core::sync::atomic::Ordering::Relaxed);
+
+    let r = val.load(core::sync::atomic::Ordering::Relaxed);
+
+    if r {
+        println!("yes!");
+    } else {
+        println!("no!");
+    }
+
+    println!("expected: no!, yes!");
+
+    struct SP {
+        ab: AtomicBool,
+        op: Option<AtomicBool>,
+    }
+
+    fn return_atomicbool() -> SP {
+        println!("try return_atomicbool!");
+        SP {
+            ab: AtomicBool::new(false),
+            op: None,
+        }
+    }
+
+    let stupid = return_atomicbool();
+    let r = stupid.ab.load(core::sync::atomic::Ordering::Relaxed);
+    if r {
+        println!("yes!");
+    } else {
+        println!("no!");
+    }
+
+    let t = stupid.op;
+
+    if t.is_none() {
+        println!("yes!");
+    } else {
+        println!("no!");
     }
 }

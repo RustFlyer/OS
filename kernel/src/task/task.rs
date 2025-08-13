@@ -6,6 +6,7 @@ use alloc::{
 };
 use core::{
     cell::SyncUnsafeCell,
+    fmt::Debug,
     sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering},
     task::Waker,
 };
@@ -66,6 +67,7 @@ pub struct TaskPerm {
     pub groups: Vec<u32>,
 }
 
+// #[repr(C, align(8))]
 pub struct Task {
     // Three members below are decided as birth and
     // can not be changed during the lifetime.
@@ -189,8 +191,41 @@ pub struct Task {
 
     perm: ShareMutex<TaskPerm>,
 
+    debug_buf: [u8; 128],
     // name, used for debug
     name: SyncUnsafeCell<String>,
+}
+
+impl Debug for Task {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Task")
+            .field("tid", &self.tid)
+            .field("process", &self.process)
+            .field("is_process", &self.is_process)
+            // .field("trap_context", &format!("SyncUnsafeCell<TrapContext>"))
+            // .field("timer", &format!("SyncUnsafeCell<TaskTimeStat>"))
+            // .field("waker", &format!("SyncUnsafeCell<Option<Waker>>"))
+            // .field("addr_space", &format!("SyncUnsafeCell<Arc<AddrSpace>>"))
+            .field("exit_code", &self.exit_code)
+            .field("exit_signal", &self.exit_signal)
+            // .field("sig_mask", &format!("SyncUnsafeCell<SigSet>"))
+            // .field("sig_manager", &format!("SyncUnsafeCell<SigManager>"))
+            // .field("sig_stack", &format!("SyncUnsafeCell<SignalStack>"))
+            .field("sig_cx_ptr", &self.sig_cx_ptr)
+            // .field("tid_address", &format!("SyncUnsafeCell<TidAddress>"))
+            // .field("elf", &format!("SyncUnsafeCell<Arc<dyn File>>"))
+            .field("is_syscall", &self.is_syscall)
+            .field("is_yield", &self.is_yield)
+            // .field("caps", &format!("SyncUnsafeCell<Capabilities>"))
+            .field("dumpable", &self.dumpable)
+            .field("no_new_privs", &self.no_new_privs)
+            .field("pdeathsig", &self.pdeathsig)
+            .field("vfork_parent", &self.vfork_parent)
+            .field("debug_buf", &self.debug_buf)
+            // .field("cpus_on", &format!("SyncUnsafeCell<CpuMask>"))
+            // .field("name", &format!("SyncUnsafeCell<String>"))
+            .finish()
+    }
 }
 
 /// This Impl is mainly for getting and setting the property of Task
@@ -204,8 +239,11 @@ impl Task {
     ) -> Self {
         let tid = tid_alloc();
         let mut perm = TaskPerm::default();
+        log::debug!("is_syscall created before");
+        let is_syscall = AtomicBool::new(false);
+        log::debug!("is_syscall created: {}", is_syscall.load(Ordering::Relaxed));
         perm.pgid = tid.0 as u32;
-        Task {
+        let task = Task {
             tid,
             process: None,
             is_process: true,
@@ -235,12 +273,12 @@ impl Task {
             cwd: new_share_mutex(sys_root_dentry()),
             root: new_share_mutex(sys_root_dentry()),
             elf: SyncUnsafeCell::new(elf_file),
-            is_syscall: AtomicBool::new(false),
+            is_syscall,
             is_yield: AtomicBool::new(false),
             itimers: new_share_mutex([ITimer::default(); 3]),
             caps: SyncUnsafeCell::new(Capabilities::new()),
 
-            dumpable: AtomicBool::new(false),
+            dumpable: AtomicBool::new(true),
             no_new_privs: AtomicBool::new(false),
             pdeathsig: AtomicU32::new(0),
 
@@ -250,8 +288,13 @@ impl Task {
             timers: new_share_mutex(Vec::new()),
 
             perm: new_share_mutex(perm),
+            debug_buf: [0u8; 128],
             name: SyncUnsafeCell::new(name),
-        }
+        };
+
+        log::debug!("task in function: {:?}", task);
+
+        task
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -344,6 +387,8 @@ impl Task {
             cpus_on,
             timers: new_share_mutex(Vec::new()),
             perm,
+            debug_buf: [0u8; 128],
+
             name,
         }
     }
@@ -566,6 +611,7 @@ impl Task {
     }
 
     pub fn is_syscall(&self) -> bool {
+        // log::error!("is_syscall-addr: {:#x}", self.is_syscall.as_ptr() as usize);
         self.is_syscall.load(Ordering::Relaxed)
     }
 

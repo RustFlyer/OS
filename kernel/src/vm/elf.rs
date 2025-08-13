@@ -207,6 +207,8 @@ impl AddrSpace {
                 segment.p_filesz as usize,
                 None,
             );
+
+            log::debug!("area: {:?}", area);
             self.add_area(area)?;
         }
 
