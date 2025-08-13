@@ -2776,20 +2776,20 @@ vxlan03.sh			skip		0	0
 vxlan04.sh			skip		0	0
 wait01			all pass		1	0
 wait02			all pass		1	0
-wait401			all fail		0	1
+wait401			all pass		3	0
 wait402			all pass		1	0			
 wait403			all pass		1	0	
-waitid01			part fail		4	1
+waitid01			all pass		5	0
 waitid02			all pass		1	0
 waitid03			all pass		1	0
 waitid04			all pass		2	0
-waitid05			part fail		5	1
+waitid05			all pass		6	0
 waitid06			all pass		6	0
 waitid07			part fail		3	3
 waitid08			part fail		3	3
 waitid09			all pass		1	0
-waitid10			all fail		0	1
-waitid11			part fail		4	1		
+waitid10			all pass		1	0
+waitid11			all pass		5	0		
 waitpid01			all pass		126	0
 waitpid03			all pass		2	0
 waitpid04			all pass		4	0
@@ -2797,10 +2797,10 @@ waitpid06			all pass		1	0
 waitpid07			all pass		1	0
 waitpid08			all pass		1	0
 waitpid09			all pass		4	0	
-waitpid10			defect panic	0	0
+waitpid10			all fail		0	1
 waitpid11			all fail		0	1
-waitpid12			unimplement panic	0	0
-waitpid13			unimplement panic	0	0
+waitpid12			all fail		0	1
+waitpid13			all fail		0	1
 wc01.sh			skip		0	0
 which01.sh			skip		0	0
 wireguard01.sh		skip		0	0
