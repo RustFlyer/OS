@@ -584,10 +584,21 @@ impl Task {
         content
     }
 
+    fn task_state_to_proc_char(&self) -> &'static str {
+        match self.get_state() {
+            TaskState::Running => "R",
+            TaskState::Interruptible => "S",
+            TaskState::UnInterruptible => "D",
+            TaskState::Sleeping => "S",
+            TaskState::Zombie => "Z",
+            TaskState::WaitForRecycle => "Z",
+        }
+    }
+
     pub fn proc_stat_read(&self) -> String {
         let task = self;
         let comm = format!("(task{})", task.tid());
-        let state = "R";
+        let state = task.task_state_to_proc_char();
         let ppid = task.ppid();
         let pgrp = task.get_pgid();
         let session = 0;

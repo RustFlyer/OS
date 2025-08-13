@@ -120,6 +120,11 @@ pub async fn sys_sched_yield() -> SyscallResult {
 /// - >0(Pid): wait for the child process of current process with the specific pid
 /// - <0(PGid): wait for any child process in the process group with the specific pgid
 pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult {
+    // Check for INT_MIN which cannot be negated safely
+    if pid == i32::MIN {
+        return Err(SysError::ESRCH);
+    }
+
     let task = current_task();
     log::info!("[sys_wait4] {} wait for recycling", task.get_name());
     let option = WaitOptions::from_bits(options).ok_or(SysError::EINVAL)?;

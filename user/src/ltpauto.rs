@@ -8,6 +8,7 @@ pub mod ltprun {
         let TESTCASES = Vec::from([
 "wait01",
 "wait02",
+"wait401",
 "wait402",
 "wait403",
 "waitid01",
