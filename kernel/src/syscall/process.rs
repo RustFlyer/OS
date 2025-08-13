@@ -132,13 +132,9 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
         -1 => WaitFor::AnyChild,
         0 => WaitFor::AnyChildInGroup,
         p if p > 0 => WaitFor::Pid(p as Pid),
-        p => WaitFor::PGid(p as PGid),
+        p => WaitFor::PGid((-p) as PGid),
     };
     log::info!("[sys_wait4] target: {target:?}, option: {option:?}");
-    // log::info!(
-    //     "[sys_wait4] existing task number: {}",
-    //     TASK_MANAGER.how_many_tasks()
-    // );
 
     // get the child for recycle according to the target
     // NOTE: recycle no more than one child per `sys_wait4`
@@ -146,7 +142,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
         WaitFor::AnyChild => {
             let children = task.children_mut().lock();
             if children.is_empty() {
-                log::info!("[sys_wait4] task [{}] fail: no child", task.get_name());
+                log::warn!("[sys_wait4] task {} [{}] fail: no child", task.tid(), task.get_name());
                 return Err(SysError::ECHILD);
             }
             children
@@ -157,7 +153,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
         WaitFor::Pid(pid) => {
             let children = task.children_mut().lock();
             if children.is_empty() {
-                log::info!("[sys_wait4] task [{}] fail: no child", task.get_name());
+                log::warn!("[sys_wait4] task {} [{}] fail: no child", task.tid(), task.get_name());
                 return Err(SysError::ECHILD);
             }
             if let Some(child) = children.get(&pid) {
@@ -167,7 +163,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
                     None
                 }
             } else {
-                log::info!("[sys_wait4] fail: no child with pid {pid}");
+                log::warn!("[sys_wait4] task {} [{}] fail: no child with pid {pid}", task.tid(), task.get_name());
                 return Err(SysError::ECHILD);
             }
         }
@@ -267,7 +263,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
             };
 
             task.set_wake_up_signal(!task.get_sig_mask() | exit_signals);
-            log::info!("[sys_wait4] task [{}] suspend for sigchld", task.get_name());
+            log::info!("[sys_wait4] task {} [{}] suspend for sigchld", task.tid(), task.get_name());
             suspend_now().await;
             // wake up from suspend for any reason(may not be SIGCHLD)
             task.set_state(TaskState::Running);
@@ -295,11 +291,14 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
                     }
                     WaitFor::Pid(pid) => {
                         let children = task.children_mut().lock();
-                        let child = children.get(&pid).unwrap().clone();
-                        if child.is_in_state(TaskState::WaitForRecycle)
-                            && child.with_thread_group(|tg| tg.len() == 1)
-                        {
-                            Some(child)
+                        if let Some(child) = children.get(&pid) {
+                            if child.is_in_state(TaskState::WaitForRecycle)
+                                && child.with_thread_group(|tg| tg.len() == 1)
+                            {
+                                Some(child.clone())
+                            } else {
+                                None
+                            }
                         } else {
                             None
                         }
@@ -348,6 +347,66 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
                 };
 
                 if let Some(child) = child {
+                    // Check if there are more children that can be recycled after removing this one
+                    let child_tid = child.tid();
+                    let more_children_available = match target {
+                        WaitFor::AnyChild => {
+                            let children = task.children_mut().lock();
+                            children
+                                .values()
+                                .any(|c| c.tid() != child_tid 
+                                    && c.is_in_state(TaskState::WaitForRecycle)
+                                    && c.with_thread_group(|tg| tg.len() == 1))
+                        }
+                        WaitFor::Pid(_) => false, // Specific PID wait only waits for one child
+                        WaitFor::PGid(pgid) => {
+                            let mut found = false;
+                            for process in PROCESS_GROUP_MANAGER
+                                .get_group(pgid)
+                                .ok_or(SysError::ECHILD)?
+                                .into_iter()
+                                .filter_map(|t| t.upgrade())
+                                .filter(|t| t.is_process())
+                            {
+                                let children = process.children_mut().lock();
+                                if children
+                                    .values()
+                                    .any(|c| c.tid() != child_tid && c.is_in_state(TaskState::WaitForRecycle))
+                                {
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            found
+                        }
+                        WaitFor::AnyChildInGroup => {
+                            let pgid = task.get_pgid();
+                            let mut found = false;
+                            for process in PROCESS_GROUP_MANAGER
+                                .get_group(pgid)
+                                .ok_or(SysError::ECHILD)?
+                                .into_iter()
+                                .filter_map(|t| t.upgrade())
+                                .filter(|t| t.is_process())
+                            {
+                                let children = process.children_mut().lock();
+                                if children
+                                    .values()
+                                    .any(|c| c.tid() != child_tid && c.is_in_state(TaskState::WaitForRecycle))
+                                {
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            found
+                        }
+                    };
+
+                    // Only consume the signal if no more children are available for recycling
+                    if !more_children_available {
+                        task.sig_manager_mut().dequeue_expect(exit_signals);
+                    }
+
                     break (
                         child.tid(),
                         child.get_exit_code(),
@@ -1988,6 +2047,71 @@ pub async fn sys_waitid(
                 };
 
                 if let Some(child) = child {
+                    // Check if there are more children that can be recycled after removing this one
+                    let child_tid = child.tid();
+                    let more_children_available = match target {
+                        WaitFor::AnyChild => {
+                            let children = task.children_mut().lock();
+                            children
+                                .values()
+                                .any(|c| c.tid() != child_tid 
+                                    && ((report_exited && c.is_in_state(TaskState::WaitForRecycle)) ||
+                                        (report_stopped && c.is_in_state(TaskState::Sleeping)))
+                                    && c.with_thread_group(|tg| tg.len() == 1))
+                        }
+                        WaitFor::Pid(_) => false, // Specific PID wait only waits for one child
+                        WaitFor::PGid(pgid) => {
+                            let mut found = false;
+                            for process in PROCESS_GROUP_MANAGER
+                                .get_group(pgid)
+                                .ok_or(SysError::ECHILD)?
+                                .into_iter()
+                                .filter_map(|t| t.upgrade())
+                                .filter(|t| t.is_process())
+                            {
+                                let children = process.children_mut().lock();
+                                if children
+                                    .values()
+                                    .any(|c| c.tid() != child_tid && 
+                                        ((report_exited && c.is_in_state(TaskState::WaitForRecycle)) ||
+                                         (report_stopped && c.is_in_state(TaskState::Sleeping))))
+                                {
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            found
+                        }
+                        WaitFor::AnyChildInGroup => {
+                            let pgid = task.get_pgid();
+                            let mut found = false;
+                            for process in PROCESS_GROUP_MANAGER
+                                .get_group(pgid)
+                                .ok_or(SysError::ECHILD)?
+                                .into_iter()
+                                .filter_map(|t| t.upgrade())
+                                .filter(|t| t.is_process())
+                            {
+                                let children = process.children_mut().lock();
+                                if children
+                                    .values()
+                                    .any(|c| c.tid() != child_tid && 
+                                        ((report_exited && c.is_in_state(TaskState::WaitForRecycle)) ||
+                                         (report_stopped && c.is_in_state(TaskState::Sleeping))))
+                                {
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            found
+                        }
+                    };
+
+                    // Only consume the signal if no more children are available for recycling
+                    if !more_children_available {
+                        task.sig_manager_mut().dequeue_expect(exit_signals);
+                    }
+
                     break (
                         child.tid(),
                         child.get_exit_code(),

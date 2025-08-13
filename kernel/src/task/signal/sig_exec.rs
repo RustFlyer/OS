@@ -40,15 +40,6 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
     let cx = task.trap_context_mut();
     let old_mask = task.get_sig_mask();
 
-    if si.sig == Sig::from_i32(33) {
-        log::info!("[sig_exec] task {} [{}] Handling signal: {:?} with action: {:?}",
-            task.tid(),
-            task.get_name(),
-            si,
-            action
-        );
-    }
-
     if *interrupted && action.flags.contains(SigActionFlag::SA_RESTART) {
         cx.sepc -= 4;
         cx.restore_last_user_ret_val();
@@ -243,6 +234,7 @@ fn kill(task: &Arc<Task>, sig: Sig) {
         exit_code |= 0x80;
     }
     task.set_exit_code(exit_code);
+    // task.notify_parent(SigInfo::CLD_KILLED, sig);
 }
 
 fn stop(task: &Arc<Task>, sig: Sig) {

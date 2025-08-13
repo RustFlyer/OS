@@ -648,7 +648,7 @@ impl Task {
 
 impl Drop for Task {
     fn drop(&mut self) {
-        let str = format!("Task [{}] is drop", self.get_name());
+        let str = format!("Task {} [{}] is drop", self.tid(), self.get_name());
 
         // let lock = self.parent_mut().lock();
         // log::trace!(

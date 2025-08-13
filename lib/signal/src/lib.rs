@@ -5,7 +5,7 @@ use core::fmt;
 
 use bitflags::*;
 
-pub const NSIG: usize = 64;
+pub const NSIG: usize = 65;
 
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
