@@ -159,6 +159,8 @@ impl Sig {
     pub const SIGPWR: Sig = Sig(30); // Power failure (System V)
     pub const SIGSYS: Sig = Sig(31); // Bad system call (SVr4); unused on Linux
     pub const SIGLEGACYMAX: Sig = Sig(32); // Legacy maximum signal
+    pub const SIGRTMIN: Sig = Sig(34); // Real-time signal minimum
+    pub const SIGRTMAX: Sig = Sig(64); // Real-time signal maximum
     pub const SIGMAX: Sig = Sig(64); // Maximum signal
 
     /// Creates a new `Sig` from a signal number.

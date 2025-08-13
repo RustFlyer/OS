@@ -119,6 +119,21 @@ pub fn init_procfs(root_dentry: Arc<dyn Dentry>) -> SysResult<()> {
     tainted_file.set_flags(OpenFlags::O_WRONLY);
     osfuture::block_on(async { tainted_file.write("0\0".as_bytes()).await })?;
 
+    // /proc/sys/kernel/core_pattern
+    let core_pattern_dentry = SimpleDentry::new(
+        "core_pattern",
+        None,
+        Some(Arc::downgrade(&kernel_dentry.clone().into_dyn())),
+    );
+    kernel_dentry.add_child(core_pattern_dentry.clone());
+    kernel_dentry
+        .clone()
+        .into_dyn()
+        .create(&core_pattern_dentry.clone().into_dyn(), InodeMode::REG)?;
+    let core_pattern_file = core_pattern_dentry.base_open()?;
+    core_pattern_file.set_flags(OpenFlags::O_WRONLY);
+    osfuture::block_on(async { core_pattern_file.write("core\0".as_bytes()).await })?;
+
     // /proc/cpuinfo
     let cpuinfo_inode = SimpleInode::new(root_dentry.superblock().unwrap());
     cpuinfo_inode.set_inotype(InodeType::Dir);
