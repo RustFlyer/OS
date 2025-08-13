@@ -347,65 +347,6 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
                 };
 
                 if let Some(child) = child {
-                    // Check if there are more children that can be recycled after removing this one
-                    let child_tid = child.tid();
-                    let more_children_available = match target {
-                        WaitFor::AnyChild => {
-                            let children = task.children_mut().lock();
-                            children
-                                .values()
-                                .any(|c| c.tid() != child_tid 
-                                    && c.is_in_state(TaskState::WaitForRecycle)
-                                    && c.with_thread_group(|tg| tg.len() == 1))
-                        }
-                        WaitFor::Pid(_) => false, // Specific PID wait only waits for one child
-                        WaitFor::PGid(pgid) => {
-                            let mut found = false;
-                            for process in PROCESS_GROUP_MANAGER
-                                .get_group(pgid)
-                                .ok_or(SysError::ECHILD)?
-                                .into_iter()
-                                .filter_map(|t| t.upgrade())
-                                .filter(|t| t.is_process())
-                            {
-                                let children = process.children_mut().lock();
-                                if children
-                                    .values()
-                                    .any(|c| c.tid() != child_tid && c.is_in_state(TaskState::WaitForRecycle))
-                                {
-                                    found = true;
-                                    break;
-                                }
-                            }
-                            found
-                        }
-                        WaitFor::AnyChildInGroup => {
-                            let pgid = task.get_pgid();
-                            let mut found = false;
-                            for process in PROCESS_GROUP_MANAGER
-                                .get_group(pgid)
-                                .ok_or(SysError::ECHILD)?
-                                .into_iter()
-                                .filter_map(|t| t.upgrade())
-                                .filter(|t| t.is_process())
-                            {
-                                let children = process.children_mut().lock();
-                                if children
-                                    .values()
-                                    .any(|c| c.tid() != child_tid && c.is_in_state(TaskState::WaitForRecycle))
-                                {
-                                    found = true;
-                                    break;
-                                }
-                            }
-                            found
-                        }
-                    };
-
-                    // Only consume the signal if no more children are available for recycling
-                    if !more_children_available {
-                        task.sig_manager_mut().dequeue_expect(exit_signals);
-                    }
 
                     break (
                         child.tid(),
@@ -440,15 +381,26 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
             }
         }
         // check if the child is still in TASK_MANAGER
-        let child = TASK_MANAGER.get_task(child_tid).unwrap();
-        log::info!(
-            "[sys_wait4] remove task [{}] with tid [{}]",
-            child_tid,
-            child.get_name()
-        );
-        // remove the child from current task's children, and TASK_MANAGER, thus the child will be dropped after hart leaves child
-        // NOTE: the child's thread group itself will be recycled when the child is dropped, and it use Weak pointer so it won't affect the drop of child
-        task.remove_child(child);
+        if let Some(child) = TASK_MANAGER.get_task(child_tid) {
+            log::info!(
+                "[sys_wait4] remove task [{}] with tid [{}]",
+                child_tid,
+                child.get_name()
+            );
+            // remove the child from current task's children, and TASK_MANAGER, thus the child will be dropped after hart leaves child
+            // NOTE: the child's thread group itself will be recycled when the child is dropped, and it use Weak pointer so it won't affect the drop of child
+            task.remove_child(child);
+        } else {
+            // Child already removed from TASK_MANAGER, just log and continue
+            log::warn!(
+                "[sys_wait4] child task [{}] already removed from TASK_MANAGER",
+                child_tid
+            );
+            // Still need to remove from parent's children list by tid
+            if let Some(child) = task.children_mut().lock().remove(&child_tid) {
+                log::debug!("[sys_wait4] removed child [{}] from parent's children list", child_tid);
+            }
+        }
         TASK_MANAGER.remove_task(child_tid);
         PROCESS_GROUP_MANAGER.remove(&task);
         Ok(child_tid)
@@ -2047,70 +1999,6 @@ pub async fn sys_waitid(
                 };
 
                 if let Some(child) = child {
-                    // Check if there are more children that can be recycled after removing this one
-                    let child_tid = child.tid();
-                    let more_children_available = match target {
-                        WaitFor::AnyChild => {
-                            let children = task.children_mut().lock();
-                            children
-                                .values()
-                                .any(|c| c.tid() != child_tid 
-                                    && ((report_exited && c.is_in_state(TaskState::WaitForRecycle)) ||
-                                        (report_stopped && c.is_in_state(TaskState::Sleeping)))
-                                    && c.with_thread_group(|tg| tg.len() == 1))
-                        }
-                        WaitFor::Pid(_) => false, // Specific PID wait only waits for one child
-                        WaitFor::PGid(pgid) => {
-                            let mut found = false;
-                            for process in PROCESS_GROUP_MANAGER
-                                .get_group(pgid)
-                                .ok_or(SysError::ECHILD)?
-                                .into_iter()
-                                .filter_map(|t| t.upgrade())
-                                .filter(|t| t.is_process())
-                            {
-                                let children = process.children_mut().lock();
-                                if children
-                                    .values()
-                                    .any(|c| c.tid() != child_tid && 
-                                        ((report_exited && c.is_in_state(TaskState::WaitForRecycle)) ||
-                                         (report_stopped && c.is_in_state(TaskState::Sleeping))))
-                                {
-                                    found = true;
-                                    break;
-                                }
-                            }
-                            found
-                        }
-                        WaitFor::AnyChildInGroup => {
-                            let pgid = task.get_pgid();
-                            let mut found = false;
-                            for process in PROCESS_GROUP_MANAGER
-                                .get_group(pgid)
-                                .ok_or(SysError::ECHILD)?
-                                .into_iter()
-                                .filter_map(|t| t.upgrade())
-                                .filter(|t| t.is_process())
-                            {
-                                let children = process.children_mut().lock();
-                                if children
-                                    .values()
-                                    .any(|c| c.tid() != child_tid && 
-                                        ((report_exited && c.is_in_state(TaskState::WaitForRecycle)) ||
-                                         (report_stopped && c.is_in_state(TaskState::Sleeping))))
-                                {
-                                    found = true;
-                                    break;
-                                }
-                            }
-                            found
-                        }
-                    };
-
-                    // Only consume the signal if no more children are available for recycling
-                    if !more_children_available {
-                        task.sig_manager_mut().dequeue_expect(exit_signals);
-                    }
 
                     break (
                         child.tid(),

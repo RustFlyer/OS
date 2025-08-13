@@ -17,8 +17,6 @@ pub mod ltprun {
 "waitid04",
 "waitid05",
 "waitid06",
-"waitid07",
-"waitid08",
 "waitid09",
 "waitid10",
 "waitid11",
