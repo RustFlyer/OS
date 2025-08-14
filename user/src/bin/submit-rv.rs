@@ -22,7 +22,7 @@ fn run_cmd(cmd: &str) {
         execve("./busybox", &["./busybox", "sh", "-c", cmd], &[]);
     } else {
         let mut result: i32 = 0;
-        waitpid(-1, &mut result);
+        waitpid(-1, &mut result, 0);
     }
 }
 
@@ -31,7 +31,7 @@ fn run_test(cmd: &str) {
         execve("./busybox", &["./busybox", "sh", cmd], &[]);
     } else {
         let mut result: i32 = 0;
-        waitpid(-1, &mut result);
+        waitpid(-1, &mut result, 0);
     }
 }
 

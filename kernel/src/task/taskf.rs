@@ -480,7 +480,7 @@ impl Task {
         if self.is_process() {
             assert!(threadgroup.len() == 1);
             log::info!(
-                "[exit] process {} do exit and recycle after all children are zombied, tg_len: {}",
+                "[exit] process {} do exit and recycle after all threads in group are zombied, tg_len: {}",
                 self.tid(),
                 threadgroup.len()
             );

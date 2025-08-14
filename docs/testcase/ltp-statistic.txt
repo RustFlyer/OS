@@ -1744,8 +1744,8 @@ route-lib.sh		all fail		0	1
 route-redirect.sh		skip		0	0
 route4-rmmod		skip		0	0
 route6-rmmod		skip		0	0
-rt_sigaction01		part fail		145	5
-rt_sigaction02		part fail		145	5	
+rt_sigaction01		all pass		150	0
+rt_sigaction02		all pass		150	0	
 rt_sigaction03		all pass		150	0	
 rt_sigprocmask01		skip		0	0
 rt_sigprocmask02		defect panic	0	0

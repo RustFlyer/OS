@@ -78,7 +78,7 @@ pub fn run_cmd(cmd: &str) {
         execve("./busybox", &["./busybox", "sh", "-c", cmd], &[]);
     } else {
         let mut result: i32 = 0;
-        waitpid(-1, &mut result);
+        waitpid(-1, &mut result, 0);
     }
 }
 
@@ -228,7 +228,7 @@ pub fn usershell() {
 
             exit(0);
         }
-        waitpid(pid, &mut exitcode);
+        waitpid(pid, &mut exitcode, 0);
     }
 }
 

@@ -6,7 +6,7 @@ pub mod ltprun {
     #[allow(non_snake_case)]
     pub fn autorun() {
         let TESTCASES = Vec::from([
-"wait01",
+            "wait01",
 "wait02",
 "wait401",
 "wait402",
@@ -42,3 +42,62 @@ pub mod ltprun {
         }
     }
 }
+
+
+// "pidfd_send_signal01",
+// "pidfd_send_signal02",
+// "pidfd_send_signal03",
+// "rt_sigprocmask01",
+// "rt_sigprocmask02",
+// "rt_sigqueueinfo01",
+// "rt_sigsuspend01",
+// "sigaction01",
+// "sigaction02",
+// "sigaltstack01",
+// "sigaltstack02",
+// "sighold02",
+// "signal01",
+// "signal02",
+// "signal03",
+// "signal04",
+// "signal05",
+// "signal06",
+// "signalfd01",
+// "signalfd4_01",
+// "signalfd4_02",
+// "sigpending02",
+// "sigprocmask01",
+// "sigrelse01",
+// "sigsuspend01",
+// "sigtimedwait01",
+// "sigwait01",
+// "sigwaitinfo01",
+
+// "pidfd_send_signal01", stuck and ESRCH
+// "pidfd_send_signal02", enoent broken
+// "pidfd_send_signal03", skiped for file not found
+// "rt_sigprocmask01", 136 unimplemented
+// "rt_sigprocmask02", pass
+// "rt_sigqueueinfo01", 138 unimplemented
+// "rt_sigsuspend01", nothing
+// "sigaction01", pass
+// "sigaction02", pass
+// "sigaltstack01", pass
+// "sigaltstack02", pass
+// "sighold02", “signal handler was executed”
+// "signal01", timeout
+// "signal02", pass
+// "signal03", pass
+// "signal04", pass
+// "signal05", pass
+// "signal06", not on x86
+// "signalfd01", pass
+// "signalfd4_01", "signalfd4(SFD_CLOEXEC) does not set close-on-exec flag"
+// "signalfd4_02", "signalfd4(SFD_CLOEXEC) does not set close-on-exec flag"
+// "sigpending02", 136 unimplemented
+// "sigprocmask01", 136 unimplemented
+// "sigrelse01", failed
+// "sigsuspend01", nothing
+// "sigtimedwait01", timeout
+// "sigwait01", timeout
+// "sigwaitinfo01", timeout

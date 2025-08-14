@@ -1,5 +1,6 @@
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
+use alloc::task;
 use alloc::vec::Vec;
 
 use bitflags::*;
@@ -126,7 +127,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
     }
 
     let task = current_task();
-    log::info!("[sys_wait4] {} wait for recycling", task.get_name());
+    log::info!("[sys_wait4] task {} called wait4(pid: {pid:?}, wstatus: {wstatus:?}, options: {options:?})", task.tid());
     let option = WaitOptions::from_bits(options).ok_or(SysError::EINVAL)?;
     let target = match pid {
         -1 => WaitFor::AnyChild,
@@ -134,7 +135,6 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
         p if p > 0 => WaitFor::Pid(p as Pid),
         p => WaitFor::PGid((-p) as PGid),
     };
-    log::info!("[sys_wait4] target: {target:?}, option: {option:?}");
 
     // get the child for recycle according to the target
     // NOTE: recycle no more than one child per `sys_wait4`
@@ -142,7 +142,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
         WaitFor::AnyChild => {
             let children = task.children_mut().lock();
             if children.is_empty() {
-                log::warn!("[sys_wait4] task {} [{}] fail: no child", task.tid(), task.get_name());
+                log::warn!("[sys_wait4] task {} [{}] wait4 fail at beginning: no child", task.tid(), task.get_name());
                 return Err(SysError::ECHILD);
             }
             children
@@ -153,7 +153,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
         WaitFor::Pid(pid) => {
             let children = task.children_mut().lock();
             if children.is_empty() {
-                log::warn!("[sys_wait4] task {} [{}] fail: no child", task.tid(), task.get_name());
+                log::warn!("[sys_wait4] task {} [{}] wait4 fail at beginning: no child", task.tid(), task.get_name());
                 return Err(SysError::ECHILD);
             }
             if let Some(child) = children.get(&pid) {
@@ -163,7 +163,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
                     None
                 }
             } else {
-                log::warn!("[sys_wait4] task {} [{}] fail: no child with pid {pid}", task.tid(), task.get_name());
+                log::warn!("[sys_wait4] task {} [{}] wait4 fail at beginning: no child with pid {pid}", task.tid(), task.get_name());
                 return Err(SysError::ECHILD);
             }
         }
@@ -211,6 +211,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
     };
 
     if let Some(child_for_recycle) = child_for_recycle {
+        log::info!("[sys_wait4] task {} found a child task {} for recycle at the beginning", task.tid(), child_for_recycle.tid());
         // 1. if there is a child for recycle when `sys_wait4` is called
         let addr_space = task.addr_space();
         let mut status = UserWritePtr::<i32>::new(wstatus, &addr_space);
@@ -222,17 +223,11 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
         if !status.is_null() {
             // status stores signal in the lowest 8 bits and exit code in higher 8 bits
             let exit_code = zombie_task.get_exit_code();
-            log::debug!("[sys_wait4] wstatus: {exit_code:#x}");
             unsafe {
                 status.write(exit_code)?;
             }
         }
         let tid = zombie_task.tid();
-        log::debug!(
-            "[sys_wait4] remove tid [{}] task [{}]",
-            tid,
-            zombie_task.get_name()
-        );
 
         task.remove_child(zombie_task.clone());
 
@@ -242,12 +237,11 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
         Ok(tid)
     } else if option.contains(WaitOptions::WNOHANG) {
         // 2. if WNOHANG option is set and there is no child for recycle, return immediately
-        log::debug!("[sys_wait4] WaitOptions::WNOHANG return");
+        log::info!("[sys_wait4] task {} wait4 return 0 because of WNOHANG", task.tid());
         Ok(0)
     } else {
         // 3. if there is no child for recycle and WNOHANG option is not set, wait for SIGCHLD from target
         let (child_tid, exit_code, child_utime, child_stime) = loop {
-            task.set_state(TaskState::Interruptible);
 
             let exit_signals = {
                 let children = task.children_mut().lock();
@@ -262,8 +256,9 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
                 sigset
             };
 
-            task.set_wake_up_signal(!task.get_sig_mask() | exit_signals);
-            log::info!("[sys_wait4] task {} [{}] suspend for sigchld", task.tid(), task.get_name());
+            task.set_wake_up_signal(exit_signals);
+            log::info!("[sys_waitid] task [{}] suspend for exit_signals: {:?}", task.get_name(), exit_signals);
+            task.set_state(TaskState::Interruptible);
             suspend_now().await;
             // wake up from suspend for any reason(may not be SIGCHLD)
             task.set_state(TaskState::Running);
@@ -274,7 +269,9 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
             // TODO: check if the matched child is identical to the SIGCHLD's info
             if let Some(info) = si {
                 log::info!(
-                    "[sys_wait4] sigchld received, the child for recycle is announced by signal to be {:?}",
+                    "[sys_wait4] exit_signals {:?} received by parent task {}, the child for recycle is announced by signal to be {:?}",
+                    exit_signals,
+                    task.tid(),
                     info.details
                 );
 
@@ -304,6 +301,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
                         }
                     }
                     WaitFor::PGid(pgid) => {
+
                         let mut result = None;
                         for process in PROCESS_GROUP_MANAGER
                             .get_group(pgid)
@@ -312,6 +310,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
                             .filter_map(|t| t.upgrade())
                             .filter(|t| t.is_process())
                         {
+                            log::info!("[sys_wait4] in PGid block, task {} try to find the assigned child task after suspending(target: {:?})", task.tid(), target);
                             let children = process.children_mut().lock();
                             if let Some(child) = children
                                 .values()
@@ -324,8 +323,16 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
                         result
                     }
                     WaitFor::AnyChildInGroup => {
+                        log::info!("[sys_wait4] in AnyChildInGroup block, task {} try to find the assigned child task after suspending(target: {:?})", task.tid(), target);
                         let pgid = task.get_pgid();
                         let mut result = None;
+                        
+                        let btree = PROCESS_GROUP_MANAGER.get_group(pgid).ok_or(SysError::ECHILD)?;
+                        log::info!("[sys_wait4] pgid {} group length: {}", pgid, btree.len());
+                        for task in PROCESS_GROUP_MANAGER.get_group(pgid).ok_or(SysError::ECHILD)?.into_iter().filter_map(|t| t.upgrade()) {
+                            log::debug!("[sys_wait4] task {} in pgid {} group", task.tid(), pgid);
+                        }
+
                         for process in PROCESS_GROUP_MANAGER
                             .get_group(pgid)
                             .ok_or(SysError::ECHILD)?
@@ -347,18 +354,20 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
                 };
 
                 if let Some(child) = child {
-
+                    log::info!("[sys_wait4] task {} found the child task {} for recycle after suspending", task.tid(), child.tid());
                     break (
                         child.tid(),
                         child.get_exit_code(),
                         child.timer_mut().user_time(),
                         child.timer_mut().kernel_time(),
                     );
+                } else {
+                    log::warn!("[sys_wait4] task {} can't find any child in the same process group after suspending", task.tid());
                 }
             } else {
-                log::info!("[sys_wait4] return SysError::EINTR");
-                log::info!(
-                    "[sys_wait4] pending signals: {:?}",
+                log::error!(
+                    "[sys_wait4] task {} was woken but doesn't find any exit_signals, pending signals: {:?}",
+                    task.tid(),
                     task.sig_manager_mut().queue
                 );
                 return Err(SysError::EINTR);
@@ -375,7 +384,7 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
         if !status.is_null() {
             // status stores signal in the lowest 8 bits and exit code in higher 8 bits
             // status macros can be found in <bits/waitstatus.h>
-            log::trace!("[sys_wait4] wstatus: {:#x}", exit_code);
+            // log::trace!("[sys_wait4] wstatus: {:#x}", exit_code);
             unsafe {
                 status.write(exit_code)?;
             }
@@ -383,26 +392,30 @@ pub async fn sys_wait4(pid: i32, wstatus: usize, options: i32) -> SyscallResult 
         // check if the child is still in TASK_MANAGER
         if let Some(child) = TASK_MANAGER.get_task(child_tid) {
             log::info!(
-                "[sys_wait4] remove task [{}] with tid [{}]",
-                child_tid,
-                child.get_name()
+                "[sys_wait4] parent task {} remove task [{}] with tid [{}] after suspending",
+                task.tid(),
+                child.get_name(),
+                child_tid
             );
             // remove the child from current task's children, and TASK_MANAGER, thus the child will be dropped after hart leaves child
             // NOTE: the child's thread group itself will be recycled when the child is dropped, and it use Weak pointer so it won't affect the drop of child
+            PROCESS_GROUP_MANAGER.remove(&child);
             task.remove_child(child);
         } else {
             // Child already removed from TASK_MANAGER, just log and continue
             log::warn!(
-                "[sys_wait4] child task [{}] already removed from TASK_MANAGER",
+                "[sys_wait4] parent task {} can't find child task {} in TASK_MANAGER after suspending",
+                task.tid(),
                 child_tid
             );
             // Still need to remove from parent's children list by tid
             if let Some(child) = task.children_mut().lock().remove(&child_tid) {
-                log::debug!("[sys_wait4] removed child [{}] from parent's children list", child_tid);
+                PROCESS_GROUP_MANAGER.remove(&child);
+                log::debug!("[sys_wait4] removed not found child task {} from parent's children list", child_tid);
             }
         }
+
         TASK_MANAGER.remove_task(child_tid);
-        PROCESS_GROUP_MANAGER.remove(&task);
         Ok(child_tid)
     }
 }
@@ -1899,7 +1912,6 @@ pub async fn sys_waitid(
     } else {
         // If there is no child for recycle and WNOHANG option is not set, wait for SIGCHLD from target
         let (child_tid, exit_code, child_utime, child_stime) = loop {
-            task.set_state(TaskState::Interruptible);
 
             let exit_signals = {
                 let children = task.children_mut().lock();
@@ -1915,7 +1927,8 @@ pub async fn sys_waitid(
             };
 
             task.set_wake_up_signal(!task.get_sig_mask() | exit_signals);
-            log::info!("[sys_waitid] task [{}] suspend for sigchld", task.get_name());
+            log::info!("[sys_waitid] task [{}] suspend for exit_signals: {:?}", task.get_name(), exit_signals);
+            task.set_state(TaskState::Interruptible);
             suspend_now().await;
             // Wake up from suspend for any reason (may not be SIGCHLD)
             task.set_state(TaskState::Running);
@@ -2064,9 +2077,9 @@ pub async fn sys_waitid(
         // Don't leave child in a waitable state if WNOWAIT is not set
         if !option.contains(WaitIdOptions::WNOWAIT) {
             // Remove the child from current task's children, and TASK_MANAGER
+            PROCESS_GROUP_MANAGER.remove(&child);
             task.remove_child(child);
             TASK_MANAGER.remove_task(child_tid);
-            PROCESS_GROUP_MANAGER.remove(&task);
         }
         
         Ok(0)

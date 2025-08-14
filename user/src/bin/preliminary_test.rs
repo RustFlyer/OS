@@ -57,7 +57,7 @@ fn main() -> i32 {
                 }
             } else {
                 let mut exit_code: i32 = 0;
-                waitpid(pid, &mut exit_code);
+                waitpid(pid, &mut exit_code, 0);
             }
         }
         println!("******************************");
