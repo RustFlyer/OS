@@ -79,11 +79,12 @@ impl Task {
 
         log::info!("[Task::recv] tid {} received signal {}", self.tid(), si.sig,);
 
-        if matches!(
-            si.sig,
-            Sig::SIGKILL | Sig::SIGSTOP | Sig::SIGCONT | Sig::SIGCHLD
-        ) || (manager.should_wake.contain_signal(si.sig)
-            && self.get_state() == TaskState::Interruptible)
+        let blocked = self.sig_mask_mut().contain_signal(si.sig);
+
+        if matches!(si.sig, Sig::SIGKILL | Sig::SIGSTOP)
+            || (!blocked && matches!(si.sig, Sig::SIGCONT | Sig::SIGCHLD))
+            || (manager.should_wake.contain_signal(si.sig)
+                && self.get_state() == TaskState::Interruptible)
         {
             log::info!(
                 "[Task::recv] tid {} received signal {}, waking up",
