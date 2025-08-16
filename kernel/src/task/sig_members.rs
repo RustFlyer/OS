@@ -97,6 +97,7 @@ impl Task {
                 si.sig,
                 self.get_state()
             );
+            log::debug!("[Task::recv] blocked: {:?}, should_wake: {:?}", blocked, manager.should_wake);
         }
     }
 
