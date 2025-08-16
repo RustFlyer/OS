@@ -6,31 +6,34 @@ pub mod ltprun {
     #[allow(non_snake_case)]
     pub fn autorun() {
         let TESTCASES = Vec::from([
-            "wait01",
-"wait02",
-"wait401",
-"wait402",
-"wait403",
-"waitid01",
-"waitid02",
-"waitid03",
-"waitid04",
-"waitid05",
-"waitid06",
-"waitid09",
-"waitid10",
-"waitid11",
-"waitpid01",
-"waitpid03",
-"waitpid04",
-"waitpid06",
-"waitpid07",
-"waitpid08",
-"waitpid09",
-"waitpid10",
-"waitpid11",
-"waitpid12",
-"waitpid13",
+"pidfd_send_signal01",
+"pidfd_send_signal02",
+"pidfd_send_signal03",
+"rt_sigprocmask01",
+"rt_sigprocmask02",
+"rt_sigqueueinfo01",
+"rt_sigsuspend01",
+"sigaction01",
+"sigaction02",
+"sigaltstack01",
+"sigaltstack02",
+"sighold02",
+"signal01",
+"signal02",
+"signal03",
+"signal04",
+"signal05",
+"signal06",
+"signalfd01",
+"signalfd4_01",
+"signalfd4_02",
+"sigpending02",
+"sigprocmask01",
+"sigrelse01",
+"sigsuspend01",
+"sigtimedwait01",
+"sigwait01",
+"sigwaitinfo01",
         ]);
 
         for test in TESTCASES {
@@ -76,7 +79,7 @@ pub mod ltprun {
 // "pidfd_send_signal01", stuck and ESRCH
 // "pidfd_send_signal02", enoent broken
 // "pidfd_send_signal03", skiped for file not found
-// "rt_sigprocmask01", 136 unimplemented
+// "rt_sigprocmask01", *pass
 // "rt_sigprocmask02", pass
 // "rt_sigqueueinfo01", 138 unimplemented
 // "rt_sigsuspend01", nothing
@@ -94,8 +97,8 @@ pub mod ltprun {
 // "signalfd01", pass
 // "signalfd4_01", "signalfd4(SFD_CLOEXEC) does not set close-on-exec flag"
 // "signalfd4_02", "signalfd4(SFD_CLOEXEC) does not set close-on-exec flag"
-// "sigpending02", 136 unimplemented
-// "sigprocmask01", 136 unimplemented
+// "sigpending02", *4 pass
+// "sigprocmask01", *pass
 // "sigrelse01", failed
 // "sigsuspend01", nothing
 // "sigtimedwait01", timeout

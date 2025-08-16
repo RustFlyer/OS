@@ -675,6 +675,7 @@ pub fn sys_tkill(tid: isize, sig: i32) -> SyscallResult {
 /// signal from the set of pending signals and returns the signal number
 /// as its function result.
 pub async fn sys_rt_sigtimedwait(set: usize, info: usize, timeout: usize) -> SyscallResult {
+
     let task = current_task();
     let addrspace = task.addr_space();
 
@@ -683,7 +684,10 @@ pub async fn sys_rt_sigtimedwait(set: usize, info: usize, timeout: usize) -> Sys
     let mut timeout = UserReadPtr::<TimeSpec>::new(timeout, &addrspace);
 
     let mut set = unsafe { set.read()? };
-    // set.remove(SigSet::SIGKILL | SigSet::SIGSTOP);
+    if set.is_empty() {
+        return Err(SysError::EINVAL);
+    }
+
     let sig = task.with_mut_sig_manager(|pending| {
         if let Some(si) = pending.get_expect(set) {
             Some(si.sig)
@@ -725,9 +729,40 @@ pub async fn sys_rt_sigtimedwait(set: usize, info: usize, timeout: usize) -> Sys
         }
         Ok(si.sig.raw())
     } else {
-        log::info!("[sys_rt_sigtimedwait] I'm woken but not by expect signal (maybe timeout)");
+        log::error!("[sys_rt_sigtimedwait] I'm woken but not by expect signal (maybe timeout)");
         Err(SysError::EAGAIN)
     }
+}
+
+pub async fn sys_rt_sigpending(set: usize, sigsetsize: usize) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+
+    // 验证sigsetsize参数
+    if sigsetsize != core::mem::size_of::<SigSet>() {
+        return Err(SysError::EINVAL);
+    }
+
+    // 创建用户空间写指针
+    let mut set_ptr = UserWritePtr::<SigSet>::new(set, &addrspace);
+
+    // 获取当前任务的待处理信号集合
+    let pending_signals = task.with_mut_sig_manager(|manager| manager.bitmap);
+
+    log::info!(
+        "[sys_rt_sigpending] tid {}, pending signals: {:#x}",
+        task.tid(),
+        pending_signals.bits()
+    );
+
+    // 将待处理信号集合写入用户空间
+    if !set_ptr.is_null() {
+        unsafe {
+            set_ptr.write(pending_signals)?;
+        }
+    }
+
+    Ok(0)
 }
 
 pub async fn sys_rt_sigsuspend(mask: usize) -> SyscallResult {

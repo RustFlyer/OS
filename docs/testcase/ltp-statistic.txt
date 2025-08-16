@@ -1747,7 +1747,7 @@ route6-rmmod		skip		0	0
 rt_sigaction01		all pass		150	0
 rt_sigaction02		all pass		150	0	
 rt_sigaction03		all pass		150	0	
-rt_sigprocmask01		skip		0	0
+rt_sigprocmask01		all pass		1	0
 rt_sigprocmask02		defect panic	0	0
 rt_sigqueueinfo01		unimplement panic(138)	0	0
 rt_sigsuspend01		skip		0	0
@@ -2040,8 +2040,8 @@ signal06			skip		0	0
 signalfd01			all pass		2	0
 signalfd4_01		all fail		0	1
 signalfd4_02		all fail		0	1
-sigpending02		all fail		0	1
-sigprocmask01		unimplement panic(136)	0	1
+sigpending02		all pass		4	0
+sigprocmask01		all pass	1	0
 sigrelse01			all fail		0	2
 sigsuspend01		skip		0	0
 sigtimedwait01		all fail		0	1
