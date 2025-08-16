@@ -587,8 +587,7 @@ pub fn sys_rt_sigmask(
     if !input_mask.is_null() {
         unsafe {
             let input = input_mask.read()?;
-            // log::debug!("[sys_rt_sigmask] task {} input:{input:#x}", task.get_name());
-            log::debug!("[sys_rt_sigmask] how: {how:#x}");
+            log::debug!("[sys_rt_sigmask] task {} input:{input:#x}", task.tid());
 
             match how {
                 SIGBLOCK => {
@@ -684,12 +683,13 @@ pub async fn sys_rt_sigtimedwait(set: usize, info: usize, timeout: usize) -> Sys
     let mut timeout = UserReadPtr::<TimeSpec>::new(timeout, &addrspace);
 
     let mut set = unsafe { set.read()? };
-    set.remove(SigSet::SIGKILL | SigSet::SIGSTOP);
+    // set.remove(SigSet::SIGKILL | SigSet::SIGSTOP);
     let sig = task.with_mut_sig_manager(|pending| {
         if let Some(si) = pending.get_expect(set) {
             Some(si.sig)
         } else {
             pending.should_wake = set | SigSet::SIGKILL | SigSet::SIGSTOP;
+            log::debug!("[sys_rt_sigtimedwait] wake_up_signal: {:?}", pending.should_wake);
             None
         }
     });
@@ -698,6 +698,9 @@ pub async fn sys_rt_sigtimedwait(set: usize, info: usize, timeout: usize) -> Sys
         return Ok(sig.raw());
     }
 
+    let sig_mask_backup = *task.sig_mask_mut();
+    let mut mask = SigSet::all() & (!set);
+    *task.sig_mask_mut() = mask;
     task.set_state(TaskState::Interruptible);
     if !timeout.is_null() {
         let timeout = unsafe { timeout.read()? };
@@ -710,6 +713,7 @@ pub async fn sys_rt_sigtimedwait(set: usize, info: usize, timeout: usize) -> Sys
         suspend_now().await;
     }
 
+    *task.sig_mask_mut() = sig_mask_backup;
     task.set_state(TaskState::Running);
     let si = task.with_mut_sig_manager(|pending| pending.dequeue_expect(set));
     if let Some(si) = si {
