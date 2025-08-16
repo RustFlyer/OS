@@ -532,7 +532,7 @@ impl Task {
         // threads will be dropped when hart leaves this task so we don't need to set.
         self.process().set_state(TaskState::WaitForRecycle);
 
-        // send SIGCHLD to process's parent
+        // send SIGCHLD to process's parent and notify wait queue
         if let Some(parent) = process.parent_mut().lock().as_ref() {
             if let Some(parent) = parent.upgrade() {
                 let lock = self.exit_signal.lock();
@@ -542,11 +542,17 @@ impl Task {
                     Sig::from_i32(lock.unwrap() as i32)
                 };
 
+                // Send traditional SIGCHLD signal for backward compatibility
                 parent.receive_siginfo(SigInfo {
                     sig,
                     code: SigInfo::CLD_EXITED,
                     details: SigDetails::Child { pid: process.pid() },
-                })
+                });
+
+                // Notify wait queue manager to wake up waiting tasks
+                use crate::task::wait_queue::WAIT_QUEUE_MANAGER;
+                WAIT_QUEUE_MANAGER.notify_child_exit(&process, &parent);
+                log::info!("[Task::exit] notified wait queue for child {} exit", process.pid());
             } else {
                 log::error!("no arc parent");
             }
@@ -559,6 +565,8 @@ impl Task {
         });
 
         self.with_mut_fdtable(|table| table.clear());
+
+        log::debug!("[Task::exit] task {} exit finished", self.tid());
     }
 
     pub fn proc_status_read(&self) -> String {

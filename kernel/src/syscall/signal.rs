@@ -721,7 +721,7 @@ pub async fn sys_rt_sigtimedwait(set: usize, info: usize, timeout: usize) -> Sys
         }
         Ok(si.sig.raw())
     } else {
-        log::info!("[sys_rt_sigtimedwait] I'm woken by timeout");
+        log::info!("[sys_rt_sigtimedwait] I'm woken but not by expect signal (maybe timeout)");
         Err(SysError::EAGAIN)
     }
 }
