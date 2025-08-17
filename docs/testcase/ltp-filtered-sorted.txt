@@ -1,0 +1,1950 @@
+name			type		pass	fail+broken
+fanotify01		all pass	702	0
+splice07		part fail	565	1
+fanotify14		all pass	513	0
+epoll_ctl03		all pass	256	0
+access01		part fail	181	18
+rt_sigaction01		all pass	150	0
+rt_sigaction02		all pass	150	0
+rt_sigaction03		all pass	150	0
+chdir01		all pass	135	0
+waitpid01		all pass	126	0
+fsetxattr01		all pass	81	0
+setxattr01		all pass	81	0
+rename01		all pass	72	0
+rename03		all pass	72	0
+pipe11		all pass	70	0
+mkdir09		all pass	54	0
+memfd_create01		part fail	52	2
+fgetxattr01		all pass	45	0
+clock_getres01		all pass	44	0
+sysconf01		skip pass	37	0
+copy_file_range01		all pass	36	0
+chmod01		all pass	32	0
+confstr01		all pass	32	0
+epoll-ltp		part fail	32	1
+posix_fadvise03		all pass	32	0
+posix_fadvise03_64		all pass	32	0
+splice08		part fail	32	2
+signal03		all pass	31	0
+signal05		all pass	31	0
+signal04		all pass	28	0
+fremovexattr02		all pass	27	0
+rename13		all pass	21	0
+utime01		all pass	21	0
+utime02		all pass	21	0
+utime04		all pass	21	0
+accept03		part fail	20	2
+madvise01		all pass	20	0
+fanotify06		all pass	18	0
+llseek03		all pass	18	0
+open_tree02		part fail	18	9
+rename08		all pass	18	0
+rename10		all pass	18	0
+statvfs01		part fail	18	9
+pathconf01		all pass	17	0
+access02		all pass	16	0
+clock_gettime01		all pass	16	0
+fanotify09		part fail	16	11
+clock_nanosleep01		skip pass	12	0
+clock_settime02		all pass	12	0
+diotest4		part fail	12	6
+link04		part fail	12	2
+madvise10		part fail	12	2
+utimensat01		skip pass	12	0
+clock_gettime02		all pass	10	0
+close_range02		part fail	10	1
+fanotify16		part fail	10	72
+times03		part fail	10	2
+add_key02		all pass	9	0
+arping01.sh		part fail	9	3
+clock_adjtime01		all pass	9	0
+fanotify04		all pass	9	0
+fpathconf01		all pass	9	0
+fremovexattr01		all pass	9	0
+fspick02		part fail	9	18
+mkdir03		part fail	9	2
+readv01		part fail	9	1
+rename04		all pass	9	0
+rename05		all pass	9	0
+rename06		all pass	9	0
+rename07		all pass	9	0
+statfs01		all pass	9	0
+statfs01_64		all pass	9	0
+access03		all pass	8	0
+access04		part fail	8	4
+add_key01		all pass	8	0
+epoll_ctl02		all pass	8	1
+fallocate03		all pass	8	0
+fanotify02		all pass	8	0
+fanotify19		part fail	8	8
+fsconfig02		part fail	8	18
+linkat01		part fail	8	2
+bind01		all pass	7	0
+creat06		part fail	7	1
+fcntl36		all pass	7	0
+fcntl36_64		all pass	7	0
+mknod01		all pass	7	0
+setreuid01		all pass	7	0
+splice03		all pass	7	0
+statx01		part fail	7	3
+unlinkat01		all pass	7	0
+utime03		all pass	7	0
+alarm02		all pass	6	0
+capget01		all pass	6	0
+chown05		all pass	6	0
+clock_gettime04		all pass	6	0
+clone302		part fail	6	1
+dup202		all pass	6	0
+fchmodat01		all pass	6	0
+fcntl02		all pass	6	0
+fcntl02_64		all pass	6	0
+fcntl16		all pass	6	0
+fcntl16_64		all pass	6	0
+fstatat01		all pass	6	0
+lchown01		all pass	6	0
+pipe2_01		part fail	6	1
+posix_fadvise01		all pass	6	0
+posix_fadvise01_64		all pass	6	0
+posix_fadvise02		all pass	6	0
+posix_fadvise02_64		all pass	6	0
+tgkill03		all pass	6	0
+waitid05		all pass	6	0
+waitid06		all pass	6	0
+accept01		all pass	5	0
+chmod06		part fail	5	4
+clone08		all pass	5	0
+epoll_wait03		all pass	5	0
+fchmodat02		part fail	5	1
+fcntl05		part fail	5	1
+fcntl05_64		part fail	5	1
+fcntl15_64		part fail	5	7
+fsconfig03		part fail	5	24416
+open07		all pass	5	0
+openat01		all pass	5	0
+read02		all pass	5	0
+readlinkat02		part fail	5	1
+renameat01		part fail	5	2
+rmdir02		part fail	5	4
+setitimer01		part fail	5	1
+socket01		part fail	5	4
+statx02		all pass	5	0
+statx03		part fail	5	2
+stream05		all pass	5	0
+symlink01		all pass	5	0
+symlinkat01		part fail	5	2
+unlink07		part fail	5	1
+waitid01		all pass	5	0
+waitid11		all pass	5	0
+accept4_01		part fail	4	4
+capget02		part fail	4	1
+chown04		part fail	4	4
+chroot03		part fail	4	1
+clock_nanosleep04		all pass	4	0
+clock_settime01		all pass	4	0
+clone301		part fail	4	1
+creat01		part fail	4	2
+dup203		all pass	4	0
+dup204		all pass	4	0
+fallocate01		all pass	4	0
+fallocate06		part fail	4	2
+fchownat01		part fail	4	1
+fcntl09		all pass	4	0
+fcntl09_64		all pass	4	0
+fcntl10		all pass	4	0
+fcntl10_64		all pass	4	0
+fstat02		part fail	4	2
+fstat02_64		part fail	4	2
+ioctl_ns07		all pass	4	0
+linkat02		part fail	4	2
+lseek01		all pass	4	0
+mknod07		part fail	4	2
+mlock01		all pass	4	0
+mmstress		part fail	4	2
+munlock01		all pass	4	0
+pwrite02		part fail	4	1
+pwrite02_64		part fail	4	1
+sched_getaffinity01		all pass	4	0
+sched_setscheduler04		part fail	4	4
+shmt03		all pass	4	0
+sigaction01		all pass	4	0
+signal01		part fail	4	1
+sigpending02		all pass	4	0
+socket02		all pass	4	0
+timerfd02		part fail	4	2
+waitpid04		all pass	4	0
+waitpid09		all pass	4	0
+writev01		part fail	4	2
+alarm05		all pass	3	0
+atof01		part fail	3	1
+capset01		all pass	3	0
+chdir04		all pass	3	0
+clock_adjtime02		part fail	3	3
+close01		all pass	3	0
+diotest2		all pass	3	0
+diotest3		all pass	3	0
+diotest5		all pass	3	0
+diotest6		all pass	3	0
+dup07		all pass	3	0
+epoll_ctl01		all pass	3	0
+faccessat01		all pass	3	0
+fanotify15		part fail	3	3
+fork04		all pass	3	0
+getgroups01		part fail	3	1
+inode01		all pass	3	0
+ioctl05		all pass	3	0
+listen01		all pass	3	0
+mknodat01		part fail	3	4
+mmap09		all pass	3	0
+mremap06		all pass	3	0
+nanosleep04		all pass	3	0
+nextafter01		all pass	3	0
+pidfd_getfd02		part fail	3	2
+prctl02		part fail	3	7
+readv02		part fail	3	2
+select03		part fail	3	2
+sendfile03		part fail	3	1
+sendfile03_64		part fail	3	1
+setgroups02		all pass	3	0
+setresuid04		all pass	3	0
+setreuid04		all pass	3	0
+setreuid06		all pass	3	0
+setreuid07		all pass	3	0
+shmt02		all pass	3	0
+sigaction02		all pass	3	0
+signal02		all pass	3	0
+socketpair01		part fail	3	7
+statfs02		part fail	3	3
+statfs02_64		part fail	3	3
+syscall01		all pass	3	0
+ulimit01		all pass	3	0
+wait401		all pass	3	0
+waitid07		part fail	3	3
+waitid08		part fail	3	3
+write05		part fail	3	1
+abort01		all pass	2	0
+abs01		all pass	2	0
+adjtimex01		all pass	2	0
+alarm03		all pass	2	0
+alarm06		all pass	2	0
+alarm07		all pass	2	0
+bind03		part fail	2	1
+chown02		part fail	2	1
+clone01		all pass	2	0
+connect01		part fail	2	4
+creat04		all pass	2	0
+dup01		all pass	2	0
+dup02		all pass	2	0
+dup04		all pass	2	0
+dup207		all pass	2	0
+dup3_01		all pass	2	0
+dup3_02		part fail	2	1
+epoll_create01		skip pass	2	0
+epoll_create1_01		all pass	2	0
+epoll_create1_02		all pass	2	0
+epoll_wait06		part fail	2	7
+epoll_wait07		part fail	2	3
+eventfd01		all pass	2	0
+eventfd03		all pass	2	0
+eventfd05		all pass	2	0
+eventfd2_01		all pass	2	0
+eventfd2_03		all pass	2	0
+faccessat02		all pass	2	0
+fanotify08		all pass	2	0
+fcntl23		all pass	2	0
+fcntl29		part fail	2	1
+fcntl29_64		part fail	2	1
+fork01		all pass	2	0
+fork10		all pass	2	0
+fsopen02		all pass	2	0
+fstat03		all pass	2	0
+fstat03_64		all pass	2	0
+ftest01		all pass	2	0
+ftest06		all pass	2	0
+kill03		part fail	2	1
+kill11		part fail	2	3
+link02		all pass	2	0
+llseek02		all pass	2	0
+lseek07		all pass	2	0
+memcmp01		all pass	2	0
+memcpy01		all pass	2	0
+mknod02		all pass	2	0
+mknodat02		part fail	2	4
+mmap06		part fail	2	6
+nanosleep02		all pass	2	0
+pidfd_open02		part fail	2	1
+pidns05		part fail	2	10
+pipe04		all pass	2	0
+poll01		all pass	2	0
+prctl01		all pass	2	0
+prctl05		part fail	2	1
+pread02		part fail	2	1
+pread02_64		part fail	2	1
+readlink01		all pass	2	0
+recv01		part fail	2	2
+recvfrom01		part fail	2	2
+removexattr02		part fail	2	1
+sched_getscheduler01		part fail	2	4
+send01		part fail	2	2
+sendto01		part fail	2	2
+setgid03		all pass	2	0
+setgroups03		part fail	2	1
+setpgid01		all pass	2	0
+setpgrp02		all pass	2	0
+setrlimit01		part fail	2	2
+setsockopt01		part fail	2	6
+settimeofday02		part fail	2	1
+setuid04		all pass	2	0
+shmctl02		part fail	2	8
+shmt05		all pass	2	0
+shmt07		all pass	2	0
+sigaltstack02		all pass	2	0
+signalfd01		all pass	2	0
+socketpair02		part fail	2	2
+splice09		all pass	2	0
+stat02		all pass	2	0
+stat02_64		all pass	2	0
+statvfs02		part fail	2	3
+stream03		all pass	2	0
+symlink04		all pass	2	0
+time01		all pass	2	0
+timerfd_create01		all pass	2	0
+tkill01		all pass	2	0
+tkill02		all pass	2	0
+truncate02		all pass	2	0
+truncate02_64		all pass	2	0
+umount2_02		part fail	2	5
+uname01		all pass	2	0
+unlink05		all pass	2	0
+unlink08		part fail	2	2
+utsname04		part fail	2	2
+waitid04		all pass	2	0
+waitpid03		all pass	2	0
+write02		all pass	2	0
+write06		all pass	2	0
+writetest		all pass	2	0
+writev07		part fail	2	6
+add_key03		all pass	1	0
+add_key04		all pass	1	0
+adjtimex02		part fail	1	6
+bpf_map01		part fail	1	2
+bpf_prog01		part fail	1	1
+bpf_prog02		part fail	1	1
+bpf_prog05		part fail	1	1
+brk02		skip pass	1	0
+capset03		all pass	1	0
+chown01		all pass	1	0
+chroot02		part fail	1	1
+clock_nanosleep02		part fail	1	6
+clone03		all pass	1	0
+clone05		all pass	1	0
+clone06		all pass	1	0
+clone07		all pass	1	0
+close02		all pass	1	0
+close_range01		part fail	1	2
+crash01		all pass	1	0
+creat03		all pass	1	0
+creat05		all pass	1	0
+cve-2017-17052		all pass	1	0
+dio_read		all pass	1	0
+dio_sparse		all pass	1	0
+diotest1		all pass	1	0
+dirtyc0w		part fail	1	1
+dirtypipe		all pass	1	0
+dup03		all pass	1	0
+dup06		all pass	1	0
+dup205		all pass	1	0
+dup206		all pass	1	0
+epoll_wait02		part fail	1	6
+epoll_wait04		all pass	1	0
+eventfd02		part fail	1	1
+eventfd2_02		part fail	1	1
+execve03		part fail	1	5
+exit01		all pass	1	0
+exit02		all pass	1	0
+exit_group01		all pass	1	0
+fallocate04		part fail	1	1
+fchdir01		all pass	1	0
+fchdir02		all pass	1	0
+fchownat02		all pass	1	0
+fcntl03		all pass	1	0
+fcntl03_64		all pass	1	0
+fcntl04		all pass	1	0
+fcntl04_64		all pass	1	0
+fcntl08		all pass	1	0
+fcntl08_64		all pass	1	0
+fcntl12		all pass	1	0
+fcntl12_64		all pass	1	0
+fcntl34		all pass	1	0
+fcntl34_64		all pass	1	0
+fgetxattr03		all pass	1	0
+fork03		all pass	1	0
+fork07		all pass	1	0
+fork08		all pass	1	0
+fork09		all pass	1	0
+fork_procs		all pass	1	0
+ftest02		all pass	1	0
+ftest03		all pass	1	0
+ftest04		all pass	1	0
+ftest05		all pass	1	0
+ftest07		all pass	1	0
+ftest08		all pass	1	0
+get_robust_list01		part fail	1	4
+getrusage04		all pass	1	0
+growfiles		all pass	1	0
+inode02		all pass	1	0
+kill06		all pass	1	0
+kill08		all pass	1	0
+kill09		all pass	1	0
+kill12		all pass	1	0
+lchown03		part fail	1	1
+lftest		all pass	1	0
+link05		all pass	1	0
+link08		part fail	1	3
+llseek01		part fail	1	1
+madvise05		all pass	1	0
+mallocstress		all pass	1	0
+memfd_create02		part fail	1	1
+memset01		all pass	1	0
+mkdir05		all pass	1	0
+mknod09		all pass	1	0
+mlock03		all pass	1	0
+mlock04		all pass	1	0
+mmap01		all pass	1	0
+mmap05		all pass	1	0
+mmap08		all pass	1	0
+mmap1		all pass	1	0
+mmap11		all pass	1	0
+mmap18		part fail	1	1
+mmap19		all pass	1	0
+mmap3		all pass	1	0
+mmapstress01		all pass	1	0
+mmapstress04		all pass	1	0
+mprotect01		part fail	1	2
+mprotect03		all pass	1	0
+mprotect04		all pass	1	0
+mprotect05		all pass	1	0
+msync01		all pass	1	0
+msync02		all pass	1	0
+munmap01		all pass	1	0
+munmap02		all pass	1	0
+nanosleep01		all pass	1	0
+newuname01		all pass	1	0
+nfs05_make_tree		all pass	1	0
+nptl01		all pass	1	0
+open01		part fail	1	1
+open02		part fail	1	1
+open03		all pass	1	0
+open04		all pass	1	0
+open09		part fail	1	1
+openat02		part fail	1	2
+page01		all pass	1	0
+page02		part fail	1	2
+pathconf02		part fail	1	5
+pidns32		all pass	1	0
+pipe01		all pass	1	0
+pipe05		all pass	1	0
+pipe06		all pass	1	0
+pipe07		part fail	1	1
+pipe09		all pass	1	0
+pipe10		all pass	1	0
+pipe12		part fail	1	2
+pipe14		all pass	1	0
+pread01		all pass	1	0
+pread01_64		all pass	1	0
+pselect01		part fail	1	6
+pselect01_64		part fail	1	6
+pselect03		all pass	1	0
+pselect03_64		all pass	1	0
+pth_str01		all pass	1	0
+pth_str02		all pass	1	0
+pth_str03		all pass	1	0
+pwrite01		part fail	1	2
+pwrite01_64		part fail	1	2
+pwrite03		all pass	1	0
+pwrite03_64		all pass	1	0
+pwrite04		part fail	1	1
+pwrite04_64		part fail	1	1
+read01		all pass	1	0
+read04		all pass	1	0
+readdir01		all pass	1	0
+removexattr01		all pass	1	0
+rename14		all pass	1	0
+renameat201		part fail	1	5
+rmdir01		all pass	1	0
+rt_sigprocmask01		all pass	1	0
+sbrk01		part fail	1	2
+sbrk02		all pass	1	0
+sched_setaffinity01		part fail	1	2
+sched_yield01		all pass	1	0
+select02		part fail	1	13
+sendfile06		all pass	1	0
+sendfile06_64		all pass	1	0
+sendfile08		all pass	1	0
+sendfile08_64		all pass	1	0
+sendto02		all pass	1	0
+set_robust_list01		part fail	1	1
+set_tid_address01		all pass	1	0
+setegid02		all pass	1	0
+setgid01		all pass	1	0
+setgid02		all pass	1	0
+setgroups01		all pass	1	0
+setgroups04		all pass	1	0
+setitimer02		part fail	1	2
+setpgrp01		all pass	1	0
+setresuid05		part fail	1	1
+setrlimit02		part fail	1	1
+setrlimit04		all pass	1	0
+setrlimit05		all pass	1	0
+setsid01		part fail	1	2
+setsockopt03		skip pass	1	0
+setsockopt04		all pass	1	0
+settimeofday01		all pass	1	0
+setuid01		all pass	1	0
+setuid03		all pass	1	0
+shmctl06		part fail	1	3
+shmem_2nstest		part fail	1	1
+shmnstest		all pass	1	0
+sigaltstack01		all pass	1	0
+sigprocmask01		all pass	1	0
+splice01		all pass	1	0
+splice02		all pass	1	0
+stack_space		all pass	1	0
+starvation		part fail	1	1
+stime01		skip pass	1	0
+stream01		all pass	1	0
+stream04		all pass	1	0
+string01		all pass	1	0
+symlink02		all pass	1	0
+sysinfo01		all pass	1	0
+sysinfo02		all pass	1	0
+tgkill01		all pass	1	0
+times01		all pass	1	0
+umount01		all pass	1	0
+uname02		all pass	1	0
+uname04		all pass	1	0
+utime07		part fail	1	4
+utsname01		all pass	1	0
+wait01		all pass	1	0
+wait02		all pass	1	0
+wait402		all pass	1	0
+wait403		all pass	1	0
+waitid02		all pass	1	0
+waitid03		all pass	1	0
+waitid09		all pass	1	0
+waitid10		all pass	1	0
+waitpid06		all pass	1	0
+waitpid07		all pass	1	0
+waitpid08		all pass	1	0
+write01		all pass	1	0
+write03		all pass	1	0
+writev02		all pass	1	0
+writev05		all pass	1	0
+writev06		all pass	1	0
+acct02		skip	0	0
+acct02_helper		skip	0	0
+acl1		skip	0	0
+add_ipv6addr		skip	0	0
+add_key05		skip	0	0
+aio-stress		skip	0	0
+aio01		skip	0	0
+aio02		skip	0	0
+aiocp		skip	0	0
+aiodio_append		skip	0	0
+aiodio_sparse		skip	0	0
+ar01.sh		skip	0	0
+arch_prctl01		skip	0	0
+asapi_01		skip	0	0
+asapi_02		skip	0	0
+asapi_03		skip	0	0
+ask_password.sh		skip	0	0
+aslr01		skip	0	0
+assign_password.sh		skip	0	0
+autogroup01		skip	0	0
+bbr01.sh		skip	0	0
+bbr02.sh		skip	0	0
+bind06		skip	0	0
+bind_noport01.sh		skip	0	0
+binfmt_misc01.sh		skip	0	0
+binfmt_misc02.sh		skip	0	0
+binfmt_misc_lib.sh		skip	0	0
+block_dev		skip	0	0
+broken_ip-checksum.sh		skip	0	0
+broken_ip-dstaddr.sh		skip	0	0
+broken_ip-fragment.sh		skip	0	0
+broken_ip-ihl.sh		skip	0	0
+broken_ip-nexthdr.sh		skip	0	0
+broken_ip-plen.sh		skip	0	0
+broken_ip-protcol.sh		skip	0	0
+broken_ip-version.sh		skip	0	0
+busy_poll01.sh		skip	0	0
+busy_poll02.sh		skip	0	0
+busy_poll03.sh		skip	0	0
+busy_poll_lib.sh		skip	0	0
+cacheflush01		skip	0	0
+can_bcm01		skip	0	0
+can_filter		skip	0	0
+can_rcv_own_msgs		skip	0	0
+cap_bounds_r		skip	0	0
+cap_bounds_rw		skip	0	0
+cap_bset_inh_bounds		skip	0	0
+capset04		part fail	0	2
+cfs_bandwidth01		skip	0	0
+cgroup_fj_function.sh		skip	0	0
+cgroup_fj_proc		skip	0	0
+cgroup_fj_stress.sh		skip	0	0
+cgroup_regression_getdelays		skip	0	0
+cgroup_regression_test.sh		skip	0	0
+cgroup_xattr		skip	0	0
+change_password.sh		skip	0	0
+check_envval		skip	0	0
+check_icmpv4_connectivity		skip	0	0
+check_icmpv6_connectivity		skip	0	0
+check_keepcaps		skip	0	0
+check_netem		skip	0	0
+check_pe		skip	0	0
+check_setkey		skip	0	0
+check_simple_capset		skip	0	0
+chmod05		part fail	0	1
+chown01_16		skip	0	0
+chown02_16		skip	0	0
+chown04_16		skip	0	0
+chown05_16		skip	0	0
+chroot01		part fail	0	1
+chroot04		part fail	0	1
+cleanup_lvm.sh		skip	0	0
+clone02		skip	0	0
+cmdlib.sh		skip	0	0
+cn_pec.sh		skip	0	0
+cp_tests.sh		skip	0	0
+cpio_tests.sh		skip	0	0
+cpuacct.sh		skip	0	0
+cpuacct_task		skip	0	0
+cpuctl_fj_cpu-hog		skip	0	0
+cpuctl_fj_simple_echo		skip	0	0
+cpuctl_latency_check_task		skip	0	0
+cpufreq_boost		skip	0	0
+cpuhotplug01.sh		skip	0	0
+cpuhotplug02.sh		skip	0	0
+cpuhotplug03.sh		skip	0	0
+cpuhotplug04.sh		skip	0	0
+cpuhotplug05.sh		skip	0	0
+cpuhotplug06.sh		skip	0	0
+cpuhotplug07.sh		skip	0	0
+cpuhotplug_do_kcompile_loop		skip	0	0
+cpuhotplug_hotplug.sh		skip	0	0
+cpuhotplug_report_proc_interrupts		skip	0	0
+cpuhotplug_testsuite.sh		skip	0	0
+cpuset01		skip	0	0
+creat07_child		skip	0	0
+create_datafile		skip	0	0
+create_file		skip	0	0
+cve-2015-3290		skip	0	0
+cve-2016-7042		skip	0	0
+cve-2017-16939		skip	0	0
+cve-2017-17053		skip	0	0
+cve-2017-2618		skip	0	0
+cve-2017-2671		skip	0	0
+cve-2022-4378		skip	0	0
+daemonlib.sh		skip	0	0
+data		skip	0	0
+data_space		skip	0	0
+datafiles		skip	0	0
+dccp01.sh		skip	0	0
+dccp_ipsec.sh		skip	0	0
+dccp_ipsec_vti.sh		skip	0	0
+dctcp01.sh		skip	0	0
+df01.sh		skip	0	0
+dhcp_lib.sh		skip	0	0
+dhcpd_tests.sh		skip	0	0
+dio_append		skip	0	0
+dirty		skip	0	0
+dirtyc0w_shmem		part fail	0	1
+dirtyc0w_shmem_child		skip	0	0
+dma_thread_diotest		skip	0	0
+dns-stress-lib.sh		skip	0	0
+dnsmasq_tests.sh		skip	0	0
+du01.sh		skip	0	0
+dynamic_debug01.sh		skip	0	0
+ebizzy		skip	0	0
+eject-tests.sh		skip	0	0
+eject_check_tray		skip	0	0
+endian_switch01		skip	0	0
+event_generator		skip	0	0
+evm_overlay.sh		skip	0	0
+exec_with_inh		skip	0	0
+exec_without_inh		skip	0	0
+execl01		skip	0	0
+execl01_child		skip	0	0
+execle01		skip	0	0
+execle01_child		skip	0	0
+execlp01_child		skip	0	0
+execv01		skip	0	0
+execv01_child		skip	0	0
+execve01		skip	0	0
+execve01_child		skip	0	0
+execve06		skip	0	0
+execve06_child		skip	0	0
+execve_child		skip	0	0
+execveat_child		skip	0	0
+execveat_errno		skip	0	0
+execvp01_child		skip	0	0
+f00f		skip	0	0
+fanotify22		skip	0	0
+fanotify_child		skip	0	0
+fanout01		skip	0	0
+fchown01_16		skip	0	0
+fchown02_16		skip	0	0
+fchown04_16		skip	0	0
+fchown05_16		skip	0	0
+fcntl01_64		skip	0	0
+fcntl23_64		skip	0	0
+fcntl24_64		skip	0	0
+fcntl25_64		skip	0	0
+fcntl26_64		skip	0	0
+fcntl31_64		skip	0	0
+fcntl32_64		skip	0	0
+fcntl35		skip	0	0
+fcntl35_64		skip	0	0
+fcntl38		skip	0	0
+fcntl38_64		skip	0	0
+fcntl39		skip	0	0
+fcntl39_64		skip	0	0
+file01.sh		skip	0	0
+filecapstest.sh		skip	0	0
+find_portbundle		skip	0	0
+force_erase.sh		skip	0	0
+fork05		skip	0	0
+fork14		skip	0	0
+fork_freeze.sh		skip	0	0
+fou01.sh		skip	0	0
+frag		skip	0	0
+freeze_cancel.sh		skip	0	0
+freeze_kill_thaw.sh		skip	0	0
+freeze_move_thaw.sh		skip	0	0
+freeze_self_thaw.sh		skip	0	0
+freeze_sleep_thaw.sh		skip	0	0
+freeze_thaw.sh		skip	0	0
+freeze_write_freezing.sh		skip	0	0
+fs_perms		skip	0	0
+fs_racer.sh		skip	0	0
+fs_racer_dir_create.sh		skip	0	0
+fs_racer_file_concat.sh		skip	0	0
+fs_racer_file_create.sh		skip	0	0
+fs_racer_file_link.sh		skip	0	0
+fs_racer_file_list.sh		skip	0	0
+fs_racer_file_rename.sh		skip	0	0
+fs_racer_file_rm.sh		skip	0	0
+fs_racer_file_symlink.sh		skip	0	0
+fsetxattr02		skip	0	0
+fsstress		skip	0	0
+ftp-download-stress01-rmt.sh		skip	0	0
+ftp-upload-stress01-rmt.sh		skip	0	0
+ftp01.sh		skip	0	0
+ftrace_regression01.sh		skip	0	0
+ftrace_regression02.sh		skip	0	0
+ftrace_stress		skip	0	0
+ftrace_stress_test.sh		skip	0	0
+ftruncate01		skip	0	0
+ftruncate01_64		skip	0	0
+ftruncate03		skip	0	0
+ftruncate03_64		skip	0	0
+ftruncate04		skip	0	0
+ftruncate04_64		skip	0	0
+futex_cmp_requeue02		skip	0	0
+futex_wait01		skip	0	0
+futex_wait02		skip	0	0
+futex_wait03		skip	0	0
+futex_wait04		skip	0	0
+futex_wait05		skip	0	0
+futex_wait_bitset01		skip	0	0
+futex_waitv01		skip	0	0
+futex_waitv02		skip	0	0
+futex_wake01		skip	0	0
+futex_wake02		skip	0	0
+futex_wake03		skip	0	0
+futex_wake04		skip	0	0
+futimesat01		skip	0	0
+fw_load		skip	0	0
+gdb01.sh		skip	0	0
+genacos		skip	0	0
+genasin		skip	0	0
+genatan		skip	0	0
+genatan2		skip	0	0
+genbessel		skip	0	0
+genceil		skip	0	0
+gencos		skip	0	0
+gencosh		skip	0	0
+generate_lvm_runfile.sh		skip	0	0
+geneve01.sh		skip	0	0
+geneve02.sh		skip	0	0
+genexp		skip	0	0
+genexp_log		skip	0	0
+genfabs		skip	0	0
+genfloor		skip	0	0
+genfmod		skip	0	0
+genfrexp		skip	0	0
+genhypot		skip	0	0
+geniperb		skip	0	0
+genj0		skip	0	0
+genj1		skip	0	0
+genldexp		skip	0	0
+genlgamma		skip	0	0
+genload		skip	0	0
+genlog		skip	0	0
+genlog10		skip	0	0
+genmodf		skip	0	0
+genpow		skip	0	0
+genpower		skip	0	0
+gensin		skip	0	0
+gensinh		skip	0	0
+gensqrt		skip	0	0
+gentan		skip	0	0
+gentanh		skip	0	0
+gentrigo		skip	0	0
+geny0		skip	0	0
+geny1		skip	0	0
+get_ifname		skip	0	0
+get_mempolicy01		skip	0	0
+get_mempolicy02		skip	0	0
+getaddrinfo_01		skip	0	0
+getcontext01		skip	0	0
+getcwd02		skip	0	0
+getcwd03		skip	0	0
+getcwd04		skip	0	0
+getdents01		skip	0	0
+getdomainname01		skip	0	0
+getegid02		skip	0	0
+getegid02_16		skip	0	0
+geteuid01		skip	0	0
+geteuid01_16		skip	0	0
+geteuid02_16		skip	0	0
+getgid01		skip	0	0
+getgid01_16		skip	0	0
+getgid03		skip	0	0
+getgid03_16		skip	0	0
+getgroups01_16		skip	0	0
+getgroups03		skip	0	0
+getgroups03_16		skip	0	0
+gethostbyname_r01		skip	0	0
+gethostid01		skip	0	0
+gethostname01		skip	0	0
+gethostname02		skip	0	0
+getitimer01		skip	0	0
+getpagesize01		skip	0	0
+getpeername01		skip	0	0
+getpgid01		skip	0	0
+getpgid02		skip	0	0
+getpgrp01		skip	0	0
+getpid01		skip	0	0
+getpid02		skip	0	0
+getppid01		skip	0	0
+getppid02		skip	0	0
+getrandom01		skip	0	0
+getrandom02		skip	0	0
+getrandom03		skip	0	0
+getrandom04		skip	0	0
+getrandom05		skip	0	0
+getresgid01_16		skip	0	0
+getresgid02_16		skip	0	0
+getresgid03_16		skip	0	0
+getresuid01_16		skip	0	0
+getresuid02_16		skip	0	0
+getresuid03_16		skip	0	0
+getrlimit01		skip	0	0
+getrlimit02		skip	0	0
+getrlimit03		skip	0	0
+getrusage01		skip	0	0
+getrusage02		skip	0	0
+getrusage03		skip	0	0
+getrusage03_child		skip	0	0
+getsid01		skip	0	0
+getsid02		skip	0	0
+getsockname01		skip	0	0
+getsockopt01		skip	0	0
+getsockopt02		skip	0	0
+gettid01		skip	0	0
+gettid02		skip	0	0
+gettimeofday01		skip	0	0
+getuid01		skip	0	0
+getuid01_16		skip	0	0
+getuid03_16		skip	0	0
+getxattr01		skip	0	0
+getxattr02		skip	0	0
+getxattr03		skip	0	0
+getxattr04		skip	0	0
+getxattr05		skip	0	0
+gre01.sh		skip	0	0
+gre02.sh		skip	0	0
+gzip_tests.sh		skip	0	0
+hackbench		skip	0	0
+ht_affinity		skip	0	0
+ht_enabled		skip	0	0
+http-stress01-rmt.sh		skip	0	0
+http-stress02-rmt.sh		skip	0	0
+hugefallocate01		skip	0	0
+hugefallocate02		skip	0	0
+hugefork01		skip	0	0
+hugefork02		skip	0	0
+hugemmap01		skip	0	0
+hugemmap02		skip	0	0
+hugemmap04		skip	0	0
+hugemmap05		skip	0	0
+hugemmap06		skip	0	0
+hugemmap07		skip	0	0
+hugemmap08		skip	0	0
+hugemmap09		skip	0	0
+hugemmap10		skip	0	0
+hugemmap11		skip	0	0
+hugemmap12		skip	0	0
+hugemmap13		skip	0	0
+hugemmap14		skip	0	0
+hugemmap15		skip	0	0
+hugemmap16		skip	0	0
+hugemmap17		skip	0	0
+hugemmap18		skip	0	0
+hugemmap19		skip	0	0
+hugemmap20		skip	0	0
+hugemmap21		skip	0	0
+hugemmap22		skip	0	0
+hugemmap23		skip	0	0
+hugemmap24		skip	0	0
+hugemmap25		skip	0	0
+hugemmap26		skip	0	0
+hugemmap27		skip	0	0
+hugemmap28		skip	0	0
+hugemmap29		skip	0	0
+hugemmap30		skip	0	0
+hugemmap31		skip	0	0
+hugemmap32		skip	0	0
+hugeshmat01		skip	0	0
+hugeshmat02		skip	0	0
+hugeshmat03		skip	0	0
+hugeshmat04		skip	0	0
+hugeshmat05		skip	0	0
+hugeshmctl01		skip	0	0
+hugeshmctl02		skip	0	0
+hugeshmctl03		skip	0	0
+hugeshmdt01		skip	0	0
+hugeshmget01		skip	0	0
+hugeshmget02		skip	0	0
+hugeshmget03		skip	0	0
+hugeshmget05		skip	0	0
+icmp-uni-basic.sh		skip	0	0
+icmp-uni-vti.sh		skip	0	0
+icmp4-multi-diffip01		skip	0	0
+icmp4-multi-diffip02		skip	0	0
+icmp4-multi-diffip03		skip	0	0
+icmp4-multi-diffip04		skip	0	0
+icmp4-multi-diffip05		skip	0	0
+icmp4-multi-diffip06		skip	0	0
+icmp4-multi-diffip07		skip	0	0
+icmp4-multi-diffnic01		skip	0	0
+icmp4-multi-diffnic02		skip	0	0
+icmp4-multi-diffnic03		skip	0	0
+icmp4-multi-diffnic04		skip	0	0
+icmp4-multi-diffnic05		skip	0	0
+icmp4-multi-diffnic06		skip	0	0
+icmp4-multi-diffnic07		skip	0	0
+icmp6-multi-diffip01		skip	0	0
+icmp6-multi-diffip02		skip	0	0
+icmp6-multi-diffip03		skip	0	0
+icmp6-multi-diffip04		skip	0	0
+icmp6-multi-diffip05		skip	0	0
+icmp6-multi-diffip06		skip	0	0
+icmp6-multi-diffip07		skip	0	0
+icmp6-multi-diffnic01		skip	0	0
+icmp6-multi-diffnic02		skip	0	0
+icmp6-multi-diffnic03		skip	0	0
+icmp6-multi-diffnic04		skip	0	0
+icmp6-multi-diffnic05		skip	0	0
+icmp6-multi-diffnic06		skip	0	0
+icmp6-multi-diffnic07		skip	0	0
+icmp_rate_limit01		skip	0	0
+if-addr-adddel.sh		skip	0	0
+if-addr-addlarge.sh		skip	0	0
+if-lib.sh		skip	0	0
+if-mtu-change.sh		skip	0	0
+if-route-adddel.sh		skip	0	0
+if-route-addlarge.sh		skip	0	0
+if-updown.sh		skip	0	0
+if4-addr-change.sh		skip	0	0
+ima_boot_aggregate		skip	0	0
+ima_conditionals.sh		skip	0	0
+ima_kexec.sh		skip	0	0
+ima_keys.sh		skip	0	0
+ima_measurements.sh		skip	0	0
+ima_policy.sh		skip	0	0
+ima_setup.sh		skip	0	0
+ima_violations.sh		skip	0	0
+in6_01		skip	0	0
+in6_02		skip	0	0
+inh_capped		skip	0	0
+init_module01		skip	0	0
+init_module02		skip	0	0
+initialize_if		skip	0	0
+inotify02		skip	0	0
+inotify03		skip	0	0
+inotify05		skip	0	0
+inotify06		skip	0	0
+inotify07		skip	0	0
+inotify08		skip	0	0
+inotify12		skip	0	0
+inotify_init1_01		skip	0	0
+inotify_init1_02		skip	0	0
+input01		skip	0	0
+input02		skip	0	0
+input03		skip	0	0
+input04		skip	0	0
+input05		skip	0	0
+input06		skip	0	0
+insmod01.sh		skip	0	0
+io_cancel01		skip	0	0
+io_cancel02		skip	0	0
+io_destroy01		skip	0	0
+io_destroy02		skip	0	0
+io_getevents01		skip	0	0
+io_getevents02		skip	0	0
+io_pgetevents01		skip	0	0
+io_pgetevents02		skip	0	0
+io_setup01		skip	0	0
+io_setup02		skip	0	0
+io_submit01		skip	0	0
+io_submit02		skip	0	0
+io_submit03		skip	0	0
+ioctl03		skip	0	0
+ioctl08		skip	0	0
+ioctl09		skip	0	0
+ioctl_loop01		skip	0	0
+ioctl_loop02		skip	0	0
+ioctl_loop03		skip	0	0
+ioctl_loop04		skip	0	0
+ioctl_loop05		skip	0	0
+ioctl_loop06		skip	0	0
+ioctl_loop07		skip	0	0
+ioctl_sg01		skip	0	0
+iogen		skip	0	0
+ioperm01		skip	0	0
+ioperm02		skip	0	0
+iopl01		skip	0	0
+iopl02		skip	0	0
+ip_tests.sh		skip	0	0
+ipneigh01.sh		skip	0	0
+iptables01.sh		skip	0	0
+iptables_lib.sh		skip	0	0
+ipvlan01.sh		skip	0	0
+irqbalance01		skip	0	0
+isofs.sh		skip	0	0
+kernbench		skip	0	0
+keyctl01.sh		skip	0	0
+keyctl03		skip	0	0
+keyctl07		skip	0	0
+kill13		skip	0	0
+killall_icmp_traffic		skip	0	0
+killall_tcp_traffic		skip	0	0
+killall_udp_traffic		skip	0	0
+ksm01		skip	0	0
+ksm02		skip	0	0
+ksm03		skip	0	0
+ksm04		skip	0	0
+ksm05		skip	0	0
+ksm06		skip	0	0
+ksm07		skip	0	0
+lchown01_16		skip	0	0
+lchown03_16		skip	0	0
+ld01.sh		skip	0	0
+ldd01.sh		skip	0	0
+ln_tests.sh		skip	0	0
+lock_torture.sh		skip	0	0
+logrotate_tests.sh		skip	0	0
+lseek11		skip	0	0
+lsmod01.sh		skip	0	0
+ltpClient		skip	0	0
+ltpServer		skip	0	0
+ltpSockets.sh		skip	0	0
+ltp_acpi		skip	0	0
+macsec01.sh		skip	0	0
+macsec02.sh		skip	0	0
+macsec03.sh		skip	0	0
+macsec_lib.sh		skip	0	0
+macvlan01.sh		skip	0	0
+macvtap01.sh		skip	0	0
+madvise08		skip	0	0
+madvise09		skip	0	0
+madvise11		skip	0	0
+mallinfo01		skip	0	0
+mallinfo02		skip	0	0
+mallinfo2_01		skip	0	0
+mallopt01		skip	0	0
+mbind01		skip	0	0
+mbind02		skip	0	0
+mbind03		skip	0	0
+mbind04		skip	0	0
+mc_member_test		skip	0	0
+mc_recv		skip	0	0
+mc_send		skip	0	0
+mc_verify_opts		skip	0	0
+mc_verify_opts_error		skip	0	0
+mcast-group-multiple-socket.sh		skip	0	0
+mcast-group-same-group.sh		skip	0	0
+mcast-group-single-socket.sh		skip	0	0
+mcast-group-source-filter.sh		skip	0	0
+mcast-pktfld01.sh		skip	0	0
+mcast-pktfld02.sh		skip	0	0
+mcast-queryfld01.sh		skip	0	0
+mcast-queryfld02.sh		skip	0	0
+mcast-queryfld03.sh		skip	0	0
+mcast-queryfld04.sh		skip	0	0
+mcast-queryfld05.sh		skip	0	0
+mcast-queryfld06.sh		skip	0	0
+meltdown		skip	0	0
+mem02		skip	0	0
+mem_process		skip	0	0
+memcg_control_test.sh		skip	0	0
+memcg_failcnt.sh		skip	0	0
+memcg_force_empty.sh		skip	0	0
+memcg_lib.sh		skip	0	0
+memcg_limit_in_bytes.sh		skip	0	0
+memcg_max_usage_in_bytes_test.sh		skip	0	0
+memcg_memsw_limit_in_bytes_test.sh		skip	0	0
+memcg_move_charge_at_immigrate_test.sh		skip	0	0
+memcg_process_stress		skip	0	0
+memcg_regression_test.sh		skip	0	0
+memcg_stat_rss.sh		skip	0	0
+memcg_stat_test.sh		skip	0	0
+memcg_stress_test.sh		skip	0	0
+memcg_subgroup_charge.sh		skip	0	0
+memcg_test_1		skip	0	0
+memcg_test_2		skip	0	0
+memcg_test_4.sh		skip	0	0
+memcg_usage_in_bytes_test.sh		skip	0	0
+memcg_use_hierarchy_test.sh		skip	0	0
+memfd_create03		skip	0	0
+memfd_create04		skip	0	0
+migrate_pages01		skip	0	0
+migrate_pages02		skip	0	0
+migrate_pages03		skip	0	0
+mkdir_tests.sh		skip	0	0
+mkdirat01		skip	0	0
+mkfs01.sh		skip	0	0
+mkswap01.sh		skip	0	0
+mlock05		skip	0	0
+mmap-corruption01		skip pass	0	0
+mmap10		skip	0	0
+mmap2		skip	0	0
+mmapstress08		skip	0	0
+mmapstress10		skip	0	0
+mmstress_dummy		skip	0	0
+modify_ldt01		skip	0	0
+modify_ldt02		skip	0	0
+modify_ldt03		skip	0	0
+mountns01		skip	0	0
+mountns02		skip	0	0
+mountns03		skip	0	0
+mountns04		skip	0	0
+move_pages01		skip	0	0
+move_pages02		skip	0	0
+move_pages03		skip	0	0
+move_pages04		skip	0	0
+move_pages05		skip	0	0
+move_pages06		skip	0	0
+move_pages07		skip	0	0
+move_pages09		skip	0	0
+move_pages10		skip	0	0
+move_pages11		skip	0	0
+move_pages12		skip	0	0
+mpls01.sh		skip	0	0
+mpls02.sh		skip	0	0
+mpls03.sh		skip	0	0
+mpls04.sh		skip	0	0
+mqns_01		skip	0	0
+mqns_02		skip	0	0
+mqns_03		skip	0	0
+mqns_04		skip	0	0
+msgctl05		skip	0	0
+msgget03		skip	0	0
+msgget04		skip	0	0
+msgget05		skip	0	0
+mv_tests.sh		skip	0	0
+myfunctions.sh		skip	0	0
+net_cmdlib.sh		skip	0	0
+netns_breakns.sh		skip	0	0
+netns_comm.sh		skip	0	0
+netns_lib.sh		skip	0	0
+netns_netlink		skip	0	0
+netns_sysfs.sh		skip	0	0
+netstat01.sh		skip	0	0
+nfs01.sh		skip	0	0
+nfs01_open_files		skip	0	0
+nfs02.sh		skip	0	0
+nfs03.sh		skip	0	0
+nfs04.sh		skip	0	0
+nfs04_create_file		skip	0	0
+nfs05.sh		skip	0	0
+nfs06.sh		skip	0	0
+nfs07.sh		skip	0	0
+nfs08.sh		skip	0	0
+nfs09.sh		skip	0	0
+nfs_flock		skip	0	0
+nfs_flock_dgen		skip	0	0
+nfs_lib.sh		skip	0	0
+nfslock01.sh		skip	0	0
+nfsstat01.sh		skip	0	0
+nft01.sh		skip	0	0
+nft02		skip	0	0
+nm01.sh		skip	0	0
+ns-echoclient		skip	0	0
+ns-icmp_redirector		skip	0	0
+ns-icmpv4_sender		skip	0	0
+ns-icmpv6_sender		skip	0	0
+ns-igmp_querier		skip	0	0
+ns-mcast_join		skip	0	0
+ns-mcast_receiver		skip	0	0
+ns-tcpclient		skip	0	0
+ns-tcpserver		skip	0	0
+ns-udpclient		skip	0	0
+ns-udpsender		skip	0	0
+ns-udpserver		skip	0	0
+numa01.sh		skip	0	0
+oom01		skip	0	0
+oom02		skip	0	0
+oom03		skip	0	0
+oom04		skip	0	0
+oom05		skip	0	0
+open12_child		skip	0	0
+openfile		skip	0	0
+output_ipsec_conf		skip	0	0
+overcommit_memory		skip	0	0
+parameters.sh		skip	0	0
+pause01		skip	0	2
+pec_listener		skip	0	0
+perf_event_open01		skip	0	0
+perf_event_open02		skip	0	0
+perf_event_open03		skip	0	0
+pidfd_open04		skip	0	0
+pidfd_send_signal03		skip	0	0
+pidns01		skip	0	0
+pidns02		skip	0	0
+pidns03		skip	0	0
+pidns12		skip	0	0
+pidns20		skip	0	0
+pids.sh		skip	0	0
+pids_task1		skip	0	0
+pids_task2		skip	0	0
+ping01.sh		skip	0	0
+ping02.sh		skip	0	0
+pipe2_02_child		skip	0	0
+pipe2_04		skip	0	0
+pm_cpu_consolidation.py		skip	0	0
+pm_get_sched_values		skip	0	0
+pm_ilb_test.py		skip	0	0
+pm_include.sh		skip	0	0
+pm_sched_domain.py		skip	0	0
+pm_sched_mc.py		skip	0	0
+prctl03		skip	0	0
+prctl04		skip	0	0
+prctl06_execve		skip	0	0
+prctl07		skip	0	0
+prctl10		skip	0	0
+prepare_lvm.sh		skip	0	0
+print_caps		skip	0	0
+proc_sched_rt01		skip	0	0
+process_madvise01		skip	0	0
+process_vm01		skip	0	0
+process_vm_readv02		skip	0	0
+process_vm_readv03		skip	0	0
+process_vm_writev02		skip	0	0
+profil01		skip	0	0
+pt_test		skip	0	0
+pthcli		skip	0	0
+ptrace04		skip	0	0
+ptrace07		skip	0	0
+ptrace08		skip	0	0
+ptrace09		skip	0	0
+ptrace10		skip	0	0
+pty03		skip	0	0
+pty06		skip	0	0
+pty07		skip	0	0
+quota_remount_test01.sh		skip	0	0
+quotactl01		skip	0	0
+quotactl02		skip	0	0
+quotactl03		skip	0	0
+quotactl05		skip	0	0
+quotactl06		skip	0	0
+quotactl07		skip	0	0
+rcu_torture.sh		skip	0	0
+readahead02		skip	0	0
+remove_password.sh		skip	0	0
+route-change-dst.sh		skip	0	0
+route-change-gw.sh		skip	0	0
+route-change-if.sh		skip	0	0
+route-change-netlink		skip	0	0
+route-change-netlink-dst.sh		skip	0	0
+route-change-netlink-gw.sh		skip	0	0
+route-change-netlink-if.sh		skip	0	0
+route-redirect.sh		skip	0	0
+route4-rmmod		skip	0	0
+route6-rmmod		skip	0	0
+rt_sigsuspend01		skip	0	0
+rtc01		skip	0	0
+rtc02		skip	0	0
+run_capbounds.sh		skip	0	0
+run_cpuctl_latency_test.sh		skip	0	0
+run_cpuctl_stress_test.sh		skip	0	0
+run_cpuctl_test.sh		skip	0	0
+run_freezer.sh		skip	0	0
+run_memctl_test.sh		skip	0	0
+run_sched_cliserv.sh		skip	0	0
+runpwtests01.sh		skip	0	0
+runpwtests02.sh		skip	0	0
+runpwtests03.sh		skip	0	0
+runpwtests04.sh		skip	0	0
+runpwtests05.sh		skip	0	0
+runpwtests06.sh		skip	0	0
+runpwtests_exclusive01.sh		skip	0	0
+runpwtests_exclusive02.sh		skip	0	0
+runpwtests_exclusive03.sh		skip	0	0
+runpwtests_exclusive04.sh		skip	0	0
+runpwtests_exclusive05.sh		skip	0	0
+rwtest		skip	0	0
+sbrk03		skip	0	0
+sched_datafile		skip	0	0
+sched_driver		skip	0	0
+sched_stress.sh		skip	0	0
+sched_tc0		skip	0	0
+sched_tc1		skip	0	0
+sched_tc2		skip	0	0
+sched_tc3		skip	0	0
+sched_tc4		skip	0	0
+sched_tc5		skip	0	0
+sched_tc6		skip	0	0
+sctp01.sh		skip	0	0
+sctp_ipsec.sh		skip	0	0
+sctp_ipsec_vti.sh		skip	0	0
+semctl08		skip	0	0
+semget05		skip	0	0
+sendfile01.sh		skip	0	0
+sendfile09		skip	0	0
+sendfile09_64		skip	0	0
+sendmsg03		skip	0	0
+sendto03		skip	0	0
+set_ipv4addr		skip	0	0
+set_mempolicy01		skip	0	0
+set_mempolicy02		skip	0	0
+set_mempolicy03		skip	0	0
+set_mempolicy04		skip	0	0
+set_mempolicy05		skip	0	0
+set_thread_area01		skip	0	0
+setfsgid01_16		skip	0	0
+setfsgid02_16		skip	0	0
+setfsuid01_16		skip	0	0
+setfsuid02_16		skip	0	0
+setfsuid04_16		skip	0	0
+setgid01_16		skip	0	0
+setgid02_16		skip	0	0
+setgid03_16		skip	0	0
+setgroups01_16		skip	0	0
+setgroups02_16		skip	0	0
+setgroups03_16		skip	0	0
+setgroups04_16		skip	0	0
+setpgid03_child		skip	0	0
+setregid01_16		skip	0	0
+setregid02_16		skip	0	0
+setregid04_16		skip	0	0
+setresgid01_16		skip	0	0
+setresgid02_16		skip	0	0
+setresgid03_16		skip	0	0
+setresgid04_16		skip	0	0
+setresuid01_16		skip	0	0
+setresuid02_16		skip	0	0
+setresuid03_16		skip	0	0
+setresuid04_16		skip	0	0
+setresuid05_16		skip	0	0
+setreuid01_16		skip	0	0
+setreuid02_16		skip	0	0
+setreuid03_16		skip	0	0
+setreuid04_16		skip	0	0
+setreuid05_16		skip	0	0
+setreuid06_16		skip	0	0
+setreuid07_16		skip	0	0
+setsockopt05		skip	0	0
+setsockopt06		skip	0	0
+setsockopt07		skip	0	0
+setsockopt08		skip	0	0
+setsockopt09		skip	0	0
+setsockopt10		skip	0	0
+setuid01_16		skip	0	0
+setuid03_16		skip	0	0
+setuid04_16		skip	0	0
+sgetmask01		skip	0	0
+shell_pipe01.sh		skip	0	0
+shmctl04		skip	0	0
+shmctl05		skip	0	0
+shmget02		skip	0	0
+shmget05		skip	0	0
+shmget06		skip	0	0
+signal06		skip	0	0
+sigsuspend01		skip	0	0
+sit01.sh		skip	0	0
+smack_common.sh		skip	0	0
+smack_file_access.sh		skip	0	0
+smack_notroot		skip	0	0
+smack_set_ambient.sh		skip	0	0
+smack_set_cipso.sh		skip	0	0
+smack_set_current.sh		skip	0	0
+smack_set_direct.sh		skip	0	0
+smack_set_doi.sh		skip	0	0
+smack_set_load.sh		skip	0	0
+smack_set_netlabel.sh		skip	0	0
+smack_set_onlycap.sh		skip	0	0
+smack_set_socket_labels		skip	0	0
+snd_seq01		skip	0	0
+snd_timer01		skip	0	0
+splice06		skip	0	0
+squashfs01		skip	0	0
+ssh-stress.sh		skip	0	0
+statx04		skip	0	0
+statx07		skip	0	0
+statx08		skip	0	0
+statx09		skip	0	0
+statx10		skip	0	0
+statx12		skip	0	0
+stop_freeze_sleep_thaw_cont.sh		skip	0	0
+stop_freeze_thaw_cont.sh		skip	0	0
+stress		skip	0	0
+support_numa		skip	0	0
+swapon03		skip	0	0
+swapping01		skip	0	0
+sysctl01.sh		skip	0	0
+sysctl02.sh		skip	0	0
+tar_tests.sh		skip	0	0
+tbio		skip	0	0
+tc01.sh		skip	0	0
+tcindex01		skip	0	0
+tcp4-multi-diffip01		skip	0	0
+tcp4-multi-diffip02		skip	0	0
+tcp4-multi-diffip03		skip	0	0
+tcp4-multi-diffip04		skip	0	0
+tcp4-multi-diffip05		skip	0	0
+tcp4-multi-diffip06		skip	0	0
+tcp4-multi-diffip07		skip	0	0
+tcp4-multi-diffip08		skip	0	0
+tcp4-multi-diffip09		skip	0	0
+tcp4-multi-diffip10		skip	0	0
+tcp4-multi-diffip11		skip	0	0
+tcp4-multi-diffip12		skip	0	0
+tcp4-multi-diffip13		skip	0	0
+tcp4-multi-diffip14		skip	0	0
+tcp4-multi-diffnic01		skip	0	0
+tcp4-multi-diffnic02		skip	0	0
+tcp4-multi-diffnic03		skip	0	0
+tcp4-multi-diffnic04		skip	0	0
+tcp4-multi-diffnic05		skip	0	0
+tcp4-multi-diffnic06		skip	0	0
+tcp4-multi-diffnic07		skip	0	0
+tcp4-multi-diffnic08		skip	0	0
+tcp4-multi-diffnic09		skip	0	0
+tcp4-multi-diffnic10		skip	0	0
+tcp4-multi-diffnic11		skip	0	0
+tcp4-multi-diffnic12		skip	0	0
+tcp4-multi-diffnic13		skip	0	0
+tcp4-multi-diffnic14		skip	0	0
+tcp4-multi-diffport01		skip	0	0
+tcp4-multi-diffport02		skip	0	0
+tcp4-multi-diffport03		skip	0	0
+tcp4-multi-diffport04		skip	0	0
+tcp4-multi-diffport05		skip	0	0
+tcp4-multi-diffport06		skip	0	0
+tcp4-multi-diffport07		skip	0	0
+tcp4-multi-diffport08		skip	0	0
+tcp4-multi-diffport09		skip	0	0
+tcp4-multi-diffport10		skip	0	0
+tcp4-multi-diffport11		skip	0	0
+tcp4-multi-diffport12		skip	0	0
+tcp4-multi-diffport13		skip	0	0
+tcp4-multi-diffport14		skip	0	0
+tcp4-multi-sameport01		skip	0	0
+tcp4-multi-sameport02		skip	0	0
+tcp4-multi-sameport03		skip	0	0
+tcp4-multi-sameport04		skip	0	0
+tcp4-multi-sameport05		skip	0	0
+tcp4-multi-sameport06		skip	0	0
+tcp4-multi-sameport07		skip	0	0
+tcp4-multi-sameport08		skip	0	0
+tcp4-multi-sameport09		skip	0	0
+tcp4-multi-sameport10		skip	0	0
+tcp4-multi-sameport11		skip	0	0
+tcp4-multi-sameport12		skip	0	0
+tcp4-multi-sameport13		skip	0	0
+tcp4-multi-sameport14		skip	0	0
+tcp4-uni-basic01		skip	0	0
+tcp4-uni-basic02		skip	0	0
+tcp4-uni-basic03		skip	0	0
+tcp4-uni-basic04		skip	0	0
+tcp4-uni-basic05		skip	0	0
+tcp4-uni-basic06		skip	0	0
+tcp4-uni-basic07		skip	0	0
+tcp4-uni-basic08		skip	0	0
+tcp4-uni-basic09		skip	0	0
+tcp4-uni-basic10		skip	0	0
+tcp4-uni-basic11		skip	0	0
+tcp4-uni-basic12		skip	0	0
+tcp4-uni-basic13		skip	0	0
+tcp4-uni-basic14		skip	0	0
+tcp4-uni-dsackoff01		skip	0	0
+tcp4-uni-dsackoff02		skip	0	0
+tcp4-uni-dsackoff03		skip	0	0
+tcp4-uni-dsackoff04		skip	0	0
+tcp4-uni-dsackoff05		skip	0	0
+tcp4-uni-dsackoff06		skip	0	0
+tcp4-uni-dsackoff07		skip	0	0
+tcp4-uni-dsackoff08		skip	0	0
+tcp4-uni-dsackoff09		skip	0	0
+tcp4-uni-dsackoff10		skip	0	0
+tcp4-uni-dsackoff11		skip	0	0
+tcp4-uni-dsackoff12		skip	0	0
+tcp4-uni-dsackoff13		skip	0	0
+tcp4-uni-dsackoff14		skip	0	0
+tcp4-uni-pktlossdup01		skip	0	0
+tcp4-uni-pktlossdup02		skip	0	0
+tcp4-uni-pktlossdup03		skip	0	0
+tcp4-uni-pktlossdup04		skip	0	0
+tcp4-uni-pktlossdup05		skip	0	0
+tcp4-uni-pktlossdup06		skip	0	0
+tcp4-uni-pktlossdup07		skip	0	0
+tcp4-uni-pktlossdup08		skip	0	0
+tcp4-uni-pktlossdup09		skip	0	0
+tcp4-uni-pktlossdup10		skip	0	0
+tcp4-uni-pktlossdup11		skip	0	0
+tcp4-uni-pktlossdup12		skip	0	0
+tcp4-uni-pktlossdup13		skip	0	0
+tcp4-uni-pktlossdup14		skip	0	0
+tcp4-uni-sackoff01		skip	0	0
+tcp4-uni-sackoff02		skip	0	0
+tcp4-uni-sackoff03		skip	0	0
+tcp4-uni-sackoff04		skip	0	0
+tcp4-uni-sackoff05		skip	0	0
+tcp4-uni-sackoff06		skip	0	0
+tcp4-uni-sackoff07		skip	0	0
+tcp4-uni-sackoff08		skip	0	0
+tcp4-uni-sackoff09		skip	0	0
+tcp4-uni-sackoff10		skip	0	0
+tcp4-uni-sackoff11		skip	0	0
+tcp4-uni-sackoff12		skip	0	0
+tcp4-uni-sackoff13		skip	0	0
+tcp4-uni-sackoff14		skip	0	0
+tcp4-uni-smallsend01		skip	0	0
+tcp4-uni-smallsend02		skip	0	0
+tcp4-uni-smallsend03		skip	0	0
+tcp4-uni-smallsend04		skip	0	0
+tcp4-uni-smallsend05		skip	0	0
+tcp4-uni-smallsend06		skip	0	0
+tcp4-uni-smallsend07		skip	0	0
+tcp4-uni-smallsend08		skip	0	0
+tcp4-uni-smallsend09		skip	0	0
+tcp4-uni-smallsend10		skip	0	0
+tcp4-uni-smallsend11		skip	0	0
+tcp4-uni-smallsend12		skip	0	0
+tcp4-uni-smallsend13		skip	0	0
+tcp4-uni-smallsend14		skip	0	0
+tcp4-uni-tso01		skip	0	0
+tcp4-uni-tso02		skip	0	0
+tcp4-uni-tso03		skip	0	0
+tcp4-uni-tso04		skip	0	0
+tcp4-uni-tso05		skip	0	0
+tcp4-uni-tso06		skip	0	0
+tcp4-uni-tso07		skip	0	0
+tcp4-uni-tso08		skip	0	0
+tcp4-uni-tso09		skip	0	0
+tcp4-uni-tso10		skip	0	0
+tcp4-uni-tso11		skip	0	0
+tcp4-uni-tso12		skip	0	0
+tcp4-uni-tso13		skip	0	0
+tcp4-uni-tso14		skip	0	0
+tcp4-uni-winscale01		skip	0	0
+tcp4-uni-winscale02		skip	0	0
+tcp4-uni-winscale03		skip	0	0
+tcp4-uni-winscale04		skip	0	0
+tcp4-uni-winscale05		skip	0	0
+tcp4-uni-winscale06		skip	0	0
+tcp4-uni-winscale07		skip	0	0
+tcp4-uni-winscale08		skip	0	0
+tcp4-uni-winscale09		skip	0	0
+tcp4-uni-winscale10		skip	0	0
+tcp4-uni-winscale11		skip	0	0
+tcp4-uni-winscale12		skip	0	0
+tcp4-uni-winscale13		skip	0	0
+tcp4-uni-winscale14		skip	0	0
+tcp6-multi-diffip01		skip	0	0
+tcp6-multi-diffip02		skip	0	0
+tcp6-multi-diffip03		skip	0	0
+tcp6-multi-diffip04		skip	0	0
+tcp6-multi-diffip05		skip	0	0
+tcp6-multi-diffip06		skip	0	0
+tcp6-multi-diffip07		skip	0	0
+tcp6-multi-diffip08		skip	0	0
+tcp6-multi-diffip09		skip	0	0
+tcp6-multi-diffip10		skip	0	0
+tcp6-multi-diffip11		skip	0	0
+tcp6-multi-diffip12		skip	0	0
+tcp6-multi-diffip13		skip	0	0
+tcp6-multi-diffip14		skip	0	0
+tcp6-multi-diffnic01		skip	0	0
+tcp6-multi-diffnic02		skip	0	0
+tcp6-multi-diffnic03		skip	0	0
+tcp6-multi-diffnic04		skip	0	0
+tcp6-multi-diffnic05		skip	0	0
+tcp6-multi-diffnic06		skip	0	0
+tcp6-multi-diffnic07		skip	0	0
+tcp6-multi-diffnic08		skip	0	0
+tcp6-multi-diffnic09		skip	0	0
+tcp6-multi-diffnic10		skip	0	0
+tcp6-multi-diffnic11		skip	0	0
+tcp6-multi-diffnic12		skip	0	0
+tcp6-multi-diffnic13		skip	0	0
+tcp6-multi-diffnic14		skip	0	0
+tcp6-multi-diffport01		skip	0	0
+tcp6-multi-diffport02		skip	0	0
+tcp6-multi-diffport03		skip	0	0
+tcp6-multi-diffport04		skip	0	0
+tcp6-multi-diffport05		skip	0	0
+tcp6-multi-diffport06		skip	0	0
+tcp6-multi-diffport07		skip	0	0
+tcp6-multi-diffport08		skip	0	0
+tcp6-multi-diffport09		skip	0	0
+tcp6-multi-diffport10		skip	0	0
+tcp6-multi-diffport11		skip	0	0
+tcp6-multi-diffport12		skip	0	0
+tcp6-multi-diffport13		skip	0	0
+tcp6-multi-diffport14		skip	0	0
+tcp6-multi-sameport01		skip	0	0
+tcp6-multi-sameport02		skip	0	0
+tcp6-multi-sameport03		skip	0	0
+tcp6-multi-sameport04		skip	0	0
+tcp6-multi-sameport05		skip	0	0
+tcp6-multi-sameport06		skip	0	0
+tcp6-multi-sameport07		skip	0	0
+tcp6-multi-sameport08		skip	0	0
+tcp6-multi-sameport09		skip	0	0
+tcp6-multi-sameport10		skip	0	0
+tcp6-multi-sameport11		skip	0	0
+tcp6-multi-sameport12		skip	0	0
+tcp6-multi-sameport13		skip	0	0
+tcp6-multi-sameport14		skip	0	0
+tcp6-uni-basic01		skip	0	0
+tcp6-uni-basic02		skip	0	0
+tcp6-uni-basic03		skip	0	0
+tcp6-uni-basic04		skip	0	0
+tcp6-uni-basic05		skip	0	0
+tcp6-uni-basic06		skip	0	0
+tcp6-uni-basic07		skip	0	0
+tcp6-uni-basic08		skip	0	0
+tcp6-uni-basic09		skip	0	0
+tcp6-uni-basic10		skip	0	0
+tcp6-uni-basic11		skip	0	0
+tcp6-uni-basic12		skip	0	0
+tcp6-uni-basic13		skip	0	0
+tcp6-uni-basic14		skip	0	0
+tcp6-uni-dsackoff01		skip	0	0
+tcp6-uni-dsackoff02		skip	0	0
+tcp6-uni-dsackoff03		skip	0	0
+tcp6-uni-dsackoff04		skip	0	0
+tcp6-uni-dsackoff05		skip	0	0
+tcp6-uni-dsackoff06		skip	0	0
+tcp6-uni-dsackoff07		skip	0	0
+tcp6-uni-dsackoff08		skip	0	0
+tcp6-uni-dsackoff09		skip	0	0
+tcp6-uni-dsackoff10		skip	0	0
+tcp6-uni-dsackoff11		skip	0	0
+tcp6-uni-dsackoff12		skip	0	0
+tcp6-uni-dsackoff13		skip	0	0
+tcp6-uni-dsackoff14		skip	0	0
+tcp6-uni-pktlossdup01		skip	0	0
+tcp6-uni-pktlossdup02		skip	0	0
+tcp6-uni-pktlossdup03		skip	0	0
+tcp6-uni-pktlossdup04		skip	0	0
+tcp6-uni-pktlossdup05		skip	0	0
+tcp6-uni-pktlossdup06		skip	0	0
+tcp6-uni-pktlossdup07		skip	0	0
+tcp6-uni-pktlossdup08		skip	0	0
+tcp6-uni-pktlossdup09		skip	0	0
+tcp6-uni-pktlossdup10		skip	0	0
+tcp6-uni-pktlossdup11		skip	0	0
+tcp6-uni-pktlossdup12		skip	0	0
+tcp6-uni-pktlossdup13		skip	0	0
+tcp6-uni-pktlossdup14		skip	0	0
+tcp6-uni-sackoff01		skip	0	0
+tcp6-uni-sackoff02		skip	0	0
+tcp6-uni-sackoff03		skip	0	0
+tcp6-uni-sackoff04		skip	0	0
+tcp6-uni-sackoff05		skip	0	0
+tcp6-uni-sackoff06		skip	0	0
+tcp6-uni-sackoff07		skip	0	0
+tcp6-uni-sackoff08		skip	0	0
+tcp6-uni-sackoff09		skip	0	0
+tcp6-uni-sackoff10		skip	0	0
+tcp6-uni-sackoff11		skip	0	0
+tcp6-uni-sackoff12		skip	0	0
+tcp6-uni-sackoff13		skip	0	0
+tcp6-uni-sackoff14		skip	0	0
+tcp6-uni-smallsend01		skip	0	0
+tcp6-uni-smallsend02		skip	0	0
+tcp6-uni-smallsend03		skip	0	0
+tcp6-uni-smallsend04		skip	0	0
+tcp6-uni-smallsend05		skip	0	0
+tcp6-uni-smallsend06		skip	0	0
+tcp6-uni-smallsend07		skip	0	0
+tcp6-uni-smallsend08		skip	0	0
+tcp6-uni-smallsend09		skip	0	0
+tcp6-uni-smallsend10		skip	0	0
+tcp6-uni-smallsend11		skip	0	0
+tcp6-uni-smallsend12		skip	0	0
+tcp6-uni-smallsend13		skip	0	0
+tcp6-uni-smallsend14		skip	0	0
+tcp6-uni-tso01		skip	0	0
+tcp6-uni-tso02		skip	0	0
+tcp6-uni-tso03		skip	0	0
+tcp6-uni-tso04		skip	0	0
+tcp6-uni-tso05		skip	0	0
+tcp6-uni-tso06		skip	0	0
+tcp6-uni-tso07		skip	0	0
+tcp6-uni-tso08		skip	0	0
+tcp6-uni-tso09		skip	0	0
+tcp6-uni-tso10		skip	0	0
+tcp6-uni-tso11		skip	0	0
+tcp6-uni-tso12		skip	0	0
+tcp6-uni-tso13		skip	0	0
+tcp6-uni-tso14		skip	0	0
+tcp6-uni-winscale01		skip	0	0
+tcp6-uni-winscale02		skip	0	0
+tcp6-uni-winscale03		skip	0	0
+tcp6-uni-winscale04		skip	0	0
+tcp6-uni-winscale05		skip	0	0
+tcp6-uni-winscale06		skip	0	0
+tcp6-uni-winscale07		skip	0	0
+tcp6-uni-winscale08		skip	0	0
+tcp6-uni-winscale09		skip	0	0
+tcp6-uni-winscale10		skip	0	0
+tcp6-uni-winscale11		skip	0	0
+tcp6-uni-winscale12		skip	0	0
+tcp6-uni-winscale13		skip	0	0
+tcp6-uni-winscale14		skip	0	0
+tcp_fastopen_run.sh		skip	0	0
+tcp_ipsec.sh		skip	0	0
+tcp_ipsec_vti.sh		skip	0	0
+test_1_to_1_accept_close		skip	0	0
+test_1_to_1_addrs		skip	0	0
+test_1_to_1_connect		skip	0	0
+test_1_to_1_connectx		skip	0	0
+test_1_to_1_events		skip	0	0
+test_1_to_1_initmsg_connect		skip	0	0
+test_1_to_1_nonblock		skip	0	0
+test_1_to_1_recvfrom		skip	0	0
+test_1_to_1_recvmsg		skip	0	0
+test_1_to_1_rtoinfo		skip	0	0
+test_1_to_1_send		skip	0	0
+test_1_to_1_sendmsg		skip	0	0
+test_1_to_1_sendto		skip	0	0
+test_1_to_1_shutdown		skip	0	0
+test_1_to_1_socket_bind_listen		skip	0	0
+test_1_to_1_sockopt		skip	0	0
+test_1_to_1_threads		skip	0	0
+test_assoc_abort		skip	0	0
+test_assoc_shutdown		skip	0	0
+test_autoclose		skip	0	0
+test_basic		skip	0	0
+test_basic_v6		skip	0	0
+test_connect		skip	0	0
+test_connectx		skip	0	0
+test_controllers.sh		skip	0	0
+test_fragments		skip	0	0
+test_fragments_v6		skip	0	0
+test_getname		skip	0	0
+test_getname_v6		skip	0	0
+test_inaddr_any		skip	0	0
+test_inaddr_any_v6		skip	0	0
+test_ioctl		skip	0	0
+test_peeloff		skip	0	0
+test_peeloff_v6		skip	0	0
+test_recvmsg		skip	0	0
+test_robind.sh		skip	0	0
+test_sctp_sendrecvmsg		skip	0	0
+test_sctp_sendrecvmsg_v6		skip	0	0
+test_sockopt		skip	0	0
+test_sockopt_v6		skip	0	0
+test_tcp_style		skip	0	0
+test_tcp_style_v6		skip	0	0
+test_timetolive		skip	0	0
+test_timetolive_v6		skip	0	0
+thp02		skip	0	0
+thp03		skip	0	0
+thp04		skip	0	0
+tpci		skip	0	0
+tpm_changeauth_tests_exp01.sh		skip	0	0
+tpm_changeauth_tests_exp02.sh		skip	0	0
+tpm_changeauth_tests_exp03.sh		skip	0	0
+tpm_clear_tests_exp01.sh		skip	0	0
+tpm_getpubek_tests_exp01.sh		skip	0	0
+tpm_restrictpubek_tests_exp01.sh		skip	0	0
+tpm_restrictpubek_tests_exp02.sh		skip	0	0
+tpm_restrictpubek_tests_exp03.sh		skip	0	0
+tpm_takeownership_tests_exp01.sh		skip	0	0
+tpmtoken_import_tests_exp01.sh		skip	0	0
+tpmtoken_import_tests_exp02.sh		skip	0	0
+tpmtoken_import_tests_exp03.sh		skip	0	0
+tpmtoken_import_tests_exp04.sh		skip	0	0
+tpmtoken_import_tests_exp05.sh		skip	0	0
+tpmtoken_import_tests_exp06.sh		skip	0	0
+tpmtoken_import_tests_exp07.sh		skip	0	0
+tpmtoken_import_tests_exp08.sh		skip	0	0
+tpmtoken_init_tests_exp00.sh		skip	0	0
+tpmtoken_init_tests_exp01.sh		skip	0	0
+tpmtoken_init_tests_exp02.sh		skip	0	0
+tpmtoken_init_tests_exp03.sh		skip	0	0
+tpmtoken_objects_tests_exp01.sh		skip	0	0
+tpmtoken_protect_tests_exp01.sh		skip	0	0
+tpmtoken_protect_tests_exp02.sh		skip	0	0
+tpmtoken_setpasswd_tests_exp01.sh		skip	0	0
+tpmtoken_setpasswd_tests_exp02.sh		skip	0	0
+tpmtoken_setpasswd_tests_exp03.sh		skip	0	0
+tpmtoken_setpasswd_tests_exp04.sh		skip	0	0
+trace_sched		skip	0	0
+tracepath01.sh		skip	0	0
+traceroute01.sh		skip	0	0
+tst_ansi_color.sh		skip	0	0
+tst_brk		skip	0	0
+tst_brkm		skip	0	0
+tst_cgctl		skip	0	0
+tst_check_drivers		skip	0	0
+tst_check_kconfigs		skip	0	0
+tst_checkpoint		skip	0	0
+tst_device		skip	0	0
+tst_exit		skip	0	0
+tst_fs_has_free		skip	0	0
+tst_fsfreeze		skip	0	0
+tst_get_median		skip	0	0
+tst_get_unused_port		skip	0	0
+tst_getconf		skip	0	0
+tst_kvcmp		skip	0	0
+tst_lockdown_enabled		skip	0	0
+tst_ncpus		skip	0	0
+tst_ncpus_conf		skip	0	0
+tst_ncpus_max		skip	0	0
+tst_net_iface_prefix		skip	0	0
+tst_net_ip_prefix		skip	0	0
+tst_net_vars		skip	0	0
+tst_ns_create		skip	0	0
+tst_ns_exec		skip	0	0
+tst_ns_ifmove		skip	0	0
+tst_random		skip	0	0
+tst_res		skip	0	0
+tst_resm		skip	0	0
+tst_rod		skip	0	0
+tst_secureboot_enabled		skip	0	0
+tst_security.sh		skip	0	0
+tst_sleep		skip	0	0
+tst_supported_fs		skip	0	0
+tst_timeout_kill		skip	0	0
+uaccess		skip	0	0
+udp4-multi-diffip01		skip	0	0
+udp4-multi-diffip02		skip	0	0
+udp4-multi-diffip03		skip	0	0
+udp4-multi-diffip04		skip	0	0
+udp4-multi-diffip05		skip	0	0
+udp4-multi-diffip06		skip	0	0
+udp4-multi-diffip07		skip	0	0
+udp4-multi-diffnic01		skip	0	0
+udp4-multi-diffnic02		skip	0	0
+udp4-multi-diffnic03		skip	0	0
+udp4-multi-diffnic04		skip	0	0
+udp4-multi-diffnic05		skip	0	0
+udp4-multi-diffnic06		skip	0	0
+udp4-multi-diffnic07		skip	0	0
+udp4-multi-diffport01		skip	0	0
+udp4-multi-diffport02		skip	0	0
+udp4-multi-diffport03		skip	0	0
+udp4-multi-diffport04		skip	0	0
+udp4-multi-diffport05		skip	0	0
+udp4-multi-diffport06		skip	0	0
+udp4-multi-diffport07		skip	0	0
+udp4-uni-basic01		skip	0	0
+udp4-uni-basic02		skip	0	0
+udp4-uni-basic03		skip	0	0
+udp4-uni-basic04		skip	0	0
+udp4-uni-basic05		skip	0	0
+udp4-uni-basic06		skip	0	0
+udp4-uni-basic07		skip	0	0
+udp6-multi-diffip01		skip	0	0
+udp6-multi-diffip02		skip	0	0
+udp6-multi-diffip03		skip	0	0
+udp6-multi-diffip04		skip	0	0
+udp6-multi-diffip05		skip	0	0
+udp6-multi-diffip06		skip	0	0
+udp6-multi-diffip07		skip	0	0
+udp6-multi-diffnic01		skip	0	0
+udp6-multi-diffnic02		skip	0	0
+udp6-multi-diffnic03		skip	0	0
+udp6-multi-diffnic04		skip	0	0
+udp6-multi-diffnic05		skip	0	0
+udp6-multi-diffnic06		skip	0	0
+udp6-multi-diffnic07		skip	0	0
+udp6-multi-diffport01		skip	0	0
+udp6-multi-diffport02		skip	0	0
+udp6-multi-diffport03		skip	0	0
+udp6-multi-diffport04		skip	0	0
+udp6-multi-diffport05		skip	0	0
+udp6-multi-diffport06		skip	0	0
+udp6-multi-diffport07		skip	0	0
+udp6-uni-basic01		skip	0	0
+udp6-uni-basic02		skip	0	0
+udp6-uni-basic03		skip	0	0
+udp6-uni-basic04		skip	0	0
+udp6-uni-basic05		skip	0	0
+udp6-uni-basic06		skip	0	0
+udp6-uni-basic07		skip	0	0
+udp_ipsec.sh		skip	0	0
+udp_ipsec_vti.sh		skip	0	0
+uevent01		skip	0	0
+uevent02		skip	0	0
+uevent03		skip	0	0
+umip_basic_test		skip	0	0
+unshare01.sh		skip	0	0
+unzip01.sh		skip	0	0
+userns01		skip	0	0
+userns02		skip	0	0
+userns03		skip	0	0
+userns04		skip	0	0
+userns05		skip	0	0
+userns06		skip	0	0
+userns07		skip	0	0
+userns08		skip	0	0
+ustat01		skip	0	0
+ustat02		skip	0	0
+verify_caps_exec		skip	0	0
+vfork		skip	0	0
+vfork_freeze.sh		skip	0	0
+virt_lib.sh		skip	0	0
+vlan01.sh		skip	0	0
+vlan02.sh		skip	0	0
+vlan03.sh		skip	0	0
+vma02		skip	0	0
+vma03		skip	0	0
+vma04		skip	0	0
+vma05.sh		skip	0	0
+vma05_vdso		skip	0	0
+vsock01		skip	0	0
+vxlan01.sh		skip	0	0
+vxlan02.sh		skip	0	0
+vxlan03.sh		skip	0	0
+vxlan04.sh		skip	0	0
+wc01.sh		skip	0	0
+which01.sh		skip	0	0
+wireguard01.sh		skip	0	0
+wireguard02.sh		skip	0	0
+wireguard_lib.sh		skip	0	0
+write_freezing.sh		skip	0	0
+writev03		skip	0	0
+zram01.sh		skip	0	0
+zram02.sh		skip	0	0
+zram03		skip	0	0
+zram_lib.sh		skip	0	0
