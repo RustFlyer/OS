@@ -3,8 +3,7 @@
 // Testcases are composed of "units".
 // Classification rules:
 // 1. all pass:			pass all units
-// 2. skip pass:			at least one passed but some units stay not tested due to unimplement feature \
-				or output indecates that it passed but not with "TPASS" format
+// 2. skip pass:			at least one passed but some units stay not tested due to unimplement feature or output indecates that it passed but not with "TPASS" format
 // 3. part fail: 			at least one failed units(sometimes caused by timeout)
 // 4. skip:				skip without pass
 // 5. skip consuming time:		skip without pass and cost more than 30 seconds

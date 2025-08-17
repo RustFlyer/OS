@@ -6,6 +6,7 @@ pub mod ltprun {
     #[allow(non_snake_case)]
     pub fn autorun() {
         let TESTCASES = Vec::from([
+<<<<<<< HEAD
             "pidfd_send_signal01",
             "pidfd_send_signal02",
             "pidfd_send_signal03",
@@ -34,6 +35,50 @@ pub mod ltprun {
             "sigtimedwait01",
             "sigwait01",
             "sigwaitinfo01",
+=======
+"setsockopt04",
+"settimeofday01",
+"setuid01",
+"setuid03",
+"shmctl06",
+"shmem_2nstest",    //Stuck for a while, killed
+"shmnstest",
+"sigaltstack01",
+"sigprocmask01",
+"splice01",
+"splice02",
+"stack_space",
+"stime01",
+"stream01",
+"stream04",
+"string01",
+"symlink02",
+"sysinfo01",
+"sysinfo02",
+"tgkill01",
+"times01",
+"umount01",
+"uname02",
+"uname04",
+"utime07",
+"utsname01",
+"wait01",
+"wait02",
+"wait402",
+"wait403",
+"waitid02",
+"waitid03",
+"waitid09",
+"waitid10",
+"waitpid06",
+"waitpid07",
+"waitpid08",
+"write01",
+"write03",
+"writev02",
+"writev05",
+"writev06",
+>>>>>>> b25bc63f2445f5097dd98b33f05b2fd43c247398
         ]);
 
         for test in TESTCASES {
@@ -49,6 +94,35 @@ pub mod ltprun {
     }
 }
 
+<<<<<<< HEAD
+=======
+// "wait01",
+// "wait02",
+// "wait401",
+// "wait402",
+// "wait403",
+// "waitid01",
+// "waitid02",
+// "waitid03",
+// "waitid04",
+// "waitid05",
+// "waitid06",
+// "waitid09",
+// "waitid10",
+// "waitid11",
+// "waitpid01",
+// "waitpid03",
+// "waitpid04",
+// "waitpid06",
+// "waitpid07",
+// "waitpid08",
+// "waitpid09",
+// "waitpid10",
+// "waitpid11",
+// "waitpid12",
+// "waitpid13",
+
+>>>>>>> b25bc63f2445f5097dd98b33f05b2fd43c247398
 // "pidfd_send_signal01",
 // "pidfd_send_signal02",
 // "pidfd_send_signal03",
