@@ -37,6 +37,7 @@ const SYSCALL_FSYNC: usize = 82;
 const SYSCALL_UTIMENSAT: usize = 88;
 const SYSCALL_EXIT: usize = 93;
 const SYSCALL_EXIT_GROUP: usize = 94;
+const SYSCALL_WAITID: usize = 95;
 const SYSCALL_SET_TID_ADDRESS: usize = 96;
 const SYSCALL_FUTEX: usize = 98;
 const SYSCALL_SET_ROBUST_LIST: usize = 99;
@@ -310,6 +311,7 @@ syscall!(
     usize
 );
 syscall!(sys_openat, SYSCALL_OPEN, usize, *const u8, usize, usize);
+syscall!(sys_faccessat, SYSCALL_FACCESSAT, usize, *const u8, i32);
 syscall!(sys_lseek, SYSCALL_LSEEK, usize, isize, usize);
 syscall!(sys_getdents64, SYSCALL_GETDENTS, usize, *const u8, usize);
 
@@ -317,6 +319,7 @@ syscall!(sys_getdents64, SYSCALL_GETDENTS, usize, *const u8, usize);
 syscall!(sys_getpid, SYSCALL_GETPID);
 syscall!(sys_exit, SYSCALL_EXIT, i32);
 syscall!(sys_exit_group, SYSCALL_EXIT_GROUP, i32);
+syscall!(sys_waitid, SYSCALL_WAITID, i32, i32, *mut usize, i32);
 syscall!(sys_kill, SYSCALL_KILL, usize, i32);
 syscall!(sys_fork, SYSCALL_CLONE);
 syscall!(sys_clone, SYSCALL_CLONE, usize, usize, usize, usize, usize);

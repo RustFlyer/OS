@@ -35,7 +35,7 @@ fn main() {
     }
 
     let mut a = 0;
-    waitpid(ret, &mut a);
+    waitpid(ret, &mut a, 0);
 
     exit(0)
 }

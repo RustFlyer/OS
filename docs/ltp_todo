@@ -1,10 +1,10 @@
                name                    total           pass
-- [ ] [   1] fanotify16                 845
+- [ ] [   1] fanotify16                 845             90
 - [x] [   2] splice07                   615             565
-- [x] [   3] fanotify01                 442             702
-- [x] [   4] fanotify14                 334             513
+- [x] [   3] fanotify01                 442             702  all
+- [x] [   4] fanotify14                 334             513  all
 - [x] [   5] epoll_ctl03                256             256
-- [ ] [   6] fanotify13                 200
+- [x] [   6] fanotify13                 200             531  ~140 to fix
 - [x] [   7] access01                   199             181
 - [x] [   8] memfd_create01             157             134
 - [x] [   9] waitpid01                  126             126
@@ -12,11 +12,11 @@
 - [x] [  11] getpid01                   100             100
 - [ ] [  12] fsmount01                   96
 - [x] [  13] chdir01                     92             135 all fs-type
-- [ ] [  14] fanotify09                  76
+- [ ] [  14] fanotify09                  76             76
 - [x] [  15] pipe11                      70             70
 - [x] [  16] fsync01                     60             90
 - [ ] [  17] mount07                     56
-- [ ] [  18] fanotify15                  55
+- [x] [  18] fanotify15                  55             90  all
 - [ ] [  19] memcontrol02                54
 - [x] [  20] rename01                    48             72  all
 - [x] [  21] rename03                    48             72  all
@@ -34,7 +34,7 @@
 - [x] [  33] splice08                    36             32
 - [x] [  34] confstr01                   34             36
 - [ ] [  35] mq_timedsend01              34
-- [ ] [  36] utimensat01                 34
+- [ ] [  36] utimensat01                 34             12
 - [ ] [  37] memcontrol04                33
 - [x] [  38] chmod01                     32             32
 - [ ] [  39] creat09                     32
@@ -77,7 +77,7 @@
 - [ ] [  76] swapon02                    20
 - [ ] [  77] personality01               19
 - [ ] [  78] copy_file_range02           18
-- [ ] [  79] fanotify06                  18
+- [x] [  79] fanotify06                  18         18  all
 - [ ] [  80] fsmount02                   18
 - [ ] [  81] fspick02                    18
 - [x] [  82] llseek03                    18         18
@@ -89,7 +89,7 @@
 - [x] [  88] access02                    16         16
 - [ ] [  89] bind04                      16
 - [x] [  90] clock_gettime01             16         16
-- [ ] [  91] fanotify19                  16
+- [ ] [  91] fanotify19                  16         8   fails=8
 - [x] [  92] getrlimit01                 16         16
 - [ ] [  93] getrlimit03                 16
 - [ ] [  94] openat201                   16

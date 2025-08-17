@@ -40,11 +40,22 @@ use crate::vm::{
     user_ptr::UserWritePtr,
     vm_area::{TypedArea, VmaFlags},
 };
+use crate::task::wait_queue::WAIT_QUEUE_MANAGER;
 
 impl Task {
     /// Suspends the Task until it is waken or time out
     pub async fn suspend_timeout(&self, limit: Duration) -> Duration {
-        let expire = get_time_duration() + limit;
+        let current_time = get_time_duration();
+        
+        // Check for potential overflow when adding limit to current time
+        let expire = if let Some(exp) = current_time.checked_add(limit) {
+            exp
+        } else {
+            // If overflow would occur, cap at Duration::MAX to avoid panic
+            log::warn!("[suspend_timeout] Duration overflow prevented, using Duration::MAX");
+            Duration::MAX
+        };
+        
         let mut timer = Timer::new(expire);
         timer.set_waker_callback(self.get_waker().clone());
         TIMER_MANAGER.add_timer(timer);
@@ -271,6 +282,7 @@ impl Task {
         } else {
             new_share_mutex(self.fdtable_mut().lock().clone())
         };
+        fd_table.lock().set_tid(tid.0 as u64);
 
         let perm = (*self.perm_mut().lock()).clone();
 
@@ -479,7 +491,7 @@ impl Task {
         if self.is_process() {
             assert!(threadgroup.len() == 1);
             log::info!(
-                "[exit] process {} do exit and recycle after all children are zombied, tg_len: {}",
+                "[exit] process {} do exit and recycle after all threads in group are zombied, tg_len: {}",
                 self.tid(),
                 threadgroup.len()
             );
@@ -531,7 +543,7 @@ impl Task {
         // threads will be dropped when hart leaves this task so we don't need to set.
         self.process().set_state(TaskState::WaitForRecycle);
 
-        // send SIGCHLD to process's parent
+        // send SIGCHLD to process's parent and notify wait queue
         if let Some(parent) = process.parent_mut().lock().as_ref() {
             if let Some(parent) = parent.upgrade() {
                 let lock = self.exit_signal.lock();
@@ -545,7 +557,11 @@ impl Task {
                     sig,
                     code: SigInfo::CLD_EXITED,
                     details: SigDetails::Child { pid: process.pid() },
-                })
+                });
+
+                // Notify wait queue manager to wake up waiting tasks
+                WAIT_QUEUE_MANAGER.notify_child_exit(&process, &parent);
+                log::info!("[Task::exit] notified wait queue for child {} exit", process.pid());
             } else {
                 log::error!("no arc parent");
             }
@@ -558,6 +574,8 @@ impl Task {
         });
 
         self.with_mut_fdtable(|table| table.clear());
+
+        log::debug!("[Task::exit] task {} exit finished", self.tid());
     }
 
     pub fn proc_status_read(&self) -> String {
@@ -583,10 +601,21 @@ impl Task {
         content
     }
 
+    fn task_state_to_proc_char(&self) -> &'static str {
+        match self.get_state() {
+            TaskState::Running => "R",
+            TaskState::Interruptible => "S",
+            TaskState::UnInterruptible => "D",
+            TaskState::Sleeping => "S",
+            TaskState::Zombie => "Z",
+            TaskState::WaitForRecycle => "Z",
+        }
+    }
+
     pub fn proc_stat_read(&self) -> String {
         let task = self;
         let comm = format!("(task{})", task.tid());
-        let state = "R";
+        let state = task.task_state_to_proc_char();
         let ppid = task.ppid();
         let pgrp = task.get_pgid();
         let session = 0;

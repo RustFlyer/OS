@@ -98,6 +98,6 @@ fn main() {
             execve(args[0], &args[0..], &[]);
             exit(0);
         }
-        waitpid(pid, &mut exitcode);
+        waitpid(pid, &mut exitcode, 0);
     }
 }

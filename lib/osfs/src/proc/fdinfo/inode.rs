@@ -1,8 +1,5 @@
 use alloc::sync::Arc;
-use config::{
-    device::BLOCK_SIZE,
-    inode::{InodeMode, InodeType},
-};
+use config::inode::InodeType;
 use systype::error::SysResult;
 use vfs::{
     inode::{Inode, InodeMeta},
@@ -11,24 +8,25 @@ use vfs::{
     superblock::SuperBlock,
 };
 
-pub struct UrandomInode {
+pub struct FdInfoInode {
     meta: InodeMeta,
+    pub thread_id: usize,
+    pub file_descriptor: usize,
 }
 
-impl UrandomInode {
-    pub fn new(superblock: Arc<dyn SuperBlock>) -> Arc<Self> {
-        let size = BLOCK_SIZE;
-        let mode = InodeMode::CHAR;
+impl FdInfoInode {
+    pub fn new(super_block: Arc<dyn SuperBlock>, tid: usize, fd: usize) -> Arc<Self> {
         let inode = Arc::new(Self {
-            meta: InodeMeta::new(alloc_ino(), superblock),
+            meta: InodeMeta::new(alloc_ino(), super_block),
+            thread_id: tid,
+            file_descriptor: fd,
         });
-        inode.set_inotype(InodeType::from(mode));
-        let _ = inode.set_size(size);
+        inode.set_inotype(InodeType::File);
         inode
     }
 }
 
-impl Inode for UrandomInode {
+impl Inode for FdInfoInode {
     fn get_meta(&self) -> &InodeMeta {
         &self.meta
     }
@@ -38,7 +36,7 @@ impl Inode for UrandomInode {
         let mode = inner.mode.bits();
         let len = inner.size;
         Ok(Stat {
-            st_dev: 0x0109,
+            st_dev: 0, // non-real-file
             st_ino: self.meta.ino as u64,
             st_mode: mode,
             st_nlink: 1,

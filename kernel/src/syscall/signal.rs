@@ -1,6 +1,6 @@
 use core::{iter, time::Duration};
 
-use config::{process::INIT_PROC_ID, vfs::OpenFlags};
+use config::{process::INIT_PROC_ID, sig, vfs::OpenFlags};
 use osfs::{
     fd_table::{FdFlags, FdInfo},
     simple::{dentry::SimpleDentry, file::SimpleFileFile, inode::SimpleInode},
@@ -488,6 +488,10 @@ pub fn sys_rt_sigaction(
         "[sys_rt_sigaction] tid {tid} signum: {signum:?}, new_sa: {new_sa:#x}, prev_sa: {prev_sa:#x}, sigsetsize: {sigsetsize:?}"
     );
 
+    if sigsetsize != size_of::<SigSet>() {
+        return Err(SysError::EINVAL);
+    }
+
     let addrspace = task.addr_space();
     let signum = Sig::from_i32(signum);
 
@@ -562,7 +566,9 @@ pub fn sys_rt_sigmask(
     let mask = task.sig_mask_mut();
     let addrspace = task.addr_space();
 
-    assert!(sigsetsize == 8);
+    if sigsetsize != size_of::<SigSet>() {
+        return Err(SysError::EINVAL);
+    }
 
     let mut input_mask = UserReadPtr::<SigSet>::new(input_mask, &addrspace);
     let mut prev_mask = UserWritePtr::<SigSet>::new(prev_mask, &addrspace);
@@ -581,8 +587,7 @@ pub fn sys_rt_sigmask(
     if !input_mask.is_null() {
         unsafe {
             let input = input_mask.read()?;
-            // log::debug!("[sys_rt_sigmask] task {} input:{input:#x}", task.get_name());
-            log::debug!("[sys_rt_sigmask] how: {how:#x}");
+            log::debug!("[sys_rt_sigmask] task {} input:{input:#x}", task.tid());
 
             match how {
                 SIGBLOCK => {
@@ -656,7 +661,10 @@ pub fn sys_tkill(tid: isize, sig: i32) -> SyscallResult {
     task.receive_siginfo(SigInfo {
         sig,
         code: SigInfo::TKILL,
-        details: SigDetails::None,
+        details: SigDetails::Kill {
+            pid: task.pid(),
+            siginfo: None,
+        },
     });
     Ok(0)
 }
@@ -667,6 +675,7 @@ pub fn sys_tkill(tid: isize, sig: i32) -> SyscallResult {
 /// signal from the set of pending signals and returns the signal number
 /// as its function result.
 pub async fn sys_rt_sigtimedwait(set: usize, info: usize, timeout: usize) -> SyscallResult {
+
     let task = current_task();
     let addrspace = task.addr_space();
 
@@ -675,12 +684,15 @@ pub async fn sys_rt_sigtimedwait(set: usize, info: usize, timeout: usize) -> Sys
     let mut timeout = UserReadPtr::<TimeSpec>::new(timeout, &addrspace);
 
     let mut set = unsafe { set.read()? };
-    set.remove(SigSet::SIGKILL | SigSet::SIGSTOP);
+    log::info!("[sys_rt_sigtimedwait] set: {:?}", set);
+    // if set.is_empty() {
+    //     return Err(SysError::EINVAL);
+    // }
+
     let sig = task.with_mut_sig_manager(|pending| {
         if let Some(si) = pending.get_expect(set) {
             Some(si.sig)
         } else {
-            pending.should_wake = set | SigSet::SIGKILL | SigSet::SIGSTOP;
             None
         }
     });
@@ -689,19 +701,30 @@ pub async fn sys_rt_sigtimedwait(set: usize, info: usize, timeout: usize) -> Sys
         return Ok(sig.raw());
     }
 
-    task.set_state(TaskState::Interruptible);
+    let should_wake_backup = task.sig_manager_mut().should_wake;
+    task.sig_manager_mut().should_wake = should_wake_backup | set;
+
+    let sig_mask_backup = *task.sig_mask_mut();
+    let mut mask = sig_mask_backup & (!set);
+    *task.sig_mask_mut() = mask;
+
     if !timeout.is_null() {
-        let timeout = unsafe { timeout.read()? };
+        let timeout = unsafe { timeout.read()? }; 
         if !timeout.is_valid() {
             return Err(SysError::EINVAL);
         }
-        log::info!("[sys_rt_sigtimedwait] {:?}", timeout);
+        log::info!("[sys_rt_sigtimedwait] timeout is set, will suspend for {:?}", timeout);
+        task.set_state(TaskState::Interruptible);
         task.suspend_timeout(timeout.into()).await;
     } else {
+        task.set_state(TaskState::Interruptible);
         suspend_now().await;
     }
 
     task.set_state(TaskState::Running);
+    task.sig_manager_mut().should_wake = should_wake_backup;
+    *task.sig_mask_mut() = sig_mask_backup;
+
     let si = task.with_mut_sig_manager(|pending| pending.dequeue_expect(set));
     if let Some(si) = si {
         log::info!("[sys_rt_sigtimedwait] I'm woken by {:?}", si);
@@ -711,10 +734,44 @@ pub async fn sys_rt_sigtimedwait(set: usize, info: usize, timeout: usize) -> Sys
             }
         }
         Ok(si.sig.raw())
+    } else if task.sig_manager_mut().has_expect_signals(!set){
+        log::info!("[sys_rt_sigtimedwait] I'm woken by unexpect signal");
+        Err(SysError::EINTR)
     } else {
-        log::info!("[sys_rt_sigtimedwait] I'm woken by timeout");
+        log::error!("[sys_rt_sigtimedwait] I'm woken by timeout");
         Err(SysError::EAGAIN)
     }
+}
+
+pub async fn sys_rt_sigpending(set: usize, sigsetsize: usize) -> SyscallResult {
+    let task = current_task();
+    let addrspace = task.addr_space();
+
+    // 验证sigsetsize参数
+    if sigsetsize != core::mem::size_of::<SigSet>() {
+        return Err(SysError::EINVAL);
+    }
+
+    // 创建用户空间写指针
+    let mut set_ptr = UserWritePtr::<SigSet>::new(set, &addrspace);
+
+    // 获取当前任务的待处理信号集合
+    let pending_signals = task.with_mut_sig_manager(|manager| manager.bitmap);
+
+    log::info!(
+        "[sys_rt_sigpending] tid {}, pending signals: {:#x}",
+        task.tid(),
+        pending_signals.bits()
+    );
+
+    // 将待处理信号集合写入用户空间
+    if !set_ptr.is_null() {
+        unsafe {
+            set_ptr.write(pending_signals)?;
+        }
+    }
+
+    Ok(0)
 }
 
 pub async fn sys_rt_sigsuspend(mask: usize) -> SyscallResult {

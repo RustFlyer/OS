@@ -1,22 +1,27 @@
-use core::ffi::CStr;
-
-use alloc::{string::{String, ToString}, vec::Vec};
+use alloc::slice;
+use core::mem;
 
 use systype::error::{SysError, SysResult};
 
-pub const HANDLE_LEN: usize = 128;
+pub const HEADER_LEN: usize = mem::size_of::<FileHandleHeader>();
+pub const HANDLE_LEN: usize = mem::size_of::<FileHandleData>();
+pub const FILE_HANDLE_LEN: usize = HEADER_LEN + HANDLE_LEN;
 
 /// Internal representation of a Linux `file_handle` structure.
 ///
 /// The external representation is defined as:
 /// ```c
 /// struct file_handle {
-///     u32 handle_bytes; // size of the handle field in bytes
-///     i32 handle_type;  // type of the handle
-///     char handle[128]; // path to the file, null-terminated
+///     unsigned handle_bytes; // size of the handle field in bytes
+///     int handle_type;       // type of the handle
+///     struct {
+///         uint32_t inode;         // inode number
+///         uint32_t generation;    // generation number
+///     } handle;              // handle data
 /// };
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[repr(C)]
 pub struct FileHandle {
     header: FileHandleHeader,
     data: FileHandleData,
@@ -27,13 +32,13 @@ impl FileHandle {
     ///
     /// This function is crate-private; external code should call [`Dentry::file_handle`]
     /// to create a [`FileHandle`] instead.
-    pub(crate) fn new(handle_type: i32, path: String) -> Self {
+    pub(crate) fn new(handle_type: u32, inode: u32, generation: u32) -> Self {
         FileHandle {
             header: FileHandleHeader {
                 handle_bytes: HANDLE_LEN as u32,
                 handle_type,
             },
-            data: FileHandleData { path },
+            data: FileHandleData { inode, generation },
         }
     }
 
@@ -41,12 +46,12 @@ impl FileHandle {
         self.header.handle_bytes
     }
 
-    pub fn handle_type(&self) -> i32 {
+    pub fn handle_type(&self) -> u32 {
         self.header.handle_type
     }
 
-    pub fn path(&self) -> &String {
-        &self.data.path
+    pub fn inode(&self) -> u32 {
+        self.data.inode
     }
 
     /// Converts a byte representation of a Linux `file_handle` structure to a
@@ -57,27 +62,18 @@ impl FileHandle {
     /// of the file handle beforehand. Instead, call [`FileHandleHeader::from_raw_bytes`]
     /// first to get the length of the handle, and then call
     /// [`FileHandleData::from_raw_bytes`] with the remaining bytes.
-    pub fn from_raw_bytes(bytes: &[u8]) -> SysResult<Self> {
-        if bytes.len() < 8 {
-            return Err(SysError::EINVAL);
-        }
+    pub fn from_raw_bytes(bytes: &[u8]) -> Self {
+        debug_assert!(bytes.len() == FILE_HANDLE_LEN);
 
         let header = FileHandleHeader::from_raw_bytes(&bytes[0..8]);
-        let data = FileHandleData::from_raw_bytes(&bytes[8..])?;
+        let data = FileHandleData::from_raw_bytes(&bytes[8..]).unwrap();
 
-        Ok(FileHandle { header, data })
+        FileHandle { header, data }
     }
 
-    /// Converts the `FileHandle` to Linux `file_handle` structure as a byte vector.
-    pub fn to_raw_bytes(&self) -> Vec<u8> {
-        debug_assert!(self.data.path.len() < HANDLE_LEN, "Path length exceeds HANDLE_LEN bytes");
-
-        let mut bytes = vec![0; 8 + HANDLE_LEN];
-        bytes[0..4].copy_from_slice(&self.header.handle_bytes.to_ne_bytes());
-        bytes[4..8].copy_from_slice(&self.header.handle_type.to_ne_bytes());
-        bytes[8..8 + self.data.path.len()].copy_from_slice(self.data.path.as_bytes());
-        bytes[8 + self.data.path.len()] = 0; // Null-terminate
-        bytes
+    /// Converts the `FileHandle` to Linux `file_handle` structure as a byte slice.
+    pub fn as_raw_bytes(&self) -> &[u8] {
+        unsafe { slice::from_raw_parts(self as *const FileHandle as *const u8, FILE_HANDLE_LEN) }
     }
 }
 
@@ -86,23 +82,11 @@ impl FileHandle {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub struct FileHandleHeader {
-    handle_bytes: u32,
-    handle_type: i32,
+    pub handle_bytes: u32,
+    pub handle_type: u32,
 }
 
 impl FileHandleHeader {
-    pub fn handle_bytes(&self) -> u32 {
-        self.handle_bytes
-    }
-
-    pub fn set_handle_bytes(&mut self, handle_bytes: u32) {
-        self.handle_bytes = handle_bytes;
-    }
-
-    pub fn handle_type(&self) -> i32 {
-        self.handle_type
-    }
-
     /// Converts the `handle_bytes` and `handle_type` fields of the Linux `file_handle`
     /// structure as bytes to a [`FileHandleHeader`].
     ///
@@ -111,7 +95,8 @@ impl FileHandleHeader {
         debug_assert!(bytes.len() == 8);
 
         let handle_bytes = u32::from_ne_bytes(bytes[0..4].try_into().unwrap());
-        let handle_type = i32::from_ne_bytes(bytes[4..8].try_into().unwrap());
+        let handle_type = u32::from_ne_bytes(bytes[4..8].try_into().unwrap());
+
         FileHandleHeader {
             handle_bytes,
             handle_type,
@@ -122,23 +107,26 @@ impl FileHandleHeader {
 /// This structure corresponds to the `handle` field of the Linux `file_handle`
 /// structure.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[repr(C)]
 pub struct FileHandleData {
-    path: String,
+    /// Inode number of the file.
+    pub inode: u32,
+    /// Generation number of the file.
+    pub generation: u32,
 }
 
 impl FileHandleData {
-    pub fn path(&self) -> &str {
-        &self.path
-    }
-
     /// Converts the `handle` field of the Linux `file_handle` structure as bytes to a
     /// [`FileHandleData`].
+    ///
+    /// `bytes` must be properly sized to match the `handle` field, or this function will
+    /// return `EINVAL`.
     pub fn from_raw_bytes(bytes: &[u8]) -> SysResult<Self> {
-        let cstr = CStr::from_bytes_until_nul(bytes)
-            .map_err(|_| SysError::EINVAL)?;
-        let path = cstr.to_str()
-            .map_err(|_| SysError::EINVAL)?
-            .to_string();
-        Ok(FileHandleData { path })
+        if bytes.len() != mem::size_of::<FileHandleData>() {
+            return Err(SysError::EINVAL);
+        }
+        let inode = u32::from_ne_bytes(bytes[0..4].try_into().unwrap());
+        let generation = u32::from_ne_bytes(bytes[4..8].try_into().unwrap());
+        Ok(FileHandleData { inode, generation })
     }
 }

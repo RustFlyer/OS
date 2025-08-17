@@ -8,6 +8,8 @@ use vfs::{
     file::{File, FileMeta},
 };
 
+use super::URANDOM_SEED;
+
 pub struct UrandomFile {
     pub(crate) meta: FileMeta,
     seed: AtomicU64,
@@ -15,9 +17,12 @@ pub struct UrandomFile {
 
 impl UrandomFile {
     pub fn new(meta: FileMeta) -> Self {
+        unsafe { URANDOM_SEED += 0xbeef }
+        let r = unsafe { URANDOM_SEED } as u64;
+
         Self {
             meta,
-            seed: AtomicU64::new(0x12345678abcdef),
+            seed: AtomicU64::new(0x12345678abcdef + r),
         }
     }
 

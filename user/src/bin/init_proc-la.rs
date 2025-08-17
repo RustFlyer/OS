@@ -4,6 +4,7 @@
 extern crate alloc;
 extern crate user_lib;
 
+#[allow(unused)]
 use user_lib::{fork, loongarch_init, software_init, usershell, waitpid};
 
 #[unsafe(no_mangle)]
@@ -16,6 +17,6 @@ fn main() {
 
     let mut dummy = 0;
     loop {
-        waitpid(-1, &mut dummy);
+        waitpid(-1, &mut dummy, 0);
     }
 }

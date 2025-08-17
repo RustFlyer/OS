@@ -38,24 +38,7 @@ pub async fn sig_check(task: Arc<Task>, interrupted: &mut bool) {
 async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysResult<bool> {
     let action = task.sig_handlers_mut().lock().get(si.sig);
     let cx = task.trap_context_mut();
-    #[cfg(target_arch = "loongarch64")]
-    log::debug!("[sig context] TrapContext.sp: {:#x}", cx.user_reg[3]);
     let old_mask = task.get_sig_mask();
-
-    // log::debug!(
-    //     "[sig_exec] task [{}] Handling signal: {:?} {:?}",
-    //     task.get_name(),
-    //     si,
-    //     action
-    // );
-
-    log::info!(
-        "[sig_exec] task {} [{}] Handling signal: {:?} {:?}",
-        task.tid(),
-        task.get_name(),
-        si.sig,
-        action
-    );
 
     if *interrupted && action.flags.contains(SigActionFlag::SA_RESTART) {
         cx.sepc -= 4;
@@ -156,6 +139,8 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
             // FIXME: `SigInfo` and `SigContext` may not be the exact struct in C, which will
             // cause a random bug that sometimes user will trap into kernel because of
             // accessing kernel addrress
+            // FIXME: SA_SIGINFO should be handled in sig_exec by accepting the siginfo_t *
+            // and void *sig_cx.
             if action.flags.contains(SigActionFlag::SA_SIGINFO) {
                 // log::error!("[SA_SIGINFO] set sig_cx {sig_cx:?}");
                 // a2
@@ -249,6 +234,7 @@ fn kill(task: &Arc<Task>, sig: Sig) {
         exit_code |= 0x80;
     }
     task.set_exit_code(exit_code);
+    // task.notify_parent(SigInfo::CLD_KILLED, sig);
 }
 
 fn stop(task: &Arc<Task>, sig: Sig) {
