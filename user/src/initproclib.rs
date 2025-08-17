@@ -14,7 +14,7 @@ use alloc::{
 };
 use config::{inode::InodeMode, vfs::OpenFlags};
 
-pub use ltpauto::ltprun::{runltp_la, runltp_rv};
+pub use ltpauto::ltprun::{runltp_lagl, runltp_laml, runltp_rvgl, runltp_rvml};
 
 pub static CMD_HELP: &str = r#"NighthawkOS Quick Command Guide:
   ls /bin          Look up basic commands

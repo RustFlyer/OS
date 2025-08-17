@@ -4,7 +4,7 @@ extern crate user_lib;
 
 #[allow(unused_imports)]
 use user_lib::{chdir, execve, exit, fork, mkdir, println, setuid, wait, waitpid};
-use user_lib::{riscv_init, runltp_rv};
+use user_lib::{riscv_init, runltp_rvgl, runltp_rvml};
 
 const TESTCASES: &[&str] = &[
     "basic_testcode.sh",
@@ -55,13 +55,13 @@ fn main() -> i32 {
     for test in TESTCASES {
         run_test(test);
     }
-    runltp_rv();
+    runltp_rvgl();
 
     chdir("/musl");
     for test in TESTCASES {
         run_test(test);
     }
-    runltp_rv();
+    runltp_rvml();
 
     exit(114514);
 }

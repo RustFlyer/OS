@@ -5,7 +5,7 @@ extern crate user_lib;
 
 #[allow(unused_imports)]
 use user_lib::{chdir, execve, exit, fork, mkdir, println, setuid, wait, waitpid};
-use user_lib::{loongarch_init, runltp_la};
+use user_lib::{loongarch_init, runltp_lagl, runltp_laml};
 
 const TESTCASES: &[&str] = &[
     "basic_testcode.sh",
@@ -47,13 +47,13 @@ fn main() -> i32 {
     for test in TESTCASES {
         run_test(test);
     }
-    runltp_la();
+    runltp_lagl();
 
     chdir("/musl");
     for test in TESTCASES {
         run_test(test);
     }
-    runltp_la();
+    runltp_laml();
 
     exit(114514);
 }
