@@ -40,6 +40,7 @@ use crate::vm::{
     user_ptr::UserWritePtr,
     vm_area::{TypedArea, VmaFlags},
 };
+use crate::task::wait_queue::WAIT_QUEUE_MANAGER;
 
 impl Task {
     /// Suspends the Task until it is waken or time out
@@ -542,7 +543,6 @@ impl Task {
                     Sig::from_i32(lock.unwrap() as i32)
                 };
 
-                // Send traditional SIGCHLD signal for backward compatibility
                 parent.receive_siginfo(SigInfo {
                     sig,
                     code: SigInfo::CLD_EXITED,
@@ -550,7 +550,6 @@ impl Task {
                 });
 
                 // Notify wait queue manager to wake up waiting tasks
-                use crate::task::wait_queue::WAIT_QUEUE_MANAGER;
                 WAIT_QUEUE_MANAGER.notify_child_exit(&process, &parent);
                 log::info!("[Task::exit] notified wait queue for child {} exit", process.pid());
             } else {

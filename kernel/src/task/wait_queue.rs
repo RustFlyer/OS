@@ -1,6 +1,8 @@
 use alloc::{collections::BTreeMap, sync::{Arc, Weak}, vec::Vec};
 use mutex::SpinNoIrqLock;
+
 use super::{Task, tid::{PGid, Pid}};
+use crate::syscall::process::WaitFor;
 
 /// 等待项，表示一个等待的任务
 #[derive(Clone)]
@@ -8,20 +10,7 @@ pub struct WaitEntry {
     /// 等待的任务
     pub task: Arc<Task>,
     /// 等待条件
-    pub condition: WaitCondition,
-}
-
-/// 等待条件，定义任务等待什么类型的事件
-#[derive(Debug, Clone, PartialEq)]
-pub enum WaitCondition {
-    /// 等待任意子进程退出
-    AnyChild,
-    /// 等待特定PID的子进程退出
-    SpecificChild(Pid),
-    /// 等待特定进程组的任意子进程退出
-    ProcessGroup(PGid),
-    /// 等待同进程组内任意子进程退出
-    SameProcessGroup,
+    pub target: WaitFor,
 }
 
 /// 等待队列，管理所有等待某个条件的任务
@@ -58,22 +47,22 @@ impl WaitQueue {
         let mut indices_to_remove = Vec::new();
 
         for (i, entry) in self.waiters.iter().enumerate() {
-            let should_wake = match &entry.condition {
-                WaitCondition::AnyChild => {
+            let should_wake = match &entry.target {
+                WaitFor::AnyChild => {
                     // 检查exited_child是否是该任务的子进程
                     entry.task.children_mut().lock().contains_key(&exited_child_pid)
                 },
-                WaitCondition::SpecificChild(pid) => {
+                WaitFor::Pid(pid) => {
                     // 检查是否等待的是这个特定子进程
                     *pid == exited_child_pid && entry.task.children_mut().lock().contains_key(&exited_child_pid)
                 },
-                WaitCondition::ProcessGroup(pgid) => {
+                WaitFor::PGid(pgid) => {
                     // 检查exited_child是否属于指定的进程组，且是等待任务所在进程组的某个进程的子进程
-                    exited_child_pgid == *pgid && is_child_of_process_group(&entry.task, exited_child_pid)
+                    is_child_of_process_group(*pgid, exited_child_pid)
                 },
-                WaitCondition::SameProcessGroup => {
+                WaitFor::AnyChildInGroup => {
                     // 检查exited_child是否属于同一个进程组，且是该进程组内某个进程的子进程
-                    exited_child_pgid == entry.task.get_pgid() && is_child_of_process_group(&entry.task, exited_child_pid)
+                    is_child_of_process_group(entry.task.get_pgid(), exited_child_pid)
                 },
             };
 
@@ -102,15 +91,14 @@ impl WaitQueue {
     }
 }
 
-/// 检查exited_child是否是某个进程组内任意进程的子进程
-fn is_child_of_process_group(task: &Arc<Task>, exited_child_pid: Pid) -> bool {
+fn is_child_of_process_group(pgid: PGid, exited_child_pid: Pid) -> bool {
     use crate::task::process_manager::PROCESS_GROUP_MANAGER;
     
-    let pgid = task.get_pgid();
     if let Some(group) = PROCESS_GROUP_MANAGER.get_group(pgid) {
         for process_weak in group {
             if let Some(process) = process_weak.upgrade() {
                 if process.is_process() && process.children_mut().lock().contains_key(&exited_child_pid) {
+                    log::info!("[WaitQueueManager] exited_child {} is a child of process group {}", exited_child_pid, pgid);
                     return true;
                 }
             }
@@ -133,9 +121,9 @@ impl WaitQueueManager {
     }
 
     /// 添加等待任务
-    pub fn add_waiter(&self, task: Arc<Task>, condition: WaitCondition) {
-        let entry = WaitEntry { task, condition };
-        log::debug!("[WaitQueueManager] Added waiter for condition: {:?}", entry.condition);
+    pub fn add_waiter(&self, task: Arc<Task>, target: WaitFor) {
+        let entry = WaitEntry { task, target };
+        log::debug!("[WaitQueueManager] Added waiter for condition: {:?}", entry.target);
         self.global_queue.lock().add_waiter(entry);
     }
 

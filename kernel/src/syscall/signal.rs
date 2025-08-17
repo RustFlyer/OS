@@ -684,16 +684,15 @@ pub async fn sys_rt_sigtimedwait(set: usize, info: usize, timeout: usize) -> Sys
     let mut timeout = UserReadPtr::<TimeSpec>::new(timeout, &addrspace);
 
     let mut set = unsafe { set.read()? };
-    if set.is_empty() {
-        return Err(SysError::EINVAL);
-    }
+    log::info!("[sys_rt_sigtimedwait] set: {:?}", set);
+    // if set.is_empty() {
+    //     return Err(SysError::EINVAL);
+    // }
 
     let sig = task.with_mut_sig_manager(|pending| {
         if let Some(si) = pending.get_expect(set) {
             Some(si.sig)
         } else {
-            pending.should_wake = set | SigSet::SIGKILL | SigSet::SIGSTOP;
-            log::debug!("[sys_rt_sigtimedwait] wake_up_signal: {:?}", pending.should_wake);
             None
         }
     });
@@ -702,23 +701,30 @@ pub async fn sys_rt_sigtimedwait(set: usize, info: usize, timeout: usize) -> Sys
         return Ok(sig.raw());
     }
 
+    let should_wake_backup = task.sig_manager_mut().should_wake;
+    task.sig_manager_mut().should_wake = should_wake_backup | set;
+
     let sig_mask_backup = *task.sig_mask_mut();
-    let mut mask = SigSet::all() & (!set);
+    let mut mask = sig_mask_backup & (!set);
     *task.sig_mask_mut() = mask;
-    task.set_state(TaskState::Interruptible);
+
     if !timeout.is_null() {
-        let timeout = unsafe { timeout.read()? };
+        let timeout = unsafe { timeout.read()? }; 
         if !timeout.is_valid() {
             return Err(SysError::EINVAL);
         }
-        log::info!("[sys_rt_sigtimedwait] {:?}", timeout);
+        log::info!("[sys_rt_sigtimedwait] timeout is set, will suspend for {:?}", timeout);
+        task.set_state(TaskState::Interruptible);
         task.suspend_timeout(timeout.into()).await;
     } else {
+        task.set_state(TaskState::Interruptible);
         suspend_now().await;
     }
 
-    *task.sig_mask_mut() = sig_mask_backup;
     task.set_state(TaskState::Running);
+    task.sig_manager_mut().should_wake = should_wake_backup;
+    *task.sig_mask_mut() = sig_mask_backup;
+
     let si = task.with_mut_sig_manager(|pending| pending.dequeue_expect(set));
     if let Some(si) = si {
         log::info!("[sys_rt_sigtimedwait] I'm woken by {:?}", si);
@@ -728,8 +734,11 @@ pub async fn sys_rt_sigtimedwait(set: usize, info: usize, timeout: usize) -> Sys
             }
         }
         Ok(si.sig.raw())
+    } else if task.sig_manager_mut().has_expect_signals(!set){
+        log::info!("[sys_rt_sigtimedwait] I'm woken by unexpect signal");
+        Err(SysError::EINTR)
     } else {
-        log::error!("[sys_rt_sigtimedwait] I'm woken but not by expect signal (maybe timeout)");
+        log::error!("[sys_rt_sigtimedwait] I'm woken by timeout");
         Err(SysError::EAGAIN)
     }
 }

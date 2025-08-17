@@ -9,7 +9,7 @@ mod misc;
 mod mm;
 mod net;
 mod poll;
-mod process;
+pub mod process;
 mod sche;
 mod signal;
 mod time;
