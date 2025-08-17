@@ -17,7 +17,17 @@ pub use timer_manager::{TIMER_MANAGER, TimerManager};
 
 pub async fn sleep_ms(ms: usize) -> Duration {
     let limit: Duration = Duration::from_micros(ms as u64);
-    let expire = get_time_duration() + limit;
+    let current_time = get_time_duration();
+    
+    // Check for potential overflow when adding limit to current time
+    let expire = if let Some(exp) = current_time.checked_add(limit) {
+        exp
+    } else {
+        // If overflow would occur, cap at Duration::MAX to avoid panic
+        log::warn!("[sleep_ms] Duration overflow prevented, using Duration::MAX");
+        Duration::MAX
+    };
+    
     let mut timer = Timer::new(expire);
     timer.set_waker_callback(take_waker().await);
     TIMER_MANAGER.add_timer(timer);

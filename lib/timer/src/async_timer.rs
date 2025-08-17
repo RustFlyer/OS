@@ -22,9 +22,20 @@ pub struct TimeoutFuture<F: Future + Send + 'static> {
 
 impl<F: Future + Send + 'static> TimeoutFuture<F> {
     pub fn new(timeout: Duration, future: F) -> Self {
+        let current_time = get_time_duration();
+        
+        // Check for potential overflow when adding timeout to current time
+        let expire = if let Some(exp) = current_time.checked_add(timeout) {
+            exp
+        } else {
+            // If overflow would occur, cap at Duration::MAX to avoid panic
+            log::warn!("[TimeoutFuture] Duration overflow prevented, using Duration::MAX");
+            Duration::MAX
+        };
+        
         Self {
             future,
-            timer: Timer::new(timeout + get_time_duration()),
+            timer: Timer::new(expire),
             registered: false,
         }
     }

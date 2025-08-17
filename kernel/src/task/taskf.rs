@@ -45,7 +45,17 @@ use crate::task::wait_queue::WAIT_QUEUE_MANAGER;
 impl Task {
     /// Suspends the Task until it is waken or time out
     pub async fn suspend_timeout(&self, limit: Duration) -> Duration {
-        let expire = get_time_duration() + limit;
+        let current_time = get_time_duration();
+        
+        // Check for potential overflow when adding limit to current time
+        let expire = if let Some(exp) = current_time.checked_add(limit) {
+            exp
+        } else {
+            // If overflow would occur, cap at Duration::MAX to avoid panic
+            log::warn!("[suspend_timeout] Duration overflow prevented, using Duration::MAX");
+            Duration::MAX
+        };
+        
         let mut timer = Timer::new(expire);
         timer.set_waker_callback(self.get_waker().clone());
         TIMER_MANAGER.add_timer(timer);

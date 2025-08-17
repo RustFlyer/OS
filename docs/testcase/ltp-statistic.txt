@@ -1413,8 +1413,8 @@ myfunctions.sh		skip		0	0
 name_to_handle_at01		unimplement panic	0	0	
 name_to_handle_at02		all fail		0	58
 nanosleep01			all pass		1	0
-nanosleep02			part fail		1	2
-nanosleep04			defect panic	0	0
+nanosleep02			all pass		2	0
+nanosleep04			all pass	3	0
 net_cmdlib.sh		skip		0	0
 netns_breakns.sh		skip		0	0	
 netns_comm.sh		skip		0	0	
