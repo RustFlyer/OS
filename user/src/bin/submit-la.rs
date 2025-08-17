@@ -44,16 +44,16 @@ fn main() -> i32 {
     }
 
     chdir("/glibc");
+    runltp_lagl();
     for test in TESTCASES {
         run_test(test);
     }
-    runltp_lagl();
 
     chdir("/musl");
+    runltp_laml();
     for test in TESTCASES {
         run_test(test);
     }
-    runltp_laml();
 
     exit(114514);
 }

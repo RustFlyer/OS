@@ -235,9 +235,9 @@ pub fn usershell() {
 }
 
 pub fn riscv_init() {
-    close(2);
+    // close(2);
 
-    if chdir("musl") < 0 {
+    if chdir("musl") < 0 && false {
         println!("The device uses disk-rv");
         mkdir("/bin");
         run_cmd("./busybox --install -s /bin");
@@ -249,7 +249,7 @@ pub fn riscv_init() {
         return;
     }
 
-    if open(-100, "/bin/ls", OpenFlags::empty(), InodeMode::empty()) > 0 {
+    if open(-100, "/bin/ls", OpenFlags::empty(), InodeMode::empty()) > 0 && false {
         println!("The device has been initialized");
         let fd = open(0, "/dev/tty", OpenFlags::O_WRONLY, InodeMode::CHAR);
         if fd != 2 {
@@ -291,7 +291,7 @@ pub fn riscv_init() {
 }
 
 pub fn loongarch_init() {
-    close(2);
+    // close(2);
 
     if chdir("musl") < 0 {
         println!("The device uses disk-la");
