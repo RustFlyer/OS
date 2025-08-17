@@ -4,7 +4,7 @@
 
 ## 项目描述
 
-Nighthawk OS 是使用 Rust 编写，支持 RISC-V 和 LoongArch 指令集架构，采用异步无栈协程架构的操作系统。
+Nighthawk OS 是使用 Rust 编写，支持 RISC-V 和 LoongArch 指令集架构，采用异步无栈协程架构的操作系统，追求系统功能的标准化和完备性。
 
 ## 完成情况
 
@@ -16,7 +16,7 @@ Nighthawk OS 是使用 Rust 编写，支持 RISC-V 和 LoongArch 指令集架构
 
 ### 决赛
 
-Nighthawk已通过所有决赛第一阶段测例，取得满分：
+Nighthawk OS 已通过所有决赛第一阶段测例，取得满分：
 
 ![决赛一阶段测例排行榜](./docs/assets/final_1_leaderboard.jpeg)
 
@@ -33,6 +33,8 @@ Nighthawk已通过所有决赛第一阶段测例，取得满分：
 - 进程通信：复用一部分Phoenix的代码，实现了符合POSIX标准的信号系统，支持用户自定义信号处理例程；实现了共享内存通信，适配内核其他异步功能；实现了等待队列机制。
 - 设备驱动：支持设备树解析，自动化设备发现与配置。实现 PLIC 支持，异步处理中断事件，提升外设响应速度。
 - 网络模块：复用一部分Phoenix和Arceos的代码，并在此基础上进行优化。模块化设计，支持灵活扩展Udp，Tcp等多种网络协议。异步事件处理框架与多核调度协同工作，确保网络通信在复杂应用场景下高效可靠。
+
+基于这些功能， Nighthawk OS 能够支持基本的实用程序运行，比如vim编辑器、git版本管理器，以及能够在内核中使用gcc本地编译并运行简单的程序，如“贪吃蛇”等。
 
 <div align="center">
   <img src="./docs/assets/Nighthawk-design.jpg" alt="Nighthawk内核架构" width="450"/>
