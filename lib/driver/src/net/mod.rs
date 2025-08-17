@@ -2,6 +2,7 @@ use alloc::boxed::Box;
 use netbuf::NetBufPtrOps;
 use smoltcp::phy::DeviceCapabilities;
 
+pub mod gmac;
 pub mod loopback;
 pub mod netbuf;
 pub mod netpool;
