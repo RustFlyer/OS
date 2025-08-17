@@ -1,3 +1,5 @@
+use crate::fork;
+
 #[allow(non_snake_case)]
 pub mod ltprun {
     extern crate alloc;
@@ -41,6 +43,7 @@ pub mod ltprun {
             println!("RUN LTP CASE {}", test);
             let cmd = format!("ltp/testcases/bin/{}", test);
             run_cmd(&cmd);
+            println!("FAIL LTP CASE {} : 0", test);
         }
         println!("#### OS COMP TEST GROUP END ltp-musl ####");
     }
@@ -591,6 +594,7 @@ pub mod ltprun {
             println!("RUN LTP CASE {}", test);
             let cmd = format!("ltp/testcases/bin/{}", test);
             run_cmd(&cmd);
+            println!("FAIL LTP CASE {} : 0", test);
         }
         println!("#### OS COMP TEST GROUP END ltp-musl ####");
     }
@@ -1141,6 +1145,7 @@ pub mod ltprun {
             println!("RUN LTP CASE {}", test);
             let cmd = format!("ltp/testcases/bin/{}", test);
             run_cmd(&cmd);
+            println!("FAIL LTP CASE {} : 0", test);
         }
         println!("#### OS COMP TEST GROUP END ltp-glibc ####");
     }
@@ -1685,6 +1690,7 @@ pub mod ltprun {
             println!("RUN LTP CASE {}", test);
             let cmd = format!("ltp/testcases/bin/{}", test);
             run_cmd(&cmd);
+            println!("FAIL LTP CASE {} : 0", test);
         }
         println!("#### OS COMP TEST GROUP END ltp-musl ####");
     }
@@ -2229,6 +2235,7 @@ pub mod ltprun {
             println!("RUN LTP CASE {}", test);
             let cmd = format!("ltp/testcases/bin/{}", test);
             run_cmd(&cmd);
+            println!("FAIL LTP CASE {} : 0", test);
         }
         println!("#### OS COMP TEST GROUP END ltp-glibc ####");
     }
@@ -2291,3 +2298,12 @@ pub mod ltprun {
 // "sigtimedwait01", timeout
 // "sigwait01", timeout
 // "sigwaitinfo01", timeout
+
+pub fn run_ltp(cmd: &str, test: &str) {
+    if fork() == 0 {
+        let r = crate::execve("./busybox", &["./busybox", "sh", "-c", cmd], &[]);
+    } else {
+        let mut result: i32 = 0;
+        crate::waitpid(-1, &mut result, 0);
+    }
+}
