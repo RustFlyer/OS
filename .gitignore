@@ -8,4 +8,5 @@
 kernel-la
 kernel-rv
 linkapp.asm
+submit
 *.asm
