@@ -3,6 +3,7 @@ use mutex::{SpinNoIrqLock, new_share_mutex};
 use smoltcp::{
     iface::{SocketHandle, SocketSet},
     socket::{self, AnySocket, tcp::SocketBuffer},
+    wire::{IpProtocol, IpVersion},
 };
 
 use crate::ETH0;
@@ -38,6 +39,12 @@ type SmolUdpSocket<'a> = socket::udp::Socket<'a>;
 /// Udp Packet Buffer, a ring buffer
 type SmolUdpPacketBuffer<'a> = socket::udp::PacketBuffer<'a>;
 
+/// Raw Socket
+type SmolRawSocket<'a> = socket::raw::Socket<'a>;
+
+/// Raw Packet Buffer, a ring buffer
+type SmolRawPacketBuffer<'a> = socket::raw::PacketBuffer<'a>;
+
 /// Udp Packet metadata
 /// ```rust
 /// pub struct UdpMetadata {
@@ -47,6 +54,8 @@ type SmolUdpPacketBuffer<'a> = socket::udp::PacketBuffer<'a>;
 /// }
 /// ```
 type SmolUdpPacketMetadata = socket::udp::PacketMetadata;
+
+type SmolRawPacketMetadata = socket::raw::PacketMetadata;
 
 /// `SmolInstant` is a representation of an absolute time value.
 ///
@@ -74,15 +83,28 @@ impl SocketSetWrapper {
 
     /// Creates a new udp socket consisting of `udp_rx_buffer` and `udp_tx_buffer`.
     pub fn new_udp_socket() -> SmolUdpSocket<'static> {
-        let udp_rx_buffer = SmolUdpPacketBuffer::new(
-            vec![SmolUdpPacketMetadata::EMPTY; 8],
-            vec![0; UDP_RX_BUF_LEN],
-        );
-        let udp_tx_buffer = SmolUdpPacketBuffer::new(
-            vec![SmolUdpPacketMetadata::EMPTY; 8],
-            vec![0; UDP_TX_BUF_LEN],
-        );
+        let udp_rx_buffer = SmolUdpPacketBuffer::new(vec![SmolUdpPacketMetadata::EMPTY; 8], vec![
+                0;
+                UDP_RX_BUF_LEN
+            ]);
+        let udp_tx_buffer = SmolUdpPacketBuffer::new(vec![SmolUdpPacketMetadata::EMPTY; 8], vec![
+                0;
+                UDP_TX_BUF_LEN
+            ]);
         SmolUdpSocket::new(udp_rx_buffer, udp_tx_buffer)
+    }
+
+    /// Creates a new raw socket consisting of `tcp_rx_buffer` and `tcp_tx_buffer`.
+    pub fn new_raw_socket(ip_protocol: IpProtocol, version: IpVersion) -> SmolRawSocket<'static> {
+        let raw_rx_buffer = SmolRawPacketBuffer::new(vec![SmolRawPacketMetadata::EMPTY; 8], vec![
+                0;
+                TCP_RX_BUF_LEN
+            ]);
+        let raw_tx_buffer = SmolRawPacketBuffer::new(vec![SmolRawPacketMetadata::EMPTY; 8], vec![
+                0;
+                TCP_TX_BUF_LEN
+            ]);
+        SmolRawSocket::new(version, ip_protocol, raw_rx_buffer, raw_tx_buffer)
     }
 
     /// Like `fdtable`, this function can receive a `socket` and add it into `Socket_Set`.

@@ -20,6 +20,7 @@ pub mod device;
 pub mod externf;
 pub mod interface;
 pub mod portmap;
+pub mod raw;
 pub mod rttoken;
 pub mod socketset;
 pub mod tcp;

@@ -281,14 +281,14 @@ impl dyn File {
         let inode = self.inode();
         let page_cache = inode.page_cache();
         if let Some(page) = page_cache.get_page(pos) {
-            log::error!("cache page in: {:#x}", Arc::as_ptr(&page) as usize);
+            log::trace!("cache page in: {:#x}", Arc::as_ptr(&page) as usize);
             return Ok(page);
         }
 
         let page = Arc::new(Page::build()?);
         let bytes_read = self.base_read(page.as_mut_slice(), pos).await?;
         page.as_mut_slice()[bytes_read..].fill(0);
-        log::error!("new page in: {:#x}", Arc::as_ptr(&page) as usize);
+        log::trace!("new page in: {:#x}", Arc::as_ptr(&page) as usize);
 
         page_cache.insert_page(pos, Arc::clone(&page));
         Ok(page)

@@ -47,7 +47,7 @@ pub fn sys_socket(domain: usize, types: i32, protocal: usize) -> SyscallResult {
 
     let types = SocketType::from_repr(types as usize).ok_or(SysError::EINVAL)?;
 
-    let socket = Socket::new(domain, types, nonblock)?;
+    let socket = Socket::new(domain, types, protocal as u8, nonblock)?;
     let fd = current_task().with_mut_fdtable(|table| table.alloc(Arc::new(socket), flags))?;
     log::info!("[sys_socket] new socket {types:?} {flags:?} in fd {fd}, nonblock:{nonblock}");
     Ok(fd)

@@ -45,18 +45,21 @@ pub fn clear_bss() {
             core::slice::from_raw_parts_mut(start_byte.add(offset), len_bytes - offset).fill(0);
         }
 
-        println!("try to read");
-        let r = core::ptr::read_volatile(0x8000_0000_0000_0000 as *const usize);
-        println!("r: {:#x}", r);
+        #[cfg(target_arch = "loongarch64")]
+        {
+            println!("try to read");
+            let r = core::ptr::read_volatile(0x8000_0000_0000_0000 as *const usize);
+            println!("r: {:#x}", r);
 
-        println!("try to write");
-        let buf = [0u8; 4096];
-        // core::ptr::copy_nonoverlapping(&buf, 0x8000_0000_0000_0000 as *mut [u8; 4096], 1);
-        core::ptr::write_volatile(0x8000_0000_0000_0000 as *mut [u8; 4096], buf);
-        println!("finish write");
+            println!("try to write");
+            let buf = [0u8; 4096];
+            // core::ptr::copy_nonoverlapping(&buf, 0x8000_0000_0000_0000 as *mut [u8; 4096], 1);
+            core::ptr::write_volatile(0x8000_0000_0000_0000 as *mut [u8; 4096], buf);
+            println!("finish write");
 
-        println!("try to read");
-        let r = core::ptr::read_volatile(0x8000_0000_0000_0000 as *const usize);
-        println!("r: {:#x}", r);
+            println!("try to read");
+            let r = core::ptr::read_volatile(0x8000_0000_0000_0000 as *const usize);
+            println!("r: {:#x}", r);
+        }
     }
 }

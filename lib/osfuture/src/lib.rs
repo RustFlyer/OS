@@ -62,7 +62,7 @@ impl Future for SuspendFuture {
 /// If the task temps to rejoin the hart TaskLine again, its
 /// waker should be called by other tasks.
 pub async fn suspend_now() {
-    log::debug!("suspend");
+    log::trace!("suspend");
     SuspendFuture::new().await
 }
 

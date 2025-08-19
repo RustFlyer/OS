@@ -4,6 +4,7 @@ use alloc::sync::Arc;
 use net::{
     NetPollState,
     addr::UNSPECIFIED_IPV4,
+    raw::RawSocket,
     tcp::core::TcpSocket,
     udp::UdpSocket,
     unix::{UnixSocket, extract_path_from_sockaddr_un},
@@ -22,6 +23,7 @@ pub enum Sock {
     Tcp(TcpSocket),
     Udp(UdpSocket),
     Unix(Arc<UnixSocket>),
+    Raw(RawSocket),
 }
 
 impl Sock {
@@ -30,6 +32,7 @@ impl Sock {
             Sock::Tcp(tcp) => tcp.set_nonblocking(true),
             Sock::Udp(udp) => udp.set_nonblocking(true),
             Sock::Unix(_unix) => (),
+            Sock::Raw(raw) => raw.set_nonblocking(true),
         }
     }
 
@@ -56,6 +59,11 @@ impl Sock {
                 }
                 udp.bind(listen_ep)
             }
+            (Sock::Raw(_raw), SaFamily::AF_INET) | (Sock::Raw(_raw), SaFamily::AF_INET6) => {
+                // RAW sockets typically don't need to bind to specific addresses
+                // They operate at the IP layer
+                Ok(())
+            }
             (Sock::Unix(unix), SaFamily::AF_UNIX) => {
                 let path = local_addr.as_unix_path().ok_or(SysError::EINVAL)?;
                 match check_unix_path(&path) {
@@ -71,6 +79,9 @@ impl Sock {
         match self {
             Sock::Tcp(tcp) => tcp.listen(current_task().waker_mut().as_ref().unwrap()),
             Sock::Udp(_udp) => Err(SysError::EOPNOTSUPP),
+            Sock::Raw(_raw) => {
+                todo!()
+            }
             Sock::Unix(_unix) => Err(SysError::EOPNOTSUPP),
         }
     }
@@ -84,6 +95,9 @@ impl Sock {
             Sock::Udp(udp) => {
                 let remote_addr = remote_addr.as_endpoint();
                 udp.connect(remote_addr)
+            }
+            Sock::Raw(_raw) => {
+                todo!()
             }
             Sock::Unix(unix) => unsafe {
                 let path = extract_path_from_sockaddr_un(&remote_addr.unix.path);
@@ -101,6 +115,9 @@ impl Sock {
             Sock::Udp(udp) => {
                 let peer_addr = SockAddr::from_endpoint(udp.peer_addr()?);
                 Ok(peer_addr)
+            }
+            Sock::Raw(_raw) => {
+                todo!()
             }
             Sock::Unix(unix) => {
                 let peer = unix.peer.lock();
@@ -135,6 +152,9 @@ impl Sock {
                 let local_addr = SockAddr::from_endpoint(udp.local_addr()?);
                 Ok(local_addr)
             }
+            Sock::Raw(_raw) => {
+                todo!()
+            }
             Sock::Unix(unix) => {
                 let path_opt = unix.path.lock();
                 if let Some(path) = &*path_opt {
@@ -160,6 +180,10 @@ impl Sock {
                 Some(addr) => udp.send_to(buf, addr.as_endpoint()).await,
                 None => udp.send(buf).await,
             },
+            Sock::Raw(raw) => {
+                let dst_addr = remote_addr.map(|addr| addr.as_endpoint().addr);
+                raw.send_raw(buf, dst_addr).await
+            }
             Sock::Unix(unix) => unix.send(buf),
         }
     }
@@ -172,6 +196,15 @@ impl Sock {
             }
             Sock::Udp(udp) => {
                 let (len, endpoint) = udp.recv_from(buf).await?;
+                Ok((len, SockAddr::from_endpoint(endpoint)))
+            }
+            Sock::Raw(raw) => {
+                let (len, src_addr_opt) = raw.recv_raw_with_addr(buf).await?;
+                let endpoint = if let Some(src_addr) = src_addr_opt {
+                    smoltcp::wire::IpEndpoint::new(src_addr, 0)
+                } else {
+                    smoltcp::wire::IpEndpoint::new(smoltcp::wire::IpAddress::v4(0, 0, 0, 0), 0)
+                };
                 Ok((len, SockAddr::from_endpoint(endpoint)))
             }
             Sock::Unix(unix) => {
@@ -193,6 +226,7 @@ impl Sock {
         match self {
             Sock::Tcp(tcp) => tcp.poll().await,
             Sock::Udp(udp) => udp.poll().await,
+            Sock::Raw(raw) => raw.poll().await,
             Sock::Unix(_unix) => unimplemented!(),
         }
     }
@@ -201,6 +235,7 @@ impl Sock {
         match self {
             Sock::Tcp(tcp) => tcp.shutdown(how),
             Sock::Udp(udp) => udp.shutdown(),
+            Sock::Raw(raw) => raw.shutdown(),
             Sock::Unix(_unix) => unimplemented!(),
         }
     }
@@ -212,22 +247,29 @@ impl Sock {
                 Ok(new_tcp)
             }
             Sock::Udp(_udp) => Err(SysError::EOPNOTSUPP),
+            Sock::Raw(_raw) => Err(SysError::EOPNOTSUPP),
             Sock::Unix(_unix) => unimplemented!(),
         }
     }
 
-    pub fn register_recv_waker(&self, waker: Waker) {
+    pub fn _register_recv_waker(&self, waker: Waker) {
         match self {
             Sock::Tcp(tcp) => tcp.register_recv_waker(&waker),
             Sock::Udp(udp) => udp.register_recv_waker(&waker),
+            Sock::Raw(_raw) => {
+                todo!()
+            }
             Sock::Unix(_unix) => unimplemented!(),
         }
     }
 
-    pub fn register_send_waker(&self, waker: Waker) {
+    pub fn _register_send_waker(&self, waker: Waker) {
         match self {
             Sock::Tcp(tcp) => tcp.register_send_waker(&waker),
             Sock::Udp(udp) => udp.register_send_waker(&waker),
+            Sock::Raw(_raw) => {
+                todo!()
+            }
             Sock::Unix(_unix) => unimplemented!(),
         }
     }

@@ -18,7 +18,7 @@ pub fn probe_tree(fdt: &Fdt) {
     {
         // PLIC
         if let Some(plic) = crate::osdriver::pbrv::probe_plic(fdt) {
-            device_manager().set_plic(Box::new(plic));
+            device_manager().set_icu(Box::new(plic));
             println!("[PLIC] INIT SUCCESS");
 
             // SERIAL
@@ -48,8 +48,11 @@ pub fn probe_tree(fdt: &Fdt) {
         }
 
         // NetWork Simple
-        use driver::net::loopback::LoopbackDev;
-        init_network(LoopbackDev::new(), true);
+        #[cfg(feature = "loopback")]
+        {
+            use driver::net::loopback::LoopbackDev;
+            init_network(LoopbackDev::new(), true);
+        }
 
         // CLOCK FREQ
         #[allow(static_mut_refs)]
@@ -66,7 +69,7 @@ pub fn probe_tree(fdt: &Fdt) {
     {
         // INTERRUPT CONTROL
         if let Some(icu) = crate::osdriver::pbla::probe_icu(fdt) {
-            device_manager().set_plic(Box::new(icu));
+            device_manager().set_icu(Box::new(icu));
             println!("[LAICU] INIT SUCCESS");
         }
 

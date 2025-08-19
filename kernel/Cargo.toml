@@ -55,3 +55,4 @@ config = { path = "../lib/config/" }
 default = ["board"]
 qemu = []
 board = []
+loopback = []

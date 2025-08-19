@@ -30,6 +30,7 @@ unsafe extern "C" {
 // 同步dcache中所有cached和uncached访存请求
 pub fn eth_sync_dcache() {
     unsafe {
+        #[cfg(target_arch = "loongarch64")]
         asm!("dbar 0");
     }
 }

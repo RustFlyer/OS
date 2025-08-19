@@ -3,7 +3,9 @@ use alloc::{boxed::Box, sync::Arc};
 use async_trait::async_trait;
 
 use config::vfs::{OpenFlags, PollEvents};
-use net::{poll_interfaces, tcp::core::TcpSocket, udp::UdpSocket, unix::UnixSocket};
+use net::{
+    poll_interfaces, raw::RawSocket, tcp::core::TcpSocket, udp::UdpSocket, unix::UnixSocket,
+};
 use systype::error::{SysError, SysResult};
 use vfs::{
     file::{File, FileMeta},
@@ -27,12 +29,18 @@ unsafe impl Sync for Socket {}
 unsafe impl Send for Socket {}
 
 impl Socket {
-    pub fn new(domain: SaFamily, types: SocketType, nonblock: bool) -> SysResult<Self> {
+    pub fn new(
+        domain: SaFamily,
+        types: SocketType,
+        protocol: u8,
+        nonblock: bool,
+    ) -> SysResult<Self> {
         let sk = match domain {
             SaFamily::AF_UNIX => Sock::Unix(Arc::new(UnixSocket::new())),
             SaFamily::AF_INET | SaFamily::AF_INET6 => match types {
                 SocketType::STREAM => Sock::Tcp(TcpSocket::new_v4()),
                 SocketType::DGRAM => Sock::Udp(UdpSocket::new()),
+                SocketType::RAW => Sock::Raw(RawSocket::new(protocol)),
                 _ => {
                     log::error!(
                         "[Socket::new] Unsupported socket type: {types:?} for domain: {domain:?}"
@@ -41,6 +49,7 @@ impl Socket {
                 }
             },
         };
+
         let flags = if nonblock {
             sk.set_nonblocking();
             OpenFlags::O_RDWR | OpenFlags::O_NONBLOCK

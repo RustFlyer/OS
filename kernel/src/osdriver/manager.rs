@@ -4,7 +4,7 @@ use config::device::MAX_HARTS;
 use driver::{
     cpu::CPU,
     device::{OSDevId, OSDevice, OSDeviceMajor, OSDeviceMeta},
-    icu::{ICU, plic::PLIC},
+    icu::ICU,
 };
 
 use crate::osdriver::ioremap_if_need;
@@ -20,39 +20,26 @@ pub fn device_manager() -> &'static mut DeviceTreeManager {
     unsafe { OSDEVICE_MANAGER.as_mut().unwrap() }
 }
 
-/// The DeviceManager struct is responsible for managing the devices within the
-/// system. It handles the initialization, probing, and interrupt management for
-/// various devices.
+#[allow(unused)]
 pub struct DeviceTreeManager {
-    /// Optional PLIC (Platform-Level Interrupt Controller) to manage external
-    /// interrupts.
-    pub plic: Option<Box<dyn ICU>>,
+    pub icu: Option<Box<dyn ICU>>,
 
-    /// Vector containing CPU instances. The capacity is set to accommodate up
-    /// to 8 CPUs.
     pub cpus: Vec<CPU>,
 
-    /// A BTreeMap that maps device IDs (DevId) to device instances (Arc<dyn
-    /// Device>). This map stores all the devices except for network devices
-    /// which are managed separately by the `InterfaceWrapper` in the `net`
-    /// module.
     pub devices: BTreeMap<OSDevId, Arc<dyn OSDevice>>,
 
     pub net: Option<OSDeviceMeta>,
 
-    /// A BTreeMap that maps interrupt numbers (irq_no) to device instances
-    /// (Arc<dyn Device>). This map is used to quickly locate the device
-    /// responsible for handling a specific interrupt.
     pub irq_map: BTreeMap<usize, Arc<dyn OSDevice>>,
 }
 
 impl DeviceTreeManager {
     /// Creates a new DeviceManager instance with default values.
-    /// Initializes the PLIC to None, reserves space for 8 CPUs, and creates
+    /// Initializes the icu to None, reserves space for 8 CPUs, and creates
     /// empty BTreeMaps for devices and irq_map.
     pub fn new() -> Self {
         Self {
-            plic: None,
+            icu: None,
             cpus: Vec::with_capacity(8),
             devices: BTreeMap::new(),
             net: None,
@@ -77,8 +64,8 @@ impl DeviceTreeManager {
         }
     }
 
-    fn plic(&self) -> &Box<dyn ICU> {
-        self.plic.as_ref().unwrap()
+    fn icu(&self) -> &Box<dyn ICU> {
+        self.icu.as_ref().unwrap()
     }
 
     pub fn get(&self, dev_id: &OSDevId) -> Option<&Arc<dyn OSDevice>> {
@@ -99,8 +86,8 @@ impl DeviceTreeManager {
     }
 
     pub fn enable_device_interrupts(&mut self) {
-        if self.plic.is_none() {
-            log::warn!("no plic");
+        if self.icu.is_none() {
+            log::warn!("no icu");
             return;
         }
 
@@ -108,7 +95,7 @@ impl DeviceTreeManager {
         for i in 0..total * 2 {
             for dev in self.devices.values() {
                 if let Some(irq) = dev.irq_no() {
-                    self.plic().enable_irq(irq, i);
+                    self.icu().enable_irq(irq, i);
                     let name = dev.name();
                     log::warn!("Enable external interrupt: {irq}, context:{i}, name: {name}");
                 }
@@ -118,20 +105,20 @@ impl DeviceTreeManager {
     }
 
     pub fn handle_irq(&mut self) {
-        if self.plic.is_none() {
-            log::warn!("no plic");
+        if self.icu.is_none() {
+            log::warn!("no icu");
             return;
         }
 
         disable_interrupt();
 
-        // First clain interrupt from PLIC
-        if let Some(irq_number) = self.plic().claim_irq(self.irq_context()) {
+        // First clain interrupt from icu
+        if let Some(irq_number) = self.icu().claim_irq(self.irq_context()) {
             // log::warn!("new interrupt: {}", irq_number);
             if let Some(dev) = self.irq_map.get(&irq_number) {
                 dev.handle_irq();
                 // Complete interrupt when done
-                self.plic().complete_irq(irq_number, self.irq_context());
+                self.icu().complete_irq(irq_number, self.irq_context());
                 return;
             }
             log::error!("Unknown interrupt: {}", irq_number);
@@ -159,8 +146,8 @@ impl DeviceTreeManager {
         self.devices.insert(id, device);
     }
 
-    pub fn set_plic(&mut self, plic: Box<dyn ICU>) {
-        self.plic = Some(plic);
+    pub fn set_icu(&mut self, icu: Box<dyn ICU>) {
+        self.icu = Some(icu);
     }
 
     pub fn set_cpus(&mut self, cpus: Vec<CPU>) {

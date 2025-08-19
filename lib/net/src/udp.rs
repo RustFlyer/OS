@@ -134,6 +134,7 @@ impl UdpSocket {
                 BindError::Unaddressable => SysError::EINVAL,
             })
         })?;
+
         *local_addr = Some(bound_addr);
 
         log::debug!("[udp::bind] bind {:?}", bound_addr);
