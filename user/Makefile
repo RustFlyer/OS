@@ -12,6 +12,6 @@ endif
 
 PHONY += build
 build:
-	cargo build $(MODE_ARGS) $(CARGO_ARGS) --offline
+	RUSTFLAGS="-Awarnings" cargo build $(MODE_ARGS) $(CARGO_ARGS) --offline
 
 .PHONY: $(PHONY)
