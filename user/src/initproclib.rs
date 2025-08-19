@@ -233,6 +233,10 @@ pub fn usershell() {
             execve(args[0], &args[0..], &[]);
             let bin = format!("/bin/{}", args[0]);
             execve(&bin, &args[0..], &[]);
+            let bin = format!("/usr/bin/{}", args[0]);
+            execve(&bin, &args[0..], &[]);
+            let bin = format!("/usr/local/bin/{}", args[0]);
+            execve(&bin, &args[0..], &[]);
             println!("{}: not found", args[0]);
 
             exit(0);
@@ -249,19 +253,25 @@ pub fn riscv_init() {
         println!("The device uses disk-rv");
         mkdir("/bin");
         run_cmd("./busybox --install -s /bin");
-        enable_usrlog();
+        // enable_usrlog();
         return;
     }
 
     if open(-100, "/bin/ls", OpenFlags::empty(), InodeMode::empty()) > 0 && false {
         println!("The device has been initialized");
-        enable_usrlog();
+        // enable_usrlog();
         return;
     }
 
-    mkdir("/bin");
-    mkdir("/lib");
-    mkdir("/usr");
+    if chdir("/bin") < 0 {
+        mkdir("/bin");
+        mkdir("/lib");
+        mkdir("/usr");
+    }
+
+    if chdir("/musl") < 0 {
+        chdir("/");
+    }
 
     run_cmd("./busybox ln -s /musl/lib/libc.so /lib/ld-musl-riscv64-sf.so.1");
     run_cmd("./busybox ln -s /musl/lib/libc.so /lib/ld-musl-riscv64.so.1");
@@ -282,8 +292,6 @@ pub fn riscv_init() {
     run_cmd("./busybox --install -s /bin");
     println!("loading user lib: 100%");
     println!("loading user lib: complete!");
-
-    enable_err();
 }
 
 // #[inline(always)]
@@ -331,7 +339,6 @@ pub fn loongarch_init() {
     run_cmd("./busybox --install -s /bin");
     println!("loading user lib: 100%");
     println!("loading user lib: complete!");
-
     enable_err();
 }
 
@@ -339,7 +346,7 @@ fn disable_err() {
     close(2);
 }
 
-fn enable_err() {
+pub fn enable_err() {
     close(2);
     let fd = open(0, "/dev/tty", OpenFlags::O_WRONLY, InodeMode::CHAR);
     sys_dup3(fd as usize, 2, 0);
@@ -348,7 +355,7 @@ fn enable_err() {
     }
 }
 
-fn enable_usrlog() {
+pub fn enable_usrlog() {
     let fd = open(0, "/dev/tty", OpenFlags::O_WRONLY, InodeMode::CHAR);
     close(fd as usize);
 }

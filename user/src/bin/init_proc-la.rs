@@ -12,6 +12,7 @@ fn main() {
     if fork() == 0 {
         // loongarch_init();
         // software_init();
+        user_lib::enable_usrlog();
         usershell();
     }
 

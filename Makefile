@@ -188,7 +188,7 @@ fs-img: user
 	@echo $(FS_IMG)
 	rm -rf $(FS_IMG)
 	mkdir -p $(FS_IMG_DIR)
-	dd if=/dev/zero of=$(FS_IMG) bs=1K count=524288 status=progress
+	dd if=/dev/zero of=$(FS_IMG) bs=1K count=1048576 status=progress
 	mkfs.ext4 -F $(FS_IMG)
 	mkdir -p emnt
 	sudo mount -t ext4 -o loop $(FS_IMG) emnt

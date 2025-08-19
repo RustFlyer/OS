@@ -515,7 +515,6 @@ fn __sys_clone(
     child_tid_ptr: usize,
     tls_ptr: usize,
 ) -> SyscallResult {
-    enable_log();
     log::info!(
         "[sys_clone] flags:{flags:#x}, stack:{stack:#x}, tls:{tls_ptr:#x}, parent_tid:{parent_tid_ptr:#x}, child_tid:{child_tid_ptr:x}"
     );

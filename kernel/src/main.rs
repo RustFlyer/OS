@@ -60,8 +60,8 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
 
         // too much log delay, cut up!
         logger::init();
-        enable_log();
-        // disable_log();
+        // enable_log();
+        disable_log();
 
         // println!("hart id: {}, dtb_addr: {:#x}", hart_id, dtb_addr);
 
@@ -202,7 +202,7 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
     log::info!("hart {}: running", hart_id);
     osfuture::block_on(async { test_serial_output().await });
     println!("Begin to run shell..");
-    enable_log();
+    // enable_log();
     task::init();
     loop {
         executor::task_run_always_alone(hart_id);
