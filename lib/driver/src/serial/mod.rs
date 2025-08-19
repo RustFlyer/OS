@@ -163,7 +163,12 @@ impl CharDevice for Serial {
     async fn write(&self, buf: &[u8]) -> usize {
         let uart = self.uart();
         for &c in buf {
-            uart.putc(c)
+            let mut ch = c;
+            if ch as char == '\n' {
+                uart.putc(ch);
+                ch = '\r' as u8;
+            }
+            uart.putc(ch)
         }
         buf.len()
     }
