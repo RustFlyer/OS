@@ -355,14 +355,14 @@ PHONY += board-rv
 board-rv:
 # make kernel-build ARCH=riscv64 MODE=release
 # @cp $(KERNEL_ELF) kernel-rv
-	make rkernel-build ARCH=riscv64 MODE=release
+	make rkernel-build ARCH=riscv64
 	@riscv64-unknown-elf-objcopy -O binary kernel-rv ./board/riscv/kernel-rv.bin 
 	@mkimage -A riscv -O linux -T kernel -C none -a 0x80200000 -e 0x80200000 -n "NighthawkOS-Rv" -d ./board/riscv/kernel-rv.bin ./board/riscv/uImage
 	@echo "success create uImage(rv)"
 
 PHONY += board-la
 board-la: 
-	make lkernel-build ARCH=loongarch64 MODE=release
+	make lkernel-build ARCH=loongarch64 
 	@loongarch64-linux-gnu-objcopy -R .eh_frame_hdr -R .eh_frame -O binary kernel-la ./board/loongarch/kernel-la.bin 
 	@mkimage -A loongarch -O linux -T kernel -C none -a 0x80200000  -e 0x80200000  -n "NighthawkOS-La" -d ./board/loongarch/kernel-la.bin ./board/loongarch/uImage
 	@echo "success create uImage(la)"
