@@ -18,7 +18,7 @@ use systype::{
     time::TimeSpec,
 };
 
-use crate::{fanotify::FanotifyEntry, stat::Stat, superblock::SuperBlock};
+use crate::{fanotify::FanotifyEntry, handle::FileHandle, stat::Stat, superblock::SuperBlock};
 
 /// Data that is common to all inodes.
 pub struct InodeMeta {
@@ -270,6 +270,11 @@ pub trait Inode: Send + Sync + DowncastSync {
             return false;
         }
         true
+    }
+
+    /// Returns a file handle for this inode.
+    fn file_handle(&self) -> FileHandle {
+        FileHandle::new(0x1ef, self.ino() as u32, 0)
     }
 }
 

@@ -6,20 +6,18 @@ extern crate user_lib;
 use user_lib::loongarch_init;
 #[allow(unused_imports)]
 use user_lib::{chdir, execve, exit, fork, mkdir, println, setuid, wait, waitpid};
+use user_lib::{runltp_lagl, runltp_laml};
 
 const TESTCASES: &[&str] = &[
-    // "basic_testcode.sh",
-    // "busybox_testcode.sh",
-    // "libctest_testcode.sh",
-    // "lua_testcode.sh",
+    "basic_testcode.sh",
+    "busybox_testcode.sh",
+    "libctest_testcode.sh",
+    "lua_testcode.sh",
     // "iozone_testcode.sh",
     // "cyclictest_testcode.sh",
     // "libcbench_testcode.sh",
     // "lmbench_testcode.sh",
     // "netperf_testcode.sh",
-    "copy-file-range_testcode.sh",
-    "interrupts_testcode.sh",
-    "splice_testcode.sh",
 ];
 
 fn run_test(cmd: &str) {
@@ -27,7 +25,7 @@ fn run_test(cmd: &str) {
         execve("./busybox", &["./busybox", "sh", cmd], &[]);
     } else {
         let mut result: i32 = 0;
-        waitpid(-1, &mut result);
+        waitpid(-1, &mut result, 0);
     }
 }
 
@@ -47,11 +45,13 @@ fn main() -> i32 {
     }
 
     chdir("/glibc");
+    runltp_lagl();
     for test in TESTCASES {
         run_test(test);
     }
 
     chdir("/musl");
+    runltp_laml();
     for test in TESTCASES {
         run_test(test);
     }

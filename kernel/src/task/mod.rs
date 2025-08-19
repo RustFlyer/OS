@@ -15,6 +15,7 @@ pub mod tid;
 pub mod time;
 pub mod time_stat;
 pub mod timeid;
+pub mod wait_queue;
 
 use arch::time::get_time_duration;
 use config::{inode::InodeMode, vfs::OpenFlags};

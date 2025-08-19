@@ -23,7 +23,7 @@ impl UrandomInode {
             meta: InodeMeta::new(alloc_ino(), superblock),
         });
         inode.set_inotype(InodeType::from(mode));
-        inode.set_size(size);
+        let _ = inode.set_size(size);
         inode
     }
 }

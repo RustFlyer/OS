@@ -55,8 +55,19 @@ impl Timer {
     }
 
     pub fn new_periodic(duration: Duration, period: Duration) -> Self {
+        let current_time = get_time_duration();
+        
+        // Check for potential overflow when adding duration to current time
+        let expire = if let Some(exp) = current_time.checked_add(duration) {
+            exp
+        } else {
+            // If overflow would occur, cap at Duration::MAX to avoid panic
+            log::warn!("[new_periodic] Duration overflow prevented, using Duration::MAX");
+            Duration::MAX
+        };
+        
         Self {
-            expire: get_time_duration() + duration,
+            expire,
             callback: None,
             state: TimerState::Active,
             periodic: true,

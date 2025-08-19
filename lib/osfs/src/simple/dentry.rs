@@ -50,6 +50,12 @@ impl Dentry for SimpleDentry {
             "[simple::base_create] set type: {:?}",
             InodeType::from(mode)
         );
+
+        let mut inode_meta_lock = inode.get_meta().inner.lock();
+        inode_meta_lock.mode = mode;
+        inode_meta_lock.nlink = 1;
+        drop(inode_meta_lock);
+
         dentry.set_inode(inode);
         Ok(())
     }
@@ -112,6 +118,11 @@ impl Dentry for SimpleDentry {
 
     fn base_unlink(&self, dentry: &dyn Dentry) -> SysResult<()> {
         check_permission(dentry)?;
+
+        let inode = dentry.inode().unwrap();
+        let mut inode_meta_lock = inode.get_meta().inner.lock();
+        inode_meta_lock.nlink -= 1;
+
         self.remove_child(dentry);
         Ok(())
     }

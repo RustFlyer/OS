@@ -10,12 +10,12 @@ use user_lib::{fork, riscv_init, software_init, usershell, waitpid};
 fn main() {
     if fork() == 0 {
         riscv_init();
-        software_init();
+        // software_init();
         usershell();
     }
 
     let mut dummy = 0;
     loop {
-        waitpid(-1, &mut dummy);
+        waitpid(-1, &mut dummy, 0);
     }
 }

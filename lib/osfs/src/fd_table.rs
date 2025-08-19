@@ -1,5 +1,5 @@
 use alloc::{sync::Arc, vec::Vec};
-use core::fmt::Debug;
+use core::{fmt::Debug, sync::atomic::AtomicU64};
 
 use config::{fs::MAX_FDS, vfs::OpenFlags};
 use systype::{
@@ -18,10 +18,21 @@ pub struct FdInfo {
     flags: FdFlags,
 }
 
+struct Tid(AtomicU64);
+
+impl Clone for Tid {
+    fn clone(&self) -> Self {
+        Tid(AtomicU64::new(
+            self.0.load(core::sync::atomic::Ordering::Relaxed),
+        ))
+    }
+}
+
 #[derive(Clone)]
 pub struct FdTable {
     table: Vec<Option<FdInfo>>,
     rlimit: RLimit,
+    tid: Tid,
 }
 
 impl FdInfo {
@@ -51,12 +62,27 @@ impl FdInfo {
         } else {
             FanEventMask::CLOSE_NOWRITE
         };
-        self.file.fanotify_publish(event);
+
+        let ondir_mask = if self.file.inode().inotype().is_dir() {
+            FanEventMask::ONDIR
+        } else {
+            FanEventMask::empty()
+        };
+
+        self.file.fanotify_publish(event | ondir_mask);
     }
 }
 
 impl FdTable {
-    pub fn new() -> Self {
+    pub fn tid(&self) -> u64 {
+        self.tid.0.load(core::sync::atomic::Ordering::Relaxed)
+    }
+
+    pub fn set_tid(&self, tid: u64) {
+        self.tid.0.store(tid, core::sync::atomic::Ordering::Relaxed);
+    }
+
+    pub fn new(tid: u64) -> Self {
         let mut table: Vec<Option<FdInfo>> = Vec::with_capacity(MAX_FDS);
 
         let fdinfo = FdInfo::new(TTY0.get().unwrap().clone(), FdFlags::empty());
@@ -74,6 +100,7 @@ impl FdTable {
                 rlim_cur: MAX_FDS,
                 rlim_max: MAX_FDS,
             },
+            tid: Tid(AtomicU64::new(tid)),
         }
     }
 
@@ -104,8 +131,16 @@ impl FdTable {
         if let Some(fd) = self.get_available_slot(0) {
             log::info!("alloc fd [{}]", fd);
             crate::proc::fd::create_self_fd_file(fd)?;
+            crate::proc::fdinfo::create_thread_fdinfo_file(self.tid() as usize, fd);
             crate::special::inotify::vfs_create_notify(file.clone());
-            file.fanotify_publish(FanEventMask::OPEN);
+
+            let ondir_mask = if file.inode().inotype().is_dir() {
+                FanEventMask::ONDIR
+            } else {
+                FanEventMask::empty()
+            };
+            file.fanotify_publish(FanEventMask::OPEN | ondir_mask);
+
             self.table[fd] = Some(FdInfo::new(file, flags.into()));
             Ok(fd)
         } else {
@@ -281,7 +316,7 @@ impl FdTable {
 
 impl Default for FdTable {
     fn default() -> Self {
-        Self::new()
+        Self::new(0)
     }
 }
 

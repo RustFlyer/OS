@@ -17,6 +17,6 @@ fn main() {
 
     let mut dummy = 0;
     loop {
-        waitpid(-1, &mut dummy);
+        waitpid(-1, &mut dummy, 0);
     }
 }

@@ -121,6 +121,14 @@ pub async fn sys_nanosleep(req: usize, rem: usize) -> SyscallResult {
     if req_time.tv_nsec >= 1_000_000_000 {
         return Err(SysError::EINVAL);
     }
+    
+    // Check for excessively large timeout values that could cause overflow
+    // Limit to reasonable maximum (approximately 584 years)
+    if req_time.tv_sec > (u64::MAX / 1_000_000_000) as usize {
+        log::warn!("[sys_nanosleep] Excessively large timeout value: {} seconds, capping", req_time.tv_sec);
+        // Return EINVAL for unreasonable timeout values
+        return Err(SysError::EINVAL);
+    }
 
     task.set_state(TaskState::Interruptible);
     task.set_wake_up_signal(!*task.sig_mask_mut());
@@ -258,6 +266,14 @@ pub async fn sys_clock_nanosleep(
             let ts = unsafe { t.read()? };
             // log::error!("[CLOCK_REALTIME] ts: {:?}", ts);
             if ts.tv_nsec >= 1_000_000_000 {
+                return Err(SysError::EINVAL);
+            }
+            
+            // Check for excessively large timeout values that could cause overflow
+            // Limit to reasonable maximum (approximately 584 years)
+            if ts.tv_sec > (u64::MAX / 1_000_000_000) as usize {
+                log::warn!("[sys_clock_nanosleep] Excessively large timeout value: {} seconds, capping", ts.tv_sec);
+                // Return EINVAL for unreasonable timeout values
                 return Err(SysError::EINVAL);
             }
 
@@ -403,8 +419,19 @@ pub fn sys_setitimer(which: usize, new_itimeval: usize, old_itimeval: usize) -> 
                     itimer.next_expire = Duration::ZERO;
                     (old_itimeval, Duration::ZERO)
                 } else {
-                    itimer.next_expire = get_time_duration() + new_itimeval.it_value.into();
-                    (old_itimeval, new_itimeval.it_value.into())
+                    let current_time = get_time_duration();
+                    let duration: Duration = new_itimeval.it_value.into();
+                    
+                    // Check for potential overflow when adding duration to current time
+                    itimer.next_expire = if let Some(exp) = current_time.checked_add(duration) {
+                        exp
+                    } else {
+                        // If overflow would occur, cap at Duration::MAX to avoid panic
+                        log::warn!("[sys_setitimer] Duration overflow prevented, using Duration::MAX");
+                        Duration::MAX
+                    };
+                    
+                    (old_itimeval, duration)
                 }
             });
 
@@ -414,7 +441,18 @@ pub fn sys_setitimer(which: usize, new_itimeval: usize, old_itimeval: usize) -> 
                     task: Arc::downgrade(&task),
                     id: timerid.0,
                 };
-                let mut timer = Timer::new(get_time_duration() + expire);
+                let current_time = get_time_duration();
+                
+                // Check for potential overflow when adding expire to current time
+                let timer_expire = if let Some(exp) = current_time.checked_add(expire) {
+                    exp
+                } else {
+                    // If overflow would occur, cap at Duration::MAX to avoid panic
+                    log::warn!("[sys_setitimer] Timer duration overflow prevented, using Duration::MAX");
+                    Duration::MAX
+                };
+                
+                let mut timer = Timer::new(timer_expire);
                 timer.set_callback(Arc::new(rtimer));
                 TIMER_MANAGER.add_timer(timer);
             }

@@ -8,6 +8,8 @@ pub mod dentry;
 pub mod file;
 pub mod inode;
 
+pub(crate) static mut URANDOM_SEED: usize = 0;
+
 pub fn init() -> SysResult<()> {
     let path = String::from("/dev/urandom");
     let path = Path::new(sys_root_dentry(), path);

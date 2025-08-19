@@ -5,6 +5,7 @@ use config::{
     vfs::OpenFlags,
 };
 use exe::{dentry::ExeDentry, inode::ExeInode};
+use fdinfo::info::ProcFdInfo;
 use gconfig::init_config_file;
 use interrupts::{dentry::InterruptsDentry, inode::InterruptsInode};
 use maps::{dentry::MapsDentry, inode::MapsInode};
@@ -21,6 +22,7 @@ use crate::{
 
 pub mod exe;
 pub mod fd;
+pub mod fdinfo;
 pub mod gconfig;
 pub mod interrupts;
 pub mod maps;
@@ -42,6 +44,7 @@ pub trait KernelProcIf {
     fn maps_from_tid(tid: usize) -> String;
     fn interrupts() -> BTreeMap<usize, usize>;
     fn fd(fd: usize) -> String;
+    fn fdinfo_from_tid_and_fd(tid: usize, fd: usize) -> SysResult<ProcFdInfo>;
 }
 
 pub fn init_procfs(root_dentry: Arc<dyn Dentry>) -> SysResult<()> {
@@ -115,6 +118,21 @@ pub fn init_procfs(root_dentry: Arc<dyn Dentry>) -> SysResult<()> {
     let tainted_file = tainted_dentry.base_open()?;
     tainted_file.set_flags(OpenFlags::O_WRONLY);
     osfuture::block_on(async { tainted_file.write("0\0".as_bytes()).await })?;
+
+    // /proc/sys/kernel/core_pattern
+    let core_pattern_dentry = SimpleDentry::new(
+        "core_pattern",
+        None,
+        Some(Arc::downgrade(&kernel_dentry.clone().into_dyn())),
+    );
+    kernel_dentry.add_child(core_pattern_dentry.clone());
+    kernel_dentry
+        .clone()
+        .into_dyn()
+        .create(&core_pattern_dentry.clone().into_dyn(), InodeMode::REG)?;
+    let core_pattern_file = core_pattern_dentry.base_open()?;
+    core_pattern_file.set_flags(OpenFlags::O_WRONLY);
+    osfuture::block_on(async { core_pattern_file.write("core\0".as_bytes()).await })?;
 
     // /proc/cpuinfo
     let cpuinfo_inode = SimpleInode::new(root_dentry.superblock().unwrap());
@@ -220,4 +238,14 @@ pub fn create_thread_stat_file(tid: usize) {
     let maps_dentry: Arc<dyn Dentry> =
         MapsDentry::new(Some(maps_inode), Some(Arc::downgrade(&num_dentry)));
     num_dentry.add_child(maps_dentry);
+
+    // /proc/<tid>/fdinfo
+    let fdinfo_inode = SimpleInode::new(root_dentry.superblock().unwrap());
+    fdinfo_inode.set_inotype(InodeType::Dir);
+    let fdinfo_dentry: Arc<dyn Dentry> = SimpleDentry::new(
+        "fdinfo",
+        Some(fdinfo_inode),
+        Some(Arc::downgrade(&num_dentry)),
+    );
+    num_dentry.add_child(fdinfo_dentry);
 }

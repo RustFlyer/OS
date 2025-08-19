@@ -39,6 +39,7 @@ impl FsContextInode {
     pub fn execute_command(&self, cmd: FsConfigCommand) -> SysResult<()> {
         let mut context = self.context.lock();
 
+        // log::error!("execute c: {}", cmd.cmd);
         match cmd.cmd {
             c if c == super::flags::FsConfigCmd::FSCONFIG_SET_STRING.bits() => {
                 if let (Some(key), Some(value)) = (cmd.key, cmd.value) {
@@ -53,14 +54,6 @@ impl FsContextInode {
                     return Err(SysError::EINVAL);
                 }
             }
-            c if c == super::flags::FsConfigCmd::FSCONFIG_SET_FLAG.bits() => {
-                if let Some(key) = cmd.key {
-                    let param = super::event::FsParameter::new_flag(key);
-                    context.add_parameter(param).map_err(|_| SysError::EINVAL)?;
-                } else {
-                    return Err(SysError::EINVAL);
-                }
-            }
             c if c == super::flags::FsConfigCmd::FSCONFIG_SET_BINARY.bits() => {
                 if let (Some(key), Some(value)) = (cmd.key, cmd.value) {
                     let param = match value {
@@ -69,6 +62,14 @@ impl FsContextInode {
                         }
                         _ => return Err(SysError::EINVAL),
                     };
+                    context.add_parameter(param).map_err(|_| SysError::EINVAL)?;
+                } else {
+                    return Err(SysError::EINVAL);
+                }
+            }
+            c if c == super::flags::FsConfigCmd::FSCONFIG_SET_FLAG.bits() => {
+                if let Some(key) = cmd.key {
+                    let param = super::event::FsParameter::new_flag(key);
                     context.add_parameter(param).map_err(|_| SysError::EINVAL)?;
                 } else {
                     return Err(SysError::EINVAL);
@@ -96,6 +97,7 @@ impl FsContextInode {
                 }
             }
             c if c == super::flags::FsConfigCmd::FSCONFIG_CMD_CREATE.bits() => {
+                log::error!("FSCONFIG_CMD_CREATE");
                 context.create_filesystem().map_err(|_| SysError::EINVAL)?;
                 self.wake_all_readers();
             }
