@@ -32,8 +32,8 @@ use crate::{loader::get_app_data_by_name, task::signal::pidfd::init_pf_table};
 
 pub fn init() {
     init_pf_table();
-    init_proc_by_insert();
-    // submit_init_by_insert();
+    // init_proc_by_insert();
+    submit_init_by_insert();
     // init_proc();
     // submit_init();
     // timer_init();

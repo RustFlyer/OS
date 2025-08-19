@@ -10,7 +10,7 @@ use user_lib::{fork, riscv_init, software_init, usershell, waitpid};
 fn main() {
     if fork() == 0 {
         riscv_init();
-        software_init();
+        // software_init();
         usershell();
     }
 

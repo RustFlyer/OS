@@ -4,17 +4,18 @@ extern crate user_lib;
 
 #[allow(unused_imports)]
 use user_lib::{chdir, execve, exit, fork, mkdir, println, setuid, wait, waitpid};
+use user_lib::{riscv_init, runltp_rvgl, runltp_rvml};
 
 const TESTCASES: &[&str] = &[
     "basic_testcode.sh",
     "busybox_testcode.sh",
     "libctest_testcode.sh",
     "lua_testcode.sh",
-    "cyclictest_testcode.sh",
-    "iozone_testcode.sh",
-    "libcbench_testcode.sh",
-    "netperf_testcode.sh",
-    "lmbench_testcode.sh",
+    // "cyclictest_testcode.sh",
+    // "iozone_testcode.sh",
+    // "libcbench_testcode.sh",
+    // "netperf_testcode.sh",
+    // "lmbench_testcode.sh",
 ];
 
 fn run_cmd(cmd: &str) {
@@ -38,19 +39,7 @@ fn run_test(cmd: &str) {
 #[unsafe(no_mangle)]
 fn main() -> i32 {
     println!("start to scan rv-disk");
-    mkdir("/bin");
-    mkdir("/lib");
-
-    // run_cmd("./busybox ln -s /musl/lib/libc.so /lib/ld-linux-riscv64-lp64.so.1 ");
-    chdir("/glibc");
-    run_cmd("./busybox cp /musl/lib/* /lib/");
-    run_cmd("./busybox cp /musl/lib/libc.so /lib/ld-musl-riscv64-sf.so.1");
-    run_cmd("./busybox cp /glibc/lib/* /lib/");
-    run_cmd("./busybox cp /glibc/lib/libc.so /lib/libc.so.6");
-    run_cmd("./busybox cp /glibc/lib/libm.so /lib/libm.so.6");
-    run_cmd("./busybox cp /glibc/busybox /bin/");
-    run_cmd("./busybox cp /glibc/busybox /");
-    run_cmd("./busybox --install -s /bin");
+    riscv_init();
 
     if fork() != 0 {
         loop {
@@ -63,18 +52,16 @@ fn main() -> i32 {
     }
 
     chdir("/glibc");
+    runltp_rvgl();
     for test in TESTCASES {
-        if *test == "libctest_testcode.sh" || *test == "netperf_testcode.sh" {
-            continue;
-        }
         run_test(test);
     }
 
     chdir("/musl");
+    runltp_rvml();
     for test in TESTCASES {
         run_test(test);
     }
-    run_test("ltp_testcode.sh");
 
     exit(114514);
 }
