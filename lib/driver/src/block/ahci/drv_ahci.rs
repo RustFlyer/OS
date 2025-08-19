@@ -5,16 +5,18 @@ use crate::block::ahci::libata::*;
 use crate::block::ahci::platform::*;
 use crate::println;
 
+use core::ptr::read_unaligned;
+use core::ptr::write_unaligned;
 use core::ptr::{null_mut, read_volatile, write_volatile};
 
 fn ahci_readl(addr: u64) -> u32 {
     let mut data: u32 = 0;
-    unsafe { data = read_volatile(addr as *mut u32) };
+    unsafe { data = read_unaligned(addr as *mut u32) };
     return data;
 }
 
 fn ahci_writel(data: u32, addr: u64) {
-    unsafe { write_volatile(addr as *mut u32, data) };
+    unsafe { write_unaligned(addr as *mut u32, data) };
 }
 
 fn ahci_ffs32(val: u32) -> u32 {
