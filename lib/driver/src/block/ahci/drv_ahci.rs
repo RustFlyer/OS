@@ -359,7 +359,7 @@ fn ahci_fill_sg(ahci_dev: &ahci_device, port: u8, buf: *mut u8, mut buf_len: u32
             ahci_sg = ahci_sg.offset(1);
         }
 
-        buf_len -= max_bytes;
+        buf_len = buf_len.wrapping_sub(max_bytes);
     }
 
     return sg_count;
