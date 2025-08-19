@@ -40,7 +40,7 @@ pub fn init() {
     init_proc_by_insert_simple();
     // submit_init();
     // timer_init();
-    net_poll_init();
+    // net_poll_init();
     // elf_test();
 }
 

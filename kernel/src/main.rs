@@ -60,8 +60,8 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
 
         // too much log delay, cut up!
         logger::init();
-        // enable_log();
-        disable_log();
+        enable_log();
+        // disable_log();
 
         // println!("hart id: {}, dtb_addr: {:#x}", hart_id, dtb_addr);
 

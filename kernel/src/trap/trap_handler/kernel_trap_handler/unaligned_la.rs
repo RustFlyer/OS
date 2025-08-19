@@ -208,19 +208,19 @@ pub unsafe fn emulate_load_store_insn(pt_regs: &mut KernelTrapContext) {
     let opcode_reg2i12 = (insn >> 22) & 0x3ff;
     let opcode_reg2i14 = (insn >> 24) & 0xff;
     let opcode_reg3 = (insn >> 15) & 0x7fff;
-    log::warn!("-----------------------------------------");
-    log::warn!(
-        "Unaligned Access PC @ {:#x} bad addr: {:#x}",
-        pt_regs.sepc,
-        addr
-    );
+    // log::warn!("-----------------------------------------");
+    // log::warn!(
+    //     "Unaligned Access PC @ {:#x} bad addr: {:#x}",
+    //     pt_regs.sepc,
+    //     addr
+    // );
 
-    log::warn!(
-        "opcode_reg2i12: {:#x} opcode_reg2i14: {:#x} opcode_reg3: {:#x}",
-        opcode_reg2i12,
-        opcode_reg2i14,
-        opcode_reg3
-    );
+    // log::warn!(
+    //     "opcode_reg2i12: {:#x} opcode_reg2i14: {:#x} opcode_reg3: {:#x}",
+    //     opcode_reg2i12,
+    //     opcode_reg2i14,
+    //     opcode_reg3
+    // );
 
     // Handle different instruction types
     match opcode_reg2i12 {
@@ -440,14 +440,14 @@ pub unsafe fn emulate_load_store_insn(pt_regs: &mut KernelTrapContext) {
             }
         }
     }
-    log::warn!(
-        "Unaligned rd: {} inst: {:#x}, reg[rd]: {:#x} -> {:#x}",
-        rd,
-        insn,
-        log_value,
-        pt_regs.user_reg[rd]
-    );
-    log::warn!("-----------------------------------------");
+    // log::warn!(
+    //     "Unaligned rd: {} inst: {:#x}, reg[rd]: {:#x} -> {:#x}",
+    //     rd,
+    //     insn,
+    //     log_value,
+    //     pt_regs.user_reg[rd]
+    // );
+    // log::warn!("-----------------------------------------");
 
     // Memory barrier to ensure all memory operations complete
     arch::mm::fence();

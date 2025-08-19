@@ -10,8 +10,8 @@ use user_lib::{fork, loongarch_init, println, software_init, usershell, waitpid}
 fn main() {
     println!("USER SHELL BEGIN!");
     if fork() == 0 {
-        loongarch_init();
-        software_init();
+        // loongarch_init();
+        // software_init();
         usershell();
     }
 
