@@ -5,7 +5,7 @@
 #![feature(box_as_ptr)]
 
 use alloc::{boxed::Box, sync::Arc, vec};
-use driver::net::NetDevice;
+use driver::{net::NetDevice, println};
 use interface::InterfaceWrapper;
 use smoltcp::wire::{EthernetAddress, IpCidr};
 use socketset::SocketSetWrapper;
@@ -91,7 +91,9 @@ pub fn poll_interfaces() -> smoltcp::time::Instant {
 }
 
 pub fn net_bench() {
+    println!("net bench start!");
     ETH0.get().unwrap().bench_test();
+    println!("net bench end!");
 }
 
 #[derive(Debug)]

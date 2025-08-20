@@ -38,6 +38,23 @@ impl TcpSocket {
             peer_addr: UnsafeCell::new(UNSPECIFIED_ENDPOINT_V4),
             nonblock: AtomicBool::new(false),
             listen_handles: new_share_mutex(Vec::new()),
+            ipv6_only: AtomicBool::new(false),
+        }
+    }
+
+    /// Creates a new TCP socket.
+    ///
+    /// 此时并没有加到SocketSet中（还没有handle），在connect/listen中才会添加
+    pub fn new_v6() -> Self {
+        Self {
+            state: AtomicU8::new(STATE_CLOSED),
+            shutdown: UnsafeCell::new(0),
+            handle: UnsafeCell::new(None),
+            local_addr: UnsafeCell::new(UNSPECIFIED_ENDPOINT_V4),
+            peer_addr: UnsafeCell::new(UNSPECIFIED_ENDPOINT_V4),
+            nonblock: AtomicBool::new(false),
+            listen_handles: new_share_mutex(Vec::new()),
+            ipv6_only: AtomicBool::new(true),
         }
     }
 
@@ -51,6 +68,7 @@ impl TcpSocket {
             peer_addr: UnsafeCell::new(peer_addr),
             nonblock: AtomicBool::new(false),
             listen_handles: new_share_mutex(Vec::new()),
+            ipv6_only: AtomicBool::new(false),
         }
     }
 
@@ -221,7 +239,12 @@ impl TcpSocket {
             unsafe {
                 (*self.local_addr.get()).port = bound_endpoint.port;
             }
-            LISTEN_TABLE.listen(bound_endpoint, waker, self.listen_handles.clone())?;
+            LISTEN_TABLE.listen(
+                bound_endpoint,
+                waker,
+                self.listen_handles.clone(),
+                self.ipv6_only.load(Ordering::Relaxed),
+            )?;
 
             // log::info!("[TcpSocket::listen] listening on {bound_endpoint:?}");
             for _ in 0..24 {
@@ -303,7 +326,7 @@ impl TcpSocket {
             // and no other threads can read or write it.
             let local_port = unsafe { self.local_addr.get().read().port };
             unsafe { self.local_addr.get().write(UNSPECIFIED_ENDPOINT_V4) }; // clear bound address
-            LISTEN_TABLE.unlisten(local_port);
+            LISTEN_TABLE.unlisten(local_port, self.ipv6_only.load(Ordering::Relaxed));
             let timestamp = SOCKET_SET.poll_interfaces();
             SOCKET_SET.check_poll(timestamp);
             Ok(())
@@ -372,6 +395,10 @@ impl TcpSocket {
             }
             Err(old) => Err(old),
         }
+    }
+
+    pub fn set_ipv6(&self) {
+        self.ipv6_only.store(true, Ordering::Relaxed);
     }
 
     #[inline]

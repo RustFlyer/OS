@@ -252,7 +252,7 @@ pub async fn sys_write(fd: usize, addr: usize, len: usize) -> SyscallResult {
     let file = task.with_mut_fdtable(|ft| ft.get_file(fd))?;
     let buf = unsafe { data_ptr.try_into_slice(len) }?;
 
-    log::info!("[sys_write] buf: {:?}", buf);
+    // log::info!("[sys_write] buf: {:?}", buf);
 
     file.write(buf).await
 }

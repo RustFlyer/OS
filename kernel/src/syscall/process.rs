@@ -96,6 +96,7 @@ pub fn sys_exit_group(status: i32) -> SyscallResult {
 
     thread_group_lock.iter().for_each(|thread| {
         thread.set_state(TaskState::Zombie);
+        thread.wake();
         if thread.is_process() {
             thread.set_exit_code((status & 0xFF) << 8);
         }
@@ -515,7 +516,6 @@ fn __sys_clone(
     child_tid_ptr: usize,
     tls_ptr: usize,
 ) -> SyscallResult {
-    enable_log();
     log::info!(
         "[sys_clone] flags:{flags:#x}, stack:{stack:#x}, tls:{tls_ptr:#x}, parent_tid:{parent_tid_ptr:#x}, child_tid:{child_tid_ptr:x}"
     );

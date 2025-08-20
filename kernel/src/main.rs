@@ -24,6 +24,7 @@ mod vm;
 
 use core::{ptr, sync::atomic::AtomicBool};
 
+use ::net::net_bench;
 use arch::mm::{fence, tlb_flush_all};
 use config::mm::{DTB_ADDR, DTB_END, DTB_START};
 use driver::{block::block_test, println};
@@ -60,8 +61,8 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
 
         // too much log delay, cut up!
         logger::init();
-        enable_log();
-        // disable_log();
+        // enable_log();
+        disable_log();
 
         // println!("hart id: {}, dtb_addr: {:#x}", hart_id, dtb_addr);
 
@@ -197,12 +198,13 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         panic!("multi-core unsupported");
     }
 
+    // net_bench();
     // vfs::path::test_split_parent_and_name();
     // hart::init(hart_id);
     log::info!("hart {}: running", hart_id);
     osfuture::block_on(async { test_serial_output().await });
     println!("Begin to run shell..");
-    enable_log();
+    // enable_log();
     task::init();
     loop {
         executor::task_run_always_alone(hart_id);

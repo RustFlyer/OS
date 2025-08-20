@@ -21,7 +21,7 @@ use vfs::{
     file::File,
 };
 
-use super::manager::TASK_MANAGER;
+use super::{TaskState, manager::TASK_MANAGER};
 use crate::{processor::current_task, trap::trap_handler::TRAP_STATS};
 
 struct KernelProcIfImpl;
@@ -38,6 +38,10 @@ impl KernelProcIf for KernelProcIfImpl {
 
     fn stat() -> String {
         current_task().proc_stat_read()
+    }
+
+    fn isdead() -> bool {
+        current_task().get_state() == TaskState::Zombie
     }
 
     fn stat_from_tid(tid: usize) -> String {

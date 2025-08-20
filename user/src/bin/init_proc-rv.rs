@@ -9,8 +9,8 @@ use user_lib::{fork, riscv_init, software_init, usershell, waitpid};
 #[unsafe(no_mangle)]
 fn main() {
     if fork() == 0 {
-        riscv_init();
-        software_init();
+        // riscv_init();
+        // software_init();
         usershell();
     }
 

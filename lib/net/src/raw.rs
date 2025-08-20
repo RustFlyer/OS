@@ -31,6 +31,7 @@ pub struct RawSocket {
     nonblock: AtomicBool,
     /// Whether to include IP header in user data
     hdr_included: AtomicBool,
+    ipv6_only: AtomicBool,
 }
 
 impl RawSocket {
@@ -53,12 +54,36 @@ impl RawSocket {
             protocol: ip_protocol,
             nonblock: AtomicBool::new(false),
             hdr_included: AtomicBool::new(false),
+            ipv6_only: AtomicBool::new(false),
+        }
+    }
+
+    pub fn new_v6(protocol: u8) -> Self {
+        let ip_protocol = IpProtocol::from(protocol);
+        let socket = SocketSetWrapper::new_raw_socket(ip_protocol, IpVersion::Ipv4);
+        let handle = SOCKET_SET.add(socket);
+        log::info!(
+            "[RawSocket::new] add handle {}, protocol: {:?}",
+            handle,
+            ip_protocol
+        );
+
+        Self {
+            handle,
+            protocol: ip_protocol,
+            nonblock: AtomicBool::new(false),
+            hdr_included: AtomicBool::new(false),
+            ipv6_only: AtomicBool::new(true),
         }
     }
 
     /// Create a new ICMP raw socket (commonly used for ping)
     pub fn new_icmp() -> Self {
         Self::new(1) // ICMP protocol number
+    }
+
+    pub fn set_ipv6(&self) {
+        self.ipv6_only.store(true, Ordering::Relaxed);
     }
 
     pub fn is_nonblocking(&self) -> bool {

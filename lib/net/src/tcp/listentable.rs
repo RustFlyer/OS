@@ -25,9 +25,16 @@ pub struct ListenTable {
     /// An array of Mutexes, each protecting an optional ListenTableEntry for a
     /// specific port.
     tcp: Box<[SpinNoIrqLock<Option<Box<ListenTableEntry>>>]>,
+
+    tcpv6: Box<[SpinNoIrqLock<Option<Box<ListenTableEntry>>>]>,
     /// An array of ports, used to store ports in incoming_tcp_packet for future
     /// check after poll.
-    waiting_ports: SpinNoIrqLock<Vec<usize>>,
+    waiting_ports: SpinNoIrqLock<Vec<Port>>,
+}
+
+pub struct Port {
+    pub portid: usize,
+    pub v4: bool,
 }
 
 impl ListenTable {
@@ -39,8 +46,20 @@ impl ListenTable {
             }
             buf.assume_init()
         };
+
+        let tcpv6 = unsafe {
+            let mut buf = Box::new_uninit_slice(PORT_NUM);
+            for i in 0..PORT_NUM {
+                buf[i].write(SpinNoIrqLock::new(None));
+            }
+            buf.assume_init()
+        };
         let waiting_ports = SpinNoIrqLock::new(Vec::new());
-        Self { tcp, waiting_ports }
+        Self {
+            tcp,
+            tcpv6,
+            waiting_ports,
+        }
     }
 
     pub fn can_listen(&self, port: u16) -> bool {
@@ -58,39 +77,66 @@ impl ListenTable {
         listen_endpoint: IpListenEndpoint,
         waker: &Waker,
         handles: ShareMutex<Vec<SocketHandle>>,
+        v6: bool,
     ) -> SysResult<()> {
         let port = listen_endpoint.port;
         log::error!("[listen] port: {}", port);
         assert_ne!(port, 0);
 
-        let mut entry = self.tcp[port as usize].lock();
+        if v6 {
+            let mut entry = self.tcpv6[port as usize].lock();
 
-        if entry.is_none() {
-            log::error!("[TABLE] add port {}", port);
-            *entry = Some(Box::new(ListenTableEntry::new(
-                listen_endpoint,
-                waker,
-                handles,
-            )));
+            if entry.is_none() {
+                log::error!("[TABLE] add port {}", port);
+                *entry = Some(Box::new(ListenTableEntry::new(
+                    listen_endpoint,
+                    waker,
+                    handles,
+                )));
+            } else {
+                log::warn!("socket listen() failed");
+                return Err(SysError::EADDRINUSE);
+            }
         } else {
-            log::warn!("socket listen() failed");
-            return Err(SysError::EADDRINUSE);
+            let mut entry = self.tcp[port as usize].lock();
+
+            if entry.is_none() {
+                log::error!("[TABLE] add port {}", port);
+                *entry = Some(Box::new(ListenTableEntry::new(
+                    listen_endpoint,
+                    waker,
+                    handles,
+                )));
+            } else {
+                log::warn!("socket listen() failed");
+                return Err(SysError::EADDRINUSE);
+            }
         }
 
         Ok(())
     }
 
-    pub fn unlisten(&self, port: u16) {
+    pub fn unlisten(&self, port: u16, v6: bool) {
         log::info!("TCP socket unlisten on {}", port);
         log::error!("[TABLE] remove port {}", port);
-        if let Some(entry) = self.tcp[port as usize].lock().take() {
-            entry.waker.wake_by_ref()
+        if v6 {
+            if let Some(entry) = self.tcpv6[port as usize].lock().take() {
+                entry.waker.wake_by_ref()
+            }
+        } else {
+            if let Some(entry) = self.tcp[port as usize].lock().take() {
+                entry.waker.wake_by_ref()
+            }
         }
     }
 
     /// checks whether a entry about the port is in ListenTable. The entry is built in `listen()`.
     pub fn can_accept(&self, port: u16) -> bool {
         if let Some(entry) = self.tcp[port as usize].lock().deref_mut() {
+            log::debug!("[can_accept] entry.syn_queue: {:?}", entry.syn_queue);
+            entry.syn_queue.iter().any(|&handle| is_connected(handle))
+            // true
+        } else if let Some(entry) = self.tcpv6[port as usize].lock().deref_mut() {
             log::debug!("[can_accept] entry.syn_queue: {:?}", entry.syn_queue);
             entry.syn_queue.iter().any(|&handle| is_connected(handle))
             // true
@@ -139,6 +185,30 @@ impl ListenTable {
             log::debug!("[accept] success return resource");
             let handle = syn_queue.swap_remove_front(idx).unwrap();
             Ok((handle, addr_tuple))
+        } else if let Some(entry) = self.tcpv6[port as usize].lock().deref_mut() {
+            let syn_queue = &mut entry.syn_queue;
+            syn_queue.iter().for_each(|&tuple| {
+                log::debug!("[accept] {}, isconnect?{}", tuple, is_connected(tuple))
+            });
+
+            let (idx, addr_tuple) = syn_queue
+                .iter()
+                .enumerate()
+                .find_map(|(idx, &handle)| {
+                    is_connected(handle).then(|| (idx, get_addr_tuple(handle)))
+                })
+                .ok_or(SysError::EAGAIN)?; // wait for connection
+
+            if idx > 0 {
+                log::warn!(
+                    "slow SYN queue enumeration: index = {}, len = {}!",
+                    idx,
+                    syn_queue.len()
+                );
+            }
+            log::debug!("[accept] success return resource");
+            let handle = syn_queue.swap_remove_front(idx).unwrap();
+            Ok((handle, addr_tuple))
         } else {
             log::warn!("socket accept() failed: not listen");
             Err(SysError::EINVAL)
@@ -169,7 +239,38 @@ impl ListenTable {
                 dst.port
             );
 
-            self.waiting_ports.lock().push(dst.port as usize);
+            let port = Port {
+                portid: dst.port as usize,
+                v4: true,
+            };
+
+            self.waiting_ports.lock().push(port);
+        } else if let Some(entry) = self.tcpv6[dst.port as usize].lock().deref_mut() {
+            if !entry.can_accept(dst.addr) {
+                // not listening on this address
+                log::warn!(
+                    "[ListenTable::incoming_tcp_packet] not listening on address {}",
+                    dst.addr
+                );
+                return;
+            }
+            if entry.syn_queue.len() >= LISTEN_QUEUE_SIZE {
+                // SYN queue is full, drop the packet
+                log::warn!("SYN queue overflow!");
+                return;
+            }
+            entry.waker.wake_by_ref();
+            log::info!(
+                "[ListenTable::incoming_tcp_packet] wake the socket who listens port {}",
+                dst.port
+            );
+
+            let port = Port {
+                portid: dst.port as usize,
+                v4: true,
+            };
+
+            self.waiting_ports.lock().push(port);
         }
     }
 
@@ -183,16 +284,17 @@ impl ListenTable {
         // log::debug!("[check_after_poll] get list lock");
         while !list.is_empty() {
             let port = list.pop().unwrap();
-            if let Some(entry) = self.tcp[port].lock().deref_mut() {
-                log::debug!("[check_after_poll] port: {}", port);
+            let portid = port.portid;
+            if let Some(entry) = self.tcp[portid].lock().deref_mut() {
+                // log::debug!("[check_after_poll] port: {}", portid);
                 let mut listen_handles = entry.handles.lock();
                 let mut ret = None;
                 for (i, &handle) in listen_handles.iter().enumerate() {
                     // log::debug!("[check_after_poll] port: {}, handle: {}", port, handle);
                     let sock: &mut tcp::Socket<'_> = sockets.get_mut(handle);
-                    log::debug!("[check_after_poll] sock.state()? {}", sock.state());
+                    // log::debug!("[check_after_poll] sock.state()? {}", sock.state());
                     if sock.state() == State::SynReceived {
-                        log::debug!("[check_after_poll] success get handle!");
+                        // log::debug!("[check_after_poll] success get handle!");
                         entry.syn_queue.push_back(handle);
 
                         let local_addr = sock.local_endpoint().unwrap();

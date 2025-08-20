@@ -70,8 +70,11 @@ ifeq ($(ARCH), riscv64)
 	QEMU_ARGS += -smp $(SMP)
 	QEMU_ARGS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
 	QEMU_ARGS += -device virtio-blk-device,drive=x0
-	QEMU_ARGS += -device virtio-net-device,netdev=net0
-	QEMU_ARGS += -netdev user,id=net0
+# QEMU_ARGS += -device virtio-net-device,netdev=net0
+# QEMU_ARGS += -netdev user,id=net0
+
+	QEMU_ARGS += -device virtio-net-device,netdev=mynet0
+	QEMU_ARGS += -netdev tap,id=mynet0,ifname=tap0,script=no,downscript=no
 
 	GDB = riscv64-unknown-elf-gdb
 	GDB_ARGS = riscv:rv64
@@ -188,7 +191,7 @@ fs-img: user
 	@echo $(FS_IMG)
 	rm -rf $(FS_IMG)
 	mkdir -p $(FS_IMG_DIR)
-	dd if=/dev/zero of=$(FS_IMG) bs=1K count=524288 status=progress
+	dd if=/dev/zero of=$(FS_IMG) bs=1K count=1048576 status=progress
 	mkfs.ext4 -F $(FS_IMG)
 	mkdir -p emnt
 	sudo mount -t ext4 -o loop $(FS_IMG) emnt
