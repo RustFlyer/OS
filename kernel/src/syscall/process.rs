@@ -4,6 +4,7 @@ use alloc::task;
 use alloc::vec::Vec;
 
 use bitflags::*;
+use common::test_more_fs;
 use config::vfs::OpenFlags;
 use osfs::simple::dentry::SimpleDentry;
 use osfs::special::perf::event::PerfEventAttr;
@@ -637,13 +638,7 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
         return Err(SysError::ENOENT);
     }
 
-    // DEBUG
-    path = path.replace("mkfs.ext3", "mkfs.ext2");
-    path = path.replace("mkfs.ext4", "mkfs.ext2");
-    path = path.replace("mkfs.exfat", "mkfs.ext2");
-    path = path.replace("mkfs.bcachefs", "mkfs.ext2");
-    path = path.replace("mkfs.btrfs", "mkfs.ext2");
-    path = path.replace("mkfs.xfs", "mkfs.ext2");
+    path = test_more_fs(path);
 
     log::info!("[sys_execve] task: {:?}", task.get_name());
     log::info!("[sys_execve] args: {args:?}");
@@ -690,14 +685,8 @@ pub async fn sys_execve(path: usize, argv: usize, envp: usize) -> SyscallResult 
 
     let mut name = String::new();
 
-    // DEBUG
     args.iter_mut().for_each(|arg| {
-        *arg = arg.replace("mkfs.ext3", "mkfs.ext2");
-        *arg = arg.replace("mkfs.ext4", "mkfs.ext2");
-        *arg = arg.replace("mkfs.exfat", "mkfs.ext2");
-        *arg = arg.replace("mkfs.bcachefs", "mkfs.ext2");
-        *arg = arg.replace("mkfs.btrfs", "mkfs.ext2");
-        *arg = arg.replace("mkfs.xfs", "mkfs.ext2");
+        *arg = test_more_fs(arg.clone().to_string());
     });
 
     args.iter().for_each(|arg| {

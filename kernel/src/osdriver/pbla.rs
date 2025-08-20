@@ -50,11 +50,11 @@ pub fn probe_char_device(fdt: &Fdt) -> Option<Arc<QUartDevice>> {
             _ => None,
         };
 
-        device_manager()
-            .icu
-            .as_mut()
-            .unwrap()
-            .set_trigger_type(irq as usize, trig.unwrap());
+        // device_manager()
+        //     .icu
+        //     .as_mut()
+        //     .unwrap()
+        //     .set_trigger_type(irq as usize, trig.unwrap());
 
         let reg = node.reg().next().unwrap();
         let _base = ioremap_if_need(reg.starting_address as usize, reg.size.unwrap());

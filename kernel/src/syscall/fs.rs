@@ -5,6 +5,7 @@ use alloc::{
     sync::Arc,
     vec::Vec,
 };
+use common::test_more_fs;
 use core::{
     cmp, mem,
     pin::Pin,
@@ -422,12 +423,7 @@ pub fn sys_fstatat(dirfd: usize, pathname: usize, stat_buf: usize, flags: i32) -
     }
 
     // DEBUG
-    path = path.replace("mkfs.ext3", "mkfs.ext2");
-    path = path.replace("mkfs.ext4", "mkfs.ext2");
-    path = path.replace("mkfs.exfat", "mkfs.ext2");
-    path = path.replace("mkfs.bcachefs", "mkfs.ext2");
-    path = path.replace("mkfs.btrfs", "mkfs.ext2");
-    path = path.replace("mkfs.xfs", "mkfs.ext2");
+    path = test_more_fs(path);
 
     log::info!(
         "[sys_fstat_at] dirfd: {:#x}, path: {}, flags: {:?}",
@@ -942,12 +938,7 @@ pub async fn sys_faccessat(dirfd: usize, pathname: usize, mode: i32) -> SyscallR
     log::info!("[sys_faccessat] dirfd: {dirfd}, path: {path}, access: {access:?}");
 
     // DEBUG
-    path = path.replace("mkfs.ext3", "mkfs.ext2");
-    path = path.replace("mkfs.ext4", "mkfs.ext2");
-    path = path.replace("mkfs.exfat", "mkfs.ext2");
-    path = path.replace("mkfs.bcachefs", "mkfs.ext2");
-    path = path.replace("mkfs.btrfs", "mkfs.ext2");
-    path = path.replace("mkfs.xfs", "mkfs.ext2");
+    path = test_more_fs(path);
 
     let mut pdentrylist: Vec<Arc<dyn Dentry>> = Vec::new();
 
@@ -2196,12 +2187,7 @@ pub fn sys_statx(
         mask
     );
 
-    path = path.replace("mkfs.ext3", "mkfs.ext2");
-    path = path.replace("mkfs.ext4", "mkfs.ext2");
-    path = path.replace("mkfs.exfat", "mkfs.ext2");
-    path = path.replace("mkfs.bcachefs", "mkfs.ext2");
-    path = path.replace("mkfs.btrfs", "mkfs.ext2");
-    path = path.replace("mkfs.xfs", "mkfs.ext2");
+    path = test_more_fs(path);
 
     let dentry = {
         if flags.contains(StatxFlags::EMPTY_PATH) {
