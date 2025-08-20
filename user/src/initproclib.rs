@@ -14,6 +14,8 @@ use alloc::{
 };
 use config::{inode::InodeMode, vfs::OpenFlags};
 
+pub use ltpauto::ltprun::{runltp_lagl, runltp_laml, runltp_rvgl, runltp_rvml};
+
 pub static CMD_HELP: &str = r#"NighthawkOS Quick Command Guide:
   ls /bin          Look up basic commands
 
@@ -80,9 +82,7 @@ pub fn run_cmd(cmd: &str) -> Result<(), ()> {
         exit(-1);
     } else {
         let mut result: i32 = 0;
-        waitpid(tid, &mut result);
-        // println!("result addr: {:#x}", core::ptr::addr_of!(result) as usize);
-        // println!("tid {} return {}", tid, result);
+        waitpid(tid, &mut result, 0);
         if result != 0 {
             return Err(());
         }
@@ -233,11 +233,15 @@ pub fn usershell() {
             execve(args[0], &args[0..], &[]);
             let bin = format!("/bin/{}", args[0]);
             execve(&bin, &args[0..], &[]);
+            let bin = format!("/usr/bin/{}", args[0]);
+            execve(&bin, &args[0..], &[]);
+            let bin = format!("/usr/local/bin/{}", args[0]);
+            execve(&bin, &args[0..], &[]);
             println!("{}: not found", args[0]);
 
             exit(0);
         }
-        waitpid(pid, &mut exitcode);
+        waitpid(pid, &mut exitcode, 0);
     }
 }
 
@@ -245,23 +249,29 @@ pub fn usershell() {
 pub fn riscv_init() {
     disable_err();
 
-    if chdir("musl") < 0 {
+    if chdir("musl") < 0 && false {
         println!("The device uses disk-rv");
         mkdir("/bin");
         run_cmd("./busybox --install -s /bin");
-        enable_usrlog();
+        // enable_usrlog();
         return;
     }
 
-    if open(-100, "/bin/ls", OpenFlags::empty(), InodeMode::empty()) > 0 {
+    if open(-100, "/bin/ls", OpenFlags::empty(), InodeMode::empty()) > 0 && false {
         println!("The device has been initialized");
-        enable_usrlog();
+        // enable_usrlog();
         return;
     }
 
-    mkdir("/bin");
-    mkdir("/lib");
-    mkdir("/usr");
+    if chdir("/bin") < 0 {
+        mkdir("/bin");
+        mkdir("/lib");
+        mkdir("/usr");
+    }
+
+    if chdir("/musl") < 0 {
+        chdir("/");
+    }
 
     run_cmd("./busybox ln -s /musl/lib/libc.so /lib/ld-musl-riscv64-sf.so.1");
     run_cmd("./busybox ln -s /musl/lib/libc.so /lib/ld-musl-riscv64.so.1");
@@ -282,8 +292,6 @@ pub fn riscv_init() {
     run_cmd("./busybox --install -s /bin");
     println!("loading user lib: 100%");
     println!("loading user lib: complete!");
-
-    enable_err();
 }
 
 // #[inline(always)]
@@ -331,7 +339,6 @@ pub fn loongarch_init() {
     run_cmd("./busybox --install -s /bin");
     println!("loading user lib: 100%");
     println!("loading user lib: complete!");
-
     enable_err();
 }
 
@@ -339,7 +346,7 @@ fn disable_err() {
     close(2);
 }
 
-fn enable_err() {
+pub fn enable_err() {
     close(2);
     let fd = open(0, "/dev/tty", OpenFlags::O_WRONLY, InodeMode::CHAR);
     sys_dup3(fd as usize, 2, 0);
@@ -348,7 +355,7 @@ fn enable_err() {
     }
 }
 
-fn enable_usrlog() {
+pub fn enable_usrlog() {
     let fd = open(0, "/dev/tty", OpenFlags::O_WRONLY, InodeMode::CHAR);
     close(fd as usize);
 }
@@ -480,6 +487,14 @@ pub fn supple_cmd(buf: &mut [u8; 256], bptr: &mut usize) {
     *bptr = tbptr;
 }
 
+/// Create a symbolic link only if the target doesn't exist
+pub fn new_link(target: &str, link_path: &str) {
+    let cmd = format!("./busybox rm -f {}", link_path);
+    run_cmd(&cmd);
+    let cmd = format!("./busybox ln -s {} {}", target, link_path);
+    run_cmd(&cmd);
+}
+
 pub fn software_init() {
     disable_err();
     if gcc_init().is_err() {
@@ -499,38 +514,48 @@ pub fn gcc_init() -> Result<(), ()> {
 
     #[cfg(target_arch = "riscv64")]
     {
-        run_cmd("./busybox ln -s /lib/ld-musl-riscv64.so.1 /lib/libc.musl-riscv64.so.1")?;
-        run_cmd("./busybox ln -s /lib/ld-musl-riscv64.so.1 /lib/libc.so")?;
+        new_link("/lib/ld-musl-riscv64.so.1", "/lib/libc.musl-riscv64.so.1");
+        new_link("/lib/ld-musl-riscv64.so.1", "/lib/libc.so");
     }
     #[cfg(target_arch = "loongarch64")]
     {
-        run_cmd("./busybox ln -s /lib/ld-musl-loongarch64.so.1 /lib/libc.musl-loongarch64.so.1")?;
-        run_cmd("./busybox ln -s /lib/ld-musl-loongarch64.so.1 /lib/libc.so")?;
+        new_link(
+            "/lib/ld-musl-loongarch64.so.1",
+            "/lib/libc.musl-loongarch64.so.1",
+        );
+        new_link("/lib/ld-musl-loongarch64.so.1", "/lib/libc.so");
     }
 
-    run_cmd("./busybox ln -s /lib/libmagic.so.1.0.0 /lib/libmagic.so.1")?;
-    run_cmd("./busybox ln -s /lib/libctf-nobfd.so.0.0.0 /lib/libctf-nobfd.so.0")?;
-    run_cmd("./busybox ln -s /lib/libcp1plugin.so.0.0.0 /lib/libcp1plugin.so.0")?;
-    run_cmd("./busybox ln -s /lib/libgomp.so.1.0.0 /lib/libgomp.so.1")?;
-    run_cmd("./busybox ln -s /lib/libcc1plugin.so.0.0.0 /lib/libcc1plugin.so")?;
-    run_cmd("./busybox ln -s /lib/libjansson.so.4.14.1 /lib/libjansson.so.4")?;
-    run_cmd("./busybox ln -s /lib/liblto_plugin.so /lib/liblto_plugin.so")?;
-    run_cmd("./busybox ln -s /lib/libz.so.1.3.1 /lib/libz.so.1")?;
-    run_cmd("./busybox ln -s /lib/libmpfr.so.6.2.1 /lib/libmpfr.so.6")?;
-    run_cmd("./busybox ln -s /lib/libgmp.so.10.5.0 /lib/libgmp.so.10")?;
-    run_cmd("./busybox ln -s /lib/libmpc.so.3.3.1 /lib/libmpc.so.3")?;
-    run_cmd("./busybox ln -s /lib/libctf.so.0.0.0 /lib/libctf.so.0")?;
-    run_cmd("./busybox ln -s /lib/libisl.so.23.3.0 /lib/libisl.so.23")?;
-    run_cmd("./busybox ln -s /lib/libstdc++.so.6.0.33 /lib/libstdc++.so.6")?;
-    run_cmd("./busybox ln -s /lib/libsframe.so.1.0.0 /lib/libsframe.so.1")?;
-    run_cmd("./busybox ln -s /lib/libatomic.so.1.2.0 /lib/libatomic.so.1")?;
-    run_cmd("./busybox ln -s /lib/libcc1plugin.so.0.0.0 /lib/libcc1plugin.so.0")?;
-    run_cmd("./busybox ln -s /lib/libgomp.so.1.0.0 /lib/libgomp.so.1")?;
-    run_cmd("./busybox ln -s /lib/libzstd.so.1.5.7 /lib/libzstd.so.1")?;
-    run_cmd("./busybox ln -s /lib/libstdc++.so.6.0.33 /lib/libstdc++.so")?;
+    new_link("/lib/libcc1.so.0.0.0", "/lib/libcc1.so");
+    new_link("/lib/libmagic.so.1.0.0", "/lib/libmagic.so.1");
+    new_link("/lib/libctf-nobfd.so.0.0.0", "/lib/libctf-nobfd.so.0");
+    new_link("/lib/libcp1plugin.so.0.0.0", "/lib/libcp1plugin.so.0");
+    new_link("/lib/libgomp.so.1.0.0", "/lib/libgomp.so.1");
+    new_link("/lib/libcc1plugin.so.0.0.0", "/lib/libcc1plugin.so");
+    new_link("/lib/libjansson.so.4.14.1", "/lib/libjansson.so.4");
+    new_link("/lib/liblto_plugin.so", "/lib/liblto_plugin.so");
+    new_link("/lib/libz.so.1.3.1", "/lib/libz.so.1");
+    new_link("/lib/libmpfr.so.6.2.1", "/lib/libmpfr.so.6");
+    new_link("/lib/libgmp.so.10.5.0", "/lib/libgmp.so.10");
+    new_link("/lib/libmpc.so.3.3.1", "/lib/libmpc.so.3");
+    new_link("/lib/libctf.so.0.0.0", "/lib/libctf.so.0");
+    new_link("/lib/libisl.so.23.3.0", "/lib/libisl.so.23");
+    new_link("/lib/libstdc++.so.6.0.33", "/lib/libstdc++.so.6");
+    new_link("/lib/libsframe.so.1.0.0", "/lib/libsframe.so.1");
+    new_link("/lib/libatomic.so.1.2.0", "/lib/libatomic.so.1");
+    new_link("/lib/libcc1plugin.so.0.0.0", "/lib/libcc1plugin.so.0");
+    new_link("/lib/libgomp.so.1.0.0", "/lib/libgomp.so.1");
+    new_link("/lib/libzstd.so.1.5.7", "/lib/libzstd.so.1");
+    new_link("/lib/libstdc++.so.6.0.33", "/lib/libstdc++.so");
 
-    run_cmd("./busybox ln -s /usr/bin/gcc /bin/gcc")?;
-
+    new_link("/usr/bin/gcc", "/bin/gcc");
+    new_link("/usr/bin/ar", "/bin/ar");
+    new_link("/usr/bin/nm", "/bin/nm");
+    new_link("/usr/bin/objcopy", "/bin/objcopy");
+    new_link("/usr/bin/objdump", "/bin/objdump");
+    new_link("/usr/bin/ranlib", "/bin/ranlib");
+    new_link("/usr/bin/readelf", "/bin/readelf");
+    new_link("/usr/bin/strip", "/bin/strip");
     Ok(())
 }
 
@@ -681,17 +706,11 @@ pub fn git_init() -> Result<(), ()> {
     const GIT_BASE_PATH: &str = "/git/libexec/git-core";
 
     for cmd in GIT_COMMANDS {
-        let command = format!(
-            "./busybox ln -s {}/git {}/{}",
-            GIT_BASE_PATH, GIT_BASE_PATH, cmd
-        );
-        run_cmd(&command)?;
+        let target = format!("{}/git", GIT_BASE_PATH);
+        let link_path = format!("{}/{}", GIT_BASE_PATH, cmd);
+        new_link(&target, &link_path);
     }
 
-    run_cmd("./busybox ln -s /git/bin/git /bin/git")?;
+    new_link("/git/bin/git", "/bin/git");
     Ok(())
-}
-
-pub fn test(str: &str) {
-    println!("test output {} in lib", str);
 }

@@ -217,16 +217,33 @@ impl dyn File {
             return Err(SysError::ENOENT);
         }
 
-        // dentry
-        //     .superblock()
-        //     .unwrap()
-        //     .fs_type()
-        //     .get_meta()
-        //     .inodes
-        //     .lock()
-        //     .push(Arc::downgrade(&dentry.inode().unwrap()));
-
         Arc::clone(&dentry).base_open()
+    }
+
+    /// Opens a file by its inode number.
+    ///
+    /// `mount` is the mount that the file is on.
+    ///
+    /// `ino` is the inode number of the file.
+    ///
+    /// `dentry` is the dentry that the file to be opened is associated with. This should
+    /// be a negative anonymous dentry.
+    pub fn open_by_inode_number(
+        mount: &Arc<dyn SuperBlock>,
+        ino: u32,
+        dentry: Arc<dyn Dentry>,
+    ) -> SysResult<Arc<dyn File>> {
+        debug_assert!(dentry.is_negative());
+
+        let inode = mount
+            .meta()
+            .inode_mapping
+            .lock()
+            .get(&ino)
+            .cloned()
+            .ok_or(SysError::ENOENT)?;
+        dentry.set_inode(inode.clone());
+        dentry.base_open()
     }
 
     /// Reads data from the file.

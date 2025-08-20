@@ -148,6 +148,11 @@ pub fn chdir(path: &str) -> isize {
     sys_chdir(pathname.as_ptr() as _)
 }
 
+// pub fn faccessat(dirfd: i32, pathname: &str, mode: i32) -> isize {
+//     let pathname = CString::new(pathname).unwrap();
+//     sys_faccessat(dirfd as usize, pathname.as_ptr() as _, mode)
+// }
+
 pub fn mkdir(path: &str) -> isize {
     let pathname = CString::new(path).unwrap();
     sys_mkdir(-100, pathname.as_ptr() as _, 0)
@@ -211,8 +216,8 @@ pub fn wait(exit_code: &mut i32) -> isize {
     sys_waitpid(-1, exit_code as *mut _, 0)
 }
 
-pub fn waitpid(pid: isize, exit_code: &mut i32) -> isize {
-    sys_waitpid(pid, exit_code as *mut _, 0)
+pub fn waitpid(pid: isize, exit_code: &mut i32, options: i32) -> isize {
+    sys_waitpid(pid, exit_code as *mut _, options as isize)
 }
 
 pub fn pipe(pipe_fd: &mut [i32]) -> isize {

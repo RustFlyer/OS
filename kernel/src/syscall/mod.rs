@@ -9,12 +9,13 @@ mod misc;
 mod mm;
 mod net;
 mod poll;
-mod process;
+pub mod process;
 mod sche;
 mod signal;
 mod time;
 mod user;
 
+use driver::print;
 pub use key::init_key;
 
 use bpf::*;
@@ -44,7 +45,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
             return -(SysError::ENOSYS.code() as isize) as usize;
         }
 
-        log::error!(
+        print!(
             "Syscall number not included: {syscall_no} | {}",
             syscall_no as isize
         );
@@ -63,6 +64,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         GETTIMEOFDAY => sys_gettimeofday(args[0], args[1]).await,
         EXIT => sys_exit(args[0] as i32),
         EXIT_GROUP => sys_exit_group(args[0] as i32),
+        WAITID => sys_waitid(args[0] as i32, args[1] as i32, args[2], args[3] as i32).await,
         SCHED_YIELD => sys_sched_yield().await,
         WRITE => sys_write(args[0], args[1], args[2]).await,
         TIMES => sys_times(args[0]).await,
@@ -145,6 +147,7 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         PRLIMIT64 => sys_prlimit64(args[0], args[1] as i32, args[2], args[3]),
         GETRANDOM => sys_getrandom(args[0], args[1], args[2] as i32),
         RT_SIGTIMEDWAIT => sys_rt_sigtimedwait(args[0], args[1], args[2]).await,
+        RT_SIGPENDING => sys_rt_sigpending(args[0], args[1]).await,
         TRUNCATE64 => sys_truncate64(args[0], args[1]).await,
         FTRUNCATE64 => sys_ftruncate64(args[0], args[1]).await,
         FSYNC => sys_fsync(args[0]),
@@ -299,14 +302,24 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         SENDMMSG => sys_sendmmsg(args[0], args[1], args[2], args[3]).await,
         RECVMMSG => sys_recvmmsg(args[0], args[1], args[2], args[3], args[4]).await,
         MEMFD_SECRET => sys_memfd_secret(args[1] as u32),
+        FSMOUNT => sys_fsmount(args[0], args[1] as u32, args[2] as u32),
+        MOVE_MOUNT => sys_move_mount(
+            args[0] as i32,
+            args[1],
+            args[2] as i32,
+            args[3],
+            args[4] as u32,
+        ),
         _ => {
             log::error!(
                 "Syscall not implemented: {}, id: {}",
                 syscall_no.as_str(),
                 syscall_no
             );
-            Ok(0)
             // panic!("Syscall not implemented: {}", syscall_no.as_str());
+            print!("Syscall not implemented: {}", syscall_no.as_str());
+            // panic!("Syscall not implemented: {}", syscall_no.as_str());
+            return -(SysError::ENOSYS.code() as isize) as usize;
         }
     };
 

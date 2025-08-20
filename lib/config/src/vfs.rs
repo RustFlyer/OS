@@ -238,7 +238,7 @@ bitflags! {
 }
 
 bitflags! {
-    #[derive(Debug)]
+    #[derive(Debug,Clone, Copy)]
     pub struct MountFlags:u32 {
         /// This filesystem is mounted read-only.
         const MS_RDONLY = 1;

@@ -91,11 +91,10 @@ impl Task {
 
         log::info!("[Task::recv] tid {} received signal {}", self.tid(), si.sig,);
 
-        if matches!(
-            si.sig,
-            Sig::SIGKILL | Sig::SIGSTOP | Sig::SIGCONT | Sig::SIGCHLD
-        ) || (manager.should_wake.contain_signal(si.sig)
-            && self.get_state() == TaskState::Interruptible)
+        let blocked = self.sig_mask_mut().contain_signal(si.sig);
+
+        if matches!(si.sig, Sig::SIGKILL | Sig::SIGSTOP | Sig::SIGCONT)
+            || (!blocked && manager.should_wake.contain_signal(si.sig) && self.get_state() == TaskState::Interruptible)
         {
             log::info!(
                 "[Task::recv] tid {} received signal {}, waking up",
@@ -110,6 +109,7 @@ impl Task {
                 si.sig,
                 self.get_state()
             );
+            log::debug!("[Task::recv] blocked: {:?}, should_wake: {:?}", blocked, manager.should_wake);
         }
     }
 
@@ -123,7 +123,7 @@ impl Task {
     ///   by default.
     pub fn set_wake_up_signal(&self, except: SigSet) {
         let manager = self.sig_manager_mut();
-        manager.should_wake = except | SigSet::SIGKILL | SigSet::SIGSTOP
+        manager.should_wake = except | SigSet::SIGKILL | SigSet::SIGSTOP | SigSet::SIGCONT
     }
 
     /// `notify_parent` can notify the parent task through signal mechanism.
@@ -170,7 +170,7 @@ impl SigManager {
         Self {
             queue: VecDeque::new(),
             bitmap: SigSet::empty(),
-            should_wake: SigSet::SIGKILL.union(SigSet::SIGSTOP),
+            should_wake: SigSet::all(),
         }
     }
 

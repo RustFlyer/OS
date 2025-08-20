@@ -210,7 +210,7 @@ pub fn sys_fanotify_mark(
         let object = FsObject::Mount(Arc::downgrade(&filesystem));
         (object_id, object)
     } else {
-        let object_id = FsObjectId::Inode(object_inode.ino());
+        let object_id = FsObjectId::Inode(object_inode.ino() as u32);
         let object = FsObject::Inode(Arc::downgrade(&object_inode));
         (object_id, object)
     };

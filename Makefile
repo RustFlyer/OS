@@ -188,7 +188,7 @@ fs-img: user
 	@echo $(FS_IMG)
 	rm -rf $(FS_IMG)
 	mkdir -p $(FS_IMG_DIR)
-	dd if=/dev/zero of=$(FS_IMG) bs=1K count=524288 status=progress
+	dd if=/dev/zero of=$(FS_IMG) bs=1K count=1048576 status=progress
 	mkfs.ext4 -F $(FS_IMG)
 	mkdir -p emnt
 	sudo mount -t ext4 -o loop $(FS_IMG) emnt
@@ -311,7 +311,7 @@ lkernel-run-wrapped: lkernel-build
 	$(QEMU) -kernel $(KERNEL_ELF) -m 1G -nographic -smp 1 -drive file=sdcard-la.img,if=none,format=raw,id=x0 \
                         -device virtio-blk-pci,drive=x0 -no-reboot  -device virtio-net-pci,netdev=net0 \
                         -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555 \
-                        -rtc base=utc -machine virt
+                        -rtc base=utc
 # -drive file=disk-la.img,if=none,format=raw,id=x1 -device virtio-blk-pci,drive=x1
 
 
