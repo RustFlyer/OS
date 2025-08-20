@@ -913,11 +913,11 @@ pub fn sys_clone3(user_args: usize, size: usize) -> SyscallResult {
         unsafe { user_pidfd.write(pidfd)? };
     }
 
-    *new_task.exit_signal.lock() = Some((args.exit_signal & 0xFF) as u8);
+    *new_task.exit_signal.lock() = Some(exit_signal as u8);
 
     log::info!("[sys_clone3] who is your parent? {}", new_task.ppid());
     spawn_user_task(new_task);
-    log::info!("[sys_clone3] clone success",);
+    log::info!("[sys_clone3] clone success");
 
     Ok(new_tid)
 }

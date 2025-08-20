@@ -290,8 +290,8 @@ pub fn riscv_init() {
 #[allow(unused)]
 pub fn loongarch_init() {
     println!("loongarch_init!");
-    disable_err();
-    println!("DISABLE ERR OUPUT!");
+    // disable_err();
+    // println!("DISABLE ERR OUPUT!");
 
     if chdir("musl") < 0 {
         println!("fail to get in musl");

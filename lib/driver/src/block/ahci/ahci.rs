@@ -123,9 +123,9 @@ impl BlockDevice for AHCI {
         let sectors_needed = (fsblocksize + sector_size - 1) / sector_size;
         let start_sector = (block_id * fsblocksize) / sector_size;
 
-        log::warn!(
-            "read sector_size: {sector_size:#x}, sectors_needed: {sectors_needed:#x}, start_sector: {start_sector:#x}, block_id: {block_id:#x}"
-        );
+        // log::warn!(
+        //     "read sector_size: {sector_size:#x}, sectors_needed: {sectors_needed:#x}, start_sector: {start_sector:#x}, block_id: {block_id:#x}"
+        // );
         let result = ahci_sata_read_common(
             &*dev,
             start_sector as u64,

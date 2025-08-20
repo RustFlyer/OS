@@ -180,10 +180,12 @@ impl Sig {
         self.0 > 0 && self.0 < NSIG as i32
     }
 
+    /// Returns the signal number (1-based).
     pub fn raw(&self) -> usize {
         self.0 as usize
     }
 
+    /// Returns signal number - 1, which is usually used in masks and arrays.
     pub fn index(&self) -> usize {
         (self.0 - 1) as usize
     }

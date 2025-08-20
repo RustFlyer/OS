@@ -60,12 +60,24 @@ impl Task {
     /// the relevant signal is `should wake` and task is in
     /// Interrupt state, task will be waken and handle the
     /// signal.
-    fn recv(&self, si: SigInfo) {
-        // log::error!(
-        //     "[Task::recv] tid {} recv {si:?} {:?}",
-        //     self.tid(),
-        //     self.sig_handlers_mut().lock().get(si.sig)
-        // );
+    fn recv(&self, mut si: SigInfo) {
+        log::error!(
+            "[Task::recv] tid {} recv signal {}",
+            self.tid(),
+            si.sig.raw(),
+        );
+
+        if si.sig.raw() == 0 {
+            log::warn!(
+                "[Task::recv] tid {} recv signal {}, \
+                which means it comes from a child that is created via `clone3` with \
+                `arg.exit_signal` = 0",
+                self.tid(),
+                si.sig.raw(),
+            );
+            // As a workaround, just set it as SIGCHLD.
+            si.sig = Sig::SIGCHLD;
+        }
 
         for fd in self.sigfd_queue_mut().lock().iter() {
             let f = self.with_mut_fdtable(|table| table.get_file(*fd)).unwrap();

@@ -656,7 +656,10 @@ pub fn sys_tkill(tid: isize, sig: i32) -> SyscallResult {
     task.receive_siginfo(SigInfo {
         sig,
         code: SigInfo::TKILL,
-        details: SigDetails::None,
+        details: SigDetails::Kill {
+            pid: task.pid(),
+            siginfo: None,
+        },
     });
     Ok(0)
 }

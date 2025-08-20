@@ -120,7 +120,7 @@ pub fn user_exception_handler(task: &Task, e: Exception, badv: Badv, era: Era) {
         }
         Exception::AddressNotAligned => unsafe {
             // panic!("User Exception::AddressNotAligned");
-            log::error!("User Exception::AddressNotAligned");
+            // log::error!("User Exception::AddressNotAligned");
             let trap_context = task.trap_context_mut();
             let mut kernel_trap_context = KernelTrapContext::from_tc(trap_context);
             crate::trap::trap_handler::unaligned_la::emulate_load_store_insn(
