@@ -54,11 +54,11 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         panic!("Syscall number not included: {syscall_no}");
     };
 
-    log::debug!(
-        "task {} call [{}]",
-        crate::processor::current_task().tid(),
-        syscall_no.as_str(),
-    );
+    // log::debug!(
+    //     "task {} call [{}]",
+    //     crate::processor::current_task().tid(),
+    //     syscall_no.as_str(),
+    // );
 
     let result = match syscall_no {
         GETTIMEOFDAY => sys_gettimeofday(args[0], args[1]).await,

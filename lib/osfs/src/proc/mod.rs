@@ -39,6 +39,7 @@ pub trait KernelProcIf {
     fn exe() -> String;
     fn status() -> String;
     fn stat() -> String;
+    fn isdead() -> bool;
     fn stat_from_tid(tid: usize) -> String;
     fn maps() -> String;
     fn maps_from_tid(tid: usize) -> String;

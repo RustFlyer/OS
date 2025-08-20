@@ -87,6 +87,13 @@ pub fn probe_tree(fdt: &Fdt) {
             println!("[AHCIBLK] INIT SUCCESS");
         }
 
+        // NetWork Simple
+        #[cfg(feature = "loopback")]
+        {
+            use driver::net::loopback::LoopbackDev;
+            init_network(LoopbackDev::new(), true);
+        }
+
         // CPUs
         // if let Some(cpus) = crate::osdriver::pbla::probe_cpu(&fdt) {
         //     device_manager().set_cpus(cpus);

@@ -286,15 +286,15 @@ impl ListenTable {
             let port = list.pop().unwrap();
             let portid = port.portid;
             if let Some(entry) = self.tcp[portid].lock().deref_mut() {
-                log::debug!("[check_after_poll] port: {}", portid);
+                // log::debug!("[check_after_poll] port: {}", portid);
                 let mut listen_handles = entry.handles.lock();
                 let mut ret = None;
                 for (i, &handle) in listen_handles.iter().enumerate() {
                     // log::debug!("[check_after_poll] port: {}, handle: {}", port, handle);
                     let sock: &mut tcp::Socket<'_> = sockets.get_mut(handle);
-                    log::debug!("[check_after_poll] sock.state()? {}", sock.state());
+                    // log::debug!("[check_after_poll] sock.state()? {}", sock.state());
                     if sock.state() == State::SynReceived {
-                        log::debug!("[check_after_poll] success get handle!");
+                        // log::debug!("[check_after_poll] success get handle!");
                         entry.syn_queue.push_back(handle);
 
                         let local_addr = sock.local_endpoint().unwrap();

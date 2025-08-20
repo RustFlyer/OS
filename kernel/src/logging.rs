@@ -7,10 +7,12 @@ use driver::print;
 use logger::LogInterface;
 use mutex::SpinNoIrqLock;
 
+use crate::processor::current_hart;
+
 static mut LOGOUT: AtomicBool = AtomicBool::new(false);
 static LOG_LOCK: SpinNoIrqLock<()> = SpinNoIrqLock::new(());
 
-static FLITER_LIST: [&[&str]; 3] = [&["objects/29"], &["/fd/3"], &["/fd/3"]];
+static FLITER_LIST: [&[&str]; 3] = [&[""], &["/fd/3"], &["/fd/3"]];
 static mut FILTER_ID: AtomicUsize = AtomicUsize::new(0);
 
 pub fn print_in_color(args: fmt::Arguments, color_code: u8) {
@@ -42,12 +44,19 @@ impl LogInterface for LogInterfaceImpl {
             }
         }
 
+        let taskid: isize = if let Some(task) = current_hart().try_get_task() {
+            task.tid() as isize
+        } else {
+            -1
+        };
+
         print_in_color(
             format_args!(
-                "[{:>5}][{}:{}] {}\n",
+                "[{:>5}][{}:{}][task {:>2}] {}\n",
                 record.level(),
                 record.file().unwrap(),
                 record.line().unwrap(),
+                taskid,
                 record.args()
             ),
             logger::level2color(record.level()),
@@ -63,7 +72,7 @@ pub fn can_log() -> bool {
 #[allow(static_mut_refs)]
 pub fn enable_log() {
     unsafe { LOGOUT.store(true, Ordering::Relaxed) };
-    log::debug!("Log Enable");
+    // log::debug!("Log Enable");
 }
 
 #[allow(static_mut_refs)]

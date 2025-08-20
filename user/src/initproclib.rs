@@ -247,7 +247,7 @@ pub fn usershell() {
 
 #[allow(unused)]
 pub fn riscv_init() {
-    disable_err();
+    // disable_err();
 
     if chdir("musl") < 0 && false {
         println!("The device uses disk-rv");

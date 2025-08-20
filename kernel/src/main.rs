@@ -24,6 +24,7 @@ mod vm;
 
 use core::{ptr, sync::atomic::AtomicBool};
 
+use ::net::net_bench;
 use arch::mm::{fence, tlb_flush_all};
 use config::mm::{DTB_ADDR, DTB_END, DTB_START};
 use driver::{block::block_test, println};
@@ -197,6 +198,7 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
         panic!("multi-core unsupported");
     }
 
+    // net_bench();
     // vfs::path::test_split_parent_and_name();
     // hart::init(hart_id);
     log::info!("hart {}: running", hart_id);

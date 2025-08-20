@@ -11,7 +11,7 @@ fn main() {
     if fork() == 0 {
         riscv_init();
         software_init();
-        user_lib::enable_err();
+        // user_lib::enable_err();
         user_lib::enable_usrlog();
         usershell();
     }

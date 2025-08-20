@@ -31,7 +31,11 @@ use osfs::{
 use timer::{TIMER_MANAGER, sleep_ms};
 use vfs::file::File;
 
-use crate::{loader::get_app_data_by_name, task::signal::pidfd::init_pf_table};
+use crate::{
+    loader::get_app_data_by_name,
+    logging::{disable_log, enable_log},
+    task::signal::pidfd::init_pf_table,
+};
 
 pub fn init() {
     init_pf_table();
@@ -41,7 +45,7 @@ pub fn init() {
     init_proc_by_insert_simple();
     // submit_init();
     // timer_init();
-    // net_poll_init();
+    net_poll_init();
     // elf_test();
 }
 
@@ -128,8 +132,10 @@ pub fn timer_init() {
 pub fn net_poll_init() {
     spawn_kernel_task(async {
         loop {
+            // disable_log();
             sleep_ms(10).await;
             poll_interfaces();
+            // enable_log();
             // log::debug!("net poll again");
         }
     });
