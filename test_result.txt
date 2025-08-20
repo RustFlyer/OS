@@ -1,0 +1,53 @@
+RISC-V qemu:
+- basic-glibc OK
+- busybox-glibc FAIL 1
+- libctest-glibc FAIL 3
+- lua-glibc OK
+- iozone-glibc OK
+- libcbench-glibc OK
+- netperf-glibc FAIL all
+- lmbench-glibc 卡死
+- basic-musl OK
+- busybox-musl FAIL 1
+- libctest-musl FAIL 3
+- lua-musl OK
+- iozone-musl OK
+- libcbench-musl OK
+- netperf-musl OK
+- lmbench-musl 卡死
+
+LoongArch qemu:
+- basic-glibc OK
+- busybox-glibc OK
+- libctest-glibc TODO
+- lua-glibc OK
+- iozone-glibc OK
+- libcbench-glibc OK
+- netperf-glibc OK
+- lmbench-glibc OK
+- basic-musl OK
+- busybox-musl OK
+- libctest-musl TODO
+- lua-musl OK
+- iozone-musl OK
+- libcbench-musl OK
+- netperf-musl OK
+- lmbench-musl OK
+
+LoongArch board:
+- basic-glibc FAIL 4
+- busybox-glibc FAIL 1
+- libctest-glibc FAIL 62
+- lua-glibc 卡死
+- iozone-glibc TODO
+- libcbench-glibc TODO
+- netperf-glibc TODO
+- lmbench-glibc TODO
+- basic-musl OK
+- busybox-musl FAIL 1
+- libctest-musl FAIL 8
+- lua-musl 卡死
+- iozone-musl TODO
+- libcbench-musl TODO
+- netperf-musl TODO
+- lmbench-musl TODO
