@@ -47,16 +47,12 @@ fn main() -> i32 {
 
     chdir("/glibc");
     runltp_lagl();
-
-    chdir("/musl");
-    runltp_laml();
-
-    chdir("/glibc");
     for test in TESTCASES {
         run_test(test);
     }
 
     chdir("/musl");
+    runltp_laml();
     for test in TESTCASES {
         run_test(test);
     }

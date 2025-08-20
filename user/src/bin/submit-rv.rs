@@ -54,20 +54,16 @@ fn main() -> i32 {
     }
 
     chdir("/glibc");
-    for test in TESTCASES {
-        run_test(test);
-    }
-
-    chdir("/musl");
-    for test in TESTCASES {
-        run_test(test);
-    }
-
-    chdir("/glibc");
     runltp_rvgl();
+    for test in TESTCASES {
+        run_test(test);
+    }
 
     chdir("/musl");
     runltp_rvml();
+    for test in TESTCASES {
+        run_test(test);
+    }
 
     exit(114514);
 }
