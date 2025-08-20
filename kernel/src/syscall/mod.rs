@@ -201,7 +201,9 @@ pub async fn syscall(syscall_no: usize, args: [usize; 6]) -> usize {
         SOCKETPAIR => sys_socketpair(args[0], args[1], args[2], args[3]),
         GETRUSAGE => sys_getrusage(args[0] as i32, args[1]),
         GETPEERNAME => sys_getpeername(args[0], args[1], args[2]),
+        FCHMOD => sys_fchmod(args[0], args[1] as u32),
         FCHMODAT => sys_fchmodat(args[0] as isize, args[1], args[2] as u32, args[3] as u32),
+        FCHOWN => sys_fchown(args[0], args[1] as u32, args[2] as u32),
         FCHOWNAT => sys_fchownat(
             args[0] as isize,
             args[1],
