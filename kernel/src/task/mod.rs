@@ -40,12 +40,12 @@ use crate::{
 pub fn init() {
     init_pf_table();
     // init_proc_by_insert();
-    // submit_init_by_insert();
+    submit_init_by_insert();
     // init_proc();
-    init_proc_by_insert_simple();
+    // init_proc_by_insert_simple();
     // submit_init();
     // timer_init();
-    // net_poll_init();
+    net_poll_init();
     // elf_test();
 }
 
