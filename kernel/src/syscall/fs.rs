@@ -2314,6 +2314,70 @@ pub fn sys_fchmodat(dirfd: isize, pathname_ptr: usize, mode: u32, flags: u32) ->
     Ok(0)
 }
 
+pub fn sys_fchmod(fd: usize, mode: u32) -> SyscallResult {
+    let task = current_task();
+    let file = task.with_mut_fdtable(|t| t.get_file(fd))?;
+    let dentry = file.dentry();
+
+    // if !task.can_chmod(&file) {
+    //     return Err(SysError::EPERM);
+    // }
+
+    let inode = dentry.inode().ok_or(SysError::ENOENT)?;
+
+    let rmode = inode.get_meta().inner.lock().mode;
+
+    inode.set_mode(
+        rmode
+            .intersection(!InodeMode::S_PERM)
+            .union(InodeMode::from_bits_retain(mode)),
+    );
+
+    Ok(0)
+}
+
+pub fn sys_fchown(fd: usize, owner: u32, group: u32) -> SyscallResult {
+    let task = current_task();
+    let file = task.with_mut_fdtable(|t| t.get_file(fd))?;
+    let dentry = file.dentry();
+
+    let inode = dentry.inode().ok_or(SysError::ENOENT)?;
+
+    let (old_uid, old_gid) = {
+        let inner = inode.get_meta().inner.lock();
+        (inner.uid, inner.gid)
+    };
+
+    log::debug!(
+        "fchown: fd={}, owner={:#x}, group={:#x}, old_uid={}, old_gid={}",
+        fd,
+        owner,
+        group,
+        old_uid,
+        old_gid
+    );
+
+    let mut changed = false;
+    if owner != u32::MAX && owner != old_uid {
+        inode.set_uid(owner);
+        changed = true;
+    }
+    if group != u32::MAX && group != old_gid {
+        inode.set_gid(group);
+        changed = true;
+    }
+
+    if changed {
+        let mut mode = inode.get_meta().inner.lock().mode;
+
+        mode.remove(InodeMode::SET_UID);
+        mode.remove(InodeMode::SET_GID);
+
+        inode.set_mode(mode);
+    }
+    Ok(0)
+}
+
 pub fn sys_fchownat(
     dirfd: isize,
     pathname_ptr: usize,
