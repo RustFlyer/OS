@@ -52,7 +52,7 @@ loongArch64 = { workspace = true }
 config = { path = "../lib/config/" }
 
 [features]
-default = ["board"]
+default = ["qemu"]
 qemu = []
 board = []
 loopback = []

@@ -1,4 +1,5 @@
 pub mod icu2k1000;
+pub mod icu_lavirt;
 pub mod plic;
 
 pub trait ICU {

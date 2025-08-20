@@ -3,6 +3,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use config::board::CLOCK_FREQ;
 use driver::cpu::CPU;
+use driver::icu::icu_lavirt::LoongArchVirtICU;
 use driver::icu::icu2k1000::LoongArch2K1000ICU;
 use driver::{block::ahci::ahci::AHCI, println, qemu::QUartDevice};
 use flat_device_tree::Fdt;
@@ -24,19 +25,21 @@ pub fn probe_ahci_blk(root: &Fdt) -> Option<Arc<AHCI>> {
 pub fn probe_char_device(fdt: &Fdt) -> Option<Arc<QUartDevice>> {
     log::debug!("probe_char_device begin");
     let chosen = fdt.chosen().ok();
+
     let mut stdout = chosen.and_then(|c| c.stdout().map(|n| n.node()));
     if stdout.is_none() {
         stdout = fdt.find_compatible(&["ns16550a", "snps,dw-apb-uart", "sifive,uart0"])
     }
 
     if let Some(node) = stdout {
+        let irq_number = node.property("interrupts").unwrap().as_usize().unwrap();
         let reg = node.reg().next().unwrap();
         let _base = ioremap_if_need(reg.starting_address as usize, reg.size.unwrap());
-        println!("[CHAR_DEVICE] INIT...");
+        println!("[CHAR_DEVICE] INIT..., irq_number: {}", irq_number);
         Some(Arc::new(QUartDevice::new(
             reg.starting_address as usize,
             reg.size.unwrap(),
-            0,
+            irq_number,
         )))
     } else {
         None
@@ -90,4 +93,40 @@ pub fn probe_icu(root: &Fdt) -> Option<LoongArch2K1000ICU> {
         log::error!("[LoongArch2K1000ICU probe] failed to find LoongArch2K1000ICU");
         None
     }
+}
+
+pub fn probe_icu_virt(root: &Fdt) -> Option<LoongArchVirtICU> {
+    log::debug!("ICU probe begin");
+
+    // 1) 先找 EIOINTC（QEMU virt 的 DTS 中：eiointc@1400）
+    if let Some(eiointc) = root.find_compatible(&["loongson,ls2k2000-eiointc"]) {
+        // reg = <0x00 0x1400 0x00 0x800>
+        let reg = match eiointc.reg().next() {
+            Some(r) => r,
+            None => {
+                log::error!("eiointc: missing reg");
+                return None;
+            }
+        };
+
+        let mmio_base = reg.starting_address as usize;
+        let mmio_size = reg.size.unwrap_or(0x800);
+        log::error!(
+            "EIOINTC(virt) base: {:#x}, size: {:#x}",
+            mmio_base,
+            mmio_size
+        );
+        ioremap_if_need(mmio_base, mmio_size);
+
+        let icu = LoongArchVirtICU::new(mmio_base, mmio_size);
+
+        // 可选：根据实际外设特性设定触发类型（示例：串口一般电平或上升沿）
+        // 按你的 virt 平台 IRQ 号调整：
+        // icu.set_trigger_type(2 /* UART0 */, VirtTrigger::HighLevel);
+
+        log::info!("ICU probe: using EIOINTC (virt)");
+        return Some(icu);
+    }
+
+    None
 }

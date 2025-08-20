@@ -73,6 +73,12 @@ pub fn probe_tree(fdt: &Fdt) {
             println!("[LAICU] INIT SUCCESS");
         }
 
+        // INTERRUPT CONTROL virt
+        if let Some(icu) = crate::osdriver::pbla::probe_icu_virt(fdt) {
+            device_manager().set_icu(Box::new(icu));
+            println!("[LAICU] INIT SUCCESS");
+        }
+
         // CHAR(used by both qemu & board)
         if let Some(char) = crate::osdriver::pbla::probe_char_device(fdt) {
             device_manager().add_device(char.dev_id(), char.clone());
