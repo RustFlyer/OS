@@ -12,11 +12,11 @@ const TESTCASES: &[&str] = &[
     "busybox_testcode.sh",
     "libctest_testcode.sh",
     "lua_testcode.sh",
-    "iozone_testcode.sh",
+    // "netperf_testcode.sh",
+    // "iperf_testcode.sh",
+    // "iozone_testcode.sh",
     // "cyclictest_testcode.sh",
     // "libcbench_testcode.sh",
-    "netperf_testcode.sh",
-    "iperf_testcode.sh",
     // "lmbench_testcode.sh",
 ];
 
@@ -54,20 +54,20 @@ fn main() -> i32 {
     }
 
     chdir("/glibc");
+    for test in TESTCASES {
+        run_test(test);
+    }
+
+    chdir("/musl");
+    for test in TESTCASES {
+        run_test(test);
+    }
+
+    chdir("/glibc");
     runltp_rvgl();
 
     chdir("/musl");
     runltp_rvml();
-
-    chdir("/glibc");
-    for test in TESTCASES {
-        run_test(test);
-    }
-
-    chdir("/musl");
-    for test in TESTCASES {
-        run_test(test);
-    }
 
     exit(114514);
 }

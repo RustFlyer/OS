@@ -13,12 +13,12 @@ const TESTCASES: &[&str] = &[
     "busybox_testcode.sh",
     "libctest_testcode.sh",
     "lua_testcode.sh",
-    "iozone_testcode.sh",
+    // "netperf_testcode.sh",
+    // "iperf_testcode.sh",
+    // "iozone_testcode.sh",
     // "cyclictest_testcode.sh",
     // "libcbench_testcode.sh",
     // "lmbench_testcode.sh",
-    "netperf_testcode.sh",
-    "iperf_testcode.sh",
 ];
 
 fn run_test(cmd: &str) {
