@@ -250,6 +250,29 @@ impl FanotifyGroup {
         let mount_entry = entries.mount;
         let fs_entry = entries.fs;
 
+        if event.contains(FanEventMask::MODIFY) {
+            if let Some(object) = &object_entry {
+                if !object.flags().contains(FanMarkFlags::IGNORED_SURV_MODIFY) {
+                    object.clear_ignore();
+                }
+            }
+            if let Some(parent) = &parent_entry {
+                if !parent.flags().contains(FanMarkFlags::IGNORED_SURV_MODIFY) {
+                    parent.clear_ignore();
+                }
+            }
+            if let Some(mount) = &mount_entry {
+                if !mount.flags().contains(FanMarkFlags::IGNORED_SURV_MODIFY) {
+                    mount.clear_ignore();
+                }
+            }
+            if let Some(fs) = &fs_entry {
+                if !fs.flags().contains(FanMarkFlags::IGNORED_SURV_MODIFY) {
+                    fs.clear_ignore();
+                }
+            }
+        }
+
         let object_mark = object_entry
             .clone()
             .map_or(FanEventMask::empty(), |e| e.mark());
