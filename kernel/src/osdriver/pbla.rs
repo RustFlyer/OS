@@ -1,10 +1,14 @@
 use crate::osdriver::ioremap_if_need;
+use crate::osdriver::manager::device_manager;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use config::board::CLOCK_FREQ;
 use driver::cpu::CPU;
-use driver::icu::icu_lavirt::LoongArchVirtICU;
+use driver::icu::cascaded::CascadedICU;
+use driver::icu::ehic::LoongArchEIOINTC;
+use driver::icu::icu_lavirt::{LoongArchVirtICU, TriggerType};
 use driver::icu::icu2k1000::LoongArch2K1000ICU;
+use driver::icu::pch::LoongArchPCHPIC;
 use driver::{block::ahci::ahci::AHCI, println, qemu::QUartDevice};
 use flat_device_tree::Fdt;
 
@@ -32,14 +36,33 @@ pub fn probe_char_device(fdt: &Fdt) -> Option<Arc<QUartDevice>> {
     }
 
     if let Some(node) = stdout {
+        let node = node;
+
         let irq_number = node.property("interrupts").unwrap().as_usize().unwrap();
+        let irq = (irq_number >> 32) as u32;
+        let flags = (irq_number & 0xFFFF_FFFF) as u32;
+
+        let trig = match flags {
+            1 => Some(TriggerType::RisingEdge),
+            2 => Some(TriggerType::FallingEdge),
+            4 => Some(TriggerType::HighLevel),
+            8 => Some(TriggerType::LowLevel),
+            _ => None,
+        };
+
+        device_manager()
+            .icu
+            .as_mut()
+            .unwrap()
+            .set_trigger_type(irq as usize, trig.unwrap());
+
         let reg = node.reg().next().unwrap();
         let _base = ioremap_if_need(reg.starting_address as usize, reg.size.unwrap());
-        println!("[CHAR_DEVICE] INIT..., irq_number: {}", irq_number);
+        println!("[CHAR_DEVICE] INIT..., irq_number: {}", irq);
         Some(Arc::new(QUartDevice::new(
             reg.starting_address as usize,
             reg.size.unwrap(),
-            irq_number,
+            irq as usize,
         )))
     } else {
         None
@@ -98,7 +121,6 @@ pub fn probe_icu(root: &Fdt) -> Option<LoongArch2K1000ICU> {
 pub fn probe_icu_virt(root: &Fdt) -> Option<LoongArchVirtICU> {
     log::debug!("ICU probe begin");
 
-    // 1) 先找 EIOINTC（QEMU virt 的 DTS 中：eiointc@1400）
     if let Some(eiointc) = root.find_compatible(&["loongson,ls2k2000-eiointc"]) {
         // reg = <0x00 0x1400 0x00 0x800>
         let reg = match eiointc.reg().next() {
@@ -120,13 +142,56 @@ pub fn probe_icu_virt(root: &Fdt) -> Option<LoongArchVirtICU> {
 
         let icu = LoongArchVirtICU::new(mmio_base, mmio_size);
 
-        // 可选：根据实际外设特性设定触发类型（示例：串口一般电平或上升沿）
-        // 按你的 virt 平台 IRQ 号调整：
-        // icu.set_trigger_type(2 /* UART0 */, VirtTrigger::HighLevel);
-
         log::info!("ICU probe: using EIOINTC (virt)");
         return Some(icu);
     }
 
     None
+}
+
+pub fn probe_cascaded_icu(root: &Fdt) -> Option<CascadedICU> {
+    log::debug!("Probe cascaded ICU (EIOINTC + PCH-PIC)");
+
+    // 1. 先探测 EIOINTC
+    let eiointc_node = root.find_compatible(&["loongson,ls2k2000-eiointc"])?;
+    let eiointc_reg = eiointc_node.reg().next()?;
+    let eiointc_base = eiointc_reg.starting_address as usize;
+    let eiointc_size = eiointc_reg.size.unwrap_or(0x800);
+
+    log::info!("EIOINTC at {:#x}, size {:#x}", eiointc_base, eiointc_size);
+    ioremap_if_need(eiointc_base, eiointc_size);
+
+    let eiointc = LoongArchEIOINTC::new(eiointc_base, eiointc_size);
+
+    // 2. 探测 PCH-PIC
+    let pch_node = root.find_compatible(&["loongson,pch-pic-1.0"])?;
+    let pch_reg = pch_node.reg().next()?;
+    let pch_base = pch_reg.starting_address as usize;
+    let pch_size = pch_reg.size.unwrap_or(0x400);
+
+    // 读取 base-vec 属性
+    let base_vec = pch_node
+        .property("loongson,pic-base-vec")
+        .and_then(|p| p.as_usize())
+        .unwrap_or(0) as u32;
+
+    log::info!(
+        "PCH-PIC at {:#x}, size {:#x}, base_vec: {:#x}",
+        pch_base,
+        pch_size,
+        base_vec
+    );
+    ioremap_if_need(pch_base, pch_size);
+
+    let pch_pic = LoongArchPCHPIC::new(pch_base, pch_size, base_vec);
+
+    let pch_irq_base = 0;
+    let pch_irq_count = 64;
+
+    Some(CascadedICU::new(
+        eiointc,
+        pch_pic,
+        pch_irq_base,
+        pch_irq_count,
+    ))
 }

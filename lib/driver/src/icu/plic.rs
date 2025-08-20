@@ -6,7 +6,7 @@
 
 use config::mm::KERNEL_MAP_OFFSET;
 
-use super::ICU;
+use super::{ICU, icu_lavirt::TriggerType};
 pub struct PLIC {
     /// MMIO base address.
     pub mmio_base: usize,
@@ -101,5 +101,9 @@ impl ICU for PLIC {
 
     fn complete_irq(&self, irq: usize, _cpu_id: usize) {
         self._complete_irq(irq, _cpu_id);
+    }
+
+    fn set_trigger_type(&self, irq: usize, trigger: TriggerType) {
+        todo!()
     }
 }

@@ -1,5 +1,7 @@
 use loongArch64::register::{crmd, ecfg, eentry};
 
+use crate::interrupt::enable_external_interrupt;
+
 use super::TrapMode;
 
 /// Timer IRQ of loongarch64
@@ -7,13 +9,16 @@ pub const TIMER_IRQ: usize = 11;
 
 pub fn init() {
     enable_interrupt();
+    enable_external_interrupt();
 }
 
 pub fn enable_interrupt() {
+    // log::error!("enable_interrupt");
     crmd::set_ie(true);
 }
 
 pub fn disable_interrupt() {
+    // log::error!("disable_interrupt");
     crmd::set_ie(false);
 }
 

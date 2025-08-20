@@ -24,6 +24,7 @@ bitfield-struct = { workspace = true }
 byte-slice-cast = { workspace = true }
 bitflags = { workspace = true }
 rustversion = { workspace = true }
+lazy_static = { workspace = true }
 
 
 [features]

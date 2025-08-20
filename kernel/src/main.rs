@@ -25,7 +25,11 @@ mod vm;
 use core::{ptr, sync::atomic::AtomicBool};
 
 use ::net::net_bench;
-use arch::mm::{fence, tlb_flush_all};
+use arch::{
+    interrupt::enable_external_interrupt,
+    mm::{fence, tlb_flush_all},
+    trap::enable_interrupt,
+};
 use config::mm::{DTB_ADDR, DTB_END, DTB_START};
 use driver::{block::block_test, println};
 use logging::{disable_log, enable_filter, enable_log};
@@ -205,6 +209,7 @@ pub fn rust_main(hart_id: usize, dtb_addr: usize) -> ! {
     osfuture::block_on(async { test_serial_output().await });
     println!("Begin to run shell..");
     // enable_log();
+    enable_external_interrupt();
     task::init();
     loop {
         executor::task_run_always_alone(hart_id);

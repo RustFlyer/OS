@@ -3,11 +3,8 @@
 //! 说明：本实现针对 QEMU loongarch `virt` 机型，按 EIOINTC 风格抽象寄存器：
 //!   status/enable/set/clear/polarity/edge/route 均分低32/高32两组，支持最多 128 路 IRQ。
 //! 若你的固件/设备树显示只有 64 路，改小 MAX_IRQS=64 并去掉 HI 分支即可。
-//!
-//! 如发现寄存器偏移与当前 QEMU 版本不一致，仅需调整 eiointc_regs 常量即可。
-//!
-//! 线程安全：MMIO 为裸访问。如在多核/中断上下文并发调用，请在上层加锁或保证原子性。
 
+use arch::interrupt::enable_external_interrupt;
 use config::mm::KERNEL_MAP_OFFSET;
 use core::ptr::read_volatile;
 use core::ptr::write_volatile;
@@ -31,18 +28,19 @@ pub struct LoongArchVirtICU {
 
 impl LoongArchVirtICU {
     pub fn new(mmio_base: usize, mmio_size: usize) -> Self {
-        Self {
+        let icu = Self {
             mmio_base,
             mmio_size,
-        }
+        };
+        icu
     }
 
     #[inline]
-    fn base_ptr(&self) -> *mut u32 {
-        (self.mmio_base + KERNEL_MAP_OFFSET) as *mut u32
+    fn base_ptr(&self) -> *mut u64 {
+        (self.mmio_base + KERNEL_MAP_OFFSET) as *mut u64
     }
 
-    pub fn set_trigger_type(&self, irq: usize, trigger: TriggerType) {
+    pub fn _set_trigger_type(&self, irq: usize, trigger: TriggerType) {
         if irq >= MAX_IRQS {
             log::error!("Invalid IRQ number: {}", irq);
             return;
@@ -111,7 +109,6 @@ impl LoongArchVirtICU {
         }
     }
 
-    /// 查询某个 IRQ 的当前状态位（raw status，不与 enable 与）
     pub fn get_irq_status(&self, irq: usize) -> bool {
         if irq >= MAX_IRQS {
             log::error!("Invalid IRQ number: {}", irq);
@@ -132,7 +129,6 @@ impl LoongArchVirtICU {
         }
     }
 
-    /// 低层使能：并可将该中断路由到指定 CPU（目前按 cpu0/cpu1 两路路由位）
     pub(crate) fn _enable_irq(&self, irq: usize, cpu_id: usize) {
         if irq >= MAX_IRQS {
             log::error!("Invalid IRQ number: {}", irq);
@@ -188,7 +184,6 @@ impl LoongArchVirtICU {
         }
     }
 
-    /// 取最高优先级的 pending 中断（此处用“最低序号优先”，实际可改为读专用 claim 寄存器）
     pub(crate) fn _claim_irq(&self, _cpu_id: usize) -> Option<usize> {
         let base = self.base_ptr();
 
@@ -209,13 +204,10 @@ impl LoongArchVirtICU {
                 return Some(32 + pending_hi.trailing_zeros() as usize);
             }
 
-            // 若支持 128 路，可继续扩展再上一组（本实现将下一组复用“HI+偏移”的方式）
-            // 如果你的 `virt` 真有 128 路，请将寄存器分组扩展为 0/1/2/3 组，每组 32 位。
             None
         }
     }
 
-    /// 完成中断：写 W1C 清除
     pub(crate) fn _complete_irq(&self, irq: usize, _cpu_id: usize) {
         if irq >= MAX_IRQS {
             log::error!("Invalid IRQ number: {}", irq);
@@ -236,8 +228,6 @@ impl LoongArchVirtICU {
     }
 }
 
-/// EIOINTC 风格寄存器偏移（以 32-bit 宽度、4 字节步长计）
-/// 如与实际 QEMU/固件不一致，仅需改这里。
 mod eiointc_regs {
     // 状态（RO）
     pub const INT_STATUS_LO: usize = 0x00;
@@ -270,6 +260,7 @@ mod eiointc_regs {
 
 impl ICU for LoongArchVirtICU {
     fn enable_irq(&self, irq: usize, ctx_id: usize) {
+        self.set_irq(irq);
         self._enable_irq(irq, ctx_id);
     }
 
@@ -283,5 +274,9 @@ impl ICU for LoongArchVirtICU {
 
     fn complete_irq(&self, irq: usize, cpu_id: usize) {
         self._complete_irq(irq, cpu_id);
+    }
+
+    fn set_trigger_type(&self, irq: usize, trigger: TriggerType) {
+        self._set_trigger_type(irq, trigger);
     }
 }
