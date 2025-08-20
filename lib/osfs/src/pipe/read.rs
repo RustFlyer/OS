@@ -5,12 +5,14 @@ use core::{
 
 use alloc::sync::Arc;
 use config::vfs::{OpenFlags, PollEvents};
+use crate_interface::call_interface;
 use mutex::SpinNoIrqLock;
 use vfs::{file::FileMeta, inode::Inode};
 
 use crate::simple::dentry::SimpleDentry;
 
 use super::inode::PipeInode;
+use crate::proc::__KernelProcIf_mod;
 
 pub struct PipeReadFile {
     pub(crate) meta: FileMeta,
@@ -69,11 +71,13 @@ impl Future for PipeReadPollFuture {
         *self.cnt.lock() += 1;
         let mut inner = self.pipe.inner.lock();
         let mut res = PollEvents::empty();
+        let isdead = call_interface!(KernelProcIf::isdead());
+
         if self.events.contains(PollEvents::IN) && !inner.ring_buffer.is_empty() {
             res |= PollEvents::IN;
             Poll::Ready(res)
         } else {
-            if inner.is_write_closed {
+            if inner.is_write_closed || isdead {
                 // || *self.cnt.lock() >= 2 {
                 res |= PollEvents::HUP;
                 return Poll::Ready(res);

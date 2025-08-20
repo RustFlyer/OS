@@ -38,6 +38,7 @@ pub struct UdpSocket {
     nonblock: AtomicBool,
     pub reuse_addr: AtomicBool,
     pub reuse_port: AtomicBool,
+    ipv6_only: AtomicBool,
 }
 
 impl UdpSocket {
@@ -52,6 +53,22 @@ impl UdpSocket {
             nonblock: AtomicBool::new(false),
             reuse_addr: AtomicBool::new(false),
             reuse_port: AtomicBool::new(false),
+            ipv6_only: AtomicBool::new(false),
+        }
+    }
+
+    pub fn new_v6() -> Self {
+        let socket = SocketSetWrapper::new_udp_socket();
+        let handle = SOCKET_SET.add(socket);
+        log::error!("[udp::new] add {}", handle);
+        Self {
+            handle,
+            local_addr: RwLock::new(None),
+            peer_addr: RwLock::new(None),
+            nonblock: AtomicBool::new(false),
+            reuse_addr: AtomicBool::new(false),
+            reuse_port: AtomicBool::new(false),
+            ipv6_only: AtomicBool::new(true),
         }
     }
 
@@ -79,6 +96,10 @@ impl UdpSocket {
 
     pub fn set_nonblocking(&self, nonblocking: bool) {
         self.nonblock.store(nonblocking, Ordering::Release);
+    }
+
+    pub fn set_ipv6(&self) {
+        self.ipv6_only.store(true, Ordering::Relaxed);
     }
 }
 

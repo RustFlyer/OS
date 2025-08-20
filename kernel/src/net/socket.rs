@@ -37,10 +37,21 @@ impl Socket {
     ) -> SysResult<Self> {
         let sk = match domain {
             SaFamily::AF_UNIX => Sock::Unix(Arc::new(UnixSocket::new())),
-            SaFamily::AF_INET | SaFamily::AF_INET6 => match types {
+            SaFamily::AF_INET => match types {
                 SocketType::STREAM => Sock::Tcp(TcpSocket::new_v4()),
                 SocketType::DGRAM => Sock::Udp(UdpSocket::new()),
                 SocketType::RAW => Sock::Raw(RawSocket::new(protocol)),
+                _ => {
+                    log::error!(
+                        "[Socket::new] Unsupported socket type: {types:?} for domain: {domain:?}"
+                    );
+                    return Err(SysError::EPROTONOSUPPORT);
+                }
+            },
+            SaFamily::AF_INET6 => match types {
+                SocketType::STREAM => Sock::Tcp(TcpSocket::new_v6()),
+                SocketType::DGRAM => Sock::Udp(UdpSocket::new_v6()),
+                SocketType::RAW => Sock::Raw(RawSocket::new_v6(protocol)),
                 _ => {
                     log::error!(
                         "[Socket::new] Unsupported socket type: {types:?} for domain: {domain:?}"

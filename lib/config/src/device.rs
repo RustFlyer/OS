@@ -10,6 +10,8 @@ pub const PCI_SERIAL_PORT_ADDR: usize = 0x1fe001e0 + KERNEL_MAP_OFFSET;
 #[cfg(feature = "board")]
 pub const UART_ADDR_LA_BOARD: usize = 0x8000_0000_1fe2_0000;
 
+pub const DEVICE_MAP_LA: usize = 0x8000_0000_0000_0000;
+
 // on qemu
 #[cfg(feature = "qemu")]
 pub const UART_ADDR_LA_BOARD: usize = PCI_SERIAL_PORT_ADDR;

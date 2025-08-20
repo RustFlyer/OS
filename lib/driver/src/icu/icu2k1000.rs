@@ -5,7 +5,7 @@
 use config::mm::KERNEL_MAP_OFFSET;
 use core::ptr::{read_volatile, write_volatile};
 
-use super::ICU;
+use super::{ICU, icu_lavirt};
 
 /// 龙芯2K1000中断控制器，支持64个中断源
 /// 低32位可以路由到CPU0的Mailbox0(IP2)，高32位路由到CPU0的Mailbox0(IP3)
@@ -20,31 +20,24 @@ pub struct LoongArch2K1000ICU {
 
 // ICU寄存器偏移定义
 mod icu_regs {
-    // 中断状态寄存器（只读）
     pub const INT_STATUS_LO: usize = 0x00; // 低32位中断状态
     pub const INT_STATUS_HI: usize = 0x04; // 高32位中断状态
 
-    // 中断使能寄存器
     pub const INT_ENABLE_LO: usize = 0x08; // 低32位中断使能
     pub const INT_ENABLE_HI: usize = 0x0C; // 高32位中断使能
 
-    // 中断设置寄存器（写1设置）
     pub const INT_SET_LO: usize = 0x10; // 低32位中断设置
     pub const INT_SET_HI: usize = 0x14; // 高32位中断设置
 
-    // 中断清除寄存器（写1清除）
     pub const INT_CLEAR_LO: usize = 0x18; // 低32位中断清除
     pub const INT_CLEAR_HI: usize = 0x1C; // 高32位中断清除
 
-    // 中断极性寄存器（0:高电平/上升沿，1:低电平/下降沿）
     pub const INT_POL_LO: usize = 0x20; // 低32位中断极性
     pub const INT_POL_HI: usize = 0x24; // 高32位中断极性
 
-    // 中断边沿寄存器（0:电平触发，1:边沿触发）
     pub const INT_EDGE_LO: usize = 0x28; // 低32位边沿配置
     pub const INT_EDGE_HI: usize = 0x2C; // 高32位边沿配置
 
-    // 中断路由寄存器（路由到CPU0或CPU1）
     pub const INT_ROUTE_LO: usize = 0x30; // 低32位路由配置
     pub const INT_ROUTE_HI: usize = 0x34; // 高32位路由配置
 }
@@ -306,5 +299,9 @@ impl ICU for LoongArch2K1000ICU {
 
     fn complete_irq(&self, irq: usize, _cpu_id: usize) {
         self._complete_irq(irq, _cpu_id);
+    }
+
+    fn set_trigger_type(&self, irq: usize, trigger: icu_lavirt::TriggerType) {
+        todo!()
     }
 }

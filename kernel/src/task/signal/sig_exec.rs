@@ -50,7 +50,7 @@ async fn sig_exec(task: Arc<Task>, si: SigInfo, interrupted: &mut bool) -> SysRe
     match action.atype {
         ActionType::Ignore => Ok(false),
         ActionType::Kill => {
-            assert!(task.tid() != 1, "kill init task");
+            // assert!(task.tid() != 1, "kill init task");
             if task.tid() == 1 {
                 log::warn!("[sig_exec] kill init task, ignored");
                 return Ok(false);

@@ -172,16 +172,18 @@ impl InterfaceWrapper {
             None => {
                 let current_time = get_time_duration();
                 let duration = Duration::from_millis(2);
-                
+
                 // Check for potential overflow when adding duration to current time
                 let timer_expire = if let Some(exp) = current_time.checked_add(duration) {
                     exp
                 } else {
                     // If overflow would occur, cap at Duration::MAX to avoid panic
-                    log::warn!("[interface] Timer duration overflow prevented, using Duration::MAX");
+                    log::warn!(
+                        "[interface] Timer duration overflow prevented, using Duration::MAX"
+                    );
                     Duration::MAX
                 };
-                
+
                 let mut timer = Timer::new(timer_expire);
                 timer.set_callback(Arc::new(PollTimer {}));
                 TIMER_MANAGER.add_timer(timer);

@@ -1,3 +1,4 @@
+use driver::println;
 use smoltcp::phy::{Device, RxToken, TxToken};
 
 use crate::{
@@ -31,7 +32,7 @@ impl DeviceWrapper {
     /// and then count how much `bandwidth` has been sent.
     pub fn bench_transmit_bandwidth(&mut self) {
         // 10 GB
-        const MAX_SEND_BYTES: usize = 10 * GB;
+        const MAX_SEND_BYTES: usize = 1 * GB;
         let mut send_bytes: usize = 0;
         let mut past_send_bytes: usize = 0;
         let mut past_time = InterfaceWrapper::current_time();
@@ -55,12 +56,9 @@ impl DeviceWrapper {
                 let mb = (((send_bytes - past_send_bytes) * 8) % GB) / MB;
                 let gib = (send_bytes - past_send_bytes) / GB;
                 let mib = ((send_bytes - past_send_bytes) % GB) / MB;
-                log::info!(
+                println!(
                     "Transmit: {}.{:03}GBytes, Bandwidth: {}.{:03}Gbits/sec.",
-                    gib,
-                    mib,
-                    gb,
-                    mb
+                    gib, mib, gb, mb
                 );
                 // log::info!("Transmit: total send bytes: {}", send_bytes);
                 past_time = current_time;
@@ -68,7 +66,7 @@ impl DeviceWrapper {
             }
         }
 
-        log::info!("Transmit: total send bytes: {}", send_bytes);
+        println!("Transmit: total send bytes: {}", send_bytes);
     }
 
     /// `bench_receive_bandwidth()` reads the original packets from the underlying
@@ -81,7 +79,7 @@ impl DeviceWrapper {
     /// and bandwidth.
     pub fn bench_receive_bandwidth(&mut self) {
         // 10 GB
-        const MAX_RECEIVE_BYTES: usize = 10 * GB;
+        const MAX_RECEIVE_BYTES: usize = 1 * GB;
         let mut receive_bytes: usize = 0;
         let mut past_receive_bytes: usize = 0;
         let mut past_time = InterfaceWrapper::current_time();
@@ -99,12 +97,9 @@ impl DeviceWrapper {
                 let mb = (((receive_bytes - past_receive_bytes) * 8) % GB) / MB;
                 let gib = (receive_bytes - past_receive_bytes) / GB;
                 let mib = ((receive_bytes - past_receive_bytes) % GB) / MB;
-                log::info!(
+                println!(
                     "Receive: {}.{:03}GBytes, Bandwidth: {}.{:03}Gbits/sec.",
-                    gib,
-                    mib,
-                    gb,
-                    mb
+                    gib, mib, gb, mb
                 );
                 // log::info!("Receive: total receive bytes: {}", receive_bytes);
                 past_time = current_time;
@@ -112,6 +107,6 @@ impl DeviceWrapper {
             }
         }
 
-        log::info!("Receive: total receive bytes: {}", receive_bytes);
+        println!("Receive: total receive bytes: {}", receive_bytes);
     }
 }

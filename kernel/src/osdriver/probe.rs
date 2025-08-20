@@ -1,8 +1,8 @@
 use alloc::{boxed::Box, sync::Arc};
 use core::{mem::size_of, ptr::NonNull};
 use driver::{
-    BLOCK_DEVICE, CHAR_DEVICE, device::OSDevice, net::virtnet::create_virt_net_dev, println,
-    qemu::QVirtBlkDevice,
+    BLOCK_DEVICE, CHAR_DEVICE, device::OSDevice, icu::extioi::LOONGARCH_ICU,
+    net::virtnet::create_virt_net_dev, println, qemu::QVirtBlkDevice,
 };
 use flat_device_tree::Fdt;
 use net::init_network;
@@ -71,6 +71,12 @@ pub fn probe_tree(fdt: &Fdt) {
         if let Some(icu) = crate::osdriver::pbla::probe_icu(fdt) {
             device_manager().set_icu(Box::new(icu));
             println!("[LAICU] INIT SUCCESS");
+        }
+
+        // INTERRUPT CONTROL virt
+        if let Some(icu) = crate::osdriver::pbla::probe_cascaded_icu(fdt) {
+            device_manager().set_icu(Box::new(icu));
+            println!("[CAS] INIT SUCCESS");
         }
 
         // CHAR(used by both qemu & board)

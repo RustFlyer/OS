@@ -47,6 +47,7 @@ pub struct TcpSocket {
     pub(crate) nonblock: AtomicBool,
     /// Just used to pass to ListenTable when listening
     pub(crate) listen_handles: ShareMutex<Vec<SocketHandle>>,
+    pub(crate) ipv6_only: AtomicBool,
 }
 
 unsafe impl Sync for TcpSocket {}

@@ -51,7 +51,7 @@ fn kernel_interrupt_handler(i: Interrupt) {
         | Interrupt::HWI5
         | Interrupt::HWI6
         | Interrupt::HWI7 => {
-            log::info!("[kernel] receive external interrupt: {:?}", i);
+            log::error!("[kernel] receive external interrupt: {:?}", i);
             device_manager().handle_irq();
             TRAP_STATS.inc(i as usize);
         }

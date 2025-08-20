@@ -263,7 +263,18 @@ pub async fn sys_sendto(
             };
             socket.sk.sendto(buf, sockaddr).await?
         }
-        _ => unimplemented!(),
+        SocketType::RAW => {
+            let sockaddr = if dest_addr != 0 {
+                Some(read_sockaddr(addrspace.clone(), dest_addr, addrlen)?)
+            } else {
+                None
+            };
+            socket.sk.sendto(buf, sockaddr).await?
+        }
+        _ => {
+            log::error!("unknown: {:?}", socket.types);
+            return Err(SysError::EOPNOTSUPP);
+        }
     };
 
     task.set_state(TaskState::Running);

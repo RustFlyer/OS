@@ -675,7 +675,6 @@ pub fn sys_tkill(tid: isize, sig: i32) -> SyscallResult {
 /// signal from the set of pending signals and returns the signal number
 /// as its function result.
 pub async fn sys_rt_sigtimedwait(set: usize, info: usize, timeout: usize) -> SyscallResult {
-
     let task = current_task();
     let addrspace = task.addr_space();
 
@@ -709,11 +708,14 @@ pub async fn sys_rt_sigtimedwait(set: usize, info: usize, timeout: usize) -> Sys
     *task.sig_mask_mut() = mask;
 
     if !timeout.is_null() {
-        let timeout = unsafe { timeout.read()? }; 
+        let timeout = unsafe { timeout.read()? };
         if !timeout.is_valid() {
             return Err(SysError::EINVAL);
         }
-        log::info!("[sys_rt_sigtimedwait] timeout is set, will suspend for {:?}", timeout);
+        log::info!(
+            "[sys_rt_sigtimedwait] timeout is set, will suspend for {:?}",
+            timeout
+        );
         task.set_state(TaskState::Interruptible);
         task.suspend_timeout(timeout.into()).await;
     } else {
@@ -734,7 +736,7 @@ pub async fn sys_rt_sigtimedwait(set: usize, info: usize, timeout: usize) -> Sys
             }
         }
         Ok(si.sig.raw())
-    } else if task.sig_manager_mut().has_expect_signals(!set){
+    } else if task.sig_manager_mut().has_expect_signals(!set) {
         log::info!("[sys_rt_sigtimedwait] I'm woken by unexpect signal");
         Err(SysError::EINTR)
     } else {

@@ -70,8 +70,11 @@ ifeq ($(ARCH), riscv64)
 	QEMU_ARGS += -smp $(SMP)
 	QEMU_ARGS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
 	QEMU_ARGS += -device virtio-blk-device,drive=x0
-	QEMU_ARGS += -device virtio-net-device,netdev=net0
-	QEMU_ARGS += -netdev user,id=net0
+# QEMU_ARGS += -device virtio-net-device,netdev=net0
+# QEMU_ARGS += -netdev user,id=net0
+
+	QEMU_ARGS += -device virtio-net-device,netdev=mynet0
+	QEMU_ARGS += -netdev tap,id=mynet0,ifname=tap0,script=no,downscript=no
 
 	GDB = riscv64-unknown-elf-gdb
 	GDB_ARGS = riscv:rv64

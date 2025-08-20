@@ -14,8 +14,11 @@ use flat_device_tree::Fdt;
 use manager::{device_manager, init_device_manager};
 use probe::*;
 
+use crate::logging::{disable_log, enable_log};
+
 #[allow(unused)]
 pub fn probe_device_tree() {
+    enable_log();
     println!("DTB_ADDR: {:#x}", unsafe { DTB_ADDR });
     let mut dtb_addr = unsafe { DTB_ADDR };
 
@@ -63,6 +66,7 @@ pub fn probe_device_tree() {
     manager.initialize_devices();
     manager.map_devices_interrupt();
     manager.enable_device_interrupts();
+    disable_log();
 }
 
 pub fn ioremap_if_need(paddr: usize, size: usize) -> usize {

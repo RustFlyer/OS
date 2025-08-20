@@ -96,6 +96,7 @@ pub fn sys_exit_group(status: i32) -> SyscallResult {
 
     thread_group_lock.iter().for_each(|thread| {
         thread.set_state(TaskState::Zombie);
+        thread.wake();
         if thread.is_process() {
             thread.set_exit_code((status & 0xFF) << 8);
         }
